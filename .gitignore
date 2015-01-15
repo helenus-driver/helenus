@@ -1,0 +1,14 @@
+/.m2/
+target/
+.classpath
+.project
+.settings/
+.apt_generated/
+*.komodoproject
+*.devscript
+.springBeans
+/eclipse
+/app
+/install
+\~*.xlsx
+/logs
