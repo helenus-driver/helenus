@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.helenusdriver.music;
+package com.github.helenusdriver.examples.music;
 
 import com.github.helenusdriver.persistence.Entity;
 import com.github.helenusdriver.persistence.Keyspace;
