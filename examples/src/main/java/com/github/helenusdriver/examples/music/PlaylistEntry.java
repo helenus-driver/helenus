@@ -18,34 +18,35 @@ package com.github.helenusdriver.examples.music;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import java.nio.ByteBuffer;
-
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.github.helenusdriver.driver.ObjectConversionException;
 import com.github.helenusdriver.driver.StatementBuilder;
+import com.github.helenusdriver.persistence.ClusteringKey;
 import com.github.helenusdriver.persistence.Column;
 import com.github.helenusdriver.persistence.Entity;
+import com.github.helenusdriver.persistence.Index;
 import com.github.helenusdriver.persistence.Keyspace;
 import com.github.helenusdriver.persistence.Mandatory;
 import com.github.helenusdriver.persistence.PartitionKey;
 import com.github.helenusdriver.persistence.Table;
 
 /**
- * The <code>Song</code> class provides the definition for an actual song
- * provided by a social music service.
+ * The <code>PlaylistEntry</code> class provides the definition for an entry in
+ * a playlist provided by a social music service.
  * <p>
  * <ul>
  *   <li>Keyspace: "music"</li>
- *   <li>Table: "songs"</li>
+ *   <li>Table: "playlists"</li>
  *   <li>Partition Key: [id]</li>
+ *   <li>Clustering Key: [song-order]↑</li>
  *   <li>Data:
  *     <ul>
+ *       <li>[song-id]</li>
  *       <li>[title]</li>
  *       <li>[album]</li>
  *       <li>[artist]</li>
- *       <li>[data]</li>
  *     </ul>
  *   </li>
  * </ul>
@@ -63,19 +64,20 @@ import com.github.helenusdriver.persistence.Table;
 @lombok.Getter
 @lombok.Setter
 @lombok.experimental.Accessors(chain=true)
-@lombok.ToString(exclude="data")
-@lombok.EqualsAndHashCode(of="id")
+@lombok.ToString
+@lombok.EqualsAndHashCode(of={"id", "songOrder"})
 @Keyspace(suffixes=Constants.MUSIC)
-@Table(name=Constants.SONGS)
+@Table(name=Constants.PLAYLISTS)
 @Entity
-public class Song {
+public class PlaylistEntry {
   /**
-   * Loads a specific song from the database.
+   * Loads a specific playlist entry from the database.
    *
    * @author paouelle
    *
-   * @param  id the song identifier
-   * @return the song loaded from the db
+   * @param  id the playlist identifier
+   * @param  songOrder the song/entry number in that playlist
+   * @return the playlist entry loaded from the db
    * @throws NullPointerException if <code>id</code> is <code>null</code>
    * @throws NoHostAvailableException if no host in the cluster can be contacted
    *         successfully to execute this statement.
@@ -87,23 +89,52 @@ public class Song {
    *         unauthorized or any other validation problem).
    * @throws ObjectConversionException if unable to convert to a POJO
    */
-  public static Song load(UUID id) {
+  public static PlaylistEntry load(UUID id, int songOrder) {
     org.apache.commons.lang3.Validate.notNull(id, "invalid null id");
-    return StatementBuilder.select(Song.class)
+    return StatementBuilder.select(PlaylistEntry.class)
       .all()
-      .from(Constants.SONGS)
+      .from(Constants.PLAYLISTS)
       .where(StatementBuilder.eq(Constants.ID, id))
+      .and(StatementBuilder.eq(Constants.SONG_ORDER, songOrder))
       .limit(1)
       .execute()
       .one();
   }
 
   /**
-   * Loads all songs from the database.
+   * Loads a specific playlist from the database.
    *
    * @author paouelle
    *
-   * @return a stream of all songs loaded from the db
+   * @param  id the playlist identifier
+   * @return a stream of all playlist entries for the given id loaded from the db
+   * @throws NullPointerException if <code>id</code> is <code>null</code>
+   * @throws NoHostAvailableException if no host in the cluster can be contacted
+   *         successfully to execute this statement.
+   * @throws QueryExecutionException if the statement triggered an execution
+   *         exception, i.e. an exception thrown by Cassandra when it cannot
+   *         execute the statement with the requested consistency level
+   *         successfully.
+   * @throws QueryValidationException if the statement is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   * @throws ObjectConversionException if unable to convert to a POJO
+   */
+  public static Stream<PlaylistEntry> load(UUID id) {
+    org.apache.commons.lang3.Validate.notNull(id, "invalid null id");
+    return StatementBuilder.select(PlaylistEntry.class)
+      .all()
+      .from(Constants.PLAYLISTS)
+      .where(StatementBuilder.eq(Constants.ID, id))
+      .execute()
+      .stream();
+  }
+
+  /**
+   * Loads all playlist entries from the database.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all playlist entries loaded from the db
    * @throws NoHostAvailableException if no host in the cluster can be contacted
    *         successfully to execute this statement.
    * @throws QueryExecutionException if the statement triggered an execution
@@ -114,16 +145,16 @@ public class Song {
    *         unauthorized or any other validation problem).
    * @throws ObjectConversionException if unable to convert a POJO
    */
-  public static Stream<Song> all() {
-    return StatementBuilder.select(Song.class)
+  public static Stream<PlaylistEntry> all() {
+    return StatementBuilder.select(PlaylistEntry.class)
       .all()
-      .from(Constants.SONGS)
+      .from(Constants.PLAYLISTS)
       .execute()
       .stream();
   }
 
   /**
-   * Holds the unique song id.
+   * Holds the unique playlist id.
    *
    * @author paouelle
    */
@@ -132,6 +163,27 @@ public class Song {
   @PartitionKey
   @Mandatory
   private UUID id;
+
+  /**
+   * Holds the song order in the playlist for this entry.
+   *
+   * @author paouelle
+   */
+  @lombok.NonNull
+  @Column(name=Constants.SONG_ORDER)
+  @ClusteringKey
+  @Mandatory
+  private Integer songOrder;
+
+  /**
+   * Holds the song's id.
+   *
+   * @author paouelle
+   */
+  @lombok.NonNull
+  @Column(name=Constants.SONG_ID)
+  @Mandatory
+  private UUID songId;
 
   /**
    * Holds the song's title.
@@ -160,19 +212,12 @@ public class Song {
    */
   @lombok.NonNull
   @Column(name=Constants.ARTIST)
+  @Index
   @Mandatory
   private String artist;
 
   /**
-   * Holds the song's data.
-   *
-   * @author paouelle
-   */
-  @Column(name=Constants.DATA)
-  private ByteBuffer data;
-
-  /**
-   * Saves this song directly in the database.
+   * Saves this playlist entry directly in the database.
    *
    * @author paouelle
    *
@@ -189,7 +234,7 @@ public class Song {
   }
 
   /**
-   * Updates this song directly in the database.
+   * Updates this playlist entry directly in the database.
    *
    * @author paouelle
    *

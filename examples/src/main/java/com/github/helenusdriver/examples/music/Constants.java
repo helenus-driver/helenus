@@ -41,6 +41,7 @@ public abstract class Constants {
    * @author paouelle
    */
   public static final String SONGS = "songs";
+  public static final String PLAYLISTS = "playlists";
 
   /**
    * Holds column constants.
@@ -52,6 +53,8 @@ public abstract class Constants {
   public static final String ALBUM = "album";
   public static final String ARTIST = "artist";
   public static final String DATA = "data";
+  public static final String SONG_ORDER = "song_order";
+  public static final String SONG_ID = "song_id";
 
   /**
    * Prevents instantiation.
