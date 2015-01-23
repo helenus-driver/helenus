@@ -15,8 +15,21 @@
  */
 package com.github.helenusdriver.examples.music;
 
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import java.nio.ByteBuffer;
+
+import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.QueryExecutionException;
+import com.datastax.driver.core.exceptions.QueryValidationException;
+import com.github.helenusdriver.driver.ObjectConversionException;
+import com.github.helenusdriver.driver.StatementBuilder;
+import com.github.helenusdriver.persistence.Column;
 import com.github.helenusdriver.persistence.Entity;
 import com.github.helenusdriver.persistence.Keyspace;
+import com.github.helenusdriver.persistence.Mandatory;
+import com.github.helenusdriver.persistence.PartitionKey;
 import com.github.helenusdriver.persistence.Table;
 
 /**
@@ -24,7 +37,7 @@ import com.github.helenusdriver.persistence.Table;
  * provided by a social music service.
  * <p>
  * <ul>
- *   <li>Keyspace: "global"</li>
+ *   <li>Keyspace: "music"</li>
  *   <li>Table: "songs"</li>
  *   <li>Partition Key: [id]</li>
  *   <li>Data:
@@ -40,7 +53,7 @@ import com.github.helenusdriver.persistence.Table;
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 15, 2015 - paouelle - Creation
+ * @version 1 - Jan 23, 2015 - paouelle - Creation
  *
  * @since 1.0
  *
@@ -50,17 +63,145 @@ import com.github.helenusdriver.persistence.Table;
 @lombok.Getter
 @lombok.Setter
 @lombok.experimental.Accessors(chain=true)
-@lombok.ToString
-@lombok.EqualsAndHashCode(of={"projectId", "recordType", "id"})
-@Keyspace(suffixes=Song.SUFFIX)
-@Table(name=Song.TABLE)
+@lombok.ToString(exclude="data")
+@lombok.EqualsAndHashCode(of="id")
+@Keyspace(suffixes=Constants.MUSIC)
+@Table(name=Constants.SONGS)
 @Entity
 public class Song {
-  public static final String SUFFIX = "service";
-  public static final String TABLE = "songs";
-  public static final String ID = "id";
-  public static final String TITLE = "title";
-  public static final String ALBUM = "album";
-  public static final String ARTIST = "artist";
-  public static final String DATA = "data";
+  /**
+   * Loads a specific song from the database.
+   *
+   * @author paouelle
+   *
+   * @param  id the song identifier
+   * @return the song loaded from the db
+   * @throws NullPointerException if <code>id</code> is <code>null</code>
+   * @throws NoHostAvailableException if no host in the cluster can be contacted
+   *         successfully to execute this statement.
+   * @throws QueryExecutionException if the statement triggered an execution
+   *         exception, i.e. an exception thrown by Cassandra when it cannot
+   *         execute the statement with the requested consistency level
+   *         successfully.
+   * @throws QueryValidationException if the statement is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   * @throws ObjectConversionException if unable to convert to a POJO
+   */
+  public static Song load(UUID id) {
+    org.apache.commons.lang3.Validate.notNull(id, "invalid null id");
+    return StatementBuilder.select(Song.class)
+      .all()
+      .from(Constants.SONGS)
+      .where(StatementBuilder.eq(Constants.ID, id))
+      .limit(1)
+      .execute()
+      .one();
+  }
+
+  /**
+   * Loads all songs from the database.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all songs loaded from the db
+   * @throws NoHostAvailableException if no host in the cluster can be contacted
+   *         successfully to execute this statement.
+   * @throws QueryExecutionException if the statement triggered an execution
+   *         exception, i.e. an exception thrown by Cassandra when it cannot
+   *         execute the statement with the requested consistency level
+   *         successfully.
+   * @throws QueryValidationException if the statement is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   * @throws ObjectConversionException if unable to convert a POJO
+   */
+  public static Stream<Song> all() {
+    return StatementBuilder.select(Song.class)
+      .all()
+      .from(Constants.SONGS)
+      .execute()
+      .stream();
+  }
+
+  /**
+   * Holds the unique song id.
+   *
+   * @author paouelle
+   */
+  @lombok.NonNull
+  @Column(name=Constants.ID)
+  @PartitionKey
+  @Mandatory
+  private UUID id;
+
+  /**
+   * Holds the song's title.
+   *
+   * @author paouelle
+   */
+  @lombok.NonNull
+  @Column(name=Constants.TITLE)
+  @Mandatory
+  private String title;
+
+  /**
+   * Holds the song's album.
+   *
+   * @author paouelle
+   */
+  @lombok.NonNull
+  @Column(name=Constants.ALBUM)
+  @Mandatory
+  private String album;
+
+  /**
+   * Holds the song 's artist.
+   *
+   * @author paouelle
+   */
+  @lombok.NonNull
+  @Column(name=Constants.ARTIST)
+  @Mandatory
+  private String artist;
+
+  /**
+   * Holds the song's data.
+   *
+   * @author paouelle
+   */
+  @Column(name=Constants.DATA)
+  private ByteBuffer data;
+
+  /**
+   * Saves this song directly in the database.
+   *
+   * @author paouelle
+   *
+   * @throws NoHostAvailableException if no host in the cluster can be
+   *         contacted successfully to execute this statement.
+   * @throws QueryExecutionException if the statement triggered an execution
+   *         exception, i.e. an exception thrown by Cassandra when it cannot execute
+   *         the statement with the requested consistency level successfully.
+   * @throws QueryValidationException if the statement is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   */
+  public void save() {
+    StatementBuilder.insert(this).execute();
+  }
+
+  /**
+   * Updates this song directly in the database.
+   *
+   * @author paouelle
+   *
+   * @throws NoHostAvailableException if no host in the cluster can be
+   *         contacted successfully to execute this statement.
+   * @throws QueryExecutionException if the statement triggered an execution
+   *         exception, i.e. an exception thrown by Cassandra when it cannot execute
+   *         the statement with the requested consistency level successfully.
+   * @throws QueryValidationException if the statement is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   */
+  public void update() {
+    StatementBuilder.update(this).execute();
+  }
 }
