@@ -27,7 +27,7 @@
     xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.github.helenus</groupId>
+    <groupId>com.github.helenusdriver</groupId>
     <artifactId>helenus</artifactId>
     <version>1.0.8-SNAPSHOT</version>
   </parent>
@@ -85,11 +85,11 @@
     </dependency>
 
     <dependency>
-      <groupId>com.github.helenus</groupId>
+      <groupId>com.github.helenusdriver</groupId>
       <artifactId>commons</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.github.helenus</groupId>
+      <groupId>com.github.helenusdriver</groupId>
       <artifactId>api</artifactId>
     </dependency>
     
