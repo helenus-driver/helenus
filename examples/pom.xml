@@ -29,7 +29,7 @@
   <parent>
     <groupId>com.github.helenusdriver</groupId>
     <artifactId>helenus</artifactId>
-    <version>1.0.8</version>
+    <version>1.0.8-SNAPSHOT</version>
   </parent>
   
   <artifactId>examples</artifactId>
