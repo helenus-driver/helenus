@@ -244,11 +244,11 @@ public class ObjectSet<T> implements Iterable<T> {
    * you can do:
    *
    * <pre>
-   *   final ObjectSet<T> os = statement.execute(...);
+   *   final ObjectSet&lt;T&gt; os = statement.execute(...);
    *   final Iterator&lt;T&gt; i = os.iterator();
    *
    *   while (i.hasNext()) {
-   *       if (os.getAvailableWithoutFetching() == 100 && !os.isFullyFetched())
+   *       if (os.getAvailableWithoutFetching() == 100 &amp; !os.isFullyFetched())
    *           os.fetchMoreObjects();
    *       final T t = i.next()
    *

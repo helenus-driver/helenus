@@ -164,6 +164,8 @@ public class GraphUtils {
    *
    * @author paouelle
    *
+   * @param <T> the type of the graph to sort
+   *
    * @param  g the graph to be sorted
    * @return a topological sort of the graph
    * @throws IllegalCycleException if the graph contains cycles
@@ -177,6 +179,8 @@ public class GraphUtils {
    * the nodes in the graph.
    *
    * @author paouelle
+   *
+   * @param <T> the type of the graph to sort
    *
    * @param  g the graph to be sorted
    * @param  smapper is a function used to map the object to a string when
@@ -195,6 +199,8 @@ public class GraphUtils {
    * the nodes in the graph.
    *
    * @author paouelle
+   *
+   * @param <T> the type of the graph to sort
    *
    * @param  g the graph to be sorted
    * @param  omapper is a function used to map the object to a different one when
@@ -216,6 +222,8 @@ public class GraphUtils {
    *
    * @author paouelle
    *
+   * @param <T> the type of the graph to sort
+   *
    * @param  g the graph to be sorted
    * @return a topological sort of the graph
    * @throws IllegalCycleException if the graph contains cycles
@@ -229,6 +237,8 @@ public class GraphUtils {
    * the nodes in the graph.
    *
    * @author paouelle
+   *
+   * @param <T> the type of the graph to sort
    *
    * @param  g the graph to be sorted
    * @param  smapper is a function used to map the object to a string when
@@ -248,6 +258,8 @@ public class GraphUtils {
    *
    * @author paouelle
    *
+   * @param <T> the type of the graph to sort
+   *
    * @param  g the graph to be sorted
    * @param  omapper is a function used to map the object to a different one when
    *         building an exception message
@@ -266,6 +278,8 @@ public class GraphUtils {
    * Gets the reverse of the input graph.
    *
    * @author paouelle
+   *
+   * @param <T> the type of the graph to reverse
    *
    * @param  g a graph to reverse
    * @return the reverse of that graph

@@ -66,9 +66,9 @@ import com.datastax.driver.core.utils.Bytes;
  * - "varint"    to {@link BigInteger}
  * - "timeuuid"  to {@link UUID}
  *
- * - "list<ctype>"       - {@link List} of the corresponding element type
- * - "map<ctype, ctype>" - {@link Map} of the corresponding element types
- * - "set<ctype>"        - {@link Set} of the corresponding element type
+ * - "list&lt;ctype&gt;"       - {@link List} of the corresponding element type
+ * - "map&lt;ctype, ctype&gt;" - {@link Map} of the corresponding element types
+ * - "set&lt;ctype&gt;"        - {@link Set} of the corresponding element type
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *

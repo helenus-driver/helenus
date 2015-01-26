@@ -66,6 +66,8 @@ public @interface Column {
    * defined by the entity.
    *
    * @author paouelle
+   *
+   * @return the name of the table this column is associated with
    */
   String table() default Table.ALL;
 
@@ -73,6 +75,8 @@ public @interface Column {
    * The name of the column.
    *
    * @author paouelle
+   *
+   * @return the name of the column
    */
   String name();
 
@@ -110,11 +114,13 @@ public @interface Column {
      * - "uuid"      - {@link UUID}
      * - "varint"    - {@link BigInteger}
      *
-     * - "list<ctype>"       - {@link List} of the corresponding element type
-     * - "map<ctype, ctype>" - {@link Map} of the corresponding element types
-     * - "set<ctype>"        - {@link Set} of the corresponding element type
+     * - "list&lt;ctype&gt;"       - {@link List} of the corresponding element type
+     * - "map&lt;ctype, ctype&gt;" - {@link Map} of the corresponding element types
+     * - "set&lt;ctype&gt;"        - {@link Set} of the corresponding element type
      *
      * @author paouelle
+     *
+     * @return the optional CQL data type
      */
     DataType type() default DataType.INFERRED;
 
@@ -125,6 +131,8 @@ public @interface Column {
      * type either.
      *
      * @author paouelle
+     *
+     * @return the optional argument types for a collection type
      */
     DataType[] arguments() default {};
   }

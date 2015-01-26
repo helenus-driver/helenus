@@ -41,7 +41,7 @@ public class Validate {
    * validating according to an arbitrary boolean expression, such as validating a
    * primitive number or using your own custom validation expression.</p>
    *
-   * <pre>Validate.isTrue(i > 0.0, "The value must be greater than zero: %d", i);</pre>
+   * <pre>Validate.isTrue(i &gt; 0.0, "The value must be greater than zero: %d", i);</pre>
    *
    * <p>For performance reasons, the long value is passed as a separate parameter and
    * appended to the exception message only in the case of an error.</p>
@@ -69,7 +69,7 @@ public class Validate {
    * validating according to an arbitrary boolean expression, such as validating a
    * primitive number or using your own custom validation expression.</p>
    *
-   * <pre>Validate.isTrue(i > 0.0, "The value must be greater than zero: %d", i);</pre>
+   * <pre>Validate.isTrue(i &gt; 0.0, "The value must be greater than zero: %d", i);</pre>
    *
    * <p>For performance reasons, the long value is passed as a separate parameter and
    * appended to the exception message only in the case of an error.</p>
@@ -99,7 +99,7 @@ public class Validate {
    * validating according to an arbitrary boolean expression, such as validating a
    * primitive number or using your own custom validation expression.</p>
    *
-   * <pre>Validate.isTrue(d > 0.0, "The value must be greater than zero: %s", d);</pre>
+   * <pre>Validate.isTrue(d &gt; 0.0, "The value must be greater than zero: %s", d);</pre>
    *
    * <p>For performance reasons, the double value is passed as a separate parameter and
    * appended to the exception message only in the case of an error.</p>
@@ -127,7 +127,7 @@ public class Validate {
    * validating according to an arbitrary boolean expression, such as validating a
    * primitive number or using your own custom validation expression.</p>
    *
-   * <pre>Validate.isTrue(d > 0.0, "The value must be greater than zero: %s", d);</pre>
+   * <pre>Validate.isTrue(d &gt; 0.0, "The value must be greater than zero: %s", d);</pre>
    *
    * <p>For performance reasons, the double value is passed as a separate parameter and
    * appended to the exception message only in the case of an error.</p>
@@ -158,7 +158,7 @@ public class Validate {
    * primitive number or using your own custom validation expression.</p>
    *
    * <pre>
-   * Validate.isTrue(i >= min && i <= max, "The value must be between %d and %d", min, max);
+   * Validate.isTrue(i &gt;= min &amp; i &lt;= max, "The value must be between %d and %d", min, max);
    * Validate.isTrue(myObject.isOk(), "The object is not okay");</pre>
    *
    * @param logger  the logger via which to log the exception
@@ -185,7 +185,7 @@ public class Validate {
    * primitive number or using your own custom validation expression.</p>
    *
    * <pre>
-   * Validate.isTrue(i >= min && i <= max, "The value must be between %d and %d", min, max);
+   * Validate.isTrue(i &gt;= min &amp; i &lt;= max, "The value must be between %d and %d", min, max);
    * Validate.isTrue(myObject.isOk(), "The object is not okay");</pre>
    *
    * @param logger  the logger via which to log the exception
@@ -214,7 +214,7 @@ public class Validate {
    * primitive number or using your own custom validation expression.</p>
    *
    * <pre>
-   * Validate.isTrue(i > 0);
+   * Validate.isTrue(i &gt; 0);
    * Validate.isTrue(myObject.isOk());</pre>
    *
    * <p>The message of the exception is &quot;The validated expression is
@@ -242,7 +242,7 @@ public class Validate {
    * primitive number or using your own custom validation expression.</p>
    *
    * <pre>
-   * Validate.isTrue(i > 0);
+   * Validate.isTrue(i &gt; 0);
    * Validate.isTrue(myObject.isOk());</pre>
    *
    * <p>The message of the exception is &quot;The validated expression is
@@ -967,7 +967,7 @@ public class Validate {
    *
    * <p>If the array has a {@code null} element, then the message in the
    * exception is &quot;The validated array contains null element at index:
-   * &quot followed by the index.</p>
+   * &quot; followed by the index.</p>
    *
    * @param <T> the array type
    * @param logger  the logger via which to log the exception
@@ -997,7 +997,7 @@ public class Validate {
    *
    * <p>If the array has a {@code null} element, then the message in the
    * exception is &quot;The validated array contains null element at index:
-   * &quot followed by the index.</p>
+   * &quot; followed by the index.</p>
    *
    * @param <T> the array type
    * @param logger  the logger via which to log the exception
@@ -1095,7 +1095,7 @@ public class Validate {
    *
    * <p>If the array has a {@code null} element, then the message in the
    * exception is &quot;The validated iterable contains null element at index:
-   * &quot followed by the index.</p>
+   * &quot; followed by the index.</p>
    *
    * @param <T> the iterable type
    * @param logger  the logger via which to log the exception
@@ -1125,7 +1125,7 @@ public class Validate {
    *
    * <p>If the array has a {@code null} element, then the message in the
    * exception is &quot;The validated iterable contains null element at index:
-   * &quot followed by the index.</p>
+   * &quot; followed by the index.</p>
    *
    * @param <T> the iterable type
    * @param level  the level at which to log the exception
@@ -1510,7 +1510,7 @@ public class Validate {
    * primitive number or using your own custom validation expression.</p>
    *
    * <pre>
-   * Validate.validState(field > 0);
+   * Validate.validState(field &gt; 0);
    * Validate.validState(this.isOk());</pre>
    *
    * <p>The message of the exception is &quot;The validated state is
@@ -1536,7 +1536,7 @@ public class Validate {
    * primitive number or using your own custom validation expression.</p>
    *
    * <pre>
-   * Validate.validState(field > 0);
+   * Validate.validState(field &gt; 0);
    * Validate.validState(this.isOk());</pre>
    *
    * <p>The message of the exception is &quot;The validated state is

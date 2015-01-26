@@ -39,7 +39,7 @@ import com.datastax.driver.core.utils.Bytes;
 
 /**
  * The <code>Utils</code> class is a copy of the
- * {@link com.datastax.driver.core.querybuilder.Utils} which is package private
+ * <i>com.datastax.driver.core.querybuilder.Utils</i> which is package private
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *

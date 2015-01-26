@@ -817,7 +817,7 @@ public class StatementManagerImpl extends StatementManager {
    * @see com.github.helenusdriver.driver.StatementManager#isObject()
    */
   @Override
-  protected <T> Clause isObject() {
+  protected Clause isObject() {
     return new ClauseImpl.IsObjectClauseImpl();
   }
 

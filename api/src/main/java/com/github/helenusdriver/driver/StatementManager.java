@@ -731,7 +731,7 @@ public abstract class StatementManager {
    *
    * @return the corresponding where clause
    */
-  protected abstract <T> Clause isObject();
+  protected abstract Clause isObject();
 
   /**
    * Creates a set of "equal" where clause stating all primary key columns
@@ -1292,7 +1292,7 @@ public abstract class StatementManager {
    * Protects a value from any interpretation by the query builder.
    * <p>
    * The following table exemplify the behavior of this function:
-   * <table border=1>
+   * <table border=1 summary="Behavior">
    * <tr>
    * <th>Code</th>
    * <th>Resulting query string</th>

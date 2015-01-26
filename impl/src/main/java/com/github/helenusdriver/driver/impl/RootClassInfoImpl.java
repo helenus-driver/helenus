@@ -552,6 +552,8 @@ public class RootClassInfoImpl<T> extends ClassInfoImpl<T> {
    *
    * @author paouelle
    *
+   * @param <S> the type of POJO for the type entity
+   *
    * @param  clazz the POJO class of the type entity to retrieve its info
    * @return the corresponding type entity POJO class information or <code>null</code>
    *         if none defined for the given class

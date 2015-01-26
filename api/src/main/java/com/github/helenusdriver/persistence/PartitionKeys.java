@@ -42,6 +42,8 @@ public @interface PartitionKeys {
    * List of all {@link PartitionKey} annotations.
    *
    * @author paouelle
+   *
+   * @return the list of all partition key annotations
    */
   PartitionKey[] value();
 }

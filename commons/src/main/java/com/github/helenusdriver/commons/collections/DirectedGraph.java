@@ -56,8 +56,8 @@ public interface DirectedGraph<T> extends Set<T> {
    * operation, or through the <code>addEdge()</code> or <code>removeEdge()</code>
    * operations on a graph node returned by the iterator) the results of the
    * iteration are undefined. The set supports node removal, which removes the
-   * corresponding node from the graph, via the <code>Iterator.remove()<code>,
-   * <code>Set.remove</code>, <code>removeAll</code>, <code>retainAll<code>,
+   * corresponding node from the graph, via the <code>Iterator.remove()</code>,
+   * <code>Set.remove</code>, <code>removeAll</code>, <code>retainAll</code>,
    * and <code>clear</code> operations. It does not support the <code>add</code>
    * or <code>addAll</code> operations.
    *

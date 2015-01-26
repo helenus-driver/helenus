@@ -44,8 +44,8 @@ import com.github.helenusdriver.annotation.Keyable;
 @Documented
 public @interface Table {
   /**
-   * Special constants used in the {@link Column}, {@PartitionKey}, and
-   * {@ClusteringKey} annotations to indicate the annotation applies to
+   * Special constants used in the {@link Column}, &#64;PartitionKey, and
+   * &#64;ClusteringKey annotations to indicate the annotation applies to
    * all tables defined for the entity.
    *
    * @author paouelle
@@ -57,6 +57,8 @@ public @interface Table {
    * characters and underscores, and must begin with a letter.
    *
    * @author paouelle
+   *
+   * @return the name for the table
    */
   String name();
 
@@ -67,6 +69,8 @@ public @interface Table {
    * listed will be added at the end of the provided list.
    *
    * @author paouelle
+   *
+   * @return the optional list of ordered partition keys
    */
   String[] partition() default {};
 
@@ -77,6 +81,8 @@ public @interface Table {
    * listed will be added at the end of the provided list.
    *
    * @author paouelle
+   *
+   * @return the optional list of ordered cluatering keys
    */
   String[] clustering() default {};
 }

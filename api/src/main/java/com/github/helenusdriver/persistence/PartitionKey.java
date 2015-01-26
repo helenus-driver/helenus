@@ -61,6 +61,8 @@ public @interface PartitionKey {
    * key for all tables defined by the entity unless otherwise overridden.
    *
    * @author paouelle
+   *
+   * @return the name of the table this partition key is assocaited with
    */
   String table() default Table.ALL;
 }

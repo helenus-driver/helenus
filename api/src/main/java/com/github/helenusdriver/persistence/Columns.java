@@ -42,6 +42,8 @@ public @interface Columns {
    * List of all {@link Column} annotations.
    *
    * @author paouelle
+   *
+   * @return the list of all column annotations
    */
   Column[] value();
 }

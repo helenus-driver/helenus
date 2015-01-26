@@ -49,6 +49,8 @@ public @interface Keyable {
    * Specifies the key element name in the annotated annotation.
    *
    * @author paouelle
+   *
+   * @return the key element name in the annotated annotation
    */
   String value();
 }

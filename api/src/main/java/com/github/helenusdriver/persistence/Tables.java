@@ -43,6 +43,8 @@ public @interface Tables {
    * List of all {@link Table} annotations.
    *
    * @author paouelle
+   *
+   * @return the list of all table annotations
    */
   Table[] value();
 }

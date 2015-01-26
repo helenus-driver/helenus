@@ -50,6 +50,8 @@ public @interface TypeKey {
    * key for all tables defined by the root entity.
    *
    * @author paouelle
+   *
+   * @return the name of the table this type key is associated with
    */
   String table() default Table.ALL;
 }

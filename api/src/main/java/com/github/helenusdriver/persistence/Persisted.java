@@ -30,7 +30,7 @@ import java.lang.annotation.Target;
  * be passed into the persister before being saved to the database. The resulting
  * database data type for the column will be changed based on the data type
  * specified here. For example, if the data type is set to "blob" the data type
- * for collection columns would be "list<blob>", "map<?,blob>", or "set<blob>".
+ * for collection columns would be "list&lt;blob&gt;", "map&lt;?,blob&gt;", or "set&lt;blob&gt;".
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -48,6 +48,8 @@ public @interface Persisted {
    * collection column.
    *
    * @author paouelle
+   *
+   * @return the persister class
    */
   Class<? extends Persister<?, ?>> using();
 
@@ -62,6 +64,8 @@ public @interface Persisted {
    * the POJO at runtime.
    *
    * @author paouelle
+   *
+   * @return the resulting CQL data type after persistence
    */
   DataType as();
 
@@ -69,6 +73,8 @@ public @interface Persisted {
    * Persister specific arguments.
    *
    * @author paouelle
+   *
+   * @return the persister specific arguments
    */
   String[] arguments() default {};
 }

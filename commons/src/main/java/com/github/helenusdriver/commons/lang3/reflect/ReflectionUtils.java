@@ -238,6 +238,8 @@ public class ReflectionUtils {
    *
    * @author paouelle
    *
+   * @param <T> the type of member
+   *
    * @param  type the type of members to retrieve
    * @param  clazz the class from which to retrieve the members
    * @return the non-<code>null</code> members of the given type from the
@@ -495,6 +497,7 @@ public class ReflectionUtils {
    *
    * @author paouelle
    *
+   * @param <K> the type of the keys to find
    * @param <T> the type of the annotation to query for and return if present
    *
    * @param  keyClass the class of the keys to find and return
@@ -695,6 +698,8 @@ public class ReflectionUtils {
    * Gets the hierarchy of a given class.
    *
    * @author paouelle
+   *
+   * @param <T> the type of the class to get the hierarchy for
    *
    * @param  clazz the class to get the hierarchy for
    * @return a list of all classes in the given class's hierarchy starting with

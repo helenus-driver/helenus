@@ -51,6 +51,8 @@ public @interface Keyspace {
    * can be referenced unless there is at least one suffix defined.
    *
    * @author paouelle
+   *
+   * @return the name of the keyspace
    */
   String name() default "";
 
@@ -61,6 +63,8 @@ public @interface Keyspace {
    * identifies the same suffix type.
    *
    * @author paouelle
+   *
+   * @return the optional list of suffix types
    */
   String[] suffixes() default {};
 
@@ -69,6 +73,8 @@ public @interface Keyspace {
    * {@link StrategyClass#SIMPLE}.
    *
    * @author paouelle
+   *
+   * @return the optional placement strategy
    */
   StrategyClass strategy() default StrategyClass.SIMPLE;
 
@@ -79,6 +85,8 @@ public @interface Keyspace {
    * factor of 2 will be used.
    *
    * @author paouelle
+   *
+   * @return the default replication factor to use with the simple placement strategy
    */
   int replicationFactor() default 0;
 
@@ -91,6 +99,8 @@ public @interface Keyspace {
    * to true.
    *
    * @author paouelle
+   *
+   * @return flag indicating wether to use durable writes or not
    */
   boolean durableWrites() default true;
 }

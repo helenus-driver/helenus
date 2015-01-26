@@ -33,7 +33,7 @@
 
   <name>Helenus</name>
   <description>JPA-like syntax for annotating POJO classes for persistence via Cassandra's Java driver</description>
-  <url>https://github.com/helenus/helenus</url>
+  <url>https://github.com/helenusdriver/helenus</url>
   
   <licenses>
     <license>
@@ -44,20 +44,20 @@
   </licenses>
   
   <scm>
-    <connection>scm:git:git://github.com/helenus-driver/helenus.git</connection>
-    <developerConnection>scm:git:git@github.com:helenus-driver/helenus.git</developerConnection>
-    <url>http://github.com/helenus-driver/helenus/tree/master/</url>
+    <connection>scm:git:git://github.com/helenusdriver/helenus.git</connection>
+    <developerConnection>scm:git:git@github.com:helenusdriver/helenus.git</developerConnection>
+    <url>http://github.com/helenusdriver/helenus/tree/master/</url>
   </scm>
 
   <issueManagement>
     <system>github</system>
-    <url>https://github.com/helenus-driver/helenus/issues</url>
+    <url>https://github.com/helenusdriver/helenus/issues</url>
   </issueManagement>
   
   <distributionManagement>
     <site>
       <id>github.com</id>
-      <url>gitsite:git@github.com/helenus-driver/helenus.git</url>
+      <url>gitsite:git@github.com/helenusdriver/helenus.git</url>
     </site>
     <snapshotRepository>
       <id>ossrh</id>
@@ -213,9 +213,16 @@
 	      </execution>
 	    </executions>
 	    <configuration>
-	      <bottom><![CDATA[Copyright (C) 2015-2015 <a href="https://github.com/helenus/helenus">The Helenus Driver Project</a> Authors.]]>
+	      <bottom><![CDATA[Copyright (C) 2015-2015 <a href="https://github.com/helenusdriver/helenus">The Helenus Driver Project</a> Authors.]]>
 	      </bottom>
 	      <detectLinks>true</detectLinks>
+	      <tags>
+		<tag>
+		  <name>copyright</name>
+		  <placement>a</placement>
+		  <head>Copyright:</head>
+		</tag>
+	      </tags>
 	    </configuration>
 	  </plugin>
 	  <!-- The Maven GPG plugin is used to sign the components -->

@@ -37,7 +37,7 @@ import com.google.common.util.concurrent.AbstractFuture;
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
  *
- * @param <T> The type of POJO associated with the future object set.
+ * @param <T> The type of POJO associated with the future object set
  *
  * @since 1.0
  */
@@ -198,17 +198,17 @@ public class ObjectSetFuture<T> extends AbstractFuture<ObjectSet<T>> {
    * the code to wait for a request result for a maximum of 1 second could
    * look like:
    * <pre>
-   *   final ObjectSetFuture<T> future = statement.executeAsync();
+   *   final ObjectSetFuture&lt;T&gt; future = statement.executeAsync();
    *
    *   try {
-   *       final ObjectSet<T> result = future.get(1, TimeUnit.SECONDS);
+   *       final ObjectSet&lt;T&gt; result = future.get(1, TimeUnit.SECONDS);
    *       ... process result ...
    *   } catch (TimeoutException e) {
    *       future.cancel(true); // Ensure any ressource used by this query driver
    *                            // side is released immediately
    *       ... handle timeout ...
    *   }
-   * <pre>
+   * </pre>
    *
    * @param  mayInterruptIfRunning the value of this parameter is currently
    *         ignored.

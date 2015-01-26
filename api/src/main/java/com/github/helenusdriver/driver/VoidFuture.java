@@ -236,14 +236,14 @@ public class VoidFuture extends AbstractFuture<Void> {
    *   final VoidFuture future = statement.executeAsync();
    *
    *   try {
-   *       final ObjectSet<T> result = future.get(1, TimeUnit.SECONDS);
+   *       final ObjectSet&lt;T&gt; result = future.get(1, TimeUnit.SECONDS);
    *       ... process result ...
    *   } catch (TimeoutException e) {
    *       future.cancel(true); // Ensure any ressource used by this query driver
    *                            // side is released immediately
    *       ... handle timeout ...
    *   }
-   * <pre>
+   * </pre>
    *
    * @param  mayInterruptIfRunning the value of this parameter is currently
    *         ignored.

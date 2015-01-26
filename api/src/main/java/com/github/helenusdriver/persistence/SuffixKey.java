@@ -46,6 +46,8 @@ public @interface SuffixKey {
    * building statements.
    *
    * @author paouelle
+   *
+   * @return the name of the suffix key
    */
   String name();
 
@@ -54,6 +56,8 @@ public @interface SuffixKey {
    * customer suffix).
    *
    * @author paouelle
+   *
+   * @return the suffix type
    */
   String type();
 }

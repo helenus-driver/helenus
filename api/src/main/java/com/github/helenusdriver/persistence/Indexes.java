@@ -42,6 +42,8 @@ public @interface Indexes {
    * List of all {@link Index} annotations.
    *
    * @author paouelle
+   *
+   * @return the list of all index annotations
    */
   Index[] value();
 }

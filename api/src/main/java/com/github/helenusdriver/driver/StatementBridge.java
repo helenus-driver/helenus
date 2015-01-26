@@ -43,6 +43,8 @@ public final class StatementBridge {
    *
    * @author paouelle
    *
+   * @param <T> The type of POJO
+   *
    * @param  context the non-<code>null</code> statement context associated with
    *         the future object set
    * @param  future the non-<code>null</code> result set future

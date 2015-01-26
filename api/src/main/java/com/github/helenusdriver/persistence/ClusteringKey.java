@@ -62,6 +62,8 @@ public @interface ClusteringKey {
    * key for all tables defined by the entity unless otherwise overridden.
    *
    * @author paouelle
+   *
+   * @return the name of table this clustering key is associated with
    */
   String table() default Table.ALL;
 
@@ -69,6 +71,8 @@ public @interface ClusteringKey {
    * Optional order for the clustering key (defaults to ascending).
    *
    * @author paouelle
+   *
+   * @return the optional order for the clustering key
    */
   Ordering order() default Ordering.ASCENDING;
 }

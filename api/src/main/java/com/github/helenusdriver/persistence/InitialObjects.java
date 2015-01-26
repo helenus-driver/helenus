@@ -32,7 +32,7 @@ import java.lang.annotation.Target;
  * The referenced method must be public and static. It must returned an array
  * of pojo objects to insert in the database. Finally, it must not take any
  * parameters unless the entity is defined with suffixes in which case it must
- * expect a single parameter of type <code>Map<String, String></code> which
+ * expect a single parameter of type <code>Map&lt;String, String&gt;</code> which
  * will be used to provide access to each suffix values based on the
  * corresponding suffix types.
  *
@@ -55,10 +55,12 @@ public @interface InitialObjects {
    * associate entity is created.
    * <p>
    * <i>Note:</i> If the POJO class requires suffix keys, the specified method
-   * must be defined with a <code>Map<String, String><code> parameter in order
+   * must be defined with a <code>Map&lt;String, String&gt;</code> parameter in order
    * to receive a map of all available suffixes keyed by their defined type.
    *
    * @author paouelle
+   *
+   * @return the factory static method to be invoked to get an array of pojo objects
    */
   String staticMethod();
 
@@ -71,6 +73,8 @@ public @interface InitialObjects {
    * as an object creator via the Helenus tool.
    *
    * @author paouelle
+   *
+   * @return the dependent creator classes
    */
   Class<?>[] dependsOn() default {};
 }

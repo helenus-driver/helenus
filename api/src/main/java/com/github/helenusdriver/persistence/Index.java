@@ -49,6 +49,8 @@ public @interface Index {
    * defined by the entity.
    *
    * @author paouelle
+   *
+   * @return the name of the table this index is associated with
    */
   String table() default Table.ALL;
 
@@ -57,6 +59,8 @@ public @interface Index {
    * Defaults to Cassandra provided name.
    *
    * @author paouelle
+   *
+   * @return the optional index name for the column
    */
   String name() default "";
 
@@ -64,6 +68,8 @@ public @interface Index {
    * Specified a custom indexing class.
    *
    * @author paouelle
+   *
+   * @return the custom indexing class
    */
   String customClass() default "";
 }

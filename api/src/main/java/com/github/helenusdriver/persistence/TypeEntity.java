@@ -44,6 +44,8 @@ public @interface TypeEntity {
    * entity.
    *
    * @author paouelle
+   *
+   * @return the name for the type
    */
   String name();
 }

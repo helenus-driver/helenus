@@ -34,7 +34,7 @@ import java.lang.annotation.Target;
  * order to indicate the specific type of this base class they represent.
  * <p>
  * The base class annotated with {@link RootEntity} must include a single column
- * as an attribute type {@link String} annotated with the {@typeKey} annotation.
+ * as an attribute type {@link String} annotated with the @typeKey annotation.
  * This attribute will be used to hold the entity type and used to identify the
  * class that will be re-created at the time an object is retrieved from Cassandra.
  * <p>
@@ -56,6 +56,8 @@ public @interface RootEntity {
    * List of supported types for this root entity.
    *
    * @author paouelle
+   *
+   * @return the list of supported types
    */
   Class<?>[] types();
 }

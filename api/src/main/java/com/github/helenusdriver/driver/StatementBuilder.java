@@ -775,7 +775,7 @@ public final class StatementBuilder {
    *
    * @return the corresponding where clause
    */
-  public static <T> Clause isObject() {
+  public static Clause isObject() {
     return StatementManager.getManager().isObject();
   }
 
@@ -1470,7 +1470,7 @@ public final class StatementBuilder {
    * Protects a value from any interpretation by the query builder.
    * <p>
    * The following table exemplify the behavior of this function:
-   * <table border=1>
+   * <table border=1 summary="Behavior">
    * <tr>
    * <th>Code</th>
    * <th>Resulting query string</th>

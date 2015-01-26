@@ -42,6 +42,8 @@ public @interface ClusteringKeys {
    * List of all {@link ClusteringKey} annotations.
    *
    * @author paouelle
+   *
+   * @return the list of all clustering key annotations
    */
   ClusteringKey[] value();
 }
