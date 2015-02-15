@@ -260,12 +260,12 @@
       <!-- Helenus Libraries -->
       <dependency>
 	<groupId>com.github.helenusdriver</groupId>
-	<artifactId>commons</artifactId>
+	<artifactId>helenus-commons</artifactId>
 	<version>${helenus-version}</version>
       </dependency>
       <dependency>
 	<groupId>com.github.helenusdriver</groupId>
-	<artifactId>api</artifactId>
+	<artifactId>helenus-api</artifactId>
 	<version>${helenus-version}</version>
       </dependency>
 
