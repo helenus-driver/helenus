@@ -40,7 +40,6 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.CloseFuture;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
-
 import com.github.helenusdriver.commons.collections.iterators.SnapshotIterator;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.Assignment;
@@ -53,11 +52,13 @@ import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.CreateTable;
 import com.github.helenusdriver.driver.Delete;
+import com.github.helenusdriver.driver.Delete.Builder;
 import com.github.helenusdriver.driver.Insert;
 import com.github.helenusdriver.driver.KeyspaceWith;
 import com.github.helenusdriver.driver.Ordering;
 import com.github.helenusdriver.driver.RegularStatement;
 import com.github.helenusdriver.driver.Select;
+import com.github.helenusdriver.driver.Select.Selection;
 import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.SequenceableStatement;
 import com.github.helenusdriver.driver.StatementBridge;
@@ -65,8 +66,6 @@ import com.github.helenusdriver.driver.StatementManager;
 import com.github.helenusdriver.driver.Truncate;
 import com.github.helenusdriver.driver.Update;
 import com.github.helenusdriver.driver.Using;
-import com.github.helenusdriver.driver.Delete.Builder;
-import com.github.helenusdriver.driver.Select.Selection;
 import com.github.helenusdriver.driver.impl.Utils.CNameSequence;
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.driver.info.EntityFilter;
@@ -876,9 +875,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @see com.github.helenusdriver.driver.StatementManager#in(java.lang.CharSequence, java.util.stream.Stream)
    */
+  @SuppressWarnings({"rawtypes", "cast", "unchecked"})
   @Override
   protected Clause in(CharSequence name, Stream<?> values) {
-    return new ClauseImpl.InClauseImpl(name, values.collect(Collectors.toList()));
+    return new ClauseImpl.InClauseImpl(
+      name, (Collection<?>)((Stream)values).collect(Collectors.toList())
+    );
   }
 
   /**
