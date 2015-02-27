@@ -20,9 +20,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.google.common.util.concurrent.ExecutionList;
-
 import com.github.helenusdriver.driver.StatementManager;
+import com.google.common.util.concurrent.ExecutionList;
 
 /**
  * The <code>EmptyResultSetFuture</code> class extends Cassandra
@@ -69,14 +68,14 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
   public EmptyResultSetFuture(StatementManager mgr) {
     super(
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!
     this.empty = ArrayBackedResultSet.fromMessage(
       new Responses.Result(Responses.Result.Kind.VOID) {}, // VOID to force an empty result
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
       null,
       null
     );
