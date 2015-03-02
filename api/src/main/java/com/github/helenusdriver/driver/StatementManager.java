@@ -28,7 +28,6 @@ import javax.json.JsonObject;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
-
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.persistence.Column;
 
@@ -58,6 +57,15 @@ public abstract class StatementManager {
    * @since 1.0
    */
   public interface Context<T> {
+    /**
+     * Gets the class of POJO represented by this class info object.
+     *
+     * @author paouelle
+     *
+     * @return the non-<code>null</code> class of POJO represented by this context
+     */
+    public Class<T> getObjectClass();
+
     /**
      * Converts the specified result row into a POJO object defined by this
      * class information and context.

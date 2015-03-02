@@ -265,6 +265,8 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *         the statement with the requested consistency level successfully.
    * @throws UpdateNotAppliedException if the statement is a conditional update
    *         that failed to be applied
+   * @throws ObjectNotFoundException if the statement is a select and the
+   *         keyspace specified doesn't exist
    * @throws ObjectExistException if the statement is a conditional insert
    *         that failed to be applied
    * @throws QueryValidationException if the statement is invalid (syntax error,

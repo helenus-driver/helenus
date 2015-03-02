@@ -62,7 +62,7 @@ public @interface PartitionKey {
    *
    * @author paouelle
    *
-   * @return the name of the table this partition key is assocaited with
+   * @return the name of the table this partition key is associated with
    */
   String table() default Table.ALL;
 }

@@ -40,7 +40,6 @@ import org.apache.commons.lang3.mutable.MutableObject;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
-
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
 import com.github.helenusdriver.driver.ObjectConversionException;
@@ -98,12 +97,13 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     Context() {}
 
     /**
-     * Gets the class of POJO represented by this class info object.
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return the non-<code>null</code> class of POJO represented by this context
+     * @see com.github.helenusdriver.driver.StatementManager.Context#getObjectClass()
      */
+    @Override
     public Class<T> getObjectClass() {
       return ClassInfoImpl.this.getObjectClass();
     }

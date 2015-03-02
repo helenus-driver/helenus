@@ -22,6 +22,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
+import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 import com.datastax.driver.core.exceptions.QueryValidationException;
@@ -85,15 +86,31 @@ public class ObjectSetFuture<T> extends AbstractFuture<ObjectSet<T>> {
    *
    * @author paouelle
    *
+   * @throws NoHostAvailableException if no host in the cluster can be contacted
+   *         successfully to execute this query.
+   * @throws QueryExecutionException if the query triggered an execution
+   *         exception, that is an exception thrown by Cassandra when it
+   *         cannot execute the query with the requested consistency level
+   *         successfully.
+   * @throws ObjectNotFoundException if the statement is a select and the
+   *         keyspace specified doesn't exist
+   * @throws QueryValidationException if the query is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   *
    * @see com.google.common.util.concurrent.AbstractFuture#get(long, java.util.concurrent.TimeUnit)
    */
   @Override
   public ObjectSet<T> get(long timeout, TimeUnit unit)
     throws InterruptedException, TimeoutException, ExecutionException {
-    final ResultSet result = future.get(timeout, unit);
+    try {
+      final ResultSet result = future.get(timeout, unit);
 
-    postProcess(result);
-    return new ObjectSet<>(context, result);
+      postProcess(result);
+      return new ObjectSet<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
   }
 
   /**
@@ -101,14 +118,30 @@ public class ObjectSetFuture<T> extends AbstractFuture<ObjectSet<T>> {
    *
    * @author paouelle
    *
+   * @throws NoHostAvailableException if no host in the cluster can be contacted
+   *         successfully to execute this query.
+   * @throws QueryExecutionException if the query triggered an execution
+   *         exception, that is an exception thrown by Cassandra when it
+   *         cannot execute the query with the requested consistency level
+   *         successfully.
+   * @throws ObjectNotFoundException if the statement is a select and the
+   *         keyspace specified doesn't exist
+   * @throws QueryValidationException if the query is invalid (syntax error,
+   *         unauthorized or any other validation problem).
+   *
    * @see com.google.common.util.concurrent.AbstractFuture#get()
    */
   @Override
   public ObjectSet<T> get() throws InterruptedException, ExecutionException {
-    final ResultSet result = future.get();
+    try {
+      final ResultSet result = future.get();
 
-    postProcess(result);
-    return new ObjectSet<>(context, result);
+      postProcess(result);
+      return new ObjectSet<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
   }
 
   /**
@@ -132,14 +165,21 @@ public class ObjectSetFuture<T> extends AbstractFuture<ObjectSet<T>> {
    *         exception, that is an exception thrown by Cassandra when it
    *         cannot execute the query with the requested consistency level
    *         successfully.
+   * @throws ObjectNotFoundException if the statement is a select and the
+   *         keyspace specified doesn't exist
    * @throws QueryValidationException if the query is invalid (syntax error,
    *         unauthorized or any other validation problem).
    */
   public ObjectSet<T> getUninterruptibly() {
-    final ResultSet result = future.getUninterruptibly();
+    try {
+      final ResultSet result = future.getUninterruptibly();
 
-    postProcess(result);
-    return new ObjectSet<>(context, result);
+      postProcess(result);
+      return new ObjectSet<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
   }
 
   /**
@@ -166,6 +206,8 @@ public class ObjectSetFuture<T> extends AbstractFuture<ObjectSet<T>> {
    *         exception, that is an exception thrown by Cassandra when it
    *         cannot execute the query with the requested consistency level
    *         successfully.
+   * @throws ObjectNotFoundException if the statement is a select and the
+   *         keyspace specified doesn't exist
    * @throws QueryValidationException if the query if invalid (syntax error,
    *         unauthorized or any other validation problem).
    * @throws TimeoutException if the wait timed out (Note that this is different
@@ -174,10 +216,15 @@ public class ObjectSetFuture<T> extends AbstractFuture<ObjectSet<T>> {
    */
   public ObjectSet<T> getUninterruptibly(long timeout, TimeUnit unit)
     throws TimeoutException {
-    final ResultSet result = future.getUninterruptibly(timeout, unit);
+    try {
+      final ResultSet result = future.getUninterruptibly(timeout, unit);
 
-    postProcess(result);
-    return new ObjectSet<>(context, result);
+      postProcess(result);
+      return new ObjectSet<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
   }
 
   /**
