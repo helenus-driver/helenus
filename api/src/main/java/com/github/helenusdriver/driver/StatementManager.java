@@ -426,6 +426,23 @@ public abstract class StatementManager {
   protected abstract <T> CreateKeyspace<T> createKeyspace(Class<T> clazz);
 
   /**
+   * Starts building a new CREATE TYPE statement for the given POJO class.
+   * <p>
+   * The column schema is automatically extracted from the POJO class definition.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @param  clazz the class of POJO associated with this statement
+   * @return a new CREATE TYPE statement
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
+   *         valid user-defined type POJO class
+   */
+  protected abstract <T> CreateType<T> createType(Class<T> clazz);
+
+  /**
    * Starts building a new CREATE TABLE statement for the given POJO class. This
    * might actually results in multiple CREATE TABLE statements.
    * <p>

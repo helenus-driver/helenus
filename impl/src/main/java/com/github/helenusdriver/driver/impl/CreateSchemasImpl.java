@@ -32,6 +32,7 @@ import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.VoidFuture;
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.persistence.Keyspace;
+
 import org.reflections.Reflections;
 
 /**
@@ -203,9 +204,39 @@ public class CreateSchemasImpl
         );
       }
     }
+    // search for all POJO annotated classes with @UDTEntity
+    for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
+      com.github.helenusdriver.persistence.UDTEntity.class, true
+    )) {
+      // skip abstract POJO classes
+      if (Modifier.isAbstract(clazz.getModifiers())) {
+        continue;
+      }
+      final ClassInfoImpl<?> cinfo = mgr.getClassInfoImpl(clazz);
+      final Keyspace k = cinfo.getKeyspace();
+      final Keyspace old = keyspaces.put(k.name(), k);
+      List<ClassInfoImpl<?>> cs = cinfos.get(k);
+
+      if (cs == null) {
+        cs = new ArrayList<>(25);
+        cinfos.put(k, cs);
+      }
+      cs.add(cinfo);
+      if ((old != null) && !k.equals(old)) {
+        // duplicate annotation found with different attribute
+        throw new IllegalArgumentException(
+          "two different @Keyspace annotations found with class '"
+          + clazz.getName()
+          + "': "
+          + old
+          + " and: "
+          + k
+        );
+      }
+    }
     org.apache.commons.lang3.Validate.isTrue(
       !cinfos.isEmpty(),
-      "no classes annotated with @Entity or @RootEntity found in package: %s",
+      "no classes annotated with @Entity, @RootEntity, or @UDTEntity found in package: %s",
       pkg
     );
     return cinfos;
@@ -301,10 +332,9 @@ public class CreateSchemasImpl
     final List<StringBuilder> builders = new ArrayList<>(contexts.size() * 2);
     final Set<Keyspace> keyspaces = new HashSet<>(contexts.size());
 
+    Thread.dumpStack();
     for (final ClassInfoImpl<?>.Context context: contexts) {
-      final CreateSchemaImpl cs = new CreateSchemaImpl(
-        context, mgr, bridge
-      );
+      final CreateSchemaImpl cs = new CreateSchemaImpl(context, mgr, bridge);
 
       if (ifNotExists) {
         cs.ifNotExists();

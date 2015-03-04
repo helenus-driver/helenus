@@ -264,7 +264,7 @@ public class DataTypeImpl {
           );
         } else if (Set.class.isAssignableFrom(clazz)) {
           if (persisted != null) {
-            // if persisted then we need to decode: Setpersisted.as()>
+            // if persisted then we need to decode: Set<persisted.as()>
             return DataDecoder.set(persisted.as().CLASS, mandatory);
           }
           final Type type = field.getGenericType();
@@ -671,7 +671,9 @@ public class DataTypeImpl {
     } else if (Instant.class == clazz) {
       types.add(DataType.TIMESTAMP);
     } else {
-      throw new IllegalArgumentException("unable to infer data type in field: " + field);
+      throw new IllegalArgumentException(
+        "unable to infer data type in field: " + field
+      );
     }
   }
 

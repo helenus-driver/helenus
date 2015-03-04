@@ -53,6 +53,7 @@ import com.github.helenusdriver.persistence.InitialObjects;
 import com.github.helenusdriver.persistence.Keyspace;
 import com.github.helenusdriver.persistence.SuffixKey;
 import com.github.helenusdriver.persistence.Table;
+import com.github.helenusdriver.persistence.UDTEntity;
 
 /**
  * The <code>ClassInfo</code> class provides information about a particular
@@ -74,7 +75,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    * The <code>Context</code> class provides a specific context for the POJO
    * as referenced while building a statement.
    *
-   *            Reserved.
+   * @copyright 2015-2015 The Helenus Driver Project Authors
    *
    * @author The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle, vasu - Creation
@@ -543,6 +544,13 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
+   * Holds the entity annotation class used to annotated the POJO class.
+   *
+   * @author paouelle
+   */
+  protected final Class<? extends Annotation> entityAnnotationClass;
+
+  /**
    * Holds the class for the POJO.
    *
    * @author vasu
@@ -627,6 +635,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     Class<? extends Annotation> entityAnnotationClass
   ) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null POJO class");
+    this.entityAnnotationClass = entityAnnotationClass;
     this.clazz = clazz;
     this.constructor = findDefaultCtor(entityAnnotationClass);
     this.finalFields = findFinalFields();
@@ -934,15 +943,31 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       String.class, Table.class, clazz
     );
 
-    org.apache.commons.lang3.Validate.isTrue(
-      !tables.isEmpty(),
-      "%s is not annotated with @Table",
-      clazz.getSimpleName()
-    );
-    for (final Table table: tables.values()) {
-      final TableInfoImpl<T> tinfo = new TableInfoImpl<>(mgr, this, table);
+    if (this instanceof UDTClassInfoImpl) {
+      org.apache.commons.lang3.Validate.isTrue(
+        tables.isEmpty(),
+        "%s is annotated with @Table",
+        clazz.getSimpleName()
+      );
+      // create a dummy table info
+      final UDTEntity ue = clazz.getAnnotation(UDTEntity.class);
 
-      this.tables.put(tinfo.getName(), tinfo);
+      org.apache.commons.lang3.Validate.isTrue(
+        ue != null,
+        "class '%s' is not annotated with @UDTEntity", clazz.getSimpleName()
+      );
+      this.tables.put(ue.name(), new TableInfoImpl<>(mgr, this, ue.name()));
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        !tables.isEmpty(),
+        "%s is not annotated with @Table",
+        clazz.getSimpleName()
+      );
+      for (final Table table: tables.values()) {
+        final TableInfoImpl<T> tinfo = new TableInfoImpl<>(mgr, this, table);
+
+        this.tables.put(tinfo.getName(), tinfo);
+      }
     }
   }
 
@@ -1067,6 +1092,9 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       return null;
     }
     try {
+      if (suffixesByType.isEmpty()) {
+        return (T[])initial.invoke(null);
+      }
       return (T[])initial.invoke(null, suffixes);
     } catch (IllegalAccessException e) { // should not happen
       throw new IllegalStateException(e);
@@ -1160,6 +1188,17 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
+   * Gets the entity annotation class used to annotated the POJO class.
+   *
+   * @author paouelle
+   *
+   * @return the entity annotation class used to annotated the POJO class
+   */
+  public Class<? extends Annotation> getEntityAnnotationClass() {
+    return entityAnnotationClass;
+  }
+
+  /**
    * Gets the class of POJO represented by this class info object.
    *
    * @author paouelle
@@ -1170,6 +1209,18 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   @Override
   public Class<T> getObjectClass() {
     return clazz;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.ClassInfo#supportsTablesAndIndexes()
+   */
+  @Override
+  public boolean supportsTablesAndIndexes() {
+    return true;
   }
 
   /**

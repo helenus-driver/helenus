@@ -34,7 +34,6 @@ import org.apache.commons.lang3.text.WordUtils;
 
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
-
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
 import com.github.helenusdriver.driver.ObjectConversionException;
@@ -56,6 +55,10 @@ import com.github.helenusdriver.persistence.TypeKey;
 /**
  * The <code>FieldInfo</code> class caches all the field information needed by
  * the class ClassInfo.
+ * <p>
+ * <i>Note:</i> A fake {@link TableInfoImpl} class with no table annotations
+ * might be passed in for user-defined type entities. By design, this class
+ * will not allow any type of keys but only columns.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -369,36 +372,39 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       = ReflectionUtils.getAnnotationsByType(String.class, ClusteringKey.class, field);
     final Map<String, TypeKey> typeKeys
       = ReflectionUtils.getAnnotationsByType(String.class, TypeKey.class, field);
+    final boolean isInTable = tinfo.getTable() != null;
 
-    org.apache.commons.lang3.Validate.isTrue(
-      !(!indexes.isEmpty() && columns.isEmpty()),
-      "field must be annotated with @Column if it is annotated with @Index: %s.%s",
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(!partitionKeys.isEmpty() && columns.isEmpty()),
-      "field must be annotated with @Column if it is annotated with @PartitionKey: %s.%s",
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(!clusteringKeys.isEmpty() && columns.isEmpty()),
-      "field must be annotated with @Column if it is annotated with @ClusteringKey: %s.%s",
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(!typeKeys.isEmpty() && columns.isEmpty()),
-      "field must be annotated with @Column if it is annotated with @TypeKey: %s.%s",
-      declaringClass.getName(),
-      field.getName()
-    );
+    if (isInTable) {
+      org.apache.commons.lang3.Validate.isTrue(
+        !(!indexes.isEmpty() && columns.isEmpty()),
+        "field must be annotated with @Column if it is annotated with @Index: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(!partitionKeys.isEmpty() && columns.isEmpty()),
+        "field must be annotated with @Column if it is annotated with @PartitionKey: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(!clusteringKeys.isEmpty() && columns.isEmpty()),
+        "field must be annotated with @Column if it is annotated with @ClusteringKey: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(!typeKeys.isEmpty() && columns.isEmpty()),
+        "field must be annotated with @Column if it is annotated with @TypeKey: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+    }
     // Note: while searching for the matching table, uses the name from the
     // table annotation instead of the one returned by getName() as the later
     // might have been cleaned and hence would not match what was defined in
     // the POJO
-    final String tname = tinfo.getTable().name();
+    final String tname = isInTable ? tinfo.getTable().name() : Table.ALL;
 
     Column column = columns.get(tname);
     Index index = indexes.get(tname);
@@ -426,12 +432,40 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       typeKey = typeKeys.get(Table.ALL);
     }
     this.typeKey = typeKey;
+    // validate some UDT stuff
+    if (!isInTable) {
+      org.apache.commons.lang3.Validate.isTrue(
+        !isIndex(),
+        "field cannot be annotated with @Index: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !isPartitionKey(),
+        "field cannot be annotated with @PartitionKey: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !isClusteringKey(),
+        "field cannot be annotated with @ClusteringKey: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !isTypeKey(),
+        "field cannot be annotated with @TypeKey: %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+    }
     if (isColumn()) {
       this.definition = DataTypeImpl.inferDataTypeFrom(field);
       this.decoder = definition.getDecoder(
         field, isMandatory() || isPartitionKey() || isClusteringKey()
       );
-      if (((clusteringKey != null) || (partitionKey != null))
+      if (isInTable
+          && ((clusteringKey != null) || (partitionKey != null))
           && (definition.getType() == DataType.SET)) {
         final Type type = field.getGenericType();
 
@@ -463,73 +497,75 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.setter = findSetterMethod(declaringClass);
     this.finalValue = findFinalValue();
     // validate some stuff
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isIndex() && !isColumn()),
-      "field in table '%s' must be annotated with @Column if it is annotated with @Index: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isPartitionKey() && isClusteringKey()),
-      "field in table '%s' must not be annotated with @ClusteringKey if it is annotated with @PartitionKey: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isPartitionKey() && !isColumn()),
-      "field in table '%s' must be annotated with @Column if it is annotated with @PartitionKey: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isClusteringKey() && !isColumn()),
-      "field in table '%s' must be annotated with @Column if it is annotated with @ClusteringKey: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isTypeKey() && !isColumn()),
-      "field in table '%s' must be annotated with @Column if it is annotated with @TypeKey: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isTypeKey() && !String.class.equals(getType())),
-      "field in table '%s' must be a String if it is annotated with @TypeKey: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isTypeKey() && isFinal()),
-      "field in table '%s' must not be final if it is annotated with @TypeKey: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !(isTypeKey()
-        && !(cinfo instanceof RootClassInfoImpl)
-        && !(cinfo instanceof TypeClassInfoImpl)),
-      "field in table '%s' must not be annotated with @TypeKey if class is annotated with @Entity: %s.%s",
-      tname,
-      declaringClass.getName(),
-      field.getName()
-    );
-    if (isColumn() && definition.isCollection()) {
+    if (isInTable) {
       org.apache.commons.lang3.Validate.isTrue(
-        !((isClusteringKey() || isPartitionKey()) && (multiKeyType == null)),
-        "field in table '%s' cannot be '%s' if it is annotated with @ClusteringKey or @PartitionKey: %s.%s",
+        !(isIndex() && !isColumn()),
+        "field in table '%s' must be annotated with @Column if it is annotated with @Index: %s.%s",
         tname,
-        definition,
         declaringClass.getName(),
         field.getName()
       );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isPartitionKey() && isClusteringKey()),
+        "field in table '%s' must not be annotated with @ClusteringKey if it is annotated with @PartitionKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isPartitionKey() && !isColumn()),
+        "field in table '%s' must be annotated with @Column if it is annotated with @PartitionKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isClusteringKey() && !isColumn()),
+        "field in table '%s' must be annotated with @Column if it is annotated with @ClusteringKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isTypeKey() && !isColumn()),
+        "field in table '%s' must be annotated with @Column if it is annotated with @TypeKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isTypeKey() && !String.class.equals(getType())),
+        "field in table '%s' must be a String if it is annotated with @TypeKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isTypeKey() && isFinal()),
+        "field in table '%s' must not be final if it is annotated with @TypeKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !(isTypeKey()
+          && !(cinfo instanceof RootClassInfoImpl)
+          && !(cinfo instanceof TypeClassInfoImpl)),
+        "field in table '%s' must not be annotated with @TypeKey if class is annotated with @Entity: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      if (isColumn() && definition.isCollection()) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !((isClusteringKey() || isPartitionKey()) && (multiKeyType == null)),
+          "field in table '%s' cannot be '%s' if it is annotated with @ClusteringKey or @PartitionKey: %s.%s",
+          tname,
+          definition,
+          declaringClass.getName(),
+          field.getName()
+        );
+      }
     }
   }
 

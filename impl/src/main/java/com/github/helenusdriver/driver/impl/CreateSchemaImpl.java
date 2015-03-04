@@ -92,19 +92,32 @@ public class CreateSchemaImpl<T>
   StringBuilder[] buildQueryStrings(Set<Keyspace> keyspaces) {
     final List<StringBuilder> builders
       = new ArrayList<>(getContext().getClassInfo().getTables().size() + 2);
+    final CreateTypeImpl<T> cy;
+    final CreateTableImpl<T> ct;
+    final CreateIndexImpl<T> ci;
 
-    final CreateTableImpl<T> ct = new CreateTableImpl<>(
-      getContext(), null, mgr, bridge
-    );
-    final CreateIndexImpl<T> ci = new CreateIndexImpl<>(
-      getContext(), null, null, mgr, bridge
-    );
+    if (getClassInfo().supportsTablesAndIndexes()) {
+      cy = null;
+      ct = new CreateTableImpl<>(getContext(), null, mgr, bridge);
+      ci = new CreateIndexImpl<>(getContext(), null, null, mgr, bridge);
+    } else {
+      cy = new CreateTypeImpl<>(getContext(), mgr, bridge);
+      ct = null;
+      ci = null;
+    }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     StringBuilder[] cbuilders;
 
     if (ifNotExists) {
-      ct.ifNotExists();
-      ci.ifNotExists();
+      if (cy != null) {
+        cy.ifNotExists();
+      }
+      if (ct != null) {
+        ct.ifNotExists();
+      }
+      if (ci != null) {
+        ci.ifNotExists();
+      }
     }
     // start by generating the keyspace
     // --- do not attempt to create the same keyspace twice when a set of keyspaces
@@ -129,21 +142,33 @@ public class CreateSchemaImpl<T>
         keyspaces.add(keyspace);
       }
     }
-    // now deal with tables
-    cbuilders = ct.buildQueryStrings();
-    if (cbuilders != null) {
-      for (final StringBuilder builder: cbuilders) {
-        if (builder != null) {
-          builders.add(builder);
+    if (cy != null) { // now deal with types
+      cbuilders = cy.buildQueryStrings();
+      if (cbuilders != null) {
+        for (final StringBuilder builder: cbuilders) {
+          if (builder != null) {
+            builders.add(builder);
+          }
         }
       }
     }
-    // now deal with indexes
-    cbuilders = ci.buildQueryStrings();
-    if (cbuilders != null) {
-      for (final StringBuilder builder: cbuilders) {
-        if (builder != null) {
-          builders.add(builder);
+    if (ct != null) { // now deal with tables
+      cbuilders = ct.buildQueryStrings();
+      if (cbuilders != null) {
+        for (final StringBuilder builder: cbuilders) {
+          if (builder != null) {
+            builders.add(builder);
+          }
+        }
+      }
+    }
+    if (ci != null) { // now deal with indexes
+      cbuilders = ci.buildQueryStrings();
+      if (cbuilders != null) {
+        for (final StringBuilder builder: cbuilders) {
+          if (builder != null) {
+            builders.add(builder);
+          }
         }
       }
     }

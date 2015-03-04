@@ -16,27 +16,22 @@
 package com.github.helenusdriver.driver;
 
 /**
- * The <code>CreateTable</code> interface provides support for the
- * CREATE TABLE statement for a POJO.
+ * The <code>CreateType</code> interface provides support for the
+ * CREATE TYPE statement for a POJO.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 15, 2015 - paouelle - Creation
+ * @version 1 - Mar 3, 2015 - paouelle - Creation
  *
  * @param <T> The type of POJO associated with this statement.
  *
  * @since 1.0
  */
-public interface CreateTable<T>
+public interface CreateType<T>
   extends Statement<T>, SequenceableStatement<Void, VoidFuture> {
   /**
    * {@inheritDoc}
-   * <p>
-   * <i>Note:</i> This might not actually be a valid query string if there are
-   * more than one tables defined in the POJO that needs to be created. It will
-   * then be a representation of the query strings for each table creation
-   * similar to a "BATCH" statement.
    *
    * @author paouelle
    *
@@ -46,45 +41,21 @@ public interface CreateTable<T>
   public String getQueryString();
 
   /**
-   * Sets the 'IF NOT EXISTS' option for this CREATE TABLE statement.
+   * Sets the 'IF NOT EXISTS' option for this CREATE TYPE statement.
    * <p>
-   * A create with that option will not succeed unless the table does not exist
+   * A create with that option will not succeed unless the type does not exist
    * at the time the creation is executing. The existence check and creations
    * are done transactionally in the sense that if multiple clients attempt to
-   * create a given table with this option, then at most one may succeed.
+   * create a given type with this option, then at most one may succeed.
    * <p>
    * Please keep in mind that using this option has a non negligible performance
    * impact and should be avoided when possible.
    *
    * @author paouelle
    *
-   * @return this CREATE TABLE statement.
+   * @return this CREATE TYPE statement.
    */
-  public CreateTable<T> ifNotExists();
-
-  /**
-   * Adds a WITH option to this statement.
-   * <p>
-   * This is a shorter/more readable version for {@code with().and(option)}.
-   *
-   * @author paouelle
-   *
-   * @param  option the option to add
-   * @return the WITH options of this statement to which more options can be
-   *         added
-   * @throws NullPointerException if <code>option</code> is <code>null</code>
-   */
-  public Options<T> with(TableWith option);
-
-  /**
-   * Returns a WITH option for this statement.
-   *
-   * @author paouelle
-   *
-   * @return the WITH options of this statement to which more options can be
-   *         added
-   */
-  public Options<T> with();
+  public CreateType<T> ifNotExists();
 
   /**
    * Adds a WHERE clause to this statement used to specify suffixes when required.
@@ -111,12 +82,12 @@ public interface CreateTable<T>
 
   /**
    * The <code>Options</code> class defines an in-statement construct for
-   * CREATE TABLE options.
+   * CREATE TYPE options.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
-   * @version 1 - Jan 15, 2015 - paouelle - Creation
+   * @version 1 - Mar 3, 2015 - paouelle - Creation
    *
    * @param <T> The type of POJO associated with this statement.
    *
@@ -124,17 +95,6 @@ public interface CreateTable<T>
    */
   public interface Options<T>
     extends Statement<T>, SequenceableStatement<Void, VoidFuture> {
-    /**
-     * Adds a WITH option to this statement.
-     *
-     * @author paouelle
-     *
-     * @param  option the option to add
-     * @return this WITH options
-     * @throws NullPointerException if <code>option</code> is <code>null</code>
-     */
-    public Options<T> and(TableWith option);
-
     /**
      * Adds a WHERE clause to this statement used to specify suffixes when required.
      *
@@ -161,13 +121,13 @@ public interface CreateTable<T>
 
   /**
    * The <code>Where</code> interface defines a WHERE clause for the CREATE
-   * TABLE statement which can be used to specify suffix keys used for the
+   * TYPE statement which can be used to specify suffix keys used for the
    * keyspace name.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
-   * @version 1 - Jan 15, 2015 - paouelle - Creation
+   * @version 1 - Mar 3, 2015 - paouelle - Creation
    *
    * @param <T> The type of POJO associated with the statement.
    *

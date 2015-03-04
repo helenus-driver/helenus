@@ -19,6 +19,7 @@ import java.lang.reflect.Field;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,6 +42,10 @@ import com.github.helenusdriver.persistence.Table;
 /**
  * The <code>TableInfo</code> class caches all the table and its field
  * information needed by the class {@link ClassInfoImpl}.
+ * <p>
+ * <i>Note:</i> A fake instance of this class will be created with no table
+ * annotations for user-defined type entities. By design, the
+ * {@link FieldInfoImpl} class will not allow any type of keys but only columns.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -203,7 +208,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @param  mgr the non-<code>null</code> statement manager
    * @param  cinfo the non-<code>null</code> class info for the POJO
-   * @param  table the non-<code>null</code> table annotation
+   * @param  table the table annotation or <code>null</code> if there is no table
    * @throws IllegalArgumentException if unable to find getter or setter
    *         methods for fields of if improperly annotated
    */
@@ -213,7 +218,28 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     this.clazz = cinfo.getObjectClass();
     this.cinfo = cinfo;
     this.table = table;
-    this.name = TableInfoImpl.cleanName(table.name());
+    this.name = (table != null) ? TableInfoImpl.cleanName(table.name()) : null;
+    findColumnFields(mgr);
+  }
+
+  /**
+   * Instantiates a new <code>TableInfo</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  mgr the non-<code>null</code> statement manager
+   * @param  cinfo the non-<code>null</code> class info for the POJO
+   * @param  name the non-<code>null</code> table name
+   * @throws IllegalArgumentException if unable to find getter or setter
+   *         methods for fields of if improperly annotated
+   */
+  public TableInfoImpl(
+    StatementManagerImpl mgr, ClassInfoImpl<T> cinfo, String name
+  ) {
+    this.clazz = cinfo.getObjectClass();
+    this.cinfo = cinfo;
+    this.table = null;
+    this.name = name;
     findColumnFields(mgr);
   }
 
@@ -252,8 +278,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           clazz.getSimpleName()
           + " cannot annotate more than one field with the same column name '"
           + field.getColumnName()
-          + "' for table '"
-          + table.name()
+          + ((table != null) ? "' for table '" + table.name() : "")
           + "': found '"
           + oldc.getDeclaringClass().getSimpleName()
           + "."
@@ -265,7 +290,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + "'"
         );
       }
-      if (field.isTypeKey()) {
+      if (field.isTypeKey()) { // by design will be false if no table is defined
         final FieldInfoImpl<T> oldk = typeKeyColumn.getValue();
 
         if (oldk != null) {
@@ -326,12 +351,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         }
       }
     }
-    org.apache.commons.lang3.Validate.isTrue(
-      !partitionKeyColumns.isEmpty(),
-      "%s must annotate one field as a partition primary key for table '%s'",
-      clazz.getSimpleName(),
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        !partitionKeyColumns.isEmpty(),
+        "%s must annotate one field as a partition primary key for table '%s'",
+        clazz.getSimpleName(),
+        table.name()
+      );
+    }
     // filters out columns if need be
     mgr.filter(this);
     // finalize table keys
@@ -350,7 +377,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @author paouelle
    */
   private void reorderPrimaryKeys() {
-    if ((table.partition().length == 0) && (table.clustering().length == 0)) {
+    if ((table == null)
+        || ((table.partition().length == 0) && (table.clustering().length == 0))) {
       return; // nothing to do so keep original order
     }
     // clone keys map so we can modify the original ones
@@ -433,17 +461,32 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       if (ignoreNonColumnNames) { // ignore it
         return;
       }
+      if (table == null) {
+        throw new IllegalArgumentException(
+          "unexpected column name '" + name + "'"
+        );
+      }
       throw new IllegalArgumentException(
         "unexpected column name '" + name + "' in table '" + table.name() + "'"
       );
     }
-    org.apache.commons.lang3.Validate.isTrue(
-      columns.containsKey(n),
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        columns.containsKey(n),
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        columns.containsKey(n),
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    }
   }
 
   /**
@@ -464,6 +507,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         to one already defined with the same column name in this table
    */
   void addNonPrimaryColumn(FieldInfoImpl<? extends T> col) {
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo instanceof RootClassInfoImpl,
+      "should not have been called for class '%s'", cinfo.getClass()
+    );
     final FieldInfoImpl<T> old = columns.get(col.getColumnName());
 
     if (old != null) {
@@ -521,21 +568,29 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       final Object value = field.getValue(object);
 
       if (value == null) {
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isMandatory(),
-          "missing mandatory column '%s' from table '%s'",
-          name, table.name()
-        );
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isPartitionKey() && !field.isClusteringKey(),
-          "missing primary key column '%s' from table '%s'",
-          name, table.name()
-        );
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isTypeKey(),
-          "missing type key column '%s' from table '%s'",
-          name, table.name()
-        );
+        if (table != null) {
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isMandatory(),
+            "missing mandatory column '%s' from table '%s'",
+            name, table.name()
+          );
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isPartitionKey() && !field.isClusteringKey(),
+            "missing primary key column '%s' from table '%s'",
+            name, table.name()
+          );
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isTypeKey(),
+            "missing type key column '%s' from table '%s'",
+            name, table.name()
+          );
+        } else {
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isMandatory(),
+            "missing mandatory column '%s'",
+            name
+          );
+        }
       }
       values.put(name, value);
     }
@@ -554,6 +609,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   Map<String, Object> getPartitionKeyColumnValues(T object) {
+    if (table == null) {
+      return Collections.emptyMap();
+    }
     final Map<String, Object> values = new LinkedHashMap<>(primaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: partitionKeyColumns.entrySet()) {
@@ -597,6 +655,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   Map<String, Object> getSuffixAndPartitionKeyColumnValues(T object) {
+    if (table == null) {
+      return Collections.emptyMap();
+    }
     final Map<String, FieldInfoImpl<T>> skeys = cinfo.getSuffixKeys();
     final Map<String, FieldInfoImpl<T>> keys = new LinkedHashMap<>(
       primaryKeyColumns.size() + skeys.size()
@@ -636,6 +697,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   Map<String, Object> getPrimaryKeyColumnValues(T object) {
+    if (table == null) {
+      return Collections.emptyMap();
+    }
     final Map<String, Object> values = new LinkedHashMap<>(primaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: primaryKeyColumns.entrySet()) {
@@ -667,6 +731,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   Map<String, Object> getSuffixAndPrimaryKeyColumnValues(T object) {
+    if (table == null) {
+      return Collections.emptyMap();
+    }
     final Map<String, FieldInfoImpl<T>> skeys = cinfo.getSuffixKeys();
     final Map<String, FieldInfoImpl<T>> keys = new LinkedHashMap<>(
       primaryKeyColumns.size() + skeys.size()
@@ -716,21 +783,29 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       final Object value = field.getValue(object);
 
       if (value == null) {
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isMandatory(),
-          "missing mandatory column '%s' from table '%s'",
-          name, table.name()
-        );
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isPartitionKey() && !field.isClusteringKey(),
-          "missing primary key column '%s' from table '%s'",
-          table.name(), name
-        );
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isTypeKey(),
-          "missing type key column '%s' from table '%s'",
-          table.name(), name
-        );
+        if (table != null) {
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isMandatory(),
+            "missing mandatory column '%s' from table '%s'",
+            name, table.name()
+          );
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isPartitionKey() && !field.isClusteringKey(),
+            "missing primary key column '%s' from table '%s'",
+            table.name(), name
+          );
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isTypeKey(),
+            "missing type key column '%s' from table '%s'",
+            table.name(), name
+          );
+        } else {
+          org.apache.commons.lang3.Validate.isTrue(
+            !field.isMandatory(),
+            "missing mandatory column '%s'",
+            name
+          );
+        }
       }
       values.put(name, value);
     }
@@ -758,12 +833,20 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       final FieldInfoImpl<T> field = e.getValue();
       final Object value = field.getNonEncodedValue(object);
 
-      org.apache.commons.lang3.Validate.isTrue(
-        !(field.isMandatory() && (value == null)),
-        "missing mandatory column '%s' from table '%s'",
-        table.name(),
-        name
-      );
+      if (table != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !(field.isMandatory() && (value == null)),
+          "missing mandatory column '%s' from table '%s'",
+          name,
+          table.name()
+        );
+      } else {
+        org.apache.commons.lang3.Validate.isTrue(
+          !(field.isMandatory() && (value == null)),
+          "missing mandatory column '%s'",
+          name
+        );
+      }
       values.put(name, value);
     }
     return values;
@@ -791,31 +874,48 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     }
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     final Object value = field.getValue(object);
 
     if (value == null) {
-      org.apache.commons.lang3.Validate.isTrue(
-        !field.isMandatory(),
-        "missing mandatory column '%s' in table '%s'",
-        n, table.name()
-      );
-      org.apache.commons.lang3.Validate.isTrue(
-        !field.isPartitionKey() && !field.isClusteringKey(),
-        "missing primary key column '%s' in table '%s'",
-        n, table.name()
-      );
-      org.apache.commons.lang3.Validate.isTrue(
-        !field.isTypeKey(),
-        "missing type key column '%s' in table '%s'",
-        n, table.name()
-      );
+      if (table != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isMandatory(),
+          "missing mandatory column '%s' in table '%s'",
+          n, table.name()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isPartitionKey() && !field.isClusteringKey(),
+          "missing primary key column '%s' in table '%s'",
+          n, table.name()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isTypeKey(),
+          "missing type key column '%s' in table '%s'",
+          n, table.name()
+        );
+      } else {
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isMandatory(),
+          "missing mandatory column '%s'",
+          n
+        );
+      }
     }
     return value;
   }
@@ -977,6 +1077,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    */
   public boolean hasPrimaryKey(Object name) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (table == null) {
+      return false;
+    }
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
         if (!hasPrimaryKey(n)) { // recurse to validate
@@ -1017,6 +1120,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    */
   public boolean isLastPartitionKey(Object name) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (table == null) {
+      return false;
+    }
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
         if (!isLastPartitionKey(n)) { // recurse to validate
@@ -1059,6 +1165,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    */
   public boolean isLastClusteringKey(Object name) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (table == null) {
+      return false;
+    }
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
         if (!isLastPartitionKey(n)) { // recurse to validate
@@ -1101,6 +1210,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    */
   public boolean isMultiKey(Object name) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (table == null) {
+      return false;
+    }
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
         if (!isMultiKey(n)) { // recurse to validate
@@ -1185,16 +1297,18 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         final String cname = current.getColumnName();
 
         // make sure the remove the field from all internal maps too
-        primaryKeyColumns.remove(cname);
-        partitionKeyColumns.remove(cname);
-        finalPrimaryKeyValues.remove(cname);
-        clusteringKeyColumns.remove(cname);
-        final FieldInfoImpl<T> old = typeKeyColumn.getValue();
+        if (table != null) {
+          primaryKeyColumns.remove(cname);
+          partitionKeyColumns.remove(cname);
+          finalPrimaryKeyValues.remove(cname);
+          clusteringKeyColumns.remove(cname);
+          final FieldInfoImpl<T> old = typeKeyColumn.getValue();
 
-        if ((old != null) && old.getColumnName().equals(cname)) {
-          typeKeyColumn.setValue(null);
+          if ((old != null) && old.getColumnName().equals(cname)) {
+            typeKeyColumn.setValue(null);
+          }
+          indexColumns.remove(cname);
         }
-        indexColumns.remove(cname);
         mandatoryAndPrimaryKeyColumns.remove(cname);
         nonPrimaryKeyColumns.remove(cname);
         fields.remove(Pair.of(current.getName(), current.getDeclaringClass()));
@@ -1449,13 +1563,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         "unexpected column name: " + name
       );
     }
-    org.apache.commons.lang3.Validate.isTrue(
-      !mandatoryAndPrimaryKeyColumns.containsKey(n),
-      "%s defines mandatory or primary key column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        !mandatoryAndPrimaryKeyColumns.containsKey(n),
+        "%s defines mandatory or primary key column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        !mandatoryAndPrimaryKeyColumns.containsKey(n),
+        "%s defines mandatory column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
   }
 
   /**
@@ -1493,20 +1616,29 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     }
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      field.isPartitionKey() || field.isClusteringKey() || field.isIndex(),
-      "%s doesn't define primary key or index column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        field.isPartitionKey() || field.isClusteringKey() || field.isIndex(),
+        "%s doesn't define primary key or index column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
   }
 
   /**
@@ -1548,20 +1680,29 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       // check suffixes
       field = (FieldInfoImpl<T>)cinfo.getSuffixKey(n);
     }
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column or suffix key '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      field.isPartitionKey() || field.isClusteringKey() || field.isSuffixKey() || field.isIndex(),
-      "%s doesn't define suffix key, primary key, or index column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column or suffix key '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        field.isPartitionKey() || field.isClusteringKey() || field.isSuffixKey() || field.isIndex(),
+        "%s doesn't define suffix key, primary key, or index column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
   }
 
   /**
@@ -1598,20 +1739,29 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     }
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      field.isCounter(),
-      "%s doesn't define counter column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        field.isCounter(),
+        "%s doesn't define counter column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
   }
 
   /**
@@ -1638,13 +1788,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     field.validateValue(value);
   }
 
@@ -1678,13 +1837,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       // check suffixes
       field = (FieldInfoImpl<T>)cinfo.getSuffixKey(n);
     }
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column or suffix key '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column or suffix key '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     field.validateValue(value);
   }
 
@@ -1714,13 +1882,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     for (final Object value: values) {
       field.validateValue(value);
     }
@@ -1757,13 +1934,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     field.validateCollectionValue(type, value);
   }
 
@@ -1798,13 +1984,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     for (final Object value: values) {
       field.validateCollectionValue(type, value);
     }
@@ -1838,13 +2033,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     field.validateMapKeyValue(key, value);
   }
 
@@ -1876,13 +2080,22 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      field != null,
-      "%s doesn't define column '%s' in table '%s'",
-      clazz.getSimpleName(),
-      n,
-      table.name()
-    );
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
     for (final Map.Entry<?, ?> e: mappings.entrySet()) {
       field.validateMapKeyValue(e.getKey(), e.getValue());
     }

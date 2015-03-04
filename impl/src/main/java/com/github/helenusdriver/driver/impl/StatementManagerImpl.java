@@ -51,6 +51,7 @@ import com.github.helenusdriver.driver.CreateKeyspace;
 import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.CreateTable;
+import com.github.helenusdriver.driver.CreateType;
 import com.github.helenusdriver.driver.Delete;
 import com.github.helenusdriver.driver.Delete.Builder;
 import com.github.helenusdriver.driver.Insert;
@@ -74,6 +75,7 @@ import com.github.helenusdriver.persistence.DataType;
 import com.github.helenusdriver.persistence.Entity;
 import com.github.helenusdriver.persistence.RootEntity;
 import com.github.helenusdriver.persistence.TypeEntity;
+import com.github.helenusdriver.persistence.UDTEntity;
 
 /**
  * The <code>StatementManagerImpl</code> class provides an implementation
@@ -312,8 +314,15 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected <T> Select.Builder<T> select(Class<T> clazz, CharSequence... columns) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a select statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new SelectImpl.BuilderImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       Arrays.asList((Object[])columns),
       this,
       bridge
@@ -329,8 +338,15 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected <T> Selection<T> select(Class<T> clazz) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a select statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new SelectImpl.SelectionImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       this,
       bridge
     );
@@ -347,8 +363,15 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected <T> Insert<T> insert(T object) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl((Class<T>)object.getClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for an insert statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), object.getClass().getSimpleName()
+    );
     return new InsertImpl<>(
-      getClassInfoImpl((Class<T>)object.getClass()).newContext(object),
+      cinfo.newContext(object),
       this,
       bridge
     );
@@ -364,8 +387,16 @@ public class StatementManagerImpl extends StatementManager {
   @SuppressWarnings("unchecked")
   @Override
   protected <T> Update<T> update(T object) {
+    org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl((Class<T>)object.getClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for an update statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), object.getClass().getSimpleName()
+    );
     return new UpdateImpl<>(
-      getClassInfoImpl((Class<T>)object.getClass()).newContext(object),
+      cinfo.newContext(object),
       this,
       bridge
     );
@@ -382,8 +413,15 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected <T> Update<T> update(T object, String... tables) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl((Class<T>)object.getClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for an update statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), object.getClass().getSimpleName()
+    );
     return new UpdateImpl<>(
-      getClassInfoImpl((Class<T>)object.getClass()).newContext(object),
+      cinfo.newContext(object),
       tables,
       this,
       bridge
@@ -401,8 +439,15 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected <T> Builder<T> delete(T object, String... columns) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl((Class<T>)object.getClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a delete statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), object.getClass().getSimpleName()
+    );
     return new DeleteImpl.BuilderImpl<>(
-      getClassInfoImpl((Class<T>)object.getClass()).newContext(object),
+      cinfo.newContext(object),
       Arrays.asList((Object[])columns),
       this,
       bridge
@@ -420,8 +465,15 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected <T> com.github.helenusdriver.driver.Delete.Selection<T> delete(T object) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl((Class<T>)object.getClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a delete statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), object.getClass().getSimpleName()
+    );
     return new DeleteImpl.SelectionImpl<>(
-      getClassInfoImpl((Class<T>)object.getClass()).newContext(object),
+      cinfo.newContext(object),
       this,
       bridge
     );
@@ -437,8 +489,15 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected <T> Delete.Builder<T> delete(Class<T> clazz, String... columns) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a delete statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new DeleteImpl.BuilderImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       Arrays.asList((Object[])columns),
       this,
       bridge
@@ -455,8 +514,15 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected <T> Delete.Selection<T> delete(Class<T> clazz) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a delete statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new DeleteImpl.SelectionImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       this,
       bridge
     );
@@ -549,12 +615,42 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see com.github.helenusdriver.driver.StatementManager#createType(java.lang.Class)
+   */
+  @Override
+  protected <T> CreateType<T> createType(Class<T> clazz) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      !cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a create type statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
+    return new CreateTypeImpl<>(
+      cinfo.newContext(),
+      this,
+      bridge
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see com.github.helenusdriver.driver.StatementManager#createTable(Class)
    */
   @Override
   protected <T> CreateTable<T> createTable(Class<T> clazz) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a create table statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new CreateTableImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       this,
       bridge
     );
@@ -569,8 +665,15 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected <T> CreateTable<T> createTable(Class<T> clazz, String... tables) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a create table statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new CreateTableImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       tables,
       this,
       bridge
@@ -586,8 +689,15 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected <T> CreateIndex.Builder<T> createIndex(Class<T> clazz) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a create index statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new CreateIndexImpl.BuilderImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       this,
       bridge
     );
@@ -652,8 +762,15 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected <T> Truncate<T> truncate(Class<T> clazz) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a truncate statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new TruncateImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       this,
       bridge
     );
@@ -668,8 +785,15 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected <T> Truncate<T> truncate(Class<T> clazz, String... tables) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a truncate statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
     return new TruncateImpl<>(
-      getClassInfoImpl(clazz).newContext(),
+      cinfo.newContext(),
       tables,
       this,
       bridge
@@ -1446,6 +1570,11 @@ public class StatementManagerImpl extends StatementManager {
             "class '%s' cannot be annotated with both @RootEntity and @Entity",
             clazz.getSimpleName()
           );
+          org.apache.commons.lang3.Validate.isTrue(
+            !clazz.isAnnotationPresent(UDTEntity.class),
+            "class '%s' cannot be annotated with both @RootEntity and @UDTEntity",
+            clazz.getSimpleName()
+          );
           if (rclazz == clazz) { // this is the root element class
             org.apache.commons.lang3.Validate.isTrue(
               !clazz.isAnnotationPresent(TypeEntity.class),
@@ -1466,6 +1595,13 @@ public class StatementManagerImpl extends StatementManager {
               );
             }
           }
+        } else if (clazz.isAnnotationPresent(UDTEntity.class)) {
+          org.apache.commons.lang3.Validate.isTrue(
+            !clazz.isAnnotationPresent(Entity.class),
+            "class '%s' cannot be annotated with both @UDTEntity and @Entity",
+            clazz.getSimpleName()
+          );
+          classInfo = new UDTClassInfoImpl<>(this, clazz);
         } else if (clazz.isAnnotationPresent(Entity.class)) {
           classInfo = new ClassInfoImpl<>(this, clazz);
         } else {

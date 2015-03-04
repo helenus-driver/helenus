@@ -57,7 +57,8 @@ public interface TableInfo<T> {
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> table annotation
+   * @return the table annotation (will be <code>null</code> for user-defined
+   *         type entities)
    */
   public Table getTable();
 
@@ -68,7 +69,8 @@ public interface TableInfo<T> {
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> name for the table
+   * @return the name for the table (will be <code>null</code> for user-defined
+   *         type entities)
    */
   public String getName();
 

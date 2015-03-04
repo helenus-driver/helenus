@@ -46,9 +46,20 @@ public interface ClassInfo<T> {
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> keysapce annotation for this POJO
+   * @return the non-<code>null</code> keyspace annotation for this POJO
    */
   public Keyspace getKeyspace();
+
+  /**
+   * Checks of the class of POJO represented by this class supports tables and.or
+   * indexes.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if the POJO class supports tables and/or indexes
+   *         <code>false</code> if it does not
+   */
+  public boolean supportsTablesAndIndexes();
 
   /**
    * Gets the field info corresponding to the given suffix key.
@@ -79,7 +90,7 @@ public interface ClassInfo<T> {
    * @return the corresponding table info
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if the specified table is not defined by
-   *         the POJO
+   *         the POJO or the POJO represented by this class doesn't support tables
    */
   public TableInfo<T> getTable(String name);
 

@@ -428,6 +428,25 @@ public final class StatementBuilder {
   }
 
   /**
+   * Starts building a new CREATE TYPE statement for the given POJO class.
+   * <p>
+   * The column schema is automatically extracted from the POJO class definition.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @param  clazz the class of POJO associated with this statement
+   * @return a new CREATE TYPE statement
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
+   *         valid user-defined type POJO class
+   */
+  public static <T> CreateType<T> createType(Class<T> clazz) {
+    return StatementManager.getManager().createType(clazz);
+  }
+
+  /**
    * Starts building a new CREATE TABLE statement for the given POJO class. This
    * might actually results in multiple CREATE TABLE statements.
    * <p>
@@ -508,8 +527,8 @@ public final class StatementBuilder {
   /**
    * Starts building a new CREATE SCHEMA statement for the given POJO class.
    * This will create all the required elements to support the schema for a given
-   * POJO. It will take care of creating the required keyspace, tables, and
-   * indexes.
+   * POJO. It will take care of creating the required keyspace, user-defined types,
+   * tables, and indexes.
    * <p>
    * <i>Note:</i> If the POJO defines multiple tables and indexes, executing this
    * statement will potentially create the keyspace, all tables and all indexes
@@ -536,17 +555,18 @@ public final class StatementBuilder {
    * Starts building a new CREATE SCHEMAS statement for all POJO classes defined
    * in a given package. This will create all the required elements to support
    * the schema for each POJO. It will take care of creating the required
-   * keyspaces, tables, and indexes.
+   * keyspaces, user-defined types, tables, and indexes.
    * <p>
    * <i>Note:</i> This statement will create the schemas for all POJOs for which
    * the defined keyspace can be computed with any of the specified suffixes via
    * the WHERE clauses.
    * <p>
    * <i>Note:</i> Executing this statement will potentially create the keyspaces,
-   * all tables and all indexes for all tables. Since keyspace, table, and index
-   * creation cannot be batched with Cassandra, this will result in a non-atomic
-   * creation of everything. The process will stop at first failure and will not
-   * revert back the created keyspaces, tables, or indexes if any.
+   * all user-defined types, all tables and all indexes for all tables. Since
+   * keyspace, user-defined type, table, and index creation cannot be batched
+   * with Cassandra, this will result in a non-atomic creation of everything.
+   * The process will stop at first failure and will not revert back the created
+   * keyspaces, user-defined types, tables, or indexes if any.
    *
    * @author paouelle
    *
@@ -566,17 +586,18 @@ public final class StatementBuilder {
    * Starts building a new CREATE SCHEMAS statement for all POJO classes defined
    * in a given package. This will create all the required elements to support
    * the schema for each POJO. It will take care of creating the required
-   * keyspaces, tables, and indexes.
+   * keyspaces, user-defined types, tables, and indexes.
    * <p>
    * <i>Note:</i> This statement will create the schemas for only the POJOs for
    * which the defined keyspace can be computed with exactly all of the specified
    * suffixes via the WHERE clauses.
    * <p>
    * <i>Note:</i> Executing this statement will potentially create the keyspaces,
-   * all tables and all indexes for all tables. Since keyspace, table, and index
-   * creation cannot be batched with Cassandra, this will result in a non-atomic
-   * creation of everything. The process will stop at first failure and will not
-   * revert back the created keyspaces, tables, or indexes if any.
+   * all user-defined types, all tables and all indexes for all tables. Since
+   * keyspace, user-defined type, table, and index creation cannot be batched
+   * with Cassandra, this will result in a non-atomic creation of everything.
+   * The process will stop at first failure and will not revert back the created
+   * keyspaces, user-defined types, tables, or indexes if any.
    *
    * @author paouelle
    *

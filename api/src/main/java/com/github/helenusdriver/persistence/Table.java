@@ -82,7 +82,7 @@ public @interface Table {
    *
    * @author paouelle
    *
-   * @return the optional list of ordered cluatering keys
+   * @return the optional list of ordered clustering keys
    */
   String[] clustering() default {};
 }
