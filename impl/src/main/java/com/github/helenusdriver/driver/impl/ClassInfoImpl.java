@@ -40,6 +40,7 @@ import org.apache.commons.lang3.mutable.MutableObject;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.UDTValue;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
 import com.github.helenusdriver.driver.ObjectConversionException;
@@ -197,6 +198,20 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     @Override
     public T getObject(Row row) {
       return ClassInfoImpl.this.getObject(row, suffixes);
+    }
+
+    /**
+     * Converts the specified UDT value into a POJO object defined by this
+     * class information.
+     *
+     * @author paouelle
+     *
+     * @param  uval the UDT value to convert into a POJO
+     * @return the POJO object corresponding to the given UDT value
+     * @throws ObjectConversionException if unable to convert to a POJO
+     */
+    public T getObject(UDTValue uval) {
+      return ClassInfoImpl.this.getObject(uval);
     }
 
     /**
@@ -563,14 +578,14 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  private final Constructor<T> constructor;
+  protected final Constructor<T> constructor;
 
   /**
    * Holds the map of all final fields with their default values.
    *
    * @author paouelle
    */
-  private final Map<Field, Object> finalFields;
+  protected final Map<Field, Object> finalFields;
 
   /**
    * Holds the optional initial objects factory method.
@@ -1188,6 +1203,17 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
+   * Gets the tables info defined by the POJO.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all defined tables info
+   */
+  protected Stream<TableInfoImpl<T>> tables() {
+    return tables.values().stream();
+  }
+
+  /**
    * Gets the entity annotation class used to annotated the POJO class.
    *
    * @author paouelle
@@ -1413,17 +1439,6 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
-   * Gets the tables info defined by the POJO.
-   *
-   * @author paouelle
-   *
-   * @return a stream of all defined tables info
-   */
-  protected Stream<TableInfoImpl<T>> tables() {
-    return tables.values().stream();
-  }
-
-  /**
    * Retrieves all columns from the POJO no matter which table they are
    * defined in.
    *
@@ -1610,5 +1625,24 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         );
       }
     }
+  }
+
+  /**
+   * Converts the specified UDT value into a POJO object defined by this
+   * class information.
+   *
+   * @author paouelle
+   *
+   * @param  uval the UDT value to convert into a POJO
+   * @return the POJO object corresponding to the given UDT value
+   * @throws ObjectConversionException if unable to convert to a POJO
+   */
+  public T getObject(UDTValue uval) {
+    throw new ObjectConversionException(
+      clazz,
+      uval,
+      getEntityAnnotationClass().getSimpleName()
+      + " POJOs cannot be retrieved from UDT values"
+    );
   }
 }

@@ -332,7 +332,6 @@ public class CreateSchemasImpl
     final List<StringBuilder> builders = new ArrayList<>(contexts.size() * 2);
     final Set<Keyspace> keyspaces = new HashSet<>(contexts.size());
 
-    Thread.dumpStack();
     for (final ClassInfoImpl<?>.Context context: contexts) {
       final CreateSchemaImpl cs = new CreateSchemaImpl(context, mgr, bridge);
 

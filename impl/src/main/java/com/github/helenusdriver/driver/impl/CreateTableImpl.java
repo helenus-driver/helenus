@@ -155,7 +155,7 @@ public class CreateTableImpl<T>
           StatementImpl.MK_PREFIX
           + field.getColumnName()
           + " "
-          + field.getDataType().getFirstArgumentType().CQL
+          + field.getDataType().getFirstArgumentType().toCQL()
         );
       }
     }

@@ -41,7 +41,7 @@ import java.util.UUID;
  * @see com.datastax.driver.core.utils.UUIDs to help work with {@link #TIMEUUID}
  */
 @SuppressWarnings("javadoc")
-public enum DataType {
+public enum DataType implements CQLDataType {
   INFERRED("?", 0, Object.class),
   ASCII("ascii", 0, String.class),
   BIGINT("bigint", 0, Long.class),
@@ -101,14 +101,38 @@ public enum DataType {
   }
 
   /**
-   * Checks if this data type represents a collection.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return <code>true</code> if this data type represents a collection;
-   *         <code>false</code> otherwise
+   * @see com.github.helenusdriver.persistence.CQLDataType#isCollection()
    */
+  @Override
   public boolean isCollection() {
     return NUM_ARGUMENTS != 0;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#isUserDefined()
+   */
+  @Override
+  public boolean isUserDefined() { // this enum only represents system types
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#toCQL()
+   */
+  @Override
+  public String toCQL() {
+    return CQL;
   }
 }

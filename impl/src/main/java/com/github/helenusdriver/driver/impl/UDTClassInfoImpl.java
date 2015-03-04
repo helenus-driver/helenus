@@ -15,13 +15,20 @@
  */
 package com.github.helenusdriver.driver.impl;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import com.datastax.driver.core.Row;
+import com.datastax.driver.core.UDTValue;
+import com.datastax.driver.core.UserType;
+import com.github.helenusdriver.driver.ObjectConversionException;
+import com.github.helenusdriver.persistence.CQLDataType;
 import com.github.helenusdriver.persistence.UDTEntity;
 
 /**
@@ -39,7 +46,7 @@ import com.github.helenusdriver.persistence.UDTEntity;
  */
 @lombok.ToString(callSuper=true)
 @lombok.EqualsAndHashCode(callSuper=true)
-public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> {
+public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType {
   /**
    * Holds the reserved user-defined type names.
    *
@@ -59,7 +66,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> {
   /**
    * Holds the name for the user-defined type represented by this class.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private final String name;
 
@@ -106,15 +113,79 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> {
   }
 
   /**
-   * Gets the name for the user-defined type represented by this class.
+   * Decodes the column fields from a UDT value and sets the decoded value in
+   * the POJO object.
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> name for the user-defined type represented
-   *         by this class
+   * @param  object the non-<code>null</code> POJO object
+   * @param  uval the non-<code>null</code> UDT value being decoded to the POJO
+   * @throws ObjectConversionException if unable to decode the UDT value in the
+   *         POJO
    */
-  public String getName() {
+  private void decodeAndSetColumnFields(T object, UDTValue uval) {
+    for (final UserType.Field coldef: uval.getType()) {
+      // find the table for this column
+      final TableInfoImpl<T> table = getTable();
+
+      if (table != null) {
+        // find the field in the table for this column
+        final FieldInfoImpl<T> field = table.getColumn(coldef.getName());
+
+        if (field != null) {
+          // now let's set the value for this column
+          field.decodeAndSetValue(object, uval);
+        }
+      }
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#name()
+   */
+  @Override
+  public String name() {
     return name;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#isCollection()
+   */
+  @Override
+  public boolean isCollection() {
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#isUserDefined()
+   */
+  @Override
+  public boolean isUserDefined() {
+    return true;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#toCQL()
+   */
+  @Override
+  public String toCQL() {
+    return "frozen<" + name + ">";
   }
 
   /**
@@ -127,6 +198,17 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> {
   @Override
   public boolean supportsTablesAndIndexes() {
     return false;
+  }
+
+  /**
+   * Gets the fake table info defined by the user-defined POJO.
+   *
+   * @author paouelle
+   *
+   * @return the fake table info defined by the POJO
+   */
+  public TableInfoImpl<T> getTable() {
+    return tables().findFirst().get();
   }
 
   /**
@@ -163,5 +245,72 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> {
   @Override
   public Collection<TableInfoImpl<T>> getTables() {
     return Collections.emptyList();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
+   */
+  @Override
+  public T getObject(Row row, Map<String, Object> suffixes) {
+    throw new ObjectConversionException(
+      clazz,
+      row,
+      getEntityAnnotationClass().getSimpleName()
+      + " POJOs cannot be retrieved from result rows"
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.UDTValue)
+   */
+  @Override
+  public T getObject(UDTValue uval) {
+    if (uval == null) {
+      return null;
+    }
+    try {
+      // create an empty shell for the pojo
+      final T object = constructor.newInstance();
+
+      // start by setting back all final fields' values
+      finalFields.forEach(
+        (field, value) -> {
+          try {
+            // set it in field directly
+            field.set(object, value);
+          } catch (IllegalAccessException e) { // should not happen
+            throw new IllegalStateException(e);
+          }
+        }
+      );
+      // now take care of the columns
+      decodeAndSetColumnFields(object, uval);
+      return object;
+    } catch (IllegalAccessException|InstantiationException e) {
+      throw new IllegalStateException(clazz.getName(), e);
+    } catch (InvocationTargetException e) {
+      final Throwable t = e.getTargetException();
+
+      if (t instanceof Error) {
+        throw (Error)t;
+      } else if (t instanceof RuntimeException) {
+        throw (RuntimeException)t;
+      } else {
+        throw new ObjectConversionException(
+          clazz,
+          uval,
+          "failed to instantiate blank POJO",
+          t
+        );
+      }
+    }
   }
 }

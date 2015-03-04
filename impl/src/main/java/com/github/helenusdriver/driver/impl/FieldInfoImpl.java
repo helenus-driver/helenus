@@ -33,6 +33,7 @@ import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.text.WordUtils;
 
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
@@ -40,6 +41,7 @@ import com.github.helenusdriver.driver.ObjectConversionException;
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.driver.info.FieldInfo;
 import com.github.helenusdriver.driver.info.TableInfo;
+import com.github.helenusdriver.persistence.CQLDataType;
 import com.github.helenusdriver.persistence.ClusteringKey;
 import com.github.helenusdriver.persistence.Column;
 import com.github.helenusdriver.persistence.DataType;
@@ -1194,22 +1196,19 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws IllegalArgumentException if the specified value is not of the
    *         right type or is <code>null</code> when the field is mandatory
    */
-  public void validateCollectionValue(DataType type, Object value) {
+  public void validateCollectionValue(CQLDataType type, Object value) {
     if (persister != null) { // will be persisted anyway so no need to check
       return;
     }
-    final DataType dtype = definition.getType();
+    final CQLDataType dtype = definition.getType();
 
     org.apache.commons.lang3.Validate.isTrue(
       dtype.isCollection(),
-      "column '%s' is not a collection",
-      getColumnName()
+      "column '%s' is not a collection", getColumnName()
     );
     org.apache.commons.lang3.Validate.isTrue(
-      type == dtype,
-      "column '%s' is not a %s",
-      getColumnName(),
-      type.name().toLowerCase()
+      type.equals(dtype),
+      "column '%s' is not a %s", getColumnName(), type.name()
     );
     if (value == null) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -1223,14 +1222,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         getColumnName()
       );
     }
-    final DataType etype = definition.getElementType();
+    final CQLDataType etype = definition.getElementType();
 
     org.apache.commons.lang3.Validate.isTrue(
       DataTypeImpl.isInstance(etype, value),
       "invalid element value for column '%s'; expecting type '%s': %s",
-      getColumnName(),
-      etype.name().toLowerCase(),
-      value
+      getColumnName(), etype.name(), value
     );
   }
 
@@ -1247,14 +1244,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   public void validateMapKeyValue(Object key, Object value) {
     validateCollectionValue(DataType.MAP, value);
-    final DataType ktype = definition.getArgumentTypes().get(0); // #0 is the data type for the key
+    final CQLDataType ktype = definition.getArgumentTypes().get(0); // #0 is the data type for the key
 
     org.apache.commons.lang3.Validate.isTrue(
       DataTypeImpl.isInstance(ktype, key),
       "invalid element key for column '%s'; expecting type '%s': %s",
-      getColumnName(),
-      ktype.name().toLowerCase(),
-      key
+      getColumnName(), ktype.name(), key
     );
   }
 
@@ -1747,6 +1742,99 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       throw new ObjectConversionException(
         clazz,
         row,
+        "unable to set field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "' with: "
+        + val,
+        e
+      );
+    }
+  }
+
+  /**
+   * Decodes and sets the field's value in the specified POJO based on the given
+   * UDT value.
+   *
+   * @author paouelle
+   *
+   * @param  object the POJO in which to set the field's decoded value
+   * @param  uval the UDT value where the column encoded value is defined
+   * @throws NullPointerException if <code>object</code> or <code>uval</code> is
+   *         <code>null</code>
+   * @throws ObjectConversionException if unable to decode the column and store
+   *         the corresponding value into the POJO object or if the column is
+   *         mandatory and not defined in the given UDT value
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public void decodeAndSetValue(T object, UDTValue uval) {
+    org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
+    // check if the column is defined in the row
+    if (!uval.getType().contains(getColumnName())) {
+      if (isMandatory()) {
+        throw new ObjectConversionException(
+          clazz,
+          uval,
+          "missing mandatory column '"
+          + getColumnName()
+          + "' from UDT value for field '"
+          + declaringClass.getName()
+          + "."
+          + name
+          + "'"
+        );
+      }
+      // not defined in the row so skip it
+      return;
+    }
+    Object val;
+
+    try {
+      // if we have a persister then we need to decode to persisted.as() first
+      val = decoder.decode(
+        uval,
+        getColumnName(),
+        (persister != null) ? (Class)persisted.as().CLASS : (Class)this.type
+      );
+    } catch (IllegalArgumentException|InvalidTypeException e) {
+      throw new ObjectConversionException(
+        clazz,
+        uval,
+        "unable to decode value for field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "'",
+        e
+      );
+    }
+    if (persister != null) { // must decode it using the persister
+      final String fname = declaringClass.getName() + "." + name;
+
+      try {
+        val = definition.decode(val, persisted, persister, fname);
+      } catch (Exception e) {
+        throw new ObjectConversionException(
+          clazz,
+          uval,
+          "unable to decode persisted "
+          + persisted.as().CQL
+          + " for field '"
+          + fname
+          + "' with persister: "
+          + persister.getClass().getName(),
+          e
+        );
+      }
+    }
+    try {
+      setValue(object, val);
+    } catch (NullPointerException|IllegalArgumentException e) {
+      throw new ObjectConversionException(
+        clazz,
+        uval,
         "unable to set field '"
         + declaringClass.getName()
         + "."

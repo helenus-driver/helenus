@@ -16,6 +16,7 @@
 package com.github.helenusdriver.driver;
 
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.UDTValue;
 
 /**
  * The <code>ObjectConversionException</code> exception is thrown when unable
@@ -51,6 +52,13 @@ public class ObjectConversionException extends RuntimeException {
   private final Row row;
 
   /**
+   * Holds the Cassandra UDT value we were trying to convert from.
+   *
+   * @author paouelle
+   */
+  private final UDTValue uval;
+
+  /**
    * Instantiates a new <code>ObjectConversionException</code> object.
    *
    * @author paouelle
@@ -69,6 +77,21 @@ public class ObjectConversionException extends RuntimeException {
    * @author paouelle
    *
    * @param clazz the POJO class we are trying to convert to
+   * @param uval the UDT value we are converting from
+   * @param message the error message
+   */
+  public ObjectConversionException(
+    Class<?> clazz, UDTValue uval, String message
+  ) {
+    this(clazz, uval, message, null);
+  }
+
+  /**
+   * Instantiates a new <code>ObjectConversionException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
    * @param row the result row we are converting from
    * @param message the error message
    * @param cause the exception that caused this error
@@ -79,6 +102,26 @@ public class ObjectConversionException extends RuntimeException {
     super(message, cause);
     this.clazz = clazz;
     this.row = row;
+    this.uval = null;
+  }
+
+  /**
+   * Instantiates a new <code>ObjectConversionException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
+   * @param uval the UDT value we are converting from
+   * @param message the error message
+   * @param cause the exception that caused this error
+   */
+  public ObjectConversionException(
+    Class<?> clazz, UDTValue uval, String message, Throwable cause
+  ) {
+    super(message, cause);
+    this.clazz = clazz;
+    this.row = null;
+    this.uval = uval;
   }
 
   /**
@@ -97,9 +140,22 @@ public class ObjectConversionException extends RuntimeException {
    *
    * @author paouelle
    *
-   * @return the result row we were trying to convert from
+   * @return the result row we were trying to convert from or <code>null</code>
+   *         if converting a user-defined type
    */
   public Row getRow() {
     return row;
+  }
+
+  /**
+   * Gets the Cassandra UDT value we were trying to convert from.
+   *
+   * @author paouelle
+   *
+   * @return the UDT value we were trying to convert from or <code>null</code>
+   *         if not converting a user-defined type
+   */
+  public UDTValue getUDTValue() {
+    return uval;
   }
 }

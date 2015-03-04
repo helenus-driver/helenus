@@ -45,6 +45,8 @@ import java.time.ZoneId;
 import org.apache.commons.lang3.StringUtils;
 
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
+import com.github.helenusdriver.driver.StatementBuilder;
+import com.github.helenusdriver.persistence.CQLDataType;
 import com.github.helenusdriver.persistence.Column;
 import com.github.helenusdriver.persistence.DataType;
 import com.github.helenusdriver.persistence.Persisted;
@@ -113,20 +115,20 @@ public class DataTypeImpl {
    *
    * @since 1.0
    */
-  public static class Definition {
+  public static class Definition implements CQLDataType {
     /**
-     * Holds the data type for this definition.
+     * Holds the data type for this definition if not a user-defined type.
      *
      * @author paouelle
      */
-    private final DataType type;
+    private final CQLDataType type;
 
     /**
      * Holds the arguments data type if this definition represents a collection.
      *
      * @author paouelle
      */
-    private final List<DataType> arguments;
+    private final List<CQLDataType> arguments;
 
     /**
      * Instantiates a new <code>Definition</code> object.
@@ -139,7 +141,21 @@ public class DataTypeImpl {
      */
     Definition(DataType type, DataType... arguments) {
       this.type = type;
-      this.arguments = Arrays.asList(arguments);
+      this.arguments = Arrays.asList((CQLDataType[])arguments);
+    }
+
+    /**
+     * Instantiates a new <code>Definition</code> object.
+     *
+     * @author paouelle
+     *
+     * @param type the non-<code>null</code> data type for this definition
+     * @param arguments the non-<code>null</code> list of arguments' data types
+     *        if the type represents a collection (may be empty)
+     */
+    Definition(DataType type, List<CQLDataType> arguments) {
+      this.type = type;
+      this.arguments = arguments;
     }
 
     /**
@@ -151,9 +167,45 @@ public class DataTypeImpl {
      *        definition (the first one correspond to the data type and the
      *        remaining are the argument data types)
      */
-    Definition(List<DataType> types) {
+    Definition(List<CQLDataType> types) {
       this.type = types.remove(0);
       this.arguments = Collections.unmodifiableList(types);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.persistence.CQLDataType#name()
+     */
+    @Override
+    public String name() {
+      return type.name();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.persistence.CQLDataType#isCollection()
+     */
+    @Override
+    public boolean isCollection() {
+      return !arguments.isEmpty();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.persistence.CQLDataType#isUserDefined()
+     */
+    @Override
+    public boolean isUserDefined() {
+      return type instanceof UDTClassInfoImpl;
     }
 
     /**
@@ -163,23 +215,11 @@ public class DataTypeImpl {
      *
      * @return the non-<code>null</code> data type for this definition
      */
-    public DataType getType() {
+    public CQLDataType getType() {
       return type;
     }
 
-    /**
-     * Checks if this definition represents a collection.
-     *
-     * @author paouelle
-     *
-     * @return <code>true</code> if this definition represent a collection;
-     *         <code>false</code> otherwise
-     */
-    public boolean isCollection() {
-      return !arguments.isEmpty();
-    }
-
-    /**
+   /**
      * Gets the data type for element values to the collection data type
      * represented by this definition.
      *
@@ -189,7 +229,7 @@ public class DataTypeImpl {
      *         <code>null</code> if this definition doesn't represent a
      *         collection
      */
-    public DataType getElementType() {
+    public CQLDataType getElementType() {
       if (arguments.size() == 0) {
         return null;
       }
@@ -206,7 +246,7 @@ public class DataTypeImpl {
      * @return a non-<code>null</code> list of all argument data types for the
      *         collection
      */
-    public List<DataType> getArgumentTypes() {
+    public List<CQLDataType> getArgumentTypes() {
       return arguments;
     }
 
@@ -219,7 +259,7 @@ public class DataTypeImpl {
      * @return the first argument data type for the collection or <code>null</code>
      *         if this definition doesn't represent a collection
      */
-    public DataType getFirstArgumentType() {
+    public CQLDataType getFirstArgumentType() {
       return (arguments.isEmpty() ? null : arguments.get(0));
     }
 
@@ -309,15 +349,18 @@ public class DataTypeImpl {
             + field.getName()
           );
         }
+      } else if (isUserDefined()) {
+        return DataDecoder.udt((UDTClassInfoImpl<?>)type);
       }
+      // if we get here then we have a system data type that is not a collection
       final DataDecoder<?> decoder;
 
       if (persisted != null) {
         // if persisted then we need to decode: persisted.as()
-        decoder = DataTypeImpl.getDecoder(type, persisted.as().CLASS);
+        decoder = DataTypeImpl.getDecoder((DataType)type, persisted.as().CLASS);
       } else {
         // check if we can get a decoder for the field data type
-        decoder = DataTypeImpl.getDecoder(type, clazz);
+        decoder = DataTypeImpl.getDecoder((DataType)type, clazz);
       }
       if (decoder != null) { // found one so return it
         return decoder;
@@ -468,24 +511,25 @@ public class DataTypeImpl {
     }
 
     /**
-     * Get a CQL representation of this data type definition.
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return a CQL representation of this data type definition
+     * @see com.github.helenusdriver.persistence.CQLDataType#toCQL()
      */
+    @Override
     public String toCQL() {
       if (!isCollection()) {
-        return type.CQL;
+        return type.toCQL();
       }
       final List<String> cqls = new ArrayList<>(arguments.size());
       final StringBuilder sb = new StringBuilder();
 
-      for (final DataType atype: arguments) {
-        cqls.add(atype.CQL);
+      for (final CQLDataType atype: arguments) {
+        cqls.add(atype.toCQL());
       }
       sb
-        .append(type.CQL)
+        .append(type.toCQL())
         .append('<')
         .append(StringUtils.join(cqls, ','))
         .append('>');
@@ -545,7 +589,7 @@ public class DataTypeImpl {
    *         the field
    */
   private static void inferDataTypeFrom(
-    Field field, Class<?> clazz, List<DataType> types
+    Field field, Class<?> clazz, List<CQLDataType> types
   ) {
     inferDataTypeFrom(field, clazz, types, field.getAnnotation(Persisted.class));
   }
@@ -565,7 +609,7 @@ public class DataTypeImpl {
    *         the field
    */
   private static void inferDataTypeFrom(
-    Field field, Class<?> clazz, List<DataType> types, Persisted persisted
+    Field field, Class<?> clazz, List<CQLDataType> types, Persisted persisted
   ) {
     if (List.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -671,9 +715,21 @@ public class DataTypeImpl {
     } else if (Instant.class == clazz) {
       types.add(DataType.TIMESTAMP);
     } else {
-      throw new IllegalArgumentException(
-        "unable to infer data type in field: " + field
-      );
+      // check if it is a user-defined type
+      try {
+        final ClassInfoImpl<?> cinfo
+          = (ClassInfoImpl<?>)StatementBuilder.getClassInfo(clazz);
+
+        org.apache.commons.lang3.Validate.isTrue(
+          cinfo instanceof UDTClassInfoImpl,
+          "unable to infer data type in field: %s", field
+        );
+        types.add((UDTClassInfoImpl<?>)cinfo);
+      } catch (Exception e) {
+        throw new IllegalArgumentException(
+          "unable to infer data type in field: " + field, e
+        );
+      }
     }
   }
 
@@ -697,25 +753,26 @@ public class DataTypeImpl {
 
       if (cdata != null) {
         final DataType type = cdata.type();
-        DataType[] atypes = cdata.arguments();
+        final List<CQLDataType> atypes
+          = new ArrayList<>(Arrays.asList(cdata.arguments()));
 
         if (type != DataType.INFERRED) {
           org.apache.commons.lang3.Validate.isTrue(
-            !(atypes.length < type.NUM_ARGUMENTS),
+            !(atypes.size() < type.NUM_ARGUMENTS),
             "missing argument data type(s) for '%s' in field: %s.%s",
             type.CQL,
             field.getDeclaringClass().getName(),
             field.getName()
           );
           org.apache.commons.lang3.Validate.isTrue(
-            !((type.NUM_ARGUMENTS == 0) && (atypes.length != 0)),
+            !((type.NUM_ARGUMENTS == 0) && (atypes.size() != 0)),
             "data type '%s' is not a collection in field: %s.%s",
             type.CQL,
             field.getDeclaringClass().getName(),
             field.getName()
           );
           org.apache.commons.lang3.Validate.isTrue(
-            !(atypes.length > type.NUM_ARGUMENTS),
+            !(atypes.size() > type.NUM_ARGUMENTS),
             "too many argument data type(s) for '%s' in field: %s.%s",
             type.CQL,
             field.getDeclaringClass().getName(),
@@ -723,28 +780,29 @@ public class DataTypeImpl {
           );
           if (type.NUM_ARGUMENTS != 0) {
             org.apache.commons.lang3.Validate.isTrue(
-              atypes[0].NUM_ARGUMENTS == 0,
+              ((DataType)atypes.get(0)).NUM_ARGUMENTS == 0,
               "collection of collection is not supported in field: %s.%s",
               field.getDeclaringClass().getName(),
               field.getName()
             );
             org.apache.commons.lang3.Validate.isTrue(
-              !((type.NUM_ARGUMENTS > 1) && (atypes[1].NUM_ARGUMENTS != 0)),
+              !((type.NUM_ARGUMENTS > 1)
+                && (((DataType)atypes.get(1)).NUM_ARGUMENTS != 0)),
               "collection of collection is not supported in field: %s.%s",
               field.getDeclaringClass().getName(),
               field.getName()
             );
-            if ((atypes[0] == DataType.INFERRED)
-                || ((type.NUM_ARGUMENTS > 1) && (atypes[1] == DataType.INFERRED))) {
+            if ((((DataType)atypes.get(0)) == DataType.INFERRED)
+                || ((type.NUM_ARGUMENTS > 1)
+                    && (((DataType)atypes.get(1)) == DataType.INFERRED))) {
               // we have an inferred part for the collection so calculate as
               // if it was all inferred and extract only the part we need
-              final List<DataType> types = new ArrayList<>(3);
+              final List<CQLDataType> types = new ArrayList<>(3);
 
               DataTypeImpl.inferDataTypeFrom(field, field.getType(), types);
-              atypes = atypes.clone(); // clone it since we will replace inferred
-              for (int i = 0; i < atypes.length; i++) {
-                if (atypes[i] == DataType.INFERRED) {
-                  atypes[i] = types.get(i + 1); // since index 1 corresponds to the collection type
+              for (int i = 0; i < atypes.size(); i++) {
+                if (atypes.get(i) == DataType.INFERRED) {
+                  atypes.set(i, types.get(i + 1)); // since index 1 corresponds to the collection type
                 }
               }
             }
@@ -774,7 +832,7 @@ public class DataTypeImpl {
         field.getName()
       );
     }
-    final List<DataType> types = new ArrayList<>(3);
+    final List<CQLDataType> types = new ArrayList<>(3);
 
     DataTypeImpl.inferDataTypeFrom(field, field.getType(), types);
     return new Definition(types);
@@ -793,7 +851,10 @@ public class DataTypeImpl {
    * @return <code>true</code> if the given class can be assigned to the given data
    *         type
    */
-  public static boolean isAssignableFrom(DataType type, Class<?> clazz) {
+  public static boolean isAssignableFrom(CQLDataType type, Class<?> clazz) {
+    if (type.isUserDefined()) {
+      return ((UDTClassInfoImpl<?>)type).getObjectClass().isAssignableFrom(clazz);
+    }
     // search the defined list of decoders for the right one
     for (final DataDecoder<?> decoder: DataTypeImpl.decoders.get(type)) {
       if (decoder.canDecodeTo(clazz)) {
@@ -814,7 +875,7 @@ public class DataTypeImpl {
    * @return <code>true</code> if the given object can be assigned to a column
    *         of this data type; <code>false</code> otherwise
    */
-  public static boolean isInstance(DataType type, Object object) {
+  public static boolean isInstance(CQLDataType type, Object object) {
     return (
       (object != null)
       ? DataTypeImpl.isAssignableFrom(type, object.getClass())

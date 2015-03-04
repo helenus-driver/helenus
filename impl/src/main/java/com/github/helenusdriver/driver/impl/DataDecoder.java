@@ -41,6 +41,7 @@ import java.time.ZoneId;
 import org.apache.commons.lang3.LocaleUtils;
 
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 import com.datastax.driver.core.utils.Bytes;
 
@@ -66,9 +67,10 @@ import com.datastax.driver.core.utils.Bytes;
  * - "varint"    to {@link BigInteger}
  * - "timeuuid"  to {@link UUID}
  *
- * - "list&lt;ctype&gt;"       - {@link List} of the corresponding element type
- * - "map&lt;ctype, ctype&gt;" - {@link Map} of the corresponding element types
- * - "set&lt;ctype&gt;"        - {@link Set} of the corresponding element type
+ * - "list&lt;ctype&gt;"       to {@link List} of the corresponding element type
+ * - "map&lt;ctype, ctype&gt;" to {@link Map} of the corresponding element types
+ * - "set&lt;ctype&gt;"        to {@link Set} of the corresponding element type
+ * - "frozen&lt;udt&gt;"       to an object of the user-defined type
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -95,6 +97,15 @@ public abstract class DataDecoder<V> {
       );
       return row.getString(name);
     }
+    @Override
+    protected String decodeImpl(UDTValue uval, String name, Class<String> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        String.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getString(name);
+    }
   };
 
   /**
@@ -113,6 +124,18 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       final String eval = row.getString(name);
+
+      return (eval != null) ? Enum.valueOf(clazz, eval) : null;
+    }
+    @SuppressWarnings("unchecked")
+    @Override
+    protected Enum decodeImpl(UDTValue uval, String name, Class<Enum> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Enum.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final String eval = uval.getString(name);
 
       return (eval != null) ? Enum.valueOf(clazz, eval) : null;
     }
@@ -143,6 +166,24 @@ public abstract class DataDecoder<V> {
         throw new IllegalArgumentException(e);
       }
     }
+    @Override
+    protected Class decodeImpl(UDTValue uval, String name, Class<Class> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Class.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final String cname = uval.getString(name);
+
+      if (cname == null) {
+        return null;
+      }
+      try {
+        return Class.forName(cname);
+      } catch (ClassNotFoundException e) {
+        throw new IllegalArgumentException(e);
+      }
+    }
   };
 
   /**
@@ -159,6 +200,17 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       final String lname = row.getString(name);
+
+      return (lname != null) ? LocaleUtils.toLocale(lname) : null;
+    }
+    @Override
+    protected Locale decodeImpl(UDTValue uval, String name, Class<Locale> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Locale.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final String lname = uval.getString(name);
 
       return (lname != null) ? LocaleUtils.toLocale(lname) : null;
     }
@@ -185,6 +237,21 @@ public abstract class DataDecoder<V> {
         throw new IllegalArgumentException(e);
       }
     }
+    @Override
+    protected ZoneId decodeImpl(UDTValue uval, String name, Class<ZoneId> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        ZoneId.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final String zid = uval.getString(name);
+
+      try {
+        return (zid != null) ? ZoneId.of(zid) : null;
+      } catch (DateTimeException e) {
+        throw new IllegalArgumentException(e);
+      }
+    }
   };
 
   /**
@@ -201,6 +268,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.isNull(name) ? null : row.getLong(name);
+    }
+    @Override
+    protected Long decodeImpl(UDTValue uval, String name, Class<Long> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Long.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.isNull(name) ? null : uval.getLong(name);
     }
   };
 
@@ -226,6 +302,22 @@ public abstract class DataDecoder<V> {
 
       return (buf != null) ? Bytes.getArray(buf) : null;
     }
+    @Override
+    protected byte[] decodeImpl(UDTValue uval, String name, Class<byte[]> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        clazz.isArray(),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        Byte.TYPE == clazz.getComponentType(),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final ByteBuffer buf = uval.getBytes(name);
+
+      return (buf != null) ? Bytes.getArray(buf) : null;
+    }
   };
 
   /**
@@ -243,6 +335,15 @@ public abstract class DataDecoder<V> {
       );
       return row.getBytes(name);
     }
+    @Override
+    protected ByteBuffer decodeImpl(UDTValue uval, String name, Class<ByteBuffer> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        ByteBuffer.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getBytes(name);
+    }
   };
 
   /**
@@ -259,6 +360,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.isNull(name) ? null : row.getBool(name);
+    }
+    @Override
+    protected Boolean decodeImpl(UDTValue uval, String name, Class<Boolean> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Boolean.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.isNull(name) ? null : uval.getBool(name);
     }
   };
 
@@ -284,6 +394,15 @@ public abstract class DataDecoder<V> {
       );
       return row.isNull(name) ? null : new AtomicLong(row.getLong(name));
     }
+    @Override
+    protected AtomicLong decodeImpl(UDTValue uval, String name, Class<AtomicLong> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        AtomicLong.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.isNull(name) ? null : new AtomicLong(uval.getLong(name));
+    }
   };
 
   /**
@@ -300,6 +419,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.getDecimal(name);
+    }
+    @Override
+    protected BigDecimal decodeImpl(UDTValue uval, String name, Class<BigDecimal> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        BigDecimal.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getDecimal(name);
     }
   };
 
@@ -318,6 +446,15 @@ public abstract class DataDecoder<V> {
       );
       return row.isNull(name) ? null : row.getDouble(name);
     }
+    @Override
+    protected Double decodeImpl(UDTValue uval, String name, Class<Double> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Double.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.isNull(name) ? null : uval.getDouble(name);
+    }
   };
 
   /**
@@ -334,6 +471,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.isNull(name) ? null : row.getFloat(name);
+    }
+    @Override
+    protected Float decodeImpl(UDTValue uval, String name, Class<Float> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Float.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.isNull(name) ? null : uval.getFloat(name);
     }
   };
 
@@ -352,6 +498,15 @@ public abstract class DataDecoder<V> {
       );
       return row.getInet(name);
     }
+    @Override
+    protected InetAddress decodeImpl(UDTValue uval, String name, Class<InetAddress> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        InetAddress.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getInet(name);
+    }
   };
 
   /**
@@ -368,6 +523,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.isNull(name) ? null : row.getInt(name);
+    }
+    @Override
+    protected Integer decodeImpl(UDTValue uval, String name, Class<Integer> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Integer.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.isNull(name) ? null : uval.getInt(name);
     }
   };
 
@@ -393,6 +557,15 @@ public abstract class DataDecoder<V> {
       );
       return row.getDate(name);
     }
+    @Override
+    protected Date decodeImpl(UDTValue uval, String name, Class<Date> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Date.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getDate(name);
+    }
   };
 
   /**
@@ -409,6 +582,17 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       final Date date = row.getDate(name);
+
+      return (date != null) ? date.toInstant() : null;
+    }
+    @Override
+    protected Instant decodeImpl(UDTValue uval, String name, Class<Instant> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Instant.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final Date date = uval.getDate(name);
 
       return (date != null) ? date.toInstant() : null;
     }
@@ -431,6 +615,17 @@ public abstract class DataDecoder<V> {
 
       return (date != null) ? date.getTime() : null;
     }
+    @Override
+    protected Long decodeImpl(UDTValue uval, String name, Class<Long> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        Long.class == clazz,
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      final Date date = uval.getDate(name);
+
+      return (date != null) ? date.getTime() : null;
+    }
   };
 
   /**
@@ -447,6 +642,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.getUUID(name);
+    }
+    @Override
+    protected UUID decodeImpl(UDTValue uval, String name, Class<UUID> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        UUID.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getUUID(name);
     }
   };
 
@@ -471,6 +675,15 @@ public abstract class DataDecoder<V> {
         clazz.getName()
       );
       return row.getVarint(name);
+    }
+    @Override
+    protected BigInteger decodeImpl(UDTValue uval, String name, Class<BigInteger> clazz) {
+      org.apache.commons.lang3.Validate.isTrue(
+        BigInteger.class.isAssignableFrom(clazz),
+        "unsupported class '%s' to decode to",
+        clazz.getName()
+      );
+      return uval.getVarint(name);
     }
   };
 
@@ -498,12 +711,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<List>(List.class) {
       @SuppressWarnings("unchecked")
-      @Override
-      protected List decodeImpl(Row row, String name, Class clazz) {
-        // get the element type from the row's metadata
-        final Class<?> etype = row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass();
-        final List<Object> list = row.isNull(name) ? null : row.getList(name, Object.class); // keeps things generic so we can handle our own errors
-
+      private List decodeImpl(Class<?> etype, List<Object> list) {
         if (list == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty lists and the schema definition requires
@@ -528,6 +736,24 @@ public abstract class DataDecoder<V> {
         }
         return nlist;
       }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected List decodeImpl(Row row, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          row.isNull(name) ? null : row.getList(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected List decodeImpl(UDTValue uval, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          uval.isNull(name) ? null : uval.getList(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
     };
   }
 
@@ -548,12 +774,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<Set>(Set.class) {
       @SuppressWarnings("unchecked")
-      @Override
-      protected Set decodeImpl(Row row, String name, Class clazz) {
-        // get the element type from the row's metadata
-        final Class<?> etype = row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass();
-        final Set<Object> set = row.isNull(name) ? null : row.getSet(name, Object.class); // keeps things generic so we can handle our own errors
-
+      private Set decodeImpl(Class<?> etype, Set<Object> set) {
         if (set == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty sets and the schema definition requires
@@ -590,6 +811,24 @@ public abstract class DataDecoder<V> {
         }
         return nset;
       }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected Set decodeImpl(Row row, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          row.isNull(name) ? null : row.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected Set decodeImpl(UDTValue uval, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          uval.isNull(name) ? null : uval.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
     };
   }
 
@@ -611,13 +850,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<Map>(Map.class) {
       @SuppressWarnings("unchecked")
-      @Override
-      protected Map decodeImpl(Row row, String name, Class clazz) {
-        // get the element type from the row's metadata
-        final Class<?> ektype = row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass();
-        final Class<?> evtype = row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName().asJavaClass();
-        final Map<Object, Object> map = row.isNull(name) ? null : row.getMap(name, Object.class, Object.class); // keeps things generic so we can handle our own errors
-
+      private Map decodeImpl(Class<?> ektype, Class<?> evtype, Map<Object, Object> map) {
         if (map == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty list and the schema definition requires
@@ -656,6 +889,61 @@ public abstract class DataDecoder<V> {
           }
         }
         return nmap;
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected Map decodeImpl(Row row, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName().asJavaClass(),
+          row.isNull(name) ? null : row.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected Map decodeImpl(UDTValue uval, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          uval.getType().getFieldType(name).getTypeArguments().get(1).getName().asJavaClass(),
+          uval.isNull(name) ? null : uval.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+    };
+  }
+
+  /**
+   * Gets a "udt" to {@link Object} decoder based on the given UDT class info.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the user-defined class info
+   * @return the non-<code>null</code> decoder for user-defined types represented
+   *         by the given class info
+   */
+  @SuppressWarnings("rawtypes")
+  public final static DataDecoder<Object> udt(final UDTClassInfoImpl<?> cinfo) {
+    return new DataDecoder<Object>(Object.class) {
+      @SuppressWarnings("unchecked")
+      @Override
+      protected Object decodeImpl(Row row, String name, Class clazz) {
+        org.apache.commons.lang3.Validate.isTrue(
+          clazz.isAssignableFrom(cinfo.getObjectClass()),
+          "unsupported class '%s' to decode to", clazz.getName()
+        );
+        final UDTValue uval = row.getUDTValue(name);
+
+        if (uval == null) {
+          return null;
+        }
+        return cinfo.getObject(uval);
+      }
+      @Override
+      protected Object decodeImpl(UDTValue uval, String name, Class clazz) { // not supported????
+        throw new IllegalArgumentException(
+          "user-defined types based on other user-defined types are not supported"
+        );
       }
     };
   }
@@ -697,6 +985,25 @@ public abstract class DataDecoder<V> {
   protected abstract V decodeImpl(Row row, String name, Class<V> clazz);
 
   /**
+   * Decodes the specified column from the given UDT value and return the value
+   * that matches the decoder's defined class.
+   *
+   * @author paouelle
+   *
+   * @param  uval the non-<code>null</code> UDT value where the column value is
+   *         defined
+   * @param  name the non-<code>null</code> name of the column to decode
+   * @param  clazz the non-<code>null</code> class to decode to
+   * @return the decoded object
+   * @throws IllegalArgumentException if decoding to <code>clazz</code> is not
+   *         supported or if <code>name</code> is not part of the
+   *         UDT value
+   * @throws InvalidTypeException if column <code>name</code> type is not the
+   *         expected one
+   */
+  protected abstract V decodeImpl(UDTValue uval, String name, Class<V> clazz);
+
+  /**
    * Checks if this decoder can decode to the specified class.
    *
    * @author paouelle
@@ -733,7 +1040,33 @@ public abstract class DataDecoder<V> {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null name");
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null clazz");
     return decodeImpl(row, name, clazz);
-  };
+  }
+
+  /**
+   * Decodes the specified column from the given UDT value and return the value
+   * that matches the decoder's defined class.
+   *
+   * @author paouelle
+   *
+   * @param  uval the non-<code>null</code> UDT value where the column value is
+   *         defined
+   * @param  name the non-<code>null</code> name of the column to decode
+   * @param  clazz the class to decode to
+   * @return the decoded object or <code>null</code> if the specified column
+   *         doesn't exist in the UDT value
+   * @throws NullPointerException if <code>uval</code>, <code>name</code>, or
+   *         <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if decoding to <code>clazz</code> is not
+   *         supported or if <code>name</code> is not part of the UDT value
+   * @throws InvalidTypeException if column <code>name</code> type is not the
+   *         expected one
+   */
+  public V decode(UDTValue uval, String name, Class<V> clazz) {
+    org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null name");
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null clazz");
+    return decodeImpl(uval, name, clazz);
+  }
 }
 
 /**
