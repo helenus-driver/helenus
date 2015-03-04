@@ -573,6 +573,41 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
+   * Instantiates a new fake <code>FieldInfo</code> object to represent a
+   * suffix key associated with the POJO class of a user-defined type.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the non-<code>null</code> class info for the POJO
+   * @param  suffix the non-<code>null</code> suffix annotation for the POJO class
+   */
+  FieldInfoImpl(ClassInfoImpl<T> cinfo, SuffixKey suffix) {
+    this.clazz = cinfo.getObjectClass();
+    this.cinfo = cinfo;
+    this.tinfo = null;
+    this.declaringClass = cinfo.getObjectClass();
+    this.field = null;
+    this.isFinal = true;
+    this.name = suffix.name();
+    this.type = String.class;
+    this.column = null;
+    this.persisted = null;
+    this.persister = null;
+    this.suffix = suffix;
+    this.mandatory = true; // keyspace suffixes are mandatory fields
+    this.index = null; // we don't care about this for keyspace suffixes
+    this.partitionKey = null; // we don't care about this for keyspace suffixes
+    this.clusteringKey = null; // we don't care about this for keyspace suffixes
+    this.typeKey = null; // we don't care about this for keyspace suffixes
+    this.multiKeyType = null; // we don't care about this for keyspace suffixes
+    this.definition = null; // we don't care about this for keyspace suffixes
+    this.decoder = null; // we don't care about this for keyspace suffixes
+    this.getter = null;
+    this.setter = null;
+    this.finalValue = null;
+  }
+
+  /**
    * Instantiates a new persister object based on the @Persisted annotation.
    *
    * @author paouelle

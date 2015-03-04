@@ -17,6 +17,8 @@ package com.github.helenusdriver.persistence;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -27,6 +29,11 @@ import java.lang.annotation.Target;
  * <p>
  * Attributes annotated with this annotation will be loaded with the corresponding
  * part of the keyspace name when reloaded from the database later.
+ * <p>
+ * When defining a user-defined type where the associated keyspace is defined
+ * with suffixes, this annotation should be place on the class itself to provide
+ * a mapping between a suffix type and a "fake" column name such that the suffix
+ * could be specified in the CREATE TYPE statement.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -35,8 +42,10 @@ import java.lang.annotation.Target;
  *
  * @since 1.0
  */
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
+@Repeatable(SuffixKeys.class)
+@Inherited
 @Documented
 public @interface SuffixKey {
   /**

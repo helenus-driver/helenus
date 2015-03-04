@@ -29,7 +29,6 @@ import java.util.stream.Stream;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
-
 import com.github.helenusdriver.driver.ObjectConversionException;
 import com.github.helenusdriver.persistence.RootEntity;
 
@@ -44,7 +43,7 @@ import com.github.helenusdriver.persistence.RootEntity;
  *
  * @param <T> The type of POJO represented by this root class
  *
- * @since 2.0
+ * @since 1.0
  */
 @lombok.ToString(callSuper=true, of={"ntypes"})
 @lombok.EqualsAndHashCode(callSuper=true)
@@ -104,7 +103,7 @@ public class RootClassInfoImpl<T> extends ClassInfoImpl<T> {
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
-   * @since 2.0
+   * @since 1.0
    */
   public class Context extends ClassInfoImpl<T>.Context {
     /**
@@ -177,7 +176,7 @@ public class RootClassInfoImpl<T> extends ClassInfoImpl<T> {
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
-   * @since 2.0
+   * @since 1.0
    */
   public class POJOContext extends ClassInfoImpl<T>.POJOContext {
     /**

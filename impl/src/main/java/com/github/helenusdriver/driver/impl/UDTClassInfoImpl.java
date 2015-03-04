@@ -42,7 +42,7 @@ import com.github.helenusdriver.persistence.UDTEntity;
  *
  * @param <T> The type of POJO represented by this class
  *
- * @since 2.0
+ * @since 1.0
  */
 @lombok.ToString(callSuper=true)
 @lombok.EqualsAndHashCode(callSuper=true)

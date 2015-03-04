@@ -621,7 +621,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  private final Map<String, FieldInfoImpl<T>> suffixesByName = new LinkedHashMap<>(8);
+  protected final Map<String, FieldInfoImpl<T>> suffixesByName = new LinkedHashMap<>(8);
 
   /**
    * Holds a map of all fields annotated as suffixes keyed by the
@@ -629,7 +629,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  private final Map<String, FieldInfoImpl<T>> suffixesByType = new LinkedHashMap<>(8);
+  protected final Map<String, FieldInfoImpl<T>> suffixesByType = new LinkedHashMap<>(8);
 
   /**
    * Instantiates a new <code>ClassInfo</code> object.
@@ -1016,33 +1016,68 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     for (final String s: keyspace.suffixes()) {
       ksuffixes.add(s);
     }
-    // make sure to walk up the class hierarchy
-    for (final Field f: ReflectionUtils.getAllFieldsAnnotatedWith(
-      clazz, SuffixKey.class, true
-    )) {
-      final FieldInfoImpl<T> field = new FieldInfoImpl<>(this, f);
-      final SuffixKey suffix = field.getSuffixKey();
+    // check suffix keys defined on the class itself
+    final SuffixKey[] suffixes = clazz.getAnnotationsByType(SuffixKey.class);
 
+    if (this instanceof UDTClassInfoImpl) {
+      for (final SuffixKey suffix: suffixes) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !suffixesByType.containsKey(suffix.type()),
+          "multipe @SuffixKey annotations found with type '%s' for class: %s",
+          suffix.type(),
+          clazz.getSimpleName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !suffixesByName.containsKey(suffix.name()),
+          "multipe @SuffixKey annotations found with name '%s' for class: %s",
+          suffix.name(),
+          clazz.getSimpleName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          ksuffixes.remove(suffix.type()),
+          "@Keyspace annotation does not define suffix type '%s' for class: %s",
+          suffix.type(),
+          clazz.getSimpleName()
+        );
+        final FieldInfoImpl<T> field = new FieldInfoImpl<>(this, suffix);
+
+        suffixesByName.put(suffix.name(), field);
+        suffixesByType.put(suffix.type(), field);
+      }
+    } else {
       org.apache.commons.lang3.Validate.isTrue(
-        !suffixesByType.containsKey(suffix.type()),
-        "multipe @SuffixKey annotations found with type '%s' for class: %s",
-        suffix.type(),
-        clazz.getSimpleName()
+        suffixes.length == 0,
+        "%s POJOs do not support @SuffixKey annotations on the type; define a field instead",
+        getEntityAnnotationClass().getSimpleName()
       );
-      org.apache.commons.lang3.Validate.isTrue(
-        !suffixesByName.containsKey(suffix.name()),
-        "multipe @SuffixKey annotations found with name '%s' for class: %s",
-        suffix.name(),
-        clazz.getSimpleName()
-      );
-      org.apache.commons.lang3.Validate.isTrue(
-        ksuffixes.remove(suffix.type()),
-        "@Keyspace annotation does not define suffix type '%s' for class: %s",
-        suffix.type(),
-        clazz.getSimpleName()
-      );
-      suffixesByName.put(suffix.name(), field);
-      suffixesByType.put(suffix.type(), field);
+      // make sure to walk up the class hierarchy
+      for (final Field f: ReflectionUtils.getAllFieldsAnnotatedWith(
+        clazz, SuffixKey.class, true
+      )) {
+        final FieldInfoImpl<T> field = new FieldInfoImpl<>(this, f);
+        final SuffixKey suffix = field.getSuffixKey();
+
+        org.apache.commons.lang3.Validate.isTrue(
+          !suffixesByType.containsKey(suffix.type()),
+          "multipe @SuffixKey annotations found with type '%s' for class: %s",
+          suffix.type(),
+          clazz.getSimpleName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !suffixesByName.containsKey(suffix.name()),
+          "multipe @SuffixKey annotations found with name '%s' for class: %s",
+          suffix.name(),
+          clazz.getSimpleName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          ksuffixes.remove(suffix.type()),
+          "@Keyspace annotation does not define suffix type '%s' for class: %s",
+          suffix.type(),
+          clazz.getSimpleName()
+        );
+        suffixesByName.put(suffix.name(), field);
+        suffixesByType.put(suffix.type(), field);
+      }
     }
     org.apache.commons.lang3.Validate.isTrue(
       ksuffixes.isEmpty(),
