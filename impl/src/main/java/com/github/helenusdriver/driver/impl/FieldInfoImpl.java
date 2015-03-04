@@ -28,6 +28,7 @@ import java.io.IOException;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.text.WordUtils;
@@ -671,6 +672,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       final Class<?> wtype = ClassUtils.primitiveToWrapper(type);
       final Class<?> wrtype = ClassUtils.primitiveToWrapper(m.getReturnType());
 
+      // account for getters that returns Optional<>
+      if (Optional.class.isAssignableFrom(wrtype)) {
+        return null;
+      }
       org.apache.commons.lang3.Validate.isTrue(
         wtype.isAssignableFrom(wrtype),
         "expecting getter for field '%s' with return type: %s",
@@ -712,6 +717,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       final Class<?> wtype = ClassUtils.primitiveToWrapper(type);
       final Class<?> wptype = ClassUtils.primitiveToWrapper(m.getParameterTypes()[0]);
 
+      // account for setters that expects Optional<>
+      if (Optional.class.isAssignableFrom(wptype)) {
+        return null;
+      }
       org.apache.commons.lang3.Validate.isTrue(
         wtype.isAssignableFrom(wptype),
         "expecting setter for field '%s' with parameter type: %s",
