@@ -47,8 +47,8 @@ public @interface Keyspace {
 
   /**
    * The name for the keyspace. Valid keyspace names are strings of alpha-numeric
-   * characters and underscores, and must begin with a letter. No keyspace name
-   * can be referenced unless there is at least one suffix defined.
+   * characters and underscores, and must begin with a letter. An empty keyspace
+   * name cannot be referenced unless there is at least one suffix defined.
    *
    * @author paouelle
    *

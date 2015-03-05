@@ -44,8 +44,8 @@ import com.github.helenusdriver.annotation.Keyable;
 @Documented
 public @interface Table {
   /**
-   * Special constants used in the {@link Column}, &#64;PartitionKey, and
-   * &#64;ClusteringKey annotations to indicate the annotation applies to
+   * Special constants used in the {@link Column}, {@link PartitionKey}, and
+   * {@link ClusteringKey} annotations to indicate the annotation applies to
    * all tables defined for the entity.
    *
    * @author paouelle
