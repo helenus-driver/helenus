@@ -1271,13 +1271,18 @@ public class Tool {
       final String server = line.getOptionValue(
         Tool.server.getLongOpt(), "127.0.0.1" // defaults to local host
       );
+      final boolean connect = (
+        line.hasOption(Tool.objects.getLongOpt())
+        || line.hasOption(Tool.schemas.getLongOpt())
+      );
 
       Tool.mgr = new StatementManagerImpl(
         Cluster
           .builder()
           .addContactPoint(server)
           .withQueryOptions(null),
-          line.getOptionValues(Tool.filters.getLongOpt())
+        connect,
+        line.getOptionValues(Tool.filters.getLongOpt())
       );
       if (line.hasOption(Tool.replicationFactor.getLongOpt())) {
         mgr.setDefaultReplicationFactor(
@@ -1287,7 +1292,7 @@ public class Tool {
         );
       }
       try {
-        if (Tool.vflag) {
+        if (connect && Tool.vflag) {
           System.out.println(
             Tool.class.getSimpleName()
             + ": connected to Cassandra on: "

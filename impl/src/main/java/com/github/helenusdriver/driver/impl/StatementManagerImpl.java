@@ -40,6 +40,7 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.CloseFuture;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.github.helenusdriver.commons.collections.iterators.SnapshotIterator;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.Assignment;
@@ -122,7 +123,7 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    */
-  private final Session session;
+  private Session session;
 
   /**
    * Holds the default replication factor to use when creating keyspaces with
@@ -159,17 +160,21 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @param  initializer the cluster initializer to use to initialize Cassandra's
    *         cluster
+   * @param  connect <code>true</code> to connect to Cassandra; <code>false</code>
+   *         not to connect
    * @throws NullPointerException if <code>initializer</code> is <code>null</code>
    * @throws IllegalArgumentException if the list of contact points provided
    *         by <code>initializer</code> is empty or if not all those contact
    *         points have the same port.
+   * @throws NoHostAvailableException if no Cassandra host amongst the contact
+   *         points can be reached
    * @throws SecurityException if the statement manager reference has already
    *         been set
    */
-  public StatementManagerImpl(Cluster.Initializer initializer) {
+  public StatementManagerImpl(Cluster.Initializer initializer, boolean connect) {
     com.github.helenusdriver.commons.lang3.Validate.notNull(logger, initializer, "invalid null initializer");
     this.cluster = Cluster.buildFrom(initializer);
-    this.session = cluster.connect();
+    this.session = connect ? cluster.connect() : null;
     this.bridge = setManager(this);
   }
 
@@ -182,18 +187,22 @@ public class StatementManagerImpl extends StatementManager {
    *         cluster
    * @param  defaultReplicationFactor the default replication factor to use when
    *         POJOS are defined with the SIMPLE strategy and do not specify a factor
+   * @param  connect <code>true</code> to connect to Cassandra; <code>false</code>
+   *         not to connect
    * @throws NullPointerException if <code>initializer</code> is <code>null</code>
    * @throws IllegalArgumentException if the list of contact points provided
    *         by <code>initializer</code> is empty or if not all those contact
    *         points have the same port or again the default replication factor
    *         is less or equal to 0
+   * @throws NoHostAvailableException if no Cassandra host amongst the contact
+   *         points can be reached
    * @throws SecurityException if the statement manager reference has already
    *         been set
    */
   public StatementManagerImpl(
-    Cluster.Initializer initializer, int defaultReplicationFactor
+    Cluster.Initializer initializer, int defaultReplicationFactor, boolean connect
   ) {
-    this(initializer);
+    this(initializer, connect);
     setDefaultReplicationFactor(defaultReplicationFactor);
   }
 
@@ -206,21 +215,26 @@ public class StatementManagerImpl extends StatementManager {
    *         cluster
    * @param  defaultReplicationFactor the default replication factor to use when
    *         POJOS are defined with the SIMPLE strategy and do not specify a factor
+   * @param  connect <code>true</code> to connect to Cassandra; <code>false</code>
+   *         not to connect
    * @param  filters optional entity filters to register
    * @throws NullPointerException if <code>initializer</code> is <code>null</code>
    * @throws IllegalArgumentException if the list of contact points provided
    *         by <code>initializer</code> is empty or if not all those contact
    *         points have the same port or again the default replication factor
    *         is less or equal to 0
+   * @throws NoHostAvailableException if no Cassandra host amongst the contact
+   *         points can be reached
    * @throws SecurityException if the statement manager reference has already
    *         been set
    */
   public StatementManagerImpl(
     Cluster.Initializer initializer,
     int defaultReplicationFactor,
+    boolean connect,
     EntityFilter... filters
   ) {
-    this(initializer, filters);
+    this(initializer, connect, filters);
     setDefaultReplicationFactor(defaultReplicationFactor);
   }
 
@@ -231,18 +245,22 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @param  initializer the cluster initializer to use to initialize Cassandra's
    *         cluster
+   * @param  connect <code>true</code> to connect to Cassandra; <code>false</code>
+   *         not to connect
    * @param  filters optional entity filters to register
    * @throws NullPointerException if <code>initializer</code> is <code>null</code>
    * @throws IllegalArgumentException if the list of contact points provided
    *         by <code>initializer</code> is empty or if not all those contact
    *         points have the same port.
+   * @throws NoHostAvailableException if no Cassandra host amongst the contact
+   *         points can be reached
    * @throws SecurityException if the statement manager reference has already
    *         been set
    */
   public StatementManagerImpl(
-    Cluster.Initializer initializer, EntityFilter... filters
+    Cluster.Initializer initializer, boolean connect, EntityFilter... filters
   ) {
-    this(initializer);
+    this(initializer, connect);
     if (filters != null) {
       for (final EntityFilter filter: filters) {
         this.filters.add(filter);
@@ -260,11 +278,15 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @param  initializer the cluster initializer to use to initialize Cassandra's
    *         cluster
+   * @param  connect <code>true</code> to connect to Cassandra; <code>false</code>
+   *         not to connect
    * @param  cnames optional entity filter class names to register
    * @throws NullPointerException if <code>initializer</code> is <code>null</code>
    * @throws IllegalArgumentException if the list of contact points provided
    *         by <code>initializer</code> is empty or if not all those contact
    *         points have the same port.
+   * @throws NoHostAvailableException if no Cassandra host amongst the contact
+   *         points can be reached
    * @throws SecurityException if the statement manager reference has already
    *         been set
    * @throws LinkageError if the linkage fails while loading a filter class
@@ -277,9 +299,10 @@ public class StatementManagerImpl extends StatementManager {
    *         or if a filter class has no default constructor; or if the
    *         instantiation fails for some other reason
    */
-  public StatementManagerImpl(Cluster.Initializer initializer, String... cnames)
-    throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-    this(initializer);
+  public StatementManagerImpl(
+    Cluster.Initializer initializer, boolean connect, String... cnames
+  ) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+    this(initializer, connect);
     if (cnames != null) {
       for (final String cname: cnames) {
         final Class<?> clazz = Class.forName(cname);
@@ -1522,6 +1545,20 @@ public class StatementManagerImpl extends StatementManager {
   }
 
   /**
+   * Connects to Cassandra if not already connected.
+   *
+   * @author paouelle
+   *
+   * @throws NoHostAvailableException if no Cassandra host amongst the contact
+   *         points can be reached
+   */
+  public synchronized void connect() {
+    if (session == null) {
+      this.session = cluster.connect();
+    }
+  }
+
+  /**
    * Filters the specified table for a POJO class.
    *
    * @author paouelle
@@ -1623,7 +1660,7 @@ public class StatementManagerImpl extends StatementManager {
    * @see com.github.helenusdriver.driver.StatementManager#getSession()
    */
   @Override
-  public Session getSession() {
+  public synchronized Session getSession() {
     return session;
   }
 
