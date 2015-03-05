@@ -74,6 +74,17 @@ public class ObjectNotFoundException extends RuntimeException {
    * @author paouelle
    *
    * @param clazz the pojo class we queried
+   */
+  public ObjectNotFoundException(Class<?> clazz) {
+    this(clazz, null, null);
+  }
+
+  /**
+   * Instantiates a new <code>ObjectNotFoundException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the pojo class we queried
    * @param msg the error message
    */
   public ObjectNotFoundException(Class<?> clazz, String msg) {

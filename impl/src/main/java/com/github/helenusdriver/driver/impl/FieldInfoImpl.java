@@ -75,6 +75,28 @@ import com.github.helenusdriver.persistence.TypeKey;
 @lombok.ToString(exclude={"cinfo", "tinfo"})
 public class FieldInfoImpl<T> implements FieldInfo<T> {
   /**
+   * Unwraps the specific class if it is an {@link Optional}.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  clazz the class to unwrap if required
+   * @param  type the corresponding type for the class
+   * @return the element of the optional class if it is an optional otherwise
+   *         the class itself
+   */
+  private static Class<?> unwrapOptionalIfPresent(Class<?> clazz, Type type) {
+    if (Optional.class.isAssignableFrom(clazz)) {
+      if (type instanceof ParameterizedType) {
+        final ParameterizedType ptype = (ParameterizedType)type;
+        final Type atype = ptype.getActualTypeArguments()[0]; // optional will always have 1 argument
+
+        return ReflectionUtils.getRawClass(atype);
+      }
+    }
+    return clazz;
+  }
+
+  /**
    * Holds the class for the POJO.
    *
    * @author vasu
@@ -311,7 +333,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     field.setAccessible(true); // make it accessible in case we need to
     this.isFinal = Modifier.isFinal(field.getModifiers());
     this.name = field.getName();
-    this.type = field.getType();
+    this.type = FieldInfoImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
     this.column = null;
     this.persisted = null;
     this.persister = null;
@@ -349,7 +371,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     field.setAccessible(true); // make it accessible in case we need to
     this.isFinal = Modifier.isFinal(field.getModifiers());
     this.name = field.getName();
-    this.type = field.getType();
+    this.type = FieldInfoImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
     this.persisted = field.getAnnotation(Persisted.class);
     if (persisted != null) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -705,12 +727,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         return null;
       }
       final Class<?> wtype = ClassUtils.primitiveToWrapper(type);
-      final Class<?> wrtype = ClassUtils.primitiveToWrapper(m.getReturnType());
+      final Class<?> wrtype = ClassUtils.primitiveToWrapper(
+        FieldInfoImpl.unwrapOptionalIfPresent(m.getReturnType(), m.getGenericReturnType())
+      );
 
-      // account for getters that returns Optional<>
-      if (Optional.class.isAssignableFrom(wrtype)) {
-        return null;
-      }
       org.apache.commons.lang3.Validate.isTrue(
         wtype.isAssignableFrom(wrtype),
         "expecting getter for field '%s' with return type: %s",
@@ -750,12 +770,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         field
       );
       final Class<?> wtype = ClassUtils.primitiveToWrapper(type);
-      final Class<?> wptype = ClassUtils.primitiveToWrapper(m.getParameterTypes()[0]);
+      final Class<?> wptype = ClassUtils.primitiveToWrapper(
+        FieldInfoImpl.unwrapOptionalIfPresent(m.getParameterTypes()[0], m.getParameters()[0].getParameterizedType())
+      );
 
-      // account for setters that expects Optional<>
-      if (Optional.class.isAssignableFrom(wptype)) {
-        return null;
-      }
       org.apache.commons.lang3.Validate.isTrue(
         wtype.isAssignableFrom(wptype),
         "expecting setter for field '%s' with parameter type: %s",
@@ -1383,10 +1401,14 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
 
     try {
       if (getter != null) {
-        val = clazz.cast(getter.invoke(object));
+        val = getter.invoke(object);
       } else { // get it from field directly
-        val = clazz.cast(field.get(object));
+        val = field.get(object);
       }
+      if (val instanceof Optional) {
+        val = ((Optional<?>)val).orElse(null);
+      }
+      val = clazz.cast(val);
     } catch (IllegalAccessException e) { // should not happen
       throw new IllegalStateException(declaringClass.getName(), e);
     } catch (InvocationTargetException e) {
@@ -1502,6 +1524,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     // of the whole field
     if (isFinal && (setter == null)) {
       return;
+    }
+    if (Optional.class.isAssignableFrom(field.getType())) {
+      value = Optional.ofNullable(value);
     }
     if (value == null) {
       org.apache.commons.lang3.Validate.isTrue(

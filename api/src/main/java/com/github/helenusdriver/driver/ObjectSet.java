@@ -109,6 +109,24 @@ public class ObjectSet<T> implements Iterable<T> {
   }
 
   /**
+   * Gets the the next POJO from this object set.
+   *
+   * @author paouelle
+   *
+   * @return the next POJO in this object set
+   * @throws ObjectConversionException if unable to convert to a POJO
+   * @throws ObjectNotFoundException if this object set is exhausted
+   */
+  public T oneRequired() {
+    final T t = one();
+
+    if (t == null) {
+      throw new ObjectNotFoundException(context.getObjectClass());
+    }
+    return t;
+  }
+
+  /**
    * Gets a stream of all the remaining POJOs in this object set.
    * <p>
    * The returned stream will throw {@link ObjectConversionException} when

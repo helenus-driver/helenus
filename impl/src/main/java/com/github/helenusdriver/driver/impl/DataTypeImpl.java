@@ -34,6 +34,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -611,10 +612,29 @@ public class DataTypeImpl {
   private static void inferDataTypeFrom(
     Field field, Class<?> clazz, List<CQLDataType> types, Persisted persisted
   ) {
-    if (List.class.isAssignableFrom(clazz)) {
+    if (Optional.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collection is not supported in field: %s",
+        "collection of optionals is not supported in field: %s",
+        field
+      );
+      final Type type = field.getGenericType();
+
+      if (type instanceof ParameterizedType) {
+        final ParameterizedType ptype = (ParameterizedType)type;
+        final Type atype = ptype.getActualTypeArguments()[0]; // optional will always have 1 argument
+
+        if (persisted != null) {
+          types.add(persisted.as());
+        } else {
+          DataTypeImpl.inferBasicDataTypeFrom(field, ReflectionUtils.getRawClass(atype), types, persisted);
+        }
+        return;
+      }
+    } else if (List.class.isAssignableFrom(clazz)) {
+      org.apache.commons.lang3.Validate.isTrue(
+        types.isEmpty(),
+        "collection of collections is not supported in field: %s",
         field
       );
       final Type type = field.getGenericType();
@@ -634,7 +654,7 @@ public class DataTypeImpl {
     } else if (Set.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collection is not supported in field: %s",
+        "collection of collections is not supported in field: %s",
         field
       );
       final Type type = field.getGenericType();
@@ -654,7 +674,7 @@ public class DataTypeImpl {
     } else if (Map.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collection is not supported in field: %s",
+        "collection of collections is not supported in field: %s",
         field
       );
       final Type type = field.getGenericType();
@@ -675,6 +695,27 @@ public class DataTypeImpl {
         return;
       }
     }
+    DataTypeImpl.inferBasicDataTypeFrom(field, clazz, types, persisted);
+  }
+
+  /**
+   * Infers the data type for the specified field once it has already been
+   * processed for optional and collections.
+   *
+   * @author paouelle
+   *
+   * @param  field the non-<code>null</code> field to infer the CQL data type for
+   * @param  clazz the non-<code>null</code> class for which to infer the CQL
+   *         data type for the field
+   * @param  types the non-<code>null</code> list where to add the inferred type and
+   *         its arguments
+   * @param  persisted the persisted annotation to consider for the field
+   * @throws IllegalArgumentException if the data type cannot be inferred from
+   *         the field
+   */
+  private static void inferBasicDataTypeFrom(
+    Field field, Class<?> clazz, List<CQLDataType> types, Persisted persisted
+  ) {
     if (persisted != null) {
       types.add(persisted.as());
     } else if (String.class == clazz) {
