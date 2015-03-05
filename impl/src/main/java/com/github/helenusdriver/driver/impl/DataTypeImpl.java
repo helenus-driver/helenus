@@ -106,6 +106,28 @@ public class DataTypeImpl {
   }
 
   /**
+   * Unwraps the specific class if it is an {@link Optional}.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  clazz the class to unwrap if required
+   * @param  type the corresponding type for the class
+   * @return the element of the optional class if it is an optional otherwise
+   *         the class itself
+   */
+  public static Class<?> unwrapOptionalIfPresent(Class<?> clazz, Type type) {
+    if (Optional.class.isAssignableFrom(clazz)) {
+      if (type instanceof ParameterizedType) {
+        final ParameterizedType ptype = (ParameterizedType)type;
+        final Type atype = ptype.getActualTypeArguments()[0]; // optional will always have 1 argument
+
+        return ReflectionUtils.getRawClass(atype);
+      }
+    }
+    return clazz;
+  }
+
+  /**
    * The <code>Definition</code> class provides a data type definition for a CQL
    * data type.
    *
@@ -280,7 +302,7 @@ public class DataTypeImpl {
     public DataDecoder<?> getDecoder(Field field, boolean mandatory) {
       org.apache.commons.lang3.Validate.notNull(field, "invalid null field");
       final Persisted persisted = field.getAnnotation(Persisted.class);
-      final Class<?> clazz = field.getType();
+      final Class<?> clazz = DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
 
       // check if we are dealing with a collection
       if (isCollection()) {

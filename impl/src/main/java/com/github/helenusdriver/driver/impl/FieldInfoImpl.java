@@ -75,28 +75,6 @@ import com.github.helenusdriver.persistence.TypeKey;
 @lombok.ToString(exclude={"cinfo", "tinfo"})
 public class FieldInfoImpl<T> implements FieldInfo<T> {
   /**
-   * Unwraps the specific class if it is an {@link Optional}.
-   *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
-   *
-   * @param  clazz the class to unwrap if required
-   * @param  type the corresponding type for the class
-   * @return the element of the optional class if it is an optional otherwise
-   *         the class itself
-   */
-  private static Class<?> unwrapOptionalIfPresent(Class<?> clazz, Type type) {
-    if (Optional.class.isAssignableFrom(clazz)) {
-      if (type instanceof ParameterizedType) {
-        final ParameterizedType ptype = (ParameterizedType)type;
-        final Type atype = ptype.getActualTypeArguments()[0]; // optional will always have 1 argument
-
-        return ReflectionUtils.getRawClass(atype);
-      }
-    }
-    return clazz;
-  }
-
-  /**
    * Holds the class for the POJO.
    *
    * @author vasu
@@ -333,7 +311,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     field.setAccessible(true); // make it accessible in case we need to
     this.isFinal = Modifier.isFinal(field.getModifiers());
     this.name = field.getName();
-    this.type = FieldInfoImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
+    this.type = DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
     this.column = null;
     this.persisted = null;
     this.persister = null;
@@ -371,7 +349,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     field.setAccessible(true); // make it accessible in case we need to
     this.isFinal = Modifier.isFinal(field.getModifiers());
     this.name = field.getName();
-    this.type = FieldInfoImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
+    this.type = DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
     this.persisted = field.getAnnotation(Persisted.class);
     if (persisted != null) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -728,7 +706,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
       final Class<?> wtype = ClassUtils.primitiveToWrapper(type);
       final Class<?> wrtype = ClassUtils.primitiveToWrapper(
-        FieldInfoImpl.unwrapOptionalIfPresent(m.getReturnType(), m.getGenericReturnType())
+        DataTypeImpl.unwrapOptionalIfPresent(m.getReturnType(), m.getGenericReturnType())
       );
 
       org.apache.commons.lang3.Validate.isTrue(
@@ -771,7 +749,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       );
       final Class<?> wtype = ClassUtils.primitiveToWrapper(type);
       final Class<?> wptype = ClassUtils.primitiveToWrapper(
-        FieldInfoImpl.unwrapOptionalIfPresent(m.getParameterTypes()[0], m.getParameters()[0].getParameterizedType())
+        DataTypeImpl.unwrapOptionalIfPresent(m.getParameterTypes()[0], m.getParameters()[0].getParameterizedType())
       );
 
       org.apache.commons.lang3.Validate.isTrue(
