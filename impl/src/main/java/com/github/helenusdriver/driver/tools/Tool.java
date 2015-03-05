@@ -401,6 +401,19 @@ public class Tool {
     .create("S");
 
   /**
+   * Holds the Cassandra server option.
+   *
+   * @author paouelle
+   */
+  @SuppressWarnings("static-access")
+  private final static Option output = OptionBuilder
+    .withLongOpt("output")
+    .withDescription("to specify the output directory (defaults to current directory)")
+    .hasArg()
+    .withArgName("output")
+    .create();
+
+  /**
    * Holds the command-line options definition.
    *
    * @author paouelle
@@ -418,6 +431,7 @@ public class Tool {
        .addOption(Tool.matches_only)
        .addOption(Tool.no_dependents)
        .addOption(Tool.replicationFactor)
+       .addOption(Tool.output)
        .addOption(Tool.verbose)
        .addOption(Tool.trace)
        .addOption(Tool.help)
@@ -829,11 +843,23 @@ public class Tool {
         + ": no Json schemas found matching the specified criteria"
       );
     } else {
+      final String output = line.getOptionValue(
+        Tool.output.getLongOpt(), "." // defaults to current directory
+      );
+      final File dir = new File(output);
+
+      if (!dir.exists()) {
+        dir.mkdirs();
+      }
+      org.apache.commons.lang3.Validate.isTrue(
+        dir.isDirectory(),
+        "not a directory: %s", dir
+      );
       final ObjectMapper m = new ObjectMapper();
 
       m.enable(SerializationFeature.INDENT_OUTPUT);
       for (final Map.Entry<Class<?>, JsonSchema> e: schemas.entrySet()) {
-        m.writeValue(new File(e.getKey().getName() + ".json"), e.getValue());
+        m.writeValue(new File(dir, e.getKey().getName() + ".json"), e.getValue());
         //System.out.println(s.getType() + " = " + m.writeValueAsString(s));
       }
     }
