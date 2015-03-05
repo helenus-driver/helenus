@@ -24,11 +24,14 @@ import java.lang.reflect.Type;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.File;
+import java.io.IOException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +53,11 @@ import org.apache.logging.log4j.core.config.LoggerConfig;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
+import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 import com.github.helenusdriver.commons.cli.RunnableFirstOption;
 import com.github.helenusdriver.commons.cli.RunnableOption;
 import com.github.helenusdriver.commons.collections.DirectedGraph;
@@ -71,6 +78,7 @@ import com.github.helenusdriver.driver.impl.StatementManagerImpl;
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.driver.info.FieldInfo;
 import com.github.helenusdriver.persistence.InitialObjects;
+
 import org.reflections.Reflections;
 
 /**
@@ -146,6 +154,31 @@ public class Tool {
         @Override
         public void run(CommandLine line) throws Exception {
           Tool.insertObjects(line);
+        }
+      };
+
+  /**
+   * Holds the schemas creation action.
+   *
+   * @author paouelle
+   */
+  @SuppressWarnings("serial")
+  private final static RunnableOption jsons
+    = new RunnableOption(
+        "j",
+        "jsons",
+        false,
+        "to write json schemas to disk for the specified pojo classes and/or packages (separated with :)"
+      ) {
+        {
+          setArgs(Option.UNLIMITED_VALUES);
+          setArgName("classes-packages");
+          setValueSeparator(':');
+        }
+        @SuppressWarnings("synthetic-access")
+        @Override
+        public void run(CommandLine line) throws Exception {
+          Tool.createJsonSchemas(line);
         }
       };
 
@@ -376,6 +409,7 @@ public class Tool {
     = (new Options()
        .addOption(Tool.schemas)
        .addOption(Tool.objects)
+       .addOption(Tool.jsons)
        .addOption(Tool.suffixes)
        .addOption(Tool.server)
        .addOption(Tool.port)
@@ -616,6 +650,192 @@ public class Tool {
       );
     } else {
       executeCQL(s);
+    }
+  }
+
+  /**
+   * Creates all defined Json schemas based on the provided set of class names
+   * and options and add the schemas to the specified map. For each class found;
+   * the corresponding array element will be nulled. All others are simply
+   * skipped.
+   *
+   * @author paouelle
+   *
+   * @param  cnames the set of class names to create Json schemas for
+   * @param  suffixes the map of provided suffix values
+   * @param  matching whether or not to only create schemas for keyspaces that
+   *         matches the specified set of suffixes
+   * @param  schemas the map where to record the Json schema for the pojo classes
+   *         found
+   * @throws LinkageError if the linkage fails for one of the specified entity
+   *         class
+   * @throws ExceptionInInitializerError if the initialization provoked by one
+   *         of the specified entity class fails
+   * @throws IOException if an I/O error occurs while generating the Json schemas
+   */
+  private static void createJsonSchemasFromClasses(
+    String[] cnames,
+    Map<String, String> suffixes,
+    boolean matching,
+    Map<Class<?>, JsonSchema> schemas
+  ) throws IOException {
+    next_class:
+    for (int i = 0; i < cnames.length; i++) {
+      try {
+        final Class<?> clazz = Class.forName(cnames[i]);
+
+        cnames[i] = null; // clear since we found a class
+        final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
+
+        // pass all required suffixes
+        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+          // check if this suffix type is defined
+          final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
+
+          if (suffix != null) {
+            // register the suffix value with the corresponding suffix name
+            cs.where(
+              StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
+            );
+          } else if (matching) {
+            // we have one more suffix then defined with this pojo
+            // and we were requested to only do does that match the provided
+            // suffixes so skip the class
+            continue next_class;
+          }
+        }
+        for (final Class<?> c: cs.getObjectClasses()) {
+          System.out.println(
+            Tool.class.getSimpleName()
+            + ": creating Json schema for "
+            + c.getName()
+          );
+          final ObjectMapper m = new ObjectMapper();
+          final SchemaFactoryWrapper visitor = new SchemaFactoryWrapper();
+
+          m.registerModule(new Jdk8Module());
+          m.enable(SerializationFeature.INDENT_OUTPUT);
+          m.acceptJsonFormatVisitor(m.constructType(c), visitor);
+          schemas.put(c, visitor.finalSchema());
+        }
+      } catch (ClassNotFoundException e) { // ignore and continue
+      }
+    }
+  }
+
+  /**
+   * Creates all defined Json schemas based on the provided set of package names
+   * and options and add the schemas to the specified map.
+   *
+   * @author paouelle
+   *
+   * @param  pkgs the set of packages to create Json schemas for
+   * @param  suffixes the map of provided suffix values
+   * @param  matching whether or not to only create schemas for keyspaces that
+   *         matches the specified set of suffixes
+   * @param  schemas the map where to record the Json schema for the pojo classes
+   *         found
+   * @throws LinkageError if the linkage fails for one of the specified entity
+   *         class
+   * @throws ExceptionInInitializerError if the initialization provoked by one
+   *         of the specified entity class fails
+   * @throws IllegalArgumentException if no pojos are found in any of the
+   *         specified packages
+   * @throws IOException if an I/O error occurs while generating the Json schemas
+   */
+  private static void createJsonSchemasFromPackages(
+    String[] pkgs,
+    Map<String, String> suffixes,
+    boolean matching,
+    Map<Class<?>, JsonSchema> schemas
+  ) throws IOException {
+    for (final String pkg: pkgs) {
+      if (pkg == null) {
+        continue;
+      }
+      final CreateSchemas cs
+        = (matching
+           ? StatementBuilder.createMatchingSchemas(pkg)
+           : StatementBuilder.createSchemas(pkg));
+
+      // pass all suffixes
+      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+        // register the suffix value with the corresponding suffix type
+        cs.where(
+          StatementBuilder.eq(e.getKey(), e.getValue())
+        );
+      }
+      for (final Class<?> c: cs.getObjectClasses()) {
+        System.out.println(
+          Tool.class.getSimpleName()
+          + ": creating Json schema for "
+          + c.getName()
+        );
+        final ObjectMapper m = new ObjectMapper();
+        final SchemaFactoryWrapper visitor = new SchemaFactoryWrapper();
+
+        m.registerModule(new Jdk8Module());
+        m.enable(SerializationFeature.INDENT_OUTPUT);
+        m.acceptJsonFormatVisitor(m.constructType(c), visitor);
+        schemas.put(c, visitor.finalSchema());
+      }
+    }
+  }
+
+  /**
+   * Creates all defined Json schemas based on the provided command line
+   * information.
+   *
+   * @author paouelle
+   *
+   * @param  line the command line information
+   * @throws Exception if an error occurs while creating schemas
+   * @throws LinkageError if the linkage fails for one of the specified entity
+   *         class
+   * @throws ExceptionInInitializerError if the initialization provoked by one
+   *         of the specified entity class fails
+   * @throws IllegalArgumentException if no pojos are found in any of the
+   *         specified packages
+   */
+  private static void createJsonSchemas(CommandLine line) throws Exception {
+    final String[] opts = line.getOptionValues(Tool.jsons.getLongOpt());
+    @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+    final Map<String, String> suffixes
+      = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
+    final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
+    final Map<Class<?>, JsonSchema> schemas = new LinkedHashMap<>();
+
+    System.out.print(
+      Tool.class.getSimpleName()
+      + ": searching for Json schema definitions in "
+      + Arrays.toString(opts)
+    );
+    if (!suffixes.isEmpty()) {
+      System.out.print(
+        " with "
+        + (matching ? "matching " : "")
+        + "suffixes "
+        + suffixes
+      );
+    }
+    System.out.println();
+    // start by assuming we have classes; if we do they will be nulled from the array
+    Tool.createJsonSchemasFromClasses(opts, suffixes, matching, schemas);
+    // now deal with the rest as if they were packages
+    Tool.createJsonSchemasFromPackages(opts, suffixes, matching, schemas);
+    if (schemas.isEmpty()) {
+      System.out.println(
+        Tool.class.getSimpleName()
+        + ": no Json schemas found matching the specified criteria"
+      );
+    } else {
+      final ObjectMapper m = new ObjectMapper();
+
+      m.enable(SerializationFeature.INDENT_OUTPUT);
+      for (final Map.Entry<Class<?>, JsonSchema> e: schemas.entrySet()) {
+        m.writeValue(new File(e.getKey().getName() + ".json"), e.getValue());
+        //System.out.println(s.getType() + " = " + m.writeValueAsString(s));
+      }
     }
   }
 
