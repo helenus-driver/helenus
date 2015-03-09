@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -2099,5 +2100,18 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     for (final Map.Entry<?, ?> e: mappings.entrySet()) {
       field.validateMapKeyValue(e.getKey(), e.getValue());
     }
+  }
+
+  /**
+   * Gets all user-defined types the pojo class represented by this table is
+   * dependent on.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all class infos for the user-defined types the pojo
+   *         class depends on
+   */
+  public Stream<UDTClassInfoImpl<?>> udts() {
+    return columns.values().stream().flatMap(f -> f.udts());
   }
 }

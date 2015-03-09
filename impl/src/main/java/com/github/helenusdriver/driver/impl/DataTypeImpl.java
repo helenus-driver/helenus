@@ -38,6 +38,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -559,6 +560,26 @@ public class DataTypeImpl {
         .append(StringUtils.join(cqls, ','))
         .append('>');
       return sb.toString();
+    }
+
+    /**
+     * Gets all user-defined types this definition is dependent on.
+     *
+     * @author paouelle
+     *
+     * @return a stream of all class infos for the user-defined types this
+     *         definition depends on
+     */
+    public Stream<UDTClassInfoImpl<?>> udts() {
+      if (type instanceof UDTClassInfoImpl) {
+        return Stream.of((UDTClassInfoImpl<?>)type);
+      }
+      final CQLDataType etype = getElementType();
+
+      if (etype instanceof UDTClassInfoImpl) {
+        return Stream.of((UDTClassInfoImpl<?>)etype);
+      }
+      return Stream.empty();
     }
 
     /**

@@ -1311,6 +1311,19 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
+   * Gets all user-defined types the pojo class represented by this class is
+   * dependent on.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all class infos for the user-defined types the pojo
+   *         class depends on
+   */
+  public Stream<UDTClassInfoImpl<?>> udts() {
+    return tables.values().stream().flatMap(t -> t.udts()).distinct();
+  }
+
+  /**
    * Gets the default value for the specified final field.
    *
    * @author paouelle

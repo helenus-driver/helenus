@@ -18,6 +18,7 @@ package com.github.helenusdriver.driver.impl;
 import java.lang.reflect.Modifier;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.github.helenusdriver.commons.collections.DirectedGraph;
+import com.github.helenusdriver.commons.collections.GraphUtils;
+import com.github.helenusdriver.commons.collections.graph.ConcurrentHashDirectedGraph;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.Clause;
 import com.github.helenusdriver.driver.CreateSchemas;
@@ -139,8 +143,62 @@ public class CreateSchemasImpl
    */
   private Map<Keyspace, List<ClassInfoImpl<?>>> findKeyspaces() {
     final Map<String, Keyspace> keyspaces = new HashMap<>(25);
-    final Map<Keyspace, List<ClassInfoImpl<?>>> cinfos = new HashMap<>(25);
     final Reflections reflections = new Reflections(pkg);
+    // search for all POJO annotated classes with @UDTEntity
+    // because of interdependencies between UDT, we need to build a graph
+    // to detect circular dependencies and also to ensure a proper creation
+    // order later
+    final Map<Keyspace, DirectedGraph<UDTClassInfoImpl<?>>> udtcinfos
+      = new HashMap<>(25);
+
+    for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
+      com.github.helenusdriver.persistence.UDTEntity.class, true
+    )) {
+      // skip abstract POJO classes
+      if (Modifier.isAbstract(clazz.getModifiers())) {
+        continue;
+      }
+      final UDTClassInfoImpl<?> cinfo = (UDTClassInfoImpl<?>)mgr.getClassInfoImpl(clazz);
+      final Keyspace k = cinfo.getKeyspace();
+      final Keyspace old = keyspaces.put(k.name(), k);
+      DirectedGraph<UDTClassInfoImpl<?>> cs = udtcinfos.get(k);
+
+      if (cs == null) {
+        cs = new ConcurrentHashDirectedGraph<>();
+        udtcinfos.put(k, cs);
+      }
+      cs.add(cinfo, cinfo.udts());
+      // add dependencies
+      if ((old != null) && !k.equals(old)) {
+        // duplicate annotation found with different attribute
+        throw new IllegalArgumentException(
+          "two different @Keyspace annotations found with class '"
+          + clazz.getName()
+          + "': "
+          + old
+          + " and: "
+          + k
+        );
+      }
+    }
+    // now we are done with types, do a reverse topological sort of all keyspace
+    // graphs such that we end up creating udts in the dependent order
+    // and populate the resulting cinfos map with that sorted list
+    @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+    final Map<Keyspace, List<ClassInfoImpl<?>>> cinfos
+      = udtcinfos.entrySet().stream().collect(Collectors.toMap(
+          e -> ((Map.Entry<Keyspace, DirectedGraph<UDTClassInfoImpl<?>>>)e).getKey(),
+          e -> {
+            final List<UDTClassInfoImpl<?>> l = GraphUtils.sort(
+              ((Map.Entry<Keyspace, DirectedGraph<UDTClassInfoImpl<?>>>)e).getValue(),
+              o -> o.getObjectClass(),
+              o -> o.getObjectClass().getSimpleName()
+            );
+
+            Collections.reverse(l);
+            return (List<ClassInfoImpl<?>>)(List)l;
+          }
+        ));
 
     // search for all POJO annotated classes with @Entity
     for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
@@ -180,36 +238,6 @@ public class CreateSchemasImpl
       if (ReflectionUtils.findFirstClassAnnotatedWith(
            clazz, com.github.helenusdriver.persistence.RootEntity.class
          ) != clazz) {
-        continue;
-      }
-      final ClassInfoImpl<?> cinfo = mgr.getClassInfoImpl(clazz);
-      final Keyspace k = cinfo.getKeyspace();
-      final Keyspace old = keyspaces.put(k.name(), k);
-      List<ClassInfoImpl<?>> cs = cinfos.get(k);
-
-      if (cs == null) {
-        cs = new ArrayList<>(25);
-        cinfos.put(k, cs);
-      }
-      cs.add(cinfo);
-      if ((old != null) && !k.equals(old)) {
-        // duplicate annotation found with different attribute
-        throw new IllegalArgumentException(
-          "two different @Keyspace annotations found with class '"
-          + clazz.getName()
-          + "': "
-          + old
-          + " and: "
-          + k
-        );
-      }
-    }
-    // search for all POJO annotated classes with @UDTEntity
-    for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
-      com.github.helenusdriver.persistence.UDTEntity.class, true
-    )) {
-      // skip abstract POJO classes
-      if (Modifier.isAbstract(clazz.getModifiers())) {
         continue;
       }
       final ClassInfoImpl<?> cinfo = mgr.getClassInfoImpl(clazz);

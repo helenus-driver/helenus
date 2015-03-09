@@ -180,6 +180,18 @@ public class ConcurrentHashDirectedGraph<T>
      *
      * @author paouelle
      *
+     * @see com.github.helenusdriver.commons.collections.DirectedGraph.Node#add(java.util.stream.Stream)
+     */
+    @Override
+    public void add(Stream<T> dests) {
+      dests.forEach(d -> add(d));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see com.github.helenusdriver.commons.collections.DirectedGraph.Node#addEdge(java.lang.Object)
      */
     @Override
@@ -689,6 +701,24 @@ public class ConcurrentHashDirectedGraph<T>
       sn = old;
     }
     sn.add(dest);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.commons.collections.DirectedGraph#add(java.lang.Object, java.util.stream.Stream)
+   */
+  @Override
+  public void add(T start, Stream<T> dests) {
+    HashNode sn = new HashNode(start);
+    final HashNode old = graph.putIfAbsent(start, sn);
+
+    if (old != null) { // we already had one so continue with it
+      sn = old;
+    }
+    sn.add(dests);
   }
 
   /**

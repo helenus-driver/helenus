@@ -77,6 +77,15 @@ public interface DirectedGraph<T> extends Set<T> {
   public void add(T start, T dest);
 
   /**
+   * Adds the specified nodes if they don't exist in the graph and build arcs
+   * from the starting node to all the destination ones.
+   *
+   * @param start the starting node
+   * @param dests the destination nodes
+   */
+  public void add(T start, Stream<T> dests);
+
+  /**
    * Adds an arc from the starting node to the destination one. If an arc
    * already exists, this operation is a no-op.
    *
@@ -224,6 +233,14 @@ public interface DirectedGraph<T> extends Set<T> {
      * @param dest the destination node
      */
     public void add(T dest);
+
+    /**
+     * Adds the specified destination nodes if missing and add arcs from this
+     * node to all the destination ones.
+     *
+     * @param dests the destination nodes
+     */
+    public void add(Stream<T> dests);
 
     /**
      * Adds an arc from this node to the destination one. If an arc

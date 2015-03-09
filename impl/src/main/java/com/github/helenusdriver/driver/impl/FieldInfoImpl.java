@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.text.WordUtils;
@@ -1914,5 +1915,17 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         e
       );
     }
+  }
+
+  /**
+   * Gets all user-defined types this field is dependent on.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all class infos for the user-defined types this field
+   *         depends on
+   */
+  public Stream<UDTClassInfoImpl<?>> udts() {
+    return (definition != null) ? definition.udts() : Stream.empty();
   }
 }
