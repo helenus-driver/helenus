@@ -35,6 +35,8 @@ import javax.json.JsonObject;
 
 import org.apache.commons.collections4.iterators.ObjectArrayIterator;
 
+import com.datastax.driver.core.TupleValue;
+import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.utils.Bytes;
 
 /**
@@ -148,6 +150,12 @@ public abstract class Utils {
     if (appendValueIfCollection(value, sb, rawValue)) {
       return sb;
     }
+    if (appendValueIfUdt(value, sb)) {
+      return sb;
+    }
+    if (appendValueIfTuple(value, sb)) {
+      return sb;
+    }
     appendStringIfValid(value, sb, rawValue);
     return sb;
   }
@@ -162,7 +170,6 @@ public abstract class Utils {
     if (appendValueIfLiteral(value, sb)) {
       return;
     }
-
     appendStringIfValid(value, sb, rawValue);
   }
 
@@ -368,6 +375,25 @@ public abstract class Utils {
     return sb;
   }
 
+  private static boolean appendValueIfUdt(Object value, StringBuilder sb) {
+    if (value instanceof UDTValue) {
+      sb.append(((UDTValue)value).toString());
+      return true;
+    } else if (value instanceof UDTValueWrapper) {
+      sb.append(((UDTValueWrapper<?>)value).toString());
+      return true;
+    }
+    return false;
+  }
+
+  private static boolean appendValueIfTuple(Object value, StringBuilder sb) {
+    if (value instanceof TupleValue) {
+      sb.append(((TupleValue)value).toString());
+      return true;
+    }
+    return false;
+  }
+
   private static StringBuilder appendValueString(String value, StringBuilder sb) {
     return sb.append("'").append(replace(value, '\'', "''")).append("'");
   }
@@ -388,7 +414,7 @@ public abstract class Utils {
     // FIXME: checking for token( specifically is uber ugly, we'll need some
     // better solution.
     if (cnamePattern.matcher(name).matches()
-        || name.startsWith("\"") || name.startsWith("token(")) {
+        || name.startsWith("\"") || name.startsWith("token(") || name.contains("|")) {
       sb.append(name);
     } else {
       sb.append("\"").append(name).append("\"");

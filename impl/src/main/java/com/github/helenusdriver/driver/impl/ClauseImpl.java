@@ -363,7 +363,7 @@ public abstract class ClauseImpl
    *
    * @since 1.0
    */
-  static class InClauseImpl extends ClauseImpl {
+  static class InClauseImpl extends ClauseImpl implements Clause.In {
     /**
      * Holds the values for this clause.
      *

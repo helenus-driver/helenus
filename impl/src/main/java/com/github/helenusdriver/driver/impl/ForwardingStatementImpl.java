@@ -19,9 +19,8 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.policies.RetryPolicy;
-import com.google.common.util.concurrent.AbstractFuture;
-
 import com.github.helenusdriver.driver.GenericStatement;
+import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * The <code>ForwardingStatementImpl</code> class defines a utility class to
@@ -39,7 +38,7 @@ import com.github.helenusdriver.driver.GenericStatement;
  *
  * @since 1.0
  */
-public abstract class ForwardingStatementImpl<R, F extends AbstractFuture<R>, T, S extends StatementImpl<R, F, T>>
+public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, T, S extends StatementImpl<R, F, T>>
   extends StatementImpl<R, F, T> {
   /**
    * Holds the encapsulated statement.

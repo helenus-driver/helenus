@@ -16,17 +16,25 @@
 package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import com.datastax.driver.core.CompoundResultSetFuture;
+import com.datastax.driver.core.EmptyResultSetFuture;
+import com.datastax.driver.core.ResultSetFuture;
+import com.github.helenusdriver.commons.collections.iterators.CombinationIterator;
 import com.github.helenusdriver.driver.Clause;
 import com.github.helenusdriver.driver.ObjectSet;
 import com.github.helenusdriver.driver.ObjectSetFuture;
@@ -96,6 +104,29 @@ public class SelectImpl<T>
   private boolean allowFiltering;
 
   /**
+   * Holds the computed keyspace name for this statement when suffixes are used
+   * with an IN clause.
+   *
+   * @author paouelle
+   */
+  private String keyspace = null;
+
+  /**
+   * Holds underlying select statements for all combinations of an IN clause
+   * on keyspace suffixes.
+   *
+   * @author paouelle
+   */
+  private List<SelectImpl<T>> statements = null;
+
+  /**
+   * Holds the collection of suffix values when using the IN clause.
+   *
+   * @author paouelle
+   */
+  private Map<String, Collection<?>> suffixes = null;
+
+  /**
    * List of columns added.
    *
    * @author paouelle
@@ -109,6 +140,7 @@ public class SelectImpl<T>
    * @author paouelle
    */
   protected boolean countOrAllSelected = false;
+
 
   /**
    * Instantiates a new <code>SelectImpl</code> object.
@@ -148,6 +180,61 @@ public class SelectImpl<T>
     if (columnNames != null) {
       this.table.validateColumns(columnNames);
     }
+  }
+
+  /**
+   * Instantiates a new <code>SelectImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param statement the non-<code>null</code> select statement to be copied
+   */
+  SelectImpl(SelectImpl<T> statement) {
+    super(statement, statement.getContext().getClassInfo().newContext());
+    setDirty();
+    clearKeyspace();
+    this.table = statement.table;
+    this.columnNames = statement.columnNames;
+    this.countOrAllSelected = statement.countOrAllSelected;
+    this.where = new WhereImpl<>(statement.where, this);
+    this.limit = statement.limit;
+    this.allowFiltering = statement.allowFiltering;
+    this.orderings = statement.orderings;
+  }
+
+  /**
+   * Gets the underlying statements when an IN clause is used with suffix keys.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all underlying statements to execute
+   */
+  @SuppressWarnings({"synthetic-access", "cast", "unchecked", "rawtypes"})
+  private Stream<SelectImpl<T>> statements() {
+    // if we get here then the query was done for suffixes with an IN clause
+    if (statements == null) {
+      // in such case, we must generate one query for each combinations
+      // and aggregate the results
+      final List<String> snames = new ArrayList<>(suffixes.keySet());
+      final CombinationIterator<Object> ci = new CombinationIterator<>(
+        Object.class, (Collection<Collection<Object>>)(Collection)suffixes.values()
+      );
+      final List<SelectImpl<T>> statements = new ArrayList<>(ci.size());
+
+      while (ci.hasNext()) {
+        final List<Object> svalues = ci.next();
+        // create a new select statement as a dup of this one but with
+        // the suffixes from the current combination
+        final SelectImpl<T> s = new SelectImpl<>(this);
+
+        for (int j = 0; j < snames.size(); j++) {
+          s.getContext().addSuffix(snames.get(j), svalues.get(j));
+        }
+        statements.add(s);
+      }
+      this.statements = statements; // cache the underlying statements
+    }
+    return statements.stream();
   }
 
   /**
@@ -222,6 +309,116 @@ public class SelectImpl<T>
       builder.append(" ALLOW FILTERING");
     }
     return builder;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.StatementImpl#clearKeyspace()
+   */
+  @Override
+  protected void clearKeyspace() {
+    super.clearKeyspace();
+    this.keyspace = null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.StatementImpl#setDirty()
+   */
+  @Override
+  protected void setDirty() {
+    super.setDirty();
+    this.keyspace = null;
+    this.statements = null;
+  }
+
+  /**
+   * Gets the keyspace name associated with this context.
+   *
+   * @author paouelle
+   *
+   * @return the non-<code>null</code> keyspace name associated with this
+   *         context
+   * @throws IllegalArgumentException if unable to compute the keyspace name
+   *         based on provided suffixes
+   */
+  @SuppressWarnings({"synthetic-access", "cast", "unchecked", "rawtypes"})
+  @Override
+  public String getKeyspace() {
+    if (suffixes == null) {
+      return super.getKeyspace();
+    }
+    if (keyspace == null) {
+      // if we get here then the query was done for suffixes with an IN clause
+      // in such case, we must generate one query for each combinations
+      // and aggregate the results
+      final List<String> snames = new ArrayList<>(suffixes.keySet());
+      final CombinationIterator<Object> ci = new CombinationIterator<>(
+        Object.class, (Collection<Collection<Object>>)(Collection)suffixes.values()
+      );
+      final List<String> keyspaces = new ArrayList<>(ci.size());
+
+      while (ci.hasNext()) {
+        final List<Object> svalues = ci.next();
+        // create a new select statement as a dup of this one but with
+        // the suffixes from the current combination
+        final SelectImpl s = new SelectImpl(this);
+
+        for (int j = 0; j < snames.size(); j++) {
+          s.getContext().addSuffix(snames.get(j), svalues.get(j));
+        }
+        keyspaces.add(s.getKeyspace());
+      }
+      this.keyspace = "(" + String.join("|", keyspaces) + ")";
+    }
+    return keyspace;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.StatementImpl#executeAsync()
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  public ObjectSetFuture<T> executeAsync() {
+    if (suffixes == null) {
+      return super.executeAsync();
+    }
+    return new CompoundObjectSetFuture<>(
+      statements()
+        .map(s -> s.executeAsync())
+        .collect(Collectors.toList())
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.StatementImpl#executeAsyncRaw()
+   */
+  @Override
+  public ResultSetFuture executeAsyncRaw() {
+    if (suffixes == null) {
+      return super.executeAsyncRaw();
+    }
+    return new CompoundResultSetFuture(
+      statements()
+        .map(s -> s.executeAsyncRaw())
+        .filter(s -> !(s instanceof EmptyResultSetFuture))
+        .collect(Collectors.toList()),
+      mgr
+    );
   }
 
   /**
@@ -357,6 +554,19 @@ public class SelectImpl<T>
     }
 
     /**
+     * Instantiates a new <code>WhereImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param w the non-<code>null</code> where to copy
+     * @param statement the encapsulated statement
+     */
+    WhereImpl(WhereImpl<T> w, SelectImpl<T> statement) {
+      super(statement);
+      clauses.addAll(w.clauses);
+    }
+
+    /**
      * Gets the "where" clauses while adding missing final partition keys.
      *
      * @author paouelle
@@ -433,6 +643,7 @@ public class SelectImpl<T>
      *
      * @see com.github.helenusdriver.driver.Select.Where#and(com.github.helenusdriver.driver.Clause)
      */
+    @SuppressWarnings("synthetic-access")
     @Override
     public Where<T> and(Clause clause) {
       org.apache.commons.lang3.Validate.notNull(clause, "invalid null clause");
@@ -461,10 +672,34 @@ public class SelectImpl<T>
             // only add if it is a column too
             add = statement.table.hasColumn(c.getColumnName());
           }
+          c.validate(statement.table);
+        } else if (c instanceof Clause.In) {
+          statement.table.validateSuffixKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
+          if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
+            // verify all suffix values one after the other to validate all of them
+            for (final Object v: c.values()) {
+              statement.getContext().getClassInfo().validateSuffix(
+                c.getColumnName().toString(), v
+              );
+            }
+            // keep track of all suffixes so we can generate all the underlying
+            // select statements later
+            if (statement.suffixes == null) {
+              statement.suffixes = new LinkedHashMap<>(6);
+            }
+            statement.suffixes.put(c.getColumnName().toString(), c.values());
+            // only add if it is a column too
+            add = statement.table.hasColumn(c.getColumnName());
+            // don't validate the clause as we know it is not a valid one with
+            // the collection of values from the in clause
+            // but that is ok since we already validated them here
+          } else {
+            c.validate(statement.table);
+          }
         } else {
           statement.table.validatePrimaryKeyOrIndexColumn(c.getColumnName());
+          c.validate(statement.table);
         }
-        c.validate(statement.table);
         if (add) {
           clauses.add(c);
           setDirty();

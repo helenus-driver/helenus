@@ -102,21 +102,65 @@ public class CombinationIterator<T>
    *         correspond to the order of the elements returned at each step
    * @throws NullPointerException if <code>clazz</code> or <code>items</code> is
    *          <code>null</code>
-   * @throws IllegalStateException if no collections of items is provided
+   * @throws IllegalArgumentException if no collections of items is provided
    */
   @SafeVarargs
   public CombinationIterator(Class<T> clazz, Collection<T>... items) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.notNull(items, "invalid null items");
+    org.apache.commons.lang3.Validate.isTrue(
+      items.length > 0, "no collection of items provided"
+    );
     this.clazz = clazz;
-    if (items == null || items.length == 0) {
-        throw new IllegalArgumentException("items");
-    }
     this.items = items;
     this.size = items.length;
     this.hasNext = false;
     this.finished = false;
     this.iterators = null;
     this.current = null;
+  }
+
+  /**
+   * Instantiates a new <code>CombinationIterator</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class of the elements being iterated
+   * @param  items the collections of elements being iterated, the order will
+   *         correspond to the order of the elements returned at each step
+   * @throws NullPointerException if <code>clazz</code> or <code>items</code> is
+   *          <code>null</code>
+   * @throws IllegalArgumentException if no collections of items is provided
+   */
+  public CombinationIterator(Class<T> clazz, Collection<Collection<T>> items) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.notNull(items, "invalid null items");
+    org.apache.commons.lang3.Validate.isTrue(
+      !items.isEmpty(), "no collection of items provided"
+    );
+    this.clazz = clazz;
+    this.items = items.toArray(new Collection[items.size()]);
+    this.size = items.size();
+    this.hasNext = false;
+    this.finished = false;
+    this.iterators = null;
+    this.current = null;
+  }
+
+  /**
+   * Gets the number of combinations in this iterator.
+   *
+   * @author paouelle
+   *
+   * @return the number of combinations in this iterator
+   */
+  public int size() {
+    int size = items[0].size();
+
+    for (int i = 1; i < items.length; i++) {
+      i *= items[i].size();
+    }
+    return size;
   }
 
   /**

@@ -31,9 +31,6 @@ import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.policies.RetryPolicy;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Uninterruptibles;
-
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.GenericStatement;
 import com.github.helenusdriver.driver.ObjectSet;
@@ -42,6 +39,8 @@ import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.VoidFuture;
 import com.github.helenusdriver.driver.info.ClassInfo;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 
 /**
  * The <code>StatementImpl</code> abstract class extends the functionality of
@@ -298,6 +297,36 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
+   * Instantiates a new <code>StatementImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param statement the non-<code>null</code> statement being copied or
+   *        wrapped
+   * @param context the non-<code>null</code> class info context for the POJO
+   *        associated with this cloned statement
+   */
+  protected StatementImpl(
+    StatementImpl<R, F, T> statement, ClassInfoImpl<T>.Context context
+  ) {
+    this.mgr = statement.mgr;
+    this.bridge = statement.bridge;
+    this.resultClass = statement.resultClass;
+    this.pojoClass = statement.pojoClass;
+    this.context = context;
+    this.pojoContext = null;
+    this.keyspace = statement.keyspace;
+    this.consistency = statement.consistency;
+    this.serialConsistency = statement.serialConsistency;
+    this.traceQuery = statement.traceQuery;
+    this.fetchSize = statement.fetchSize;
+    this.retryPolicy = statement.retryPolicy;
+    this.dirty = statement.dirty;
+    this.cache = statement.cache;
+    this.isCounterOp = statement.isCounterOp;
+  }
+
+  /**
    * Builds the query strings (one per underlying statement) to be batched if
    * the statement represents some form of batch statement.
    *
@@ -377,6 +406,15 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     appendGroupType(builder);
     builder.append(';');
     return builder;
+  }
+
+  /**
+   * Clears the keyspace so it be recomputed later.
+   *
+   * @author paouelle
+   */
+  protected void clearKeyspace() {
+    this.keyspace = null;
   }
 
   /**
@@ -731,7 +769,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     final ResultSetFuture rawFuture = executeAsyncRaw();
 
     if (ObjectSet.class == resultClass) {
-      return (F)bridge.newObjectSetFuture(context, rawFuture);
+      return (F)new ObjectSetFutureImpl<>(context, rawFuture);
     }
     if (Void.class == resultClass) {
       return (F)bridge.newVoidFuture(rawFuture);

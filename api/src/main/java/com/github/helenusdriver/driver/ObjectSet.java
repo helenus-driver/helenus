@@ -15,23 +15,16 @@
  */
 package com.github.helenusdriver.driver;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.ExecutionInfo;
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Row;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
- * The <code>ObjectSet</code> class extends Cassandra's
+ * The <code>ObjectSet</code> class extends on Cassandra's
  * {@link com.datastax.driver.core.ResultSet} class in order to provide support
  * for POJOs.
  *
@@ -44,35 +37,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  *
  * @since 1.0
  */
-public class ObjectSet<T> implements Iterable<T> {
-  /**
-   * Holds the statement context associated with this object set.
-   *
-   * @author paouelle
-   */
-  private final StatementManager.Context<T> context;
-
-  /**
-   * Holds the raw future set.
-   *
-   * @author paouelle
-   */
-  private final com.datastax.driver.core.ResultSet result;
-
-  /**
-   * Instantiates a new <code>ObjectSet</code> object.
-   *
-   * @author paouelle
-   *
-   * @param context the non-<code>null</code> statement context associated with
-   *        this object set
-   * @param result the non-<code>null</code> result set
-   */
-  ObjectSet(StatementManager.Context<T> context, ResultSet result) {
-    this.context = context;
-    this.result = result;
-  }
-
+public interface ObjectSet<T> extends Iterable<T> {
   /**
    * Gets the columns returned in this object set.
    *
@@ -80,9 +45,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *
    * @return the columns returned in this object set.
    */
-  public ColumnDefinitions getColumnDefinitions() {
-    return result.getColumnDefinitions();
-  }
+  public ColumnDefinitions getColumnDefinitions();
 
   /**
    * Gets whether this object set has more POJOs.
@@ -91,9 +54,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *
    * @return whether this object set has more POJOs.
    */
-  public boolean isExhausted() {
-    return result.isExhausted();
-  }
+  public boolean isExhausted();
 
   /**
    * Gets the the next POJO from this object set.
@@ -104,9 +65,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *         object set is exhausted
    * @throws ObjectConversionException if unable to convert to a POJO
    */
-  public T one() {
-    return context.getObject(result.one());
-  }
+  public T one();
 
   /**
    * Gets the the next POJO from this object set.
@@ -117,14 +76,7 @@ public class ObjectSet<T> implements Iterable<T> {
    * @throws ObjectConversionException if unable to convert to a POJO
    * @throws ObjectNotFoundException if this object set is exhausted
    */
-  public T oneRequired() {
-    final T t = one();
-
-    if (t == null) {
-      throw new ObjectNotFoundException(context.getObjectClass());
-    }
-    return t;
-  }
+  public T oneRequired();
 
   /**
    * Gets a stream of all the remaining POJOs in this object set.
@@ -137,12 +89,7 @@ public class ObjectSet<T> implements Iterable<T> {
    * @return a non-<code>null</code> stream containing the remaining POJOs of
    *         this object set
    */
-  public Stream<T> stream() {
-    return StreamSupport.stream(Spliterators.spliteratorUnknownSize(
-      iterator(),
-      Spliterator.ORDERED | Spliterator.IMMUTABLE | Spliterator.NONNULL
-    ), false);
-  }
+  public Stream<T> stream();
 
   /**
    * Gets a list of all the remaining POJOs in this object set.
@@ -154,19 +101,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *         set is exhausted
    * @throws ObjectConversionException if unable to convert to POJOs
    */
-  public List<T> all() {
-    final List<Row> rows = result.all();
-    final List<T> ts = new ArrayList<>(rows.size());
-
-    for (final Row row: rows) {
-      final T obj = context.getObject(row);
-
-      if (obj != null) {
-        ts.add(obj);
-      }
-    }
-    return ts;
-  }
+  public List<T> all();
 
   /**
    * {@inheritDoc}
@@ -187,32 +122,7 @@ public class ObjectSet<T> implements Iterable<T> {
    * @see java.lang.Iterable#iterator()
    */
   @Override
-  public Iterator<T> iterator() {
-    final Iterator<Row> i = result.iterator();
-
-    return new Iterator<T>() {
-      private T next = null;
-
-      @Override
-      @SuppressWarnings("synthetic-access")
-      public boolean hasNext() {
-        while ((next == null) && i.hasNext()) { // skip over all invalid type result
-          this.next = context.getObject(i.next());
-        }
-        return next != null;
-      }
-      @Override
-      public T next() {
-        if (!hasNext()) {
-          throw new NoSuchElementException("ObjectSet Iterator");
-        }
-        final T obj = next;
-
-        this.next = null;
-        return obj;
-      }
-    };
-  }
+  public Iterator<T> iterator();
 
   /**
    * Gets the number of POJOs that can be retrieved from this object set without
@@ -225,9 +135,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *         remaining in this object set (after which the object set will be
    *         exhausted)
    */
-  public int getAvailableWithoutFetching() {
-    return result.getAvailableWithoutFetching();
-  }
+  public int getAvailableWithoutFetching();
 
   /**
    * Checks whether all POJOs from this object set has been fetched from the
@@ -243,9 +151,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *
    * @return whether all POJOs have been fetched
    */
-  public boolean isFullyFetched() {
-    return result.isFullyFetched();
-  }
+  public boolean isFullyFetched();
 
   /**
    * Force the fetching the next page of POJOs for this object set, if any.
@@ -293,9 +199,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *         should thus call {@code isFullyFetched() to know if calling this
    *          method can be of any use}).
    */
-  public ListenableFuture<Void> fetchMoreObjects() {
-    return result.fetchMoreResults();
-  }
+  public ListenableFuture<Void> fetchMoreObjects();
 
   /**
    * Gets information on the execution of the last query made for this object
@@ -314,9 +218,7 @@ public class ObjectSet<T> implements Iterable<T> {
    *
    * @return the execution info for the last query made for this object set
    */
-  public ExecutionInfo getExecutionInfo() {
-    return result.getExecutionInfo();
-  }
+  public ExecutionInfo getExecutionInfo();
 
   /**
    * Gets the execution informations for all queries made to retrieve this
@@ -332,19 +234,5 @@ public class ObjectSet<T> implements Iterable<T> {
    * @return a list of the execution info for all the queries made for this
    *         object set
    */
-  public List<ExecutionInfo> getAllExecutionInfo() {
-    return result.getAllExecutionInfo();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see java.lang.Object#toString()
-   */
-  @Override
-  public String toString() {
-    return result.toString();
-  }
+  public List<ExecutionInfo> getAllExecutionInfo();
 }

@@ -475,7 +475,9 @@ public class DataTypeImpl {
           || (val instanceof PersistedObject)) {
         return val;
       }
-      if ((type == DataType.LIST) || (type == DataType.SET)) {
+      if ((type == DataType.LIST)
+          || (type == DataType.SET)
+          || (type == DataType.MAP)) {
         // encode the element value directly
         final PersistedValue<T, PT> pval = new PersistedValue<>(
             persisted, persister, fname
@@ -484,7 +486,7 @@ public class DataTypeImpl {
         pval.getEncodedValue(); // force it to be decoded
         return pval;
       }
-      throw new IOException("field is not a list or a set");
+      throw new IOException("field is not a list, a set, or a map");
     }
 
     /**

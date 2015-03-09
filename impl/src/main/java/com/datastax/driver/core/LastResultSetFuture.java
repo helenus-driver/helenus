@@ -90,7 +90,7 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
     @SuppressWarnings("synthetic-access")
     @Override
     public void run() {
-      boolean execute = false;;
+      boolean execute = false;
 
       try {
         synchronized (LastResultSetFuture.this.statements) {

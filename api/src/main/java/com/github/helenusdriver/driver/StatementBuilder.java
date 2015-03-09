@@ -837,6 +837,12 @@ public final class StatementBuilder {
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -846,13 +852,19 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>values</code> is empty
    */
-  public static Clause in(CharSequence name, Object... values) {
+  public static Clause.In in(CharSequence name, Object... values) {
     return StatementManager.getManager().in(name, values);
   }
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -862,13 +874,19 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>values</code> is empty
    */
-  public static Clause in(CharSequence name, Collection<?> values) {
+  public static Clause.In in(CharSequence name, Collection<?> values) {
     return StatementManager.getManager().in(name, values);
   }
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -878,13 +896,19 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>values</code> is empty
    */
-  public static Clause in(CharSequence name, Stream<?> values) {
+  public static Clause.In in(CharSequence name, Stream<?> values) {
     return StatementManager.getManager().in(name, values);
   }
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * a value in the provided range.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -895,7 +919,7 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if the specified range is empty
    */
-  public static Clause in(CharSequence name, int from, int to) {
+  public static Clause.In in(CharSequence name, int from, int to) {
     return StatementManager.getManager().in(name, from, to);
   }
 

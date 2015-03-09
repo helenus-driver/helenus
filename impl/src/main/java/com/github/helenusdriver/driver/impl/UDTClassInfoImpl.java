@@ -27,6 +27,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
+import com.github.helenusdriver.driver.ColumnPersistenceException;
 import com.github.helenusdriver.driver.ObjectConversionException;
 import com.github.helenusdriver.persistence.CQLDataType;
 import com.github.helenusdriver.persistence.UDTEntity;
@@ -64,11 +65,276 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   };
 
   /**
+   * The <code>POJOContext</code> class provides a specific context for the POJO
+   * as referenced while building an insert or update statement.
+   *
+   * @copyright 2015-2015 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Mar 7, 2015 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  public class POJOContext extends ClassInfoImpl<T>.POJOContext {
+    /**
+     * Instantiates a new <code>POJOContext</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  object the POJO object
+     * @throws NullPointerException if <code>object</code> is <code>null</code>
+     * @throws IllegalArgumentException if <code>object</code> is not of the
+     *         appropriate class
+     */
+    public POJOContext(T object) {
+      super(object);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#populateSuffixes(java.util.Map)
+     */
+    @Override
+    protected void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {
+    }
+
+    /**
+     * Retrieves all columns and their values from the POJO.
+     *
+     * @author paouelle
+     *
+     * @return a non-<code>null</code> map of all column/value pairs for the POJO
+     * @throws IllegalArgumentException if a mandatory column is missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    @SuppressWarnings("synthetic-access")
+    public Map<String, Object> getColumnValues() {
+      if (table == null) { // table not defined so nothing to return; should not happen
+        return Collections.emptyMap();
+      }
+      return table.getColumnValues(object);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getColumnValues(String tname) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getPartitionKeyColumnValues(String tname) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPartitionKeyColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getSuffixAndPartitionKeyColumnValues(String tname) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getPrimaryKeyColumnValues(String tname) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPrimaryKeyColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getSuffixAndPrimaryKeyColumnValues(String tname) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * Retrieves all mandatory columns and their values from the POJO.
+     *
+     * @author paouelle
+     *
+     * @return a non-<code>null</code> map of all mandatory column/value pairs
+     *         for the POJO
+     * @throws IllegalArgumentException if a column is missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    @SuppressWarnings("synthetic-access")
+    public Map<String, Object> getMandatoryColumnValues() {
+      if (table == null) { // table not defined so nothing to return; should not happen
+        return Collections.emptyMap();
+      }
+      return table.getMandatoryAndPrimaryKeyColumnValues(object);
+    }
+
+     /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getMandatoryAndPrimaryKeyColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getMandatoryAndPrimaryKeyColumnValues(
+      String tname
+    ) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnValues(java.lang.String)
+     */
+    @Override
+    public Map<String, Object> getNonPrimaryKeyColumnValues(String tname) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * Retrieves the specified column value from the POJO.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column to retrieve
+     * @return the column value for the POJO
+     * @throws IllegalArgumentException if the column name is not defined by the
+     *         POJO or is mandatory and missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    @SuppressWarnings("synthetic-access")
+    public Object getColumnValue(CharSequence name) {
+      if (table == null) { // table not defined so nothing to return; should not happen
+        return Collections.emptyMap();
+      }
+      return table.getColumnValue(object, name);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
+     */
+    @Override
+    public Object getColumnValue(String tname, CharSequence name) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * Retrieves the specified columns and their values from the POJO.
+     *
+     * @author paouelle
+     *
+     * @param  names the names of the columns to retrieve
+     * @return a non-<code>null</code> map of all requested column/value pairs
+     *         for the POJO
+     * @throws IllegalArgumentException if any of the column names are not defined
+     *         by the POJO or is mandatory and missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    @SuppressWarnings("synthetic-access")
+    public Map<String, Object> getColumnValues(Iterable<CharSequence> names) {
+      if (table == null) { // table not defined so nothing to return; should not happen
+        return Collections.emptyMap();
+      }
+      return table.getColumnValues(object, names);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.Iterable)
+     */
+    @Override
+    public Map<String, Object> getColumnValues(
+      String tname, Iterable<CharSequence> names
+    ) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+
+    /**
+     * Retrieves the specified columns and their values from the POJO.
+     *
+     * @author paouelle
+     *
+     * @param  names the names of the columns to retrieve
+     * @return a non-<code>null</code> map of all requested column/value pairs
+     *         for the POJO
+     * @throws IllegalArgumentException if any of the column names are not defined
+     *         by the POJO or is mandatory and missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    @SuppressWarnings("synthetic-access")
+    public Map<String, Object> getColumnValues(CharSequence... names) {
+      if (table == null) { // table not defined so nothing to return; should not happen
+        return Collections.emptyMap();
+      }
+      return table.getColumnValues(object, names);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.CharSequence[])
+     */
+    @Override
+    public Map<String, Object> getColumnValues(
+      String tname, CharSequence... names
+    ) {
+      throw new IllegalArgumentException("user-defined types do not define tables");
+    }
+  }
+
+  /**
    * Holds the name for the user-defined type represented by this class.
    *
    * @author paouelle
    */
   private final String name;
+
+  /**
+   * Holds the fake table used to represent the suer-defined type columns.
+   *
+   * @author paouelle
+   */
+  private final TableInfoImpl<T> table;
 
   /**
    * Instantiates a new <code>TypeClassInfoImpl</code> object.
@@ -88,6 +354,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
       "type entity class '%s', cannot be abstract", clazz.getSimpleName()
     );
     this.name = findName();
+    this.table = tables().findFirst().get();
   }
 
   /**
@@ -208,7 +475,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    * @return the fake table info defined by the POJO
    */
   public TableInfoImpl<T> getTable() {
-    return tables().findFirst().get();
+    return table;
   }
 
   /**
@@ -245,6 +512,18 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   @Override
   public Collection<TableInfoImpl<T>> getTables() {
     return Collections.emptyList();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#newContext(java.lang.Object)
+   */
+  @Override
+  public POJOContext newContext(T object) {
+    return new POJOContext(object);
   }
 
   /**

@@ -791,6 +791,12 @@ public abstract class StatementManager {
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -800,11 +806,17 @@ public abstract class StatementManager {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>values</code> is empty
    */
-  protected abstract Clause in(CharSequence name, Object... values);
+  protected abstract Clause.In in(CharSequence name, Object... values);
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -814,11 +826,17 @@ public abstract class StatementManager {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>values</code> is empty
    */
-  protected abstract Clause in(CharSequence name, Collection<?> values);
+  protected abstract Clause.In in(CharSequence name, Collection<?> values);
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -828,11 +846,17 @@ public abstract class StatementManager {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>values</code> is empty
    */
-  protected abstract Clause in(CharSequence name, Stream<?> values);
+  protected abstract Clause.In in(CharSequence name, Stream<?> values);
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
    * a value in the provided range.
+   * <p>
+   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * multiple keyspaces at the same time. In such case, the select statement
+   * will actually be split into multiple select statements (one for each
+   * matching keyspace) and the result will be combined as if only one select
+   * statement had been executed.
    *
    * @author paouelle
    *
@@ -843,7 +867,7 @@ public abstract class StatementManager {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if the specified range is empty
    */
-  protected abstract Clause in(CharSequence name, int from, int to);
+  protected abstract Clause.In in(CharSequence name, int from, int to);
 
   /**
    * Creates a "lesser than" where clause stating the provided column must be

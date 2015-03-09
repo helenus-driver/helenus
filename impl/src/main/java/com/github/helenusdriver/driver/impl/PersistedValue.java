@@ -88,7 +88,7 @@ public class PersistedValue<T, PT> implements PersistedObject<T, PT> {
   private boolean encodedDirty;
 
   /**
-   * Instantiates a new <code>EncodedValue</code> object.
+   * Instantiates a new <code>PersistedValue</code> object.
    *
    * @author paouelle
    *

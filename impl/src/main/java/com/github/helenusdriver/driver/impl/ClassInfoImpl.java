@@ -165,7 +165,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         !name.isEmpty(),
         "invalid empty keyspace name"
       );
-      // replaces all non-alphanumeric or underscores with underscores
+      // replaces all non-alphanumeric and non underscores with underscores
       // to comply with Cassandra
       return name.replaceAll("[^a-zA-Z0-9_]", "_").toLowerCase();
     }
@@ -265,7 +265,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *
      * @author paouelle
      */
-    private final T object;
+    protected final T object;
 
     /**
      * Instantiates a new <code>POJOContext</code> object.
@@ -297,7 +297,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @param suffixFields the map of suffix fields from the POJO where to extract
      *        the suffix values
      */
-    private void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {
+    protected void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {
       for (final Map.Entry<String, FieldInfoImpl<T>> e: suffixFields.entrySet()) {
         final String suffix = e.getKey();
         final FieldInfoImpl<T> field = e.getValue();

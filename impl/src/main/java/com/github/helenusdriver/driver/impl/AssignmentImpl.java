@@ -824,7 +824,12 @@ public abstract class AssignmentImpl
       sb.append("]=");
       final FieldInfoImpl<?> finfo = tinfo.getColumn(name);
 
-      Utils.appendValue(finfo.encodeValue(value), sb);
+      // paouelle: 03/06/15 - I think this is a bug, it should be encoded as an
+      // element of the map and not the type of the map as such, it should be
+      // using the encodeElementValue and we should make sure that the
+      // encodeElementValue, properly support MAP in to the definition.encodeElement()
+      // --> Utils.appendValue(finfo.encodeValue(value), sb);
+      Utils.appendValue(finfo.encodeElementValue(value), sb);
     }
 
     /**

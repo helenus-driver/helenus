@@ -999,7 +999,7 @@ public class StatementManagerImpl extends StatementManager {
    * @see com.github.helenusdriver.driver.StatementManager#in(java.lang.CharSequence, java.lang.Object[])
    */
   @Override
-  protected Clause in(CharSequence name, Object... values) {
+  protected Clause.In in(CharSequence name, Object... values) {
     return new ClauseImpl.InClauseImpl(name, Arrays.asList(values));
   }
 
@@ -1011,7 +1011,7 @@ public class StatementManagerImpl extends StatementManager {
    * @see com.github.helenusdriver.driver.StatementManager#in(java.lang.CharSequence, java.util.Collection)
    */
   @Override
-  protected Clause in(CharSequence name, Collection<?> values) {
+  protected Clause.In in(CharSequence name, Collection<?> values) {
     return new ClauseImpl.InClauseImpl(name, values);
   }
 
@@ -1024,7 +1024,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @SuppressWarnings({"rawtypes", "cast", "unchecked"})
   @Override
-  protected Clause in(CharSequence name, Stream<?> values) {
+  protected Clause.In in(CharSequence name, Stream<?> values) {
     return new ClauseImpl.InClauseImpl(
       name, (Collection<?>)((Stream)values).collect(Collectors.toList())
     );
@@ -1038,7 +1038,7 @@ public class StatementManagerImpl extends StatementManager {
    * @see com.github.helenusdriver.driver.StatementManager#in(java.lang.CharSequence, int, int)
    */
   @Override
-  protected Clause in(CharSequence name, int from, int to) {
+  protected Clause.In in(CharSequence name, int from, int to) {
     org.apache.commons.lang3.Validate.isTrue(
       to >= from,
       "'to' value '%d' must be greater or equal to 'from' value '%d'",

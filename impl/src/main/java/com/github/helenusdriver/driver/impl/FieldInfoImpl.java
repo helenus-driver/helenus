@@ -82,7 +82,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final Class<T> clazz;
 
   /**
-   * Holds the class info for the POJO.
+   * Holds the class info for the POJO this field is in.
    *
    * @author paouelle
    */
@@ -1427,7 +1427,19 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         was required
    * @throws ColumnPersistenceException if unable to persist the field's value
    */
+  @SuppressWarnings("unchecked")
   public Object encodeValue(Object val) {
+    if ((val != null)
+        && (definition != null)
+        && definition.isUserDefined()) {
+      final UDTClassInfoImpl<?> udtcinfo = (UDTClassInfoImpl<?>)definition.getType();
+
+      if (udtcinfo.getObjectClass().isInstance(val)) {
+        // if this field represents a UDT, then we need to convert its value to a
+        // UDTValue to start with
+        val = new UDTValueWrapper<>(udtcinfo, val);
+      }
+    }
     if (persister != null) { // must encode it using the persister
       final String fname = declaringClass.getName() + "." + name;
 
@@ -1461,6 +1473,17 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws ColumnPersistenceException if unable to persist the field's value
    */
   public Object encodeElementValue(Object val) {
+    if ((val != null)
+        && (definition != null)
+        && definition.getElementType().isUserDefined()) {
+      final UDTClassInfoImpl<?> udtcinfo = (UDTClassInfoImpl<?>)definition.getElementType();
+
+      if (udtcinfo.getObjectClass().isInstance(val)) {
+        // if the element of this field represents a UDT, then we need to convert
+        // its value to a UDTValue to start with
+        val = new UDTValueWrapper<>(udtcinfo, val);
+      }
+    }
     if (persister != null) { // must encode it using the persister
       final String fname = declaringClass.getName() + "." + name;
 

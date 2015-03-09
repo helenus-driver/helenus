@@ -17,7 +17,6 @@ package com.github.helenusdriver.driver;
 
 import com.datastax.driver.core.ResultSetFuture;
 
-
 /**
  * The <code>StatementBridge</code> class provides access to protected statement
  * information and services. A statement bridge is returned when a statement
@@ -37,24 +36,6 @@ public final class StatementBridge {
    * @author paouelle
    */
   StatementBridge() {}
-
-  /**
-   * Instantiates a new <code>ObjectSetFuture</code> object.
-   *
-   * @author paouelle
-   *
-   * @param <T> The type of POJO
-   *
-   * @param  context the non-<code>null</code> statement context associated with
-   *         the future object set
-   * @param  future the non-<code>null</code> result set future
-   * @return the corresponding new instance
-   */
-  public <T> ObjectSetFuture<T> newObjectSetFuture(
-    StatementManager.Context<T> context, ResultSetFuture future
-  ) {
-    return new ObjectSetFuture<>(context, future);
-  }
 
   /**
    * Instantiates a new <code>VoidFuture</code> object.

@@ -39,4 +39,16 @@ public interface Clause {
    * @since 1.0
    */
   public interface Equality extends Clause {}
+
+  /**
+   * The <code>In</code> class defines an in clause.
+   *
+   * @copyright 2015-2015 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Mar 3, 2015 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  public interface In extends Clause {}
 }

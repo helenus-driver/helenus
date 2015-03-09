@@ -13,19 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.helenusdriver.driver;
+package com.github.helenusdriver.driver.impl;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.ResultSetFuture;
+import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 import com.datastax.driver.core.exceptions.QueryValidationException;
-import com.google.common.util.concurrent.ListenableFuture;
+import com.github.helenusdriver.driver.ObjectNotFoundException;
+import com.github.helenusdriver.driver.ObjectSet;
+import com.github.helenusdriver.driver.ObjectSetFuture;
+import com.github.helenusdriver.driver.StatementManager;
+import com.google.common.util.concurrent.AbstractFuture;
 
 /**
- * The <code>ObjectSetFuture</code> class extends on Cassandra's
+ * The <code>ObjectSetFutureImpl</code> class extends Cassandra's
  * {@link com.datastax.driver.core.ResultSetFuture} in order to provide
  * support for POJOs.
  *
@@ -38,7 +46,47 @@ import com.google.common.util.concurrent.ListenableFuture;
  *
  * @since 1.0
  */
-public interface ObjectSetFuture<T> extends ListenableFuture<ObjectSet<T>> {
+public class ObjectSetFutureImpl<T>
+  extends AbstractFuture<ObjectSet<T>>
+  implements ObjectSetFuture<T> {
+  /**
+   * Holds the statement context associated with this object set.
+   *
+   * @author paouelle
+   */
+  private final StatementManager.Context<T> context;
+
+  /**
+   * Holds the raw result set future.
+   *
+   * @author paouelle
+   */
+  private final ResultSetFuture future;
+
+  /**
+   * Instantiates a new <code>ObjectSetFutureImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param context the non-<code>null</code> statement context associated with
+   *        this future object set
+   * @param future the non-<code>null</code> result set future
+   */
+  ObjectSetFutureImpl(StatementManager.Context<T> context, ResultSetFuture future) {
+    this.context = context;
+    this.future = future;
+  }
+
+  /**
+   * Post-process the result set. The returned {@link ObjectSetImpl} will be based
+   * on what is left off in the result set after post-processing.
+   *
+   * @author paouelle
+   *
+   * @param  result the non-<code>null</code> result set to be post processed
+   */
+  protected void postProcess(ResultSet result) {}
+
   /**
    * {@inheritDoc}
    *
@@ -55,11 +103,21 @@ public interface ObjectSetFuture<T> extends ListenableFuture<ObjectSet<T>> {
    * @throws QueryValidationException if the query is invalid (syntax error,
    *         unauthorized or any other validation problem).
    *
-   * @see java.util.concurrent.Future#get(long, java.util.concurrent.TimeUnit)
+   * @see com.google.common.util.concurrent.AbstractFuture#get(long, java.util.concurrent.TimeUnit)
    */
   @Override
   public ObjectSet<T> get(long timeout, TimeUnit unit)
-    throws InterruptedException, TimeoutException, ExecutionException;
+    throws InterruptedException, TimeoutException, ExecutionException {
+    try {
+      final ResultSet result = future.get(timeout, unit);
+
+      postProcess(result);
+      return new ObjectSetImpl<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
+  }
 
   /**
    * {@inheritDoc}
@@ -77,73 +135,61 @@ public interface ObjectSetFuture<T> extends ListenableFuture<ObjectSet<T>> {
    * @throws QueryValidationException if the query is invalid (syntax error,
    *         unauthorized or any other validation problem).
    *
-   * @see java.util.concurrent.Future#get()
+   * @see com.google.common.util.concurrent.AbstractFuture#get()
    */
   @Override
-  public ObjectSet<T> get() throws InterruptedException, ExecutionException;
+  public ObjectSet<T> get() throws InterruptedException, ExecutionException {
+    try {
+      final ResultSet result = future.get();
+
+      postProcess(result);
+      return new ObjectSetImpl<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
+  }
 
   /**
-   * Waits for the query to return and return its object set.
-   *
-   * This method is usually more convenient than {@link #get} because it:
-   * <ul>
-   * <li>Waits for the result uninterruptibly, and so doesn't throw
-   * {@link InterruptedException}.</li>
-   * <li>Returns meaningful exceptions, instead of having to deal with
-   * ExecutionException.</li>
-   * </ul>
-   * As such, it is the preferred way to get the future result.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> object set
-   * @throws NoHostAvailableException if no host in the cluster can be contacted
-   *         successfully to execute this query.
-   * @throws QueryExecutionException if the query triggered an execution
-   *         exception, that is an exception thrown by Cassandra when it
-   *         cannot execute the query with the requested consistency level
-   *         successfully.
-   * @throws ObjectNotFoundException if the statement is a select and the
-   *         keyspace specified doesn't exist
-   * @throws QueryValidationException if the query is invalid (syntax error,
-   *         unauthorized or any other validation problem).
+   * @see com.github.helenusdriver.driver.ObjectSetFuture#getUninterruptibly()
    */
-  public ObjectSet<T> getUninterruptibly();
+  @Override
+  public ObjectSet<T> getUninterruptibly() {
+    try {
+      final ResultSet result = future.getUninterruptibly();
+
+      postProcess(result);
+      return new ObjectSetImpl<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
+  }
 
   /**
-   * Waits for the provided time for the query to return and return its object
-   * set if available.
-   *
-   * This method is usually more convenient than {@link #get} because it:
-   * <ul>
-   * <li>Waits for the result uninterruptibly, and so doesn't throw
-   * {@link InterruptedException}.</li>
-   * <li>Returns meaningful exceptions, instead of having to deal with
-   * ExecutionException.</li>
-   * </ul>
-   * As such, it is the preferred way to get the future result.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @param  timeout the timeout to wait for
-   * @param  unit the units for the timeout
-   * @return the non-<code>null</code> object set
-   * @throws NoHostAvailableException if no host in the cluster can be contacted
-   *         successfully to execute this query.
-   * @throws QueryExecutionException if the query triggered an execution
-   *         exception, that is an exception thrown by Cassandra when it
-   *         cannot execute the query with the requested consistency level
-   *         successfully.
-   * @throws ObjectNotFoundException if the statement is a select and the
-   *         keyspace specified doesn't exist
-   * @throws QueryValidationException if the query if invalid (syntax error,
-   *         unauthorized or any other validation problem).
-   * @throws TimeoutException if the wait timed out (Note that this is different
-   *         from a Cassandra timeout, which is a
-   *         {@code QueryExecutionException}).
+   * @see com.github.helenusdriver.driver.ObjectSetFuture#getUninterruptibly(long, java.util.concurrent.TimeUnit)
    */
+  @Override
   public ObjectSet<T> getUninterruptibly(long timeout, TimeUnit unit)
-    throws TimeoutException;
+    throws TimeoutException {
+    try {
+      final ResultSet result = future.getUninterruptibly(timeout, unit);
+
+      postProcess(result);
+      return new ObjectSetImpl<>(context, result);
+    } catch (InvalidQueryException e) {
+      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
+      throw e;
+    }
+  }
 
   /**
    * {@inheritDoc}
@@ -180,8 +226,46 @@ public interface ObjectSetFuture<T> extends ListenableFuture<ObjectSet<T>> {
    * @return <code>false</code> if the future could not be cancelled (it has already
    *         completed normally); <code>true</code> otherwise.
    *
-   * @see java.util.concurrent.Future#cancel(boolean)
+   * @see com.google.common.util.concurrent.AbstractFuture#cancel(boolean)
    */
   @Override
-  public boolean cancel(boolean mayInterruptIfRunning);
+  public boolean cancel(boolean mayInterruptIfRunning) {
+    return future.cancel(mayInterruptIfRunning);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.google.common.util.concurrent.AbstractFuture#isDone()
+   */
+  @Override
+  public boolean isDone() {
+    return future.isDone();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.google.common.util.concurrent.AbstractFuture#isCancelled()
+   */
+  @Override
+  public boolean isCancelled() {
+    return future.isCancelled();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.google.common.util.concurrent.AbstractFuture#addListener(Runnable, java.util.concurrent.Executor)
+   */
+  @Override
+  public void addListener(Runnable listener, Executor exec) {
+    future.addListener(listener, exec);
+  }
 }
