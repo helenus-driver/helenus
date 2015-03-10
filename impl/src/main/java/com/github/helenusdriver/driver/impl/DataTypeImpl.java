@@ -764,6 +764,7 @@ public class DataTypeImpl {
   private static void inferBasicDataTypeFrom(
     Field field, Class<?> clazz, List<CQLDataType> types, Persisted persisted
   ) {
+    clazz = ClassUtils.primitiveToWrapper(clazz);
     if (persisted != null) {
       types.add(persisted.as());
     } else if (String.class == clazz) {
