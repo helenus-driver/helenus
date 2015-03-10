@@ -263,7 +263,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Long decodeImpl(Row row, String name, Class<Long> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Long.class == clazz,
+        (Long.class == clazz) || (Long.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -272,7 +272,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Long decodeImpl(UDTValue uval, String name, Class<Long> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Long.class == clazz,
+        (Long.class == clazz) || (Long.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -355,7 +355,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Boolean decodeImpl(Row row, String name, Class<Boolean> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Boolean.class == clazz,
+        (Boolean.class == clazz) || (Boolean.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -364,7 +364,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Boolean decodeImpl(UDTValue uval, String name, Class<Boolean> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Boolean.class == clazz,
+        (Boolean.class == clazz) || (Boolean.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -440,7 +440,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Double decodeImpl(Row row, String name, Class<Double> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Double.class == clazz,
+        (Double.class == clazz) || (Double.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -449,7 +449,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Double decodeImpl(UDTValue uval, String name, Class<Double> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Double.class == clazz,
+        (Double.class == clazz) || (Double.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -466,7 +466,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Float decodeImpl(Row row, String name, Class<Float> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Float.class == clazz,
+        (Float.class == clazz) || (Float.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -475,7 +475,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Float decodeImpl(UDTValue uval, String name, Class<Float> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Float.class == clazz,
+        (Float.class == clazz) || (Float.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -518,7 +518,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Integer decodeImpl(Row row, String name, Class<Integer> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Integer.class == clazz,
+        (Integer.class == clazz) || (Integer.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -527,7 +527,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Integer decodeImpl(UDTValue uval, String name, Class<Integer> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Integer.class == clazz,
+        (Integer.class == clazz) || (Integer.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -607,7 +607,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Long decodeImpl(Row row, String name, Class<Long> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Long.class == clazz,
+        (Long.class == clazz) || (Long.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
@@ -618,7 +618,7 @@ public abstract class DataDecoder<V> {
     @Override
     protected Long decodeImpl(UDTValue uval, String name, Class<Long> clazz) {
       org.apache.commons.lang3.Validate.isTrue(
-        Long.class == clazz,
+        (Long.class == clazz) || (Long.TYPE == clazz),
         "unsupported class '%s' to decode to",
         clazz.getName()
       );

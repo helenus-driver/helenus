@@ -44,6 +44,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.ZoneId;
 
+import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
@@ -303,7 +304,9 @@ public class DataTypeImpl {
     public DataDecoder<?> getDecoder(Field field, boolean mandatory) {
       org.apache.commons.lang3.Validate.notNull(field, "invalid null field");
       final Persisted persisted = field.getAnnotation(Persisted.class);
-      final Class<?> clazz = DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
+      final Class<?> clazz = ClassUtils.primitiveToWrapper(
+        DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType())
+      );
 
       // check if we are dealing with a collection
       if (isCollection()) {
