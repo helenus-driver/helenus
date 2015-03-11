@@ -25,7 +25,6 @@ import java.util.Set;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
-
 import com.github.helenusdriver.commons.collections.iterators.CombinationIterator;
 import com.github.helenusdriver.driver.Assignment;
 import com.github.helenusdriver.driver.Clause;
@@ -306,13 +305,25 @@ public class UpdateImpl<T>
         if (table.getPrimaryKey(a.getColumnName()) != null) { // assigning to a primary key
           foundPK = true;
           if (a instanceof AssignmentImpl.ReplaceAssignmentImpl) { // great, we know what was the old one!
+            final AssignmentImpl.ReplaceAssignmentImpl ra = (AssignmentImpl.ReplaceAssignmentImpl)a;
+
             if (old_values == null) {
               old_values = new LinkedHashMap<>(table.getPrimaryKeys().size());
             }
-            old_values.put(
-              a.getColumnName().toString(),
-              ((AssignmentImpl.ReplaceAssignmentImpl)a).getOldValue()
-            );
+            final Object oldval = ra.getOldValue();
+
+            // check if this assignment is for a multi-column and if it is then we
+            // only want to keep the entries in the set that are not present in
+            // in the new multi key to avoid having DELETE generate for these
+            // keys which are supposed to remain in place
+            if (!multiKeys.isEmpty()) {
+              final FieldInfoImpl<?> f = table.getColumn(a.getColumnName());
+
+              if (f.isMultiKey()) {
+                ((Set<?>)oldval).removeAll((Set<?>)(ra.getValue()));
+              }
+            }
+            old_values.put(a.getColumnName().toString(), oldval);
           }
         }
       }
