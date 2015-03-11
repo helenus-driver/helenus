@@ -22,10 +22,10 @@ import java.util.Objects;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
-
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
 import com.github.helenusdriver.driver.ObjectConversionException;
 import com.github.helenusdriver.driver.StatementBuilder;
+import com.github.helenusdriver.driver.info.TypeClassInfo;
 import com.github.helenusdriver.persistence.Keyspace;
 import com.github.helenusdriver.persistence.RootEntity;
 import com.github.helenusdriver.persistence.Table;
@@ -46,7 +46,9 @@ import com.github.helenusdriver.persistence.TypeEntity;
  */
 @lombok.ToString(callSuper=true)
 @lombok.EqualsAndHashCode(callSuper=true)
-public class TypeClassInfoImpl<T> extends ClassInfoImpl<T> {
+public class TypeClassInfoImpl<T>
+  extends ClassInfoImpl<T>
+  implements TypeClassInfo<T> {
   /**
    * Holds the class of POJO for the root entity this POJO is a type.
    *
@@ -188,25 +190,26 @@ public class TypeClassInfoImpl<T> extends ClassInfoImpl<T> {
   }
 
   /**
-   * Gets the class info for the root entity defined for this type entity.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> root entity POJO class info defined for
-   *         this type entity
+   * @see com.github.helenusdriver.driver.info.TypeClassInfo#getRoot()
    */
+  @Override
   @SuppressWarnings("unchecked")
   public RootClassInfoImpl<? super T> getRoot() {
     return (RootClassInfoImpl<? super T>)StatementBuilder.getClassInfo(rclazz);
   }
 
   /**
-   * Gets the type of this POJO class.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> type of this POJO class
+   * @see com.github.helenusdriver.driver.info.TypeClassInfo#getType()
    */
+  @Override
   public String getType() {
     return type;
   }

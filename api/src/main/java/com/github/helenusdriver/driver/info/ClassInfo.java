@@ -21,14 +21,14 @@ import com.github.helenusdriver.persistence.Keyspace;
  * The <code>ClassInfo</code> interface provides information about a particular
  * POJO class.
  *
- * @param <T> The type of POJO represented by this class
- *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
  *
- * @since 2.0
+ * @param <T> The type of POJO represented by this class
+ *
+ * @since 1.0
  */
 public interface ClassInfo<T> {
   /**

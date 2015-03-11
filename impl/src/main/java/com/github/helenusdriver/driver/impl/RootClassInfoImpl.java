@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
 import com.github.helenusdriver.driver.ObjectConversionException;
+import com.github.helenusdriver.driver.info.RootClassInfo;
 import com.github.helenusdriver.persistence.RootEntity;
 
 /**
@@ -47,7 +48,9 @@ import com.github.helenusdriver.persistence.RootEntity;
  */
 @lombok.ToString(callSuper=true, of={"ntypes"})
 @lombok.EqualsAndHashCode(callSuper=true)
-public class RootClassInfoImpl<T> extends ClassInfoImpl<T> {
+public class RootClassInfoImpl<T>
+  extends ClassInfoImpl<T>
+  implements RootClassInfo<T> {
   /**
    * Finds the class info for all type classes for this root element class.
    *
@@ -546,32 +549,26 @@ public class RootClassInfoImpl<T> extends ClassInfoImpl<T> {
   }
 
   /**
-   * Gets the class info for the specified type entity defined from this root
-   * entity.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @param <S> the type of POJO for the type entity
-   *
-   * @param  clazz the POJO class of the type entity to retrieve its info
-   * @return the corresponding type entity POJO class information or <code>null</code>
-   *         if none defined for the given class
+   * @see com.github.helenusdriver.driver.info.RootClassInfo#getType(java.lang.Class)
    */
+  @Override
   @SuppressWarnings("unchecked")
   public <S extends T> TypeClassInfoImpl<S> getType(Class<S> clazz) {
     return (TypeClassInfoImpl<S>)ctypes.get(clazz);
   }
 
   /**
-   * Gets the class info for the specified type entity defined from this root
-   * entity.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @param  name the name of the type entity to retrieve its info
-   * @return the corresponding type entity POJO class information or <code>null</code>
-   *         if none defined for the given name
+   * @see com.github.helenusdriver.driver.info.RootClassInfo#getType(java.lang.String)
    */
+  @Override
   public TypeClassInfoImpl<? extends T> getType(String name) {
     return ntypes.get(name);
   }
