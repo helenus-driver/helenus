@@ -365,7 +365,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       this.persister = null;
     }
     this.suffix = field.getAnnotation(SuffixKey.class);
-    this.mandatory = field.getAnnotation(Mandatory.class) != null;
+    this.mandatory = (
+      // primitive types for fields must be mandatory since null is not possible
+      field.getType().isPrimitive() || (field.getAnnotation(Mandatory.class) != null)
+    );
     final Map<String, Column> columns
       = ReflectionUtils.getAnnotationsByType(String.class, Column.class, field);
     final Map<String, Index> indexes

@@ -28,6 +28,10 @@ import java.lang.annotation.Target;
  * annotated with {@link PartitionKey} or {@link ClusteringKey} are automatically
  * mandatory and do not need to be annotated with this annotation. However,
  * doing so won't generate any errors.
+ * <p>
+ * <i>Note:</i> A field defined using a primitive data type and not its wrapper
+ * class type (e.g. <code>long</code> versus {@link Long}) will automatically be
+ * considered mandatory.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
