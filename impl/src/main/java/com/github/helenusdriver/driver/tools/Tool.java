@@ -388,6 +388,19 @@ public class Tool {
     .create();
 
   /**
+   * Holds the Cassandra default data centers option.
+   *
+   * @author paouelle
+   */
+  @SuppressWarnings("static-access")
+  private final static Option dataCenters = OptionBuilder
+    .withDescription("to specify the default data centers and number of replicas to use with the network topology strategy when creating keyspaces (e.g. -Ddatacenter1=2)")
+    .hasArgs(2)
+    .withArgName("datacenter=replicas")
+    .withValueSeparator()
+    .create("D");
+
+  /**
    * Holds the suffix options.
    *
    * @author paouelle
@@ -431,6 +444,7 @@ public class Tool {
        .addOption(Tool.matches_only)
        .addOption(Tool.no_dependents)
        .addOption(Tool.replicationFactor)
+       .addOption(Tool.dataCenters)
        .addOption(Tool.output)
        .addOption(Tool.verbose)
        .addOption(Tool.trace)
@@ -1290,6 +1304,17 @@ public class Tool {
             line.getOptionValue(Tool.replicationFactor.getLongOpt())
           )
         );
+      }
+      if (line.hasOption(Tool.dataCenters.getOpt())) {
+        @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+        final Map<String, String> dcss
+          = (Map<String, String>)(Map)line.getOptionProperties(Tool.dataCenters.getOpt());
+        final Map<String, Integer> dcs = new LinkedHashMap<>(dcss.size() * 3 / 2);
+
+        for (final Map.Entry<String, String> e: dcss.entrySet()) {
+          dcs.put(e.getKey(),  Integer.parseInt(e.getValue()));
+        }
+        mgr.setDefaultDataCenters(dcs);
       }
       try {
         if (connect && Tool.vflag) {

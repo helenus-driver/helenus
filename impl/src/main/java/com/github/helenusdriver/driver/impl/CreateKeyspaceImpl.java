@@ -111,10 +111,9 @@ public class CreateKeyspaceImpl<T>
     Utils.appendName(getKeyspace(), builder);
     KeyspaceWithImpl.ReplicationWithImpl replication = with.replication;
 
-    if (replication == null) {
-      // default to POJO's details
+    if (replication == null) { // default to POJO's details
       replication = new KeyspaceWithImpl.ReplicationWithImpl(
-        getContext().getClassInfo().getKeyspace(), mgr
+        getContext().getClassInfo(), mgr
       );
     }
     final List<KeyspaceWithImpl> options = new ArrayList<>(with.options.size() + 1);

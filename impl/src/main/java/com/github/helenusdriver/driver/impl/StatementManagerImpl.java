@@ -135,6 +135,15 @@ public class StatementManagerImpl extends StatementManager {
   private int defaultReplicationFactor = 2;
 
   /**
+   * Holds the default data centers to use when creating keyspaces with
+   * a NETWORK topology strategy and no data centers have been defined
+   * in the POJO.
+   *
+   * @author paouelle
+   */
+  private Map<String, Integer> defaultDataCenters = null;
+
+  /**
    * Hold the classInfoCache. This static map is used to collect and store
    * information about a given Object class file It finds out the keyspace suffix
    * field, tables suffix which help to speed up querying on these tables
@@ -1691,7 +1700,7 @@ public class StatementManagerImpl extends StatementManager {
 
   /**
    * Sets the default replication factor to use when POJOS are defined with the
-   * SIMPLE strategy and do not specify a factor.
+   * SIMPLE strategy and the pojo does not specify a factor.
    *
    * @author paouelle
    *
@@ -1707,6 +1716,47 @@ public class StatementManagerImpl extends StatementManager {
       "invalid default replication factor: %d", defaultReplicationFactor
     );
     this.defaultReplicationFactor = defaultReplicationFactor;
+    return this;
+  }
+
+  /**
+   * Gets the default data centers to use when POJOS are defined with the
+   * NETWORK topology strategy and the pojo does not specify data centers.
+   *
+   * @author paouelle
+   *
+   * @return the default data centers to use for the NETWORK topology
+   *         strategy
+   */
+  public Map<String, Integer> getDefaultDataCenters() {
+    return defaultDataCenters;
+  }
+
+  /**
+   * Sets the default data centers to use when POJOS are defined with the
+   * NETWORK topology strategy and do not specify any.
+   *
+   * @author paouelle
+   *
+   * @param  defaultDataCenters the default data centers to use for
+   *         the NETWORK topology strategy
+   * @return this for chaining
+   * @throws IllegalArgumentException if any of the replication factor
+   *         is less or equal to 0
+   */
+  public StatementManagerImpl setDefaultDataCenters(
+    Map<String, Integer> defaultDataCenters
+  ) {
+    if (defaultDataCenters != null) {
+      defaultDataCenters.entrySet()
+        .forEach(e ->
+          org.apache.commons.lang3.Validate.isTrue(
+            (e.getValue() != null) && (e.getValue() > 0),
+            "invalid replication factor: %d for: %s", e.getValue(), e.getKey()
+          )
+        );
+    }
+    this.defaultDataCenters = defaultDataCenters;
     return this;
   }
 

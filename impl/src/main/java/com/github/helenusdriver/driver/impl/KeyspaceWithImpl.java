@@ -15,12 +15,19 @@
  */
 package com.github.helenusdriver.driver.impl;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.ArrayUtils;
+
 import com.github.helenusdriver.driver.KeyspaceWith;
 import com.github.helenusdriver.persistence.Keyspace;
+import com.github.helenusdriver.persistence.StrategyClass;
 
 /**
  * The <code>KeyspaceWithImpl</code> class defines options to be used when
@@ -109,19 +116,60 @@ public class KeyspaceWithImpl
      *
      * @author paouelle
      *
-     * @param  keyspace the keyspace from which to compute the properties
-     * @param mgr the statement manager from which to extract tool options
+     * @param  cinfo the non-<code>null</code> class info for the pojo class
+     *         where to get the replication information
+     * @param  mgr the statement manager from which to extract tool options
      * @return the corresponding Json object for the keyspace properties
      */
+    @SuppressWarnings("fallthrough")
     private static JsonObject getReplicationProperties(
-      Keyspace keyspace, StatementManagerImpl mgr
+      ClassInfoImpl<?> cinfo, StatementManagerImpl mgr
     ) {
+      final Keyspace keyspace = cinfo.getKeyspace();
       final JsonObjectBuilder jbuild = Json.createObjectBuilder();
+      StrategyClass strategy = keyspace.strategy();
 
-      switch (keyspace.strategy()) {
+      switch (strategy) {
+        case NETWORK_TOPOLOGY:
+          final Map<String, Integer> dcs;
+
+          if (ArrayUtils.isEmpty(keyspace.dataCenter())) {
+            // must have default ones then otherwise fall-through
+            dcs = mgr.getDefaultDataCenters();
+            if (MapUtils.isEmpty(dcs)) {
+              strategy = StrategyClass.SIMPLE;
+            }
+          } else {
+            final int[] factors = keyspace.replicationFactor();
+            final String[] names = keyspace.dataCenter();
+
+            org.apache.commons.lang3.Validate.isTrue(
+              names.length == factors.length,
+              "mismatch number of data centers and replication factors for network topology in %s",
+              cinfo.getObjectClass().getName()
+            );
+            dcs = new LinkedHashMap<>(names.length * 3 / 2);
+            for (int i = 0; i < names.length; i++) {
+              dcs.put(names[i], factors[i]);
+            }
+          }
+          if (strategy == StrategyClass.NETWORK_TOPOLOGY) {
+            dcs.entrySet().forEach(e -> jbuild.add(e.getKey(), e.getValue()));
+            break;
+          } // else - fall-through
         case SIMPLE:
-          int replicationFactor = keyspace.replicationFactor();
+          int replicationFactor;
 
+          if (ArrayUtils.isEmpty(keyspace.replicationFactor())) {
+            replicationFactor = 0;
+          } else {
+            org.apache.commons.lang3.Validate.isTrue(
+              keyspace.replicationFactor().length == 1,
+              "too many replication factors speecified for simple strategy in %s",
+              cinfo.getObjectClass().getName()
+            );
+            replicationFactor = keyspace.replicationFactor()[0];
+          }
           if (replicationFactor == 0) { // fallback to manager's default
             replicationFactor = mgr.getDefaultReplicationFactor();
           }
@@ -130,11 +178,8 @@ public class KeyspaceWithImpl
           }
           jbuild.add("replication_factor", replicationFactor);
           break;
-        case NETWORK_TOPOLOGY:
-          // TODO: handle network topology strategy class
-          break;
       }
-      jbuild.add("class", keyspace.strategy().NAME);
+      jbuild.add("class", strategy.NAME);
       return jbuild.build();
     }
 
@@ -156,12 +201,12 @@ public class KeyspaceWithImpl
      *
      * @author paouelle
      *
-     * @param keyspace the @Keyspace annotation from which to get the
-     *        replication option
+     * @param cinfo the non-<code>null</code> class info for the pojo class
+     *        where to get the replication information
      * @param mgr the statement manager from which to extract tool options
      */
-    public ReplicationWithImpl(Keyspace keyspace, StatementManagerImpl mgr) {
-      this(ReplicationWithImpl.getReplicationProperties(keyspace, mgr));
+    public ReplicationWithImpl(ClassInfoImpl<?> cinfo, StatementManagerImpl mgr) {
+      this(ReplicationWithImpl.getReplicationProperties(cinfo, mgr));
     }
   }
 }

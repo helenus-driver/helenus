@@ -70,27 +70,44 @@ public @interface Keyspace {
 
   /**
    * The optional placement strategy for the keyspace. Defaults to
-   * {@link StrategyClass#SIMPLE}.
+   * {@link StrategyClass#NETWORK_TOPOLOGY}.
    *
    * @author paouelle
    *
    * @return the optional placement strategy
    */
-  StrategyClass strategy() default StrategyClass.SIMPLE;
+  StrategyClass strategy() default StrategyClass.NETWORK_TOPOLOGY;
 
   /**
    * The default replication factor to use along with the simple placement
-   * strategy. Defaults to 0 indicating the value should be provided by the
-   * Helenus tool at the time the keyspace is created otherwise a replication
-   * factor of 2 will be used.
+   * strategy or with the corresponding indexed data center with the network
+   * topology strategy. Defaults to 0 indicating the value should be provided
+   * by the Helenus tool at the time the keyspace is created otherwise a
+   * replication factor of 2 will be used.
    *
    * @author paouelle
    *
-   * @return the default replication factor to use with the simple placement strategy
+   * @return the default replication factor to use with the simple placement
+   *         strategy or with the corresponding indexed data centers with the
+   *         network topology strategy
    */
-  int replicationFactor() default 0;
+  int[] replicationFactor() default 0;
 
-  // TODO: for network topology, we might need to specify a properties file which will define the data centers and their respective replication factor. If omitted there, we can then use the above one as a default value
+  /**
+   * The data centers where to replicate the data to use along with the network
+   * topology strategy. The corresponding indexed replication factor will be
+   * used for the number of replicas for each data center specified. Defaults
+   * to none which means the set of data centers should be provided by the
+   * Helenus tool at the time the keyspace is created otherwise it will fallback
+   * to a simple strategy.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @return the default data centers to replicate the data to use along with
+   *         the network topology strategy with the corresponding indexed
+   *         replication factor
+   */
+  String[] dataCenter() default {};
 
   /**
    * When set to false, data written to the keyspace bypasses the commit log.
@@ -100,7 +117,7 @@ public @interface Keyspace {
    *
    * @author paouelle
    *
-   * @return flag indicating wether to use durable writes or not
+   * @return flag indicating whether to use durable writes or not
    */
   boolean durableWrites() default true;
 }
