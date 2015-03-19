@@ -110,7 +110,7 @@ public class DataTypeImpl {
   /**
    * Unwraps the specific class if it is an {@link Optional}.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  clazz the class to unwrap if required
    * @param  type the corresponding type for the class

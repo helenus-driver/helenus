@@ -301,14 +301,10 @@ public class CompoundObjectSetFuture<T>
    * The <code>CompoundObjectSet</code> class is used to compound together
    * multiple object sets.
    *
-   * @copyright Enlighted Inc. Confidential
-   *            Copyright (c) 2015-2015 by Enlighted, Inc.
-   *            All Rights Reserved.
+   * @copyright 2015-2015 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
-   * @version 1 - Mar 9, 2015
-   *            - paouelle
-   *            - Creation
+   * @version 1 - Mar 9, 2015 - paouelle - Creation
    *
    * @param <T> The type of POJO associated with the future object set
    *

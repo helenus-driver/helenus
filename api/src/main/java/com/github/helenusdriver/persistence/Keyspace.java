@@ -101,7 +101,7 @@ public @interface Keyspace {
    * Helenus tool at the time the keyspace is created otherwise it will fallback
    * to a simple strategy.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @return the default data centers to replicate the data to use along with
    *         the network topology strategy with the corresponding indexed
