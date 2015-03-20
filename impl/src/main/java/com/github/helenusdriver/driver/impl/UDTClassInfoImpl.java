@@ -426,18 +426,6 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#tablesImpl()
-   */
-  @Override
-  protected Stream<TableInfoImpl<T>> tablesImpl() {
-    return Stream.empty();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
    * @see com.github.helenusdriver.persistence.CQLDataType#name()
    */
   @Override
