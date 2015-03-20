@@ -194,6 +194,39 @@ public final class StatementBuilder {
     return StatementManager.getManager().update(object, tables);
   }
 
+  /**
+   * Starts building a new UPDATE statement for the following POJO object to update
+   * all the specified tables defined by the POJO based on the assignment clauses
+   * specified.
+   * <p>
+   * <i>Note:</i> The primary key columns are automatically added to the
+   * "WHERE" part of the UPDATE statement if no clauses are added to the "WHERE"
+   * part. In addition, if no assignments are specified via the "WITH" part of
+   * the UPDATE statement, all non-primary columns will be automatically added.
+   * <p>
+   * If it is discovered that a primary key is part of the set of assignments,
+   * the "update" will be translated into a full "insert" of the POJO object
+   * without regards to the assignments specified with the "update. This is to
+   * ensure that the whole POJO is persisted to the DB into a new row. If a
+   * primary key is assigned using the {@link #set(CharSequence, Object, Object)}
+   * then a "delete" statement will also be generated for each tables affected
+   * by the primary key column before a full "insert" is generated.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @param  object the POJO object to be updated
+   * @param  tables the tables to update
+   * @return an in-construction UPDATE statement
+   * @throws NullPointerException if <code>object</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>object</code> is not a valid POJO
+   *         or if any of the specified tables are not defined in the POJO
+   */
+  public static <T> Update<T> update(T object, Stream<String> tables) {
+    return StatementManager.getManager().update(object, tables.toArray(String[]::new));
+  }
+
   // TODO: implement Update with only POJO class
   // this one will support statements like this:
   // UPDATE(class, [table...]).with(setAllFrom(obj))
