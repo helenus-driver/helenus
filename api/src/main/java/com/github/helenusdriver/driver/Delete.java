@@ -15,7 +15,7 @@
  */
 package com.github.helenusdriver.driver;
 
-
+import java.util.stream.Stream;
 
 /**
  * The <code>Delete</code> interface extends the functionality of Cassandra's
@@ -169,6 +169,22 @@ public interface Delete<T>
      *         referenced columns are not defined by the POJO
      */
     public Delete<T> from(String... tables);
+
+    /**
+     * Adds tables to delete from using the keyspace defined in the POJO.
+     * <p>
+     * This flavor should be used when the POJO doesn't require suffixes to the
+     * keyspace name.
+     *
+     * @author paouelle
+     *
+     * @param  tables the names of the tables to delete from
+     * @return a newly build DELETE statement that deletes from the specified
+     *         tables
+     * @throws IllegalArgumentException if any of the tables or any of the
+     *         referenced columns are not defined by the POJO
+     */
+    public Delete<T> from(Stream<String> tables);
 
     /**
      * Specifies to delete from all tables defined in the POJO using the

@@ -199,7 +199,7 @@ public abstract class StatementManager {
    * @throws NullPointerException if <code>object</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>object</code> is not a valid POJO
    */
-  protected abstract <T> Insert<T> insert(T object);
+  protected abstract <T> Insert.Builder<T> insert(T object);
 
   /**
    * Starts building a new UPDATE statement for the following POJO object to update

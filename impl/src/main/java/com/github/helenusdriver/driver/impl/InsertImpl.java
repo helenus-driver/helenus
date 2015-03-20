@@ -23,8 +23,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Row;
 import com.github.helenusdriver.commons.collections.iterators.CombinationIterator;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
@@ -51,6 +53,13 @@ import com.github.helenusdriver.driver.VoidFuture;
 public class InsertImpl<T>
   extends StatementImpl<Void, VoidFuture, T>
   implements Insert<T> {
+  /**
+   * Holds the tables to insert into.
+   *
+   * @author paouelle
+   */
+  private final List<TableInfoImpl<T>> tables = new ArrayList<>(8);
+
   /**
    * Holds the column names being inserted.
    *
@@ -86,18 +95,29 @@ public class InsertImpl<T>
    *
    * @param  context the non-<code>null</code> class info context for the POJO
    *         associated with this statement
+   * @param  tables the tables to insert into
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>context</code> is <code>null</code>
    * @throws IllegalArgumentException if unable to compute the keyspace name
    *         based from the given object
    */
-  public InsertImpl(
+  InsertImpl(
     ClassInfoImpl<T>.POJOContext context,
+    String[] tables,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
     super(Void.class, context, mgr, bridge);
+    if (tables != null) {
+      for (final String table: tables) {
+        if (table != null) {
+          this.tables.add((TableInfoImpl<T>)context.getClassInfo().getTable(table));
+        }
+      }
+    } else { // fallback to all
+      this.tables.addAll(context.getClassInfo().getTablesImpl());
+    }
     this.usings = new OptionsImpl<>(this);
   }
 
@@ -217,7 +237,6 @@ public class InsertImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
-    final Collection<TableInfoImpl<T>> tables = getPOJOContext().getClassInfo().getTablesImpl();
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
 
     for (final TableInfoImpl<T> table: tables) {
@@ -374,6 +393,242 @@ public class InsertImpl<T>
         // else all good
       }
     });
+  }
+
+  /**
+   * The <code>BuilderImpl</code> class defines an in-construction INSERT statement.
+   *
+   * @copyright 2015-2015 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Mar 20, 2015 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @since 1.0
+   */
+  public static class BuilderImpl<T>
+    extends StatementImpl<Void, VoidFuture, T> implements Builder<T> {
+    /**
+     * Instantiates a new <code>BuilderImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param context the non-<code>null</code> class info context
+     *        associated with this statement
+     * @param mgr the non-<code>null</code> statement manager
+     * @param bridge the non-<code>null</code> statement bridge
+     */
+    BuilderImpl(
+      ClassInfoImpl<T>.POJOContext context,
+      StatementManagerImpl mgr,
+      StatementBridge bridge
+    ) {
+      super(Void.class, context, mgr, bridge);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.StatementImpl#buildQueryStrings()
+     */
+    @Override
+    protected StringBuilder[] buildQueryStrings() {
+      return ((InsertImpl<T>)intoAll()).buildQueryStrings();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert.Builder#into(java.lang.String[])
+     */
+    @Override
+    public Insert<T> into(String... tables) {
+      final InsertImpl<T> i = new InsertImpl<>(getPOJOContext(), tables, mgr, bridge);
+
+      i.setConsistencyLevel(getConsistencyLevel());
+      i.setSerialConsistencyLevel(getSerialConsistencyLevel());
+      if (isTracing()) {
+        i.enableTracing();
+      } else {
+        i.disableTracing();
+      }
+      i.setRetryPolicy(getRetryPolicy());
+      i.setFetchSize(getFetchSize());
+      return i;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert.Builder#into(java.util.stream.Stream)
+     */
+    @Override
+    public Insert<T> into(Stream<String> tables) {
+      final InsertImpl<T> i =  new InsertImpl<>(
+          getPOJOContext(), tables.toArray(String[]::new), mgr, bridge
+      );
+
+      i.setConsistencyLevel(getConsistencyLevel());
+      i.setSerialConsistencyLevel(getSerialConsistencyLevel());
+      if (isTracing()) {
+        i.enableTracing();
+      } else {
+        i.disableTracing();
+      }
+      i.setRetryPolicy(getRetryPolicy());
+      i.setFetchSize(getFetchSize());
+      return i;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert.Builder#intoAll()
+     */
+    @Override
+    public Insert<T> intoAll() {
+      final InsertImpl<T> i = new InsertImpl<>(getPOJOContext(), null, mgr, bridge);
+
+      i.setConsistencyLevel(getConsistencyLevel());
+      i.setSerialConsistencyLevel(getSerialConsistencyLevel());
+      if (isTracing()) {
+        i.enableTracing();
+      } else {
+        i.disableTracing();
+      }
+      i.setRetryPolicy(getRetryPolicy());
+      i.setFetchSize(getFetchSize());
+      return i;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert#valuesFromObject()
+     */
+    @Override
+    public Insert<T> valuesFromObject() {
+      return intoAll().valuesFromObject();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert#value(java.lang.String)
+     */
+    @Override
+    public Insert<T> value(String name) {
+      return intoAll().value(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert#values(java.lang.String[])
+     */
+    @Override
+    public Insert<T> values(String... names) {
+      return intoAll().values(names);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert#using(com.github.helenusdriver.driver.Using)
+     */
+    @Override
+    public Options<T> using(Using using) {
+      return intoAll().using(using);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert.Builder#ifNotExists()
+     */
+    @Override
+    public Insert<T> ifNotExists() {
+      return intoAll().ifNotExists();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.StatementImpl#getQueryString()
+     */
+    @Override
+    public String getQueryString() {
+      return intoAll().getQueryString();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.StatementImpl#execute()
+     */
+    @Override
+    public Void execute() {
+      return intoAll().execute();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.StatementImpl#executeAsync()
+     */
+    @Override
+    public VoidFuture executeAsync() {
+      return intoAll().executeAsync();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.StatementImpl#executeRaw()
+     */
+    @Override
+    public ResultSet executeRaw() {
+      return intoAll().executeRaw();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.impl.StatementImpl#executeAsyncRaw()
+     */
+    @Override
+    public ResultSetFuture executeAsyncRaw() {
+      return intoAll().executeAsyncRaw();
+    }
   }
 
   /**

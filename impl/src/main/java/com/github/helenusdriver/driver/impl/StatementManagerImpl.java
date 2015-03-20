@@ -393,7 +393,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @SuppressWarnings("unchecked")
   @Override
-  protected <T> Insert<T> insert(T object) {
+  protected <T> Insert.Builder<T> insert(T object) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
     final ClassInfoImpl<T> cinfo = getClassInfoImpl((Class<T>)object.getClass());
 
@@ -402,7 +402,7 @@ public class StatementManagerImpl extends StatementManager {
       "unsupported %s POJO class '%s' for an insert statement",
       cinfo.getEntityAnnotationClass().getSimpleName(), object.getClass().getSimpleName()
     );
-    return new InsertImpl<>(
+    return new InsertImpl.BuilderImpl<>(
       cinfo.newContext(object),
       this,
       bridge

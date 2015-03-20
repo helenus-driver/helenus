@@ -343,7 +343,7 @@ public class UpdateImpl<T>
         }
         // time to shift gears to a full insert in which case we must rely
         // on the whole POJO as the assignments might not be complete
-        new InsertImpl<>(getPOJOContext(), mgr, bridge)
+        new InsertImpl<>(getPOJOContext(), new String[] { table.getName() }, mgr, bridge)
           .buildQueryStrings(table, builders);
         return;
       }

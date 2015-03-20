@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -80,7 +81,7 @@ public class DeleteImpl<T>
   private final OptionsImpl<T> usings;
 
   /**
-   * Flag to keep track of whether or not the special* has been selected.
+   * Flag to keep track of whether or not the special * has been selected.
    *
    * @author paouelle
    */
@@ -753,6 +754,23 @@ public class DeleteImpl<T>
         allSelected = true;
       }
       return new DeleteImpl<>(context, tables, columnNames, allSelected, mgr, bridge);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Delete.Builder#from(java.util.stream.Stream)
+     */
+    @Override
+    public Delete<T> from(Stream<String> tables) {
+      if (columnNames == null) {
+        allSelected = true;
+      }
+      return new DeleteImpl<>(
+        context, tables.toArray(String[]::new), columnNames, allSelected, mgr, bridge
+      );
     }
 
     /**

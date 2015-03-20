@@ -15,6 +15,7 @@
  */
 package com.github.helenusdriver.driver;
 
+import java.util.stream.Stream;
 
 /**
  * The <code>Insert</code> interface extends the functionality of Cassandra's
@@ -100,6 +101,60 @@ public interface Insert<T>
    * @return this INSERT statement.
    */
   public Insert<T> ifNotExists();
+
+  /**
+   * The <code>Builder</code> interface defines an in-construction INSERT statement.
+   *
+   * @copyright 2015-2015 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Mar 20, 2015 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @since 1.0
+   */
+  public interface Builder<T> extends Insert<T> {
+    /**
+     * Adds tables to insert into using the keyspace defined in the POJO.
+     *
+     * @author paouelle
+     *
+     * @param  tables the names of the tables to insert into
+     * @return a newly build INSERT statement that inserts into the specified
+     *         tables
+     * @throws NullPointerException if <code>tables</code> is <code>null</code>
+     * @throws IllegalArgumentException if any of the tables or any of the
+     *         referenced columns are not defined by the POJO
+     */
+    public Insert<T> into(String... tables);
+
+    /**
+     * Adds tables to insert into using the keyspace defined in the POJO.
+     *
+     * @author paouelle
+     *
+     * @param  tables the names of the tables to insert into
+     * @return a newly build INSERT statement that inserts into the specified
+     *         tables
+     * @throws IllegalArgumentException if any of the tables or any of the
+     *         referenced columns are not defined by the POJO
+     */
+    public Insert<T> into(Stream<String> tables);
+
+    /**
+     * Specifies to insert into all tables defined in the POJO using the
+     * keyspace defined in the POJO.
+     *
+     * @author paouelle
+     *
+     * @return a newly build INSERT statement that inserts into the specified
+     *         tables
+     * @throws IllegalArgumentException if any of the referenced columns are not
+     *         defined by the POJO
+     */
+    public Insert<T> intoAll();
+  }
 
   /**
    * The <code>Options</code> interface defines the options of an INSERT

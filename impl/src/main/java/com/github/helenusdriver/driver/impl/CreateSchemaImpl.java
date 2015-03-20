@@ -184,6 +184,7 @@ public class CreateSchemaImpl<T>
         batch.add(
           new InsertImpl<>(
             getContext().getClassInfo().newContext(io),
+            null,
             mgr,
             bridge
           )

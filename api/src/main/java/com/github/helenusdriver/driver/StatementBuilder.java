@@ -125,7 +125,7 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>object</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>object</code> is not a valid POJO
    */
-  public static <T> Insert<T> insert(T object) {
+  public static <T> Insert.Builder<T> insert(T object) {
     return StatementManager.getManager().insert(object);
   }
 
