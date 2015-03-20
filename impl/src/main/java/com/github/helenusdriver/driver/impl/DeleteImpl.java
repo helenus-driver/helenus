@@ -158,7 +158,7 @@ public class DeleteImpl<T>
         }
       }
     } else { // fallback to all
-      this.tables.addAll(context.getClassInfo().getTables());
+      this.tables.addAll(context.getClassInfo().getTablesImpl());
     }
     this.columnNames = columnNames;
     this.allSelected = allSelected;

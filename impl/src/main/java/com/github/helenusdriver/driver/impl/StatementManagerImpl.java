@@ -1537,7 +1537,7 @@ public class StatementManagerImpl extends StatementManager {
     final ClassInfoImpl<?> cinfo = getClassInfoImpl(clazz);
     final Set<String> names = new LinkedHashSet<>(cinfo.getNumTables()); // preserve order
 
-    for (final TableInfoImpl<?> tinfo: cinfo.getTables()) {
+    for (final TableInfoImpl<?> tinfo: cinfo.getTablesImpl()) {
       final FieldInfoImpl<?> column = tinfo.getColumnByField(field);
 
       if (column != null) {

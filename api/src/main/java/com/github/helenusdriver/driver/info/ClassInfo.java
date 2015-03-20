@@ -15,6 +15,10 @@
  */
 package com.github.helenusdriver.driver.info;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.stream.Stream;
+
 import com.github.helenusdriver.persistence.Keyspace;
 
 /**
@@ -30,7 +34,7 @@ import com.github.helenusdriver.persistence.Keyspace;
  *
  * @since 1.0
  */
-public interface ClassInfo<T> {
+public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
   /**
    * Gets the class of POJO represented by this class info object.
    *
@@ -102,4 +106,35 @@ public interface ClassInfo<T> {
    * @return the number of tables defined by the POJO
    */
   public int getNumTables();
+
+  /**
+   * Gets the tables info defined by the POJO.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> unmodifiable collection of all defined
+   *         tables info
+   */
+  public Collection<TableInfo<T>> getTables();
+
+  /**
+   * Gets the tables info defined by the POJO.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all defined tables info
+   */
+  public Stream<TableInfo<T>> tables();
+
+  /**
+   * {@inheritDoc}
+   *
+   * The returned iterator will be unmodifiable.
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Iterable#iterator()
+   */
+  @Override
+  public Iterator<TableInfo<T>> iterator();
 }

@@ -95,7 +95,7 @@ public class CreateTypeImpl<T>
   StringBuilder buildQueryString(TableInfoImpl<T> table) {
     final List<String> columns = new ArrayList<>(table.getColumns().size());
 
-    for (final FieldInfoImpl<?> field: table.getColumns()) {
+    for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
       columns.add(field.getColumnName() + " " + field.getDataType().toCQL());
     }
     final StringBuilder builder = new StringBuilder();
@@ -126,7 +126,7 @@ public class CreateTypeImpl<T>
   @Override
   protected StringBuilder[] buildQueryStrings() {
     // by design, there should only be one table!!!
-    final List<StringBuilder> builders = ((ClassInfoImpl<T>)getClassInfo()).tables()
+    final List<StringBuilder> builders = ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
       .map(t -> buildQueryString(t))
       .filter(b -> b != null)
       .collect(Collectors.toList());

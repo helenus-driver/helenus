@@ -21,6 +21,7 @@ import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -29,6 +30,7 @@ import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
 import com.github.helenusdriver.driver.ObjectConversionException;
+import com.github.helenusdriver.driver.info.TableInfo;
 import com.github.helenusdriver.persistence.CQLDataType;
 import com.github.helenusdriver.persistence.UDTEntity;
 
@@ -354,7 +356,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
       "type entity class '%s', cannot be abstract", clazz.getSimpleName()
     );
     this.name = findName();
-    this.table = tables().findFirst().get();
+    this.table = tablesImpl().findFirst().get();
   }
 
   /**
@@ -405,6 +407,30 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
         }
       }
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#getTablesImpl()
+   */
+  @Override
+  protected Collection<TableInfoImpl<T>> getTablesImpl() {
+    return Collections.emptyList();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#tablesImpl()
+   */
+  @Override
+  protected Stream<TableInfoImpl<T>> tablesImpl() {
+    return Stream.empty();
   }
 
   /**
@@ -483,6 +509,18 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    *
    * @author paouelle
    *
+   * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#tables()
+   */
+  @Override
+  public Stream<TableInfo<T>> tables() {
+    return Stream.empty();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#getTableImpl(java.lang.String)
    */
   @Override
@@ -510,7 +548,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#getTables()
    */
   @Override
-  public Collection<TableInfoImpl<T>> getTables() {
+  public Collection<TableInfo<T>> getTables() {
     return Collections.emptyList();
   }
 

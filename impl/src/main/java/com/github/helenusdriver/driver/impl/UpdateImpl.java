@@ -137,7 +137,7 @@ public class UpdateImpl<T>
         } // else - skip
       }
     } else { // fallback to all
-      this.tables.addAll(context.getClassInfo().getTables());
+      this.tables.addAll(context.getClassInfo().getTablesImpl());
     }
     this.assignments = new AssignmentsImpl<>(this);
     this.where = new WhereImpl<>(this);

@@ -118,7 +118,7 @@ public class CreateTableImpl<T>
         } // else - skip
       }
     } else { // fallback to all
-      this.tables.addAll(context.getClassInfo().getTables());
+      this.tables.addAll(context.getClassInfo().getTablesImpl());
     }
     this.with = new OptionsImpl<>(this);
     this.where = new WhereImpl<>(this);
@@ -146,7 +146,7 @@ public class CreateTableImpl<T>
     final List<String> pkeys = new ArrayList<>(table.getPartitionKeys().size());
     final Map<String, Ordering> ckeys = new LinkedHashMap<>(table.getClusteringKeys().size());
 
-    for (final FieldInfoImpl<?> field: table.getColumns()) {
+    for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
       columns.add(field.getColumnName() + " " + field.getDataType().toCQL());
       if (field.isMultiKey()) {
         // we need to add a new column to represent a single value from the set

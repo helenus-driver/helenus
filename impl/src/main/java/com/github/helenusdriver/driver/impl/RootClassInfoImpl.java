@@ -474,7 +474,7 @@ public class RootClassInfoImpl<T>
    */
   private void validateAndComplementSchema() {
     // check all tables
-    tables().forEach(
+    tablesImpl().forEach(
       t -> {
         // check type key
         org.apache.commons.lang3.Validate.isTrue(

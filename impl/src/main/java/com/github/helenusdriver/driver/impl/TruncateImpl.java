@@ -97,7 +97,7 @@ public class TruncateImpl<T>
         } // else - skip
       }
     } else { // fallback to all
-      this.tables.addAll(context.getClassInfo().getTables());
+      this.tables.addAll(context.getClassInfo().getTablesImpl());
     }
     this.where = new WhereImpl<>(this);
   }

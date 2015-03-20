@@ -26,7 +26,6 @@ import java.util.Set;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
-
 import com.github.helenusdriver.commons.collections.iterators.CombinationIterator;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
 import com.github.helenusdriver.driver.Insert;
@@ -218,7 +217,7 @@ public class InsertImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
-    final Collection<TableInfoImpl<T>> tables = getPOJOContext().getClassInfo().getTables();
+    final Collection<TableInfoImpl<T>> tables = getPOJOContext().getClassInfo().getTablesImpl();
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
 
     for (final TableInfoImpl<T> table: tables) {

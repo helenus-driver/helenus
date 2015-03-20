@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -1244,8 +1245,19 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @return a stream of all defined tables info
    */
-  protected Stream<TableInfoImpl<T>> tables() {
+  protected Stream<TableInfoImpl<T>> tablesImpl() {
     return tables.values().stream();
+  }
+
+  /**
+   * Gets the tables info defined by the POJO.
+   *
+   * @author paouelle
+   *
+   * @return a collection of all defined tables info
+   */
+  protected Collection<TableInfoImpl<T>> getTablesImpl() {
+    return tables.values();
   }
 
   /**
@@ -1476,14 +1488,41 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
-   * Gets the tables info defined by the POJO.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return a collection of all defined tables info
+   * @see com.github.helenusdriver.driver.info.ClassInfo#getTables()
    */
-  public Collection<TableInfoImpl<T>> getTables() {
+  @Override
+  public Collection<TableInfo<T>> getTables() {
     return Collections.unmodifiableCollection(tables.values());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.ClassInfo#tables()
+   */
+  @SuppressWarnings({"rawtypes", "cast", "unchecked"})
+  @Override
+  public Stream<TableInfo<T>> tables() {
+    return (Stream<TableInfo<T>>)(Stream)tables.values().stream();
+  }
+
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.ClassInfo#iterator()
+   */
+  @Override
+  public Iterator<TableInfo<T>> iterator() {
+    return getTables().iterator();
   }
 
   /**

@@ -15,7 +15,9 @@
  */
 package com.github.helenusdriver.driver.info;
 
+import java.util.Collection;
 import java.util.Iterator;
+import java.util.stream.Stream;
 
 import com.github.helenusdriver.persistence.Table;
 
@@ -32,7 +34,7 @@ import com.github.helenusdriver.persistence.Table;
  *
  * @since 2.0
  */
-public interface TableInfo<T> {
+public interface TableInfo<T> extends Iterable<FieldInfo<T>> {
   /**
    * Gets the class of POJO represented by this class info object.
    *
@@ -75,6 +77,8 @@ public interface TableInfo<T> {
   public String getName();
 
   /**
+   * {@inheritDoc}
+   *
    * Gets an iterator of all fields defined as columns in this table.
    * <p>
    * <i>Note:</i> The {@link Iterator#remove} method is fully supported and if
@@ -85,6 +89,27 @@ public interface TableInfo<T> {
    *
    * @return a non-<code>null</code> iterator of all fields defined as columns
    *         in this table
+   *
+   * @see java.lang.Iterable#iterator()
    */
-  public Iterator<FieldInfo<T>> columns();
+  @Override
+  public Iterator<FieldInfo<T>> iterator();
+
+  /**
+   * Gets the set of column fields for the POJO in this table.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> unmodifiable collection of all column fields
+   */
+  public Collection<FieldInfo<T>> getColumns();
+
+  /**
+   * Gets the set of column fields for the POJO in this table.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all column fields
+   */
+  public Stream<FieldInfo<T>> columns();
 }

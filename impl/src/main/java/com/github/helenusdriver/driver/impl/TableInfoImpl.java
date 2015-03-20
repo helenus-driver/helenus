@@ -980,6 +980,17 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
+   * Gets the set of column fields for the POJO in this table.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> set of all column fields
+   */
+  protected Collection<FieldInfoImpl<T>> getColumnsImpl() {
+    return columns.values();
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -1273,10 +1284,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.info.TableInfo#columns()
+   * @see com.github.helenusdriver.driver.info.TableInfo#iterator()
    */
   @Override
-  public Iterator<FieldInfo<T>> columns() {
+  public Iterator<FieldInfo<T>> iterator() {
     final Iterator<FieldInfoImpl<T>> iterator = columns.values().iterator();
 
     return new Iterator<FieldInfo<T>>() {
@@ -1319,14 +1330,28 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Gets the set of column fields for the POJO in this table.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return a non-<code>null</code> set of all column fields
+   * @see com.github.helenusdriver.driver.info.TableInfo#getColumns()
    */
-  public Collection<FieldInfoImpl<T>> getColumns() {
-    return columns.values();
+  @Override
+  public Collection<FieldInfo<T>> getColumns() {
+    return Collections.unmodifiableCollection(columns.values());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.TableInfo#columns()
+   */
+  @Override
+  @SuppressWarnings({"rawtypes", "cast", "unchecked"})
+  public Stream<FieldInfo<T>> columns() {
+    return (Stream<FieldInfo<T>>)(Stream)columns.values().stream();
   }
 
   /**

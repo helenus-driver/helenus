@@ -127,7 +127,7 @@ public class TypeClassInfoImpl<T>
       }
     );
     // check all tables
-   tables().forEach(
+   tablesImpl().forEach(
      t -> {
        // check keyspace
        org.apache.commons.lang3.Validate.isTrue(
