@@ -428,6 +428,34 @@ public class InsertImpl<T>
     }
 
     /**
+     * Initializes the specified insert statement with the same settings as
+     * this statement.
+     *
+     * @author paouelle
+     *
+     * @param  i the non-<code>null</code> insert statement to initialize
+     * @return <code>i</code>
+     */
+    private InsertImpl<T> init(InsertImpl<T> i) {
+      if (getConsistencyLevel() != null) {
+        i.setConsistencyLevel(getConsistencyLevel());
+      }
+      if (getSerialConsistencyLevel() != null) {
+        i.setSerialConsistencyLevel(getSerialConsistencyLevel());
+      }
+      if (isTracing()) {
+        i.enableTracing();
+      } else {
+        i.disableTracing();
+      }
+      if (getRetryPolicy() != null) {
+       i.setRetryPolicy(getRetryPolicy());
+      }
+      i.setFetchSize(getFetchSize());
+      return i;
+    }
+
+    /**
      * {@inheritDoc}
      *
      * @author paouelle
@@ -448,18 +476,7 @@ public class InsertImpl<T>
      */
     @Override
     public Insert<T> into(String... tables) {
-      final InsertImpl<T> i = new InsertImpl<>(getPOJOContext(), tables, mgr, bridge);
-
-      i.setConsistencyLevel(getConsistencyLevel());
-      i.setSerialConsistencyLevel(getSerialConsistencyLevel());
-      if (isTracing()) {
-        i.enableTracing();
-      } else {
-        i.disableTracing();
-      }
-      i.setRetryPolicy(getRetryPolicy());
-      i.setFetchSize(getFetchSize());
-      return i;
+      return init(new InsertImpl<>(getPOJOContext(), tables, mgr, bridge));
     }
 
     /**
@@ -471,20 +488,9 @@ public class InsertImpl<T>
      */
     @Override
     public Insert<T> into(Stream<String> tables) {
-      final InsertImpl<T> i =  new InsertImpl<>(
-          getPOJOContext(), tables.toArray(String[]::new), mgr, bridge
-      );
-
-      i.setConsistencyLevel(getConsistencyLevel());
-      i.setSerialConsistencyLevel(getSerialConsistencyLevel());
-      if (isTracing()) {
-        i.enableTracing();
-      } else {
-        i.disableTracing();
-      }
-      i.setRetryPolicy(getRetryPolicy());
-      i.setFetchSize(getFetchSize());
-      return i;
+      return init(new InsertImpl<>(
+        getPOJOContext(), tables.toArray(String[]::new), mgr, bridge
+      ));
     }
 
     /**
@@ -496,18 +502,7 @@ public class InsertImpl<T>
      */
     @Override
     public Insert<T> intoAll() {
-      final InsertImpl<T> i = new InsertImpl<>(getPOJOContext(), null, mgr, bridge);
-
-      i.setConsistencyLevel(getConsistencyLevel());
-      i.setSerialConsistencyLevel(getSerialConsistencyLevel());
-      if (isTracing()) {
-        i.enableTracing();
-      } else {
-        i.disableTracing();
-      }
-      i.setRetryPolicy(getRetryPolicy());
-      i.setFetchSize(getFetchSize());
-      return i;
+      return init(new InsertImpl<>(getPOJOContext(), null, mgr, bridge));
     }
 
     /**

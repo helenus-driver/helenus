@@ -44,6 +44,8 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 import com.datastax.driver.core.utils.Bytes;
+import com.github.helenusdriver.driver.StatementBuilder;
+import com.github.helenusdriver.driver.info.ClassInfo;
 
 /**
  * The <code>DataDecoder</code> abstract class defines the decoding functionality
@@ -1104,8 +1106,25 @@ abstract class ElementConverter {
    * @throws IllegalArgumentException if the combination is not supported
    */
   @SuppressWarnings("rawtypes")
-  static ElementConverter getConverter(final Class eclass, Class reclass) {
-    if (Enum.class.isAssignableFrom(eclass) && (String.class == reclass)) {
+  static ElementConverter getConverter(Class eclass, Class reclass) {
+    if (UDTValue.class.isAssignableFrom(reclass)) { // special case for udt
+      @SuppressWarnings("unchecked")
+      final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(eclass);
+
+      org.apache.commons.lang3.Validate.isTrue(
+        cinfo instanceof UDTClassInfoImpl,
+        "unsupported element conversion from: %s to: %s; unknown user-defined type",
+        reclass.getName(), eclass.getName()
+      );
+      final UDTClassInfoImpl<?> udtinfo = (UDTClassInfoImpl<?>)cinfo;
+
+      return new ElementConverter() {
+        @Override
+        public Object convert(Object re) {
+          return udtinfo.getObject((UDTValue)re);
+        }
+      };
+    } else if (Enum.class.isAssignableFrom(eclass) && (String.class == reclass)) {
       return new ElementConverter() {
         @SuppressWarnings("unchecked")
         @Override
