@@ -312,7 +312,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     field.setAccessible(true); // make it accessible in case we need to
     this.isFinal = Modifier.isFinal(field.getModifiers());
     this.name = field.getName();
-    this.type = DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
+    this.type = ClassUtils.primitiveToWrapper(
+      DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType())
+    );
     this.column = null;
     this.persisted = null;
     this.persister = null;
@@ -350,7 +352,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     field.setAccessible(true); // make it accessible in case we need to
     this.isFinal = Modifier.isFinal(field.getModifiers());
     this.name = field.getName();
-    this.type = DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType());
+    this.type = ClassUtils.primitiveToWrapper(
+      DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType())
+    );
     this.persisted = field.getAnnotation(Persisted.class);
     if (persisted != null) {
       org.apache.commons.lang3.Validate.isTrue(
