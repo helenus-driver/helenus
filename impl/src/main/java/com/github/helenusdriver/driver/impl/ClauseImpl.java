@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.apache.commons.collections4.CollectionUtils;
 
+import com.github.helenusdriver.driver.BindMarker;
 import com.github.helenusdriver.driver.Clause;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
 
@@ -407,14 +408,13 @@ public abstract class ClauseImpl
       // side,
       // it is a lot more useful to do:
       // ... IN ? ...
-      // which binds the variable to the full list the IN is on. Now, at the
-      // time
-      // of this writing, that last syntax is not supported, but it will be
-      // once CASSANDRA-4210 is fixed. So to avoid breaking compatibility later
-      // on,
-      // we support the most common behavior now.
-      if (values.size() == 1 && firstValue() == StatementManagerImpl.BIND_MARKER) {
-        Utils.appendName(name, sb).append("IN ?");
+      // which binds the variable to the full list the IN is on.
+      final Object fv = firstValue();
+
+      if ((values.size() == 1)
+          && ((fv instanceof BindMarker)
+              || (fv instanceof com.datastax.driver.core.querybuilder.BindMarker))) {
+        Utils.appendName(name, sb).append("IN ").append(fv);
         return;
       }
       Utils.appendName(name, sb).append(" IN (");

@@ -967,23 +967,15 @@ public abstract class StatementManager {
   protected abstract Using ttl(int ttl);
 
   /**
-   * An object representing a bind marker (a question mark).
-   * <p>
-   * This can be used wherever a value is expected. For instance, one can do:
+   * Appends the specified string as a CQL name to the given string builder.
    *
-   * <pre>
-   * {
-   *   &#064;code Insert i = StatementBuilder.insertInto(&quot;test&quot;).value(&quot;k&quot;, 0)
-   *     .value(&quot;c&quot;, StatementBuilder.bindMarker());
-   *   PreparedState p = session.prepare(i.toString());
-   * }
-   * </pre>
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
    *
-   * @author paouelle
-   *
-   * @return an object representing a bind marker.
+   * @param  name the name string to append as a CQL name
+   * @param  sb the string builder where to append the name
+   * @return <code>sb</code> for chaining
    */
-  protected abstract Object bindMarker();
+  protected abstract StringBuilder appendName(String name, StringBuilder sb);
 
   /**
    * Simple "set" assignment of a value to a column. The value is extracted

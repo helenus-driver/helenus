@@ -98,13 +98,6 @@ public class StatementManagerImpl extends StatementManager {
   private final static Logger logger = LogManager.getFormatterLogger(StatementManagerImpl.class);
 
   /**
-   * Holds a bind marker.
-   *
-   * @author paouelle
-   */
-  static final Object BIND_MARKER = new Object() {};
-
-  /**
    * Holds the bridge.
    *
    * @author paouelle
@@ -1171,11 +1164,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#bindMarker()
+   * @see com.github.helenusdriver.driver.StatementManager#appendName(java.lang.String, java.lang.StringBuilder)
    */
   @Override
-  protected Object bindMarker() {
-    return StatementManagerImpl.BIND_MARKER;
+  protected StringBuilder appendName(String name, StringBuilder sb) {
+    return Utils.appendName(name, sb);
   }
 
   /**

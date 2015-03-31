@@ -1089,9 +1089,9 @@ public final class StatementBuilder {
    * This can be used wherever a value is expected. For instance, one can do:
    *
    * <pre>
-   * {
-   *   &#064;code Insert i = StatementBuilder.insertInto(&quot;test&quot;).value(&quot;k&quot;, 0)
-   *     .value(&quot;c&quot;, StatementBuilder.bindMarker());
+   * {@code
+   *   Insert i = StatementBuilder.insertInto("test").value("k", 0)
+   *                                                 .value("c", StatementBuilder.bindMarker());
    *   PreparedState p = session.prepare(i.toString());
    * }
    * </pre>
@@ -1100,8 +1100,31 @@ public final class StatementBuilder {
    *
    * @return an object representing a bind marker.
    */
-  public static Object bindMarker() {
-    return StatementManager.getManager().bindMarker();
+  public static BindMarker bindMarker() {
+    return BindMarker.ANONYMOUS;
+  }
+
+  /**
+   * An object representing a named bind marker.
+   * <p>
+   * This can be used wherever a value is expected. For instance, one can do:
+   * <pre>
+   * {@code
+   *     Insert i = StatementBuilder.insertInto("test").value("k", 0)
+   *                                                   .value("c", StatementBuilder.bindMarker("c_val"));
+   *     PreparedState p = session.prepare(i.toString());
+   * }
+   * </pre>
+   * <p>
+   * Please note that named bind makers are only supported starting with Cassandra 2.0.1.
+   *
+   * @author paouelle
+   *
+   * @param  name the name for the bind marker
+   * @return an object representing a bind marker named {@code name}.
+   */
+  public static BindMarker bindMarker(String name) {
+    return new BindMarker(name);
   }
 
   /**

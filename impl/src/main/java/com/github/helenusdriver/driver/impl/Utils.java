@@ -15,6 +15,9 @@
  */
 package com.github.helenusdriver.driver.impl;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
 import java.net.InetAddress;
 
 import java.util.Collection;
@@ -37,7 +40,12 @@ import org.apache.commons.collections4.iterators.ObjectArrayIterator;
 
 import com.datastax.driver.core.TupleValue;
 import com.datastax.driver.core.UDTValue;
+import com.datastax.driver.core.querybuilder.BindMarker;
 import com.datastax.driver.core.utils.Bytes;
+import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
+import com.github.helenusdriver.driver.StatementBuilder;
+import com.github.helenusdriver.driver.info.ClassInfo;
+import com.github.helenusdriver.persistence.UDTEntity;
 
 /**
  * The <code>Utils</code> class is a copy of the
@@ -52,8 +60,9 @@ import com.datastax.driver.core.utils.Bytes;
  */
 @SuppressWarnings("javadoc")
 public abstract class Utils {
-  private static final Pattern cnamePattern = Pattern
-    .compile("\\w+(?:\\[.+\\])?");
+  private static final Pattern cnamePattern = Pattern.compile(
+    "\\w+(?:\\[.+\\])?"
+  );
 
   public static StringBuilder joinAndAppendNamesAndValues(
     StringBuilder sb,
@@ -78,7 +87,8 @@ public abstract class Utils {
     TableInfoImpl<?> tinfo,
     StringBuilder sb,
     String separator,
-    Collection<? extends Appendeable> values) {
+    Collection<? extends Appendeable> values
+  ) {
     boolean first = true;
 
     for (final Appendeable value: values) {
@@ -95,7 +105,8 @@ public abstract class Utils {
   public static StringBuilder joinAndAppendNames(
     StringBuilder sb,
     String separator,
-    Iterable<?> values) {
+    Iterable<?> values
+  ) {
     boolean first = true;
 
     for (final Object value: values) {
@@ -112,7 +123,8 @@ public abstract class Utils {
   public static StringBuilder joinAndAppendValues(
     StringBuilder sb,
     String separator,
-    Iterable<?> values) {
+    Iterable<?> values
+  ) {
     boolean first = true;
 
     for (final Object value: values) {
@@ -126,20 +138,34 @@ public abstract class Utils {
     return sb;
   }
 
-  public static StringBuilder appendValue(Object value, StringBuilder sb) {
-    return appendValue(value, sb, false);
+  // Returns null if it's not really serializable (function call, bind markers, ...)
+  public static boolean isSerializable(Object value) {
+    if ((value instanceof BindMarker)
+        || (value instanceof com.datastax.driver.core.querybuilder.BindMarker)
+        || (value instanceof FCName)) {
+      return false;
+    }
+    // We also don't serialize fixed size number types. The reason is that if we do it, we will
+    // force a particular size (4 bytes for ints, ...) and for the statement builder, we don't want
+    // users to have to bother with that.
+    if ((value instanceof Number)
+        && !((value instanceof BigInteger) || (value instanceof BigDecimal))) {
+      return false;
+    }
+    return true;
   }
 
-  public static StringBuilder appendFlatValue(Object value, StringBuilder sb) {
-    appendFlatValue(value, sb, false);
+
+  public static StringBuilder appendValue(Object value, StringBuilder sb, List<Object> variables) {
+    if ((variables == null) || !isSerializable(value)) {
+      return appendValue(value, sb);
+    }
+    sb.append('?');
+    variables.add(value);
     return sb;
   }
 
-  private static StringBuilder appendValue(
-    Object value,
-    StringBuilder sb,
-    boolean rawValue
-  ) {
+  public static StringBuilder appendValue(Object value, StringBuilder sb) {
     if (value instanceof PersistedValue) {
       value = ((PersistedValue<?,?>)value).getEncodedValue();
     }
@@ -147,7 +173,7 @@ public abstract class Utils {
     if (appendValueIfLiteral(value, sb)) {
       return sb;
     }
-    if (appendValueIfCollection(value, sb, rawValue)) {
+    if (appendValueIfCollection(value, sb)) {
       return sb;
     }
     if (appendValueIfUdt(value, sb)) {
@@ -156,27 +182,28 @@ public abstract class Utils {
     if (appendValueIfTuple(value, sb)) {
       return sb;
     }
-    appendStringIfValid(value, sb, rawValue);
+    appendStringIfValid(value, sb);
     return sb;
   }
 
-  private static void appendFlatValue(
-    Object value,
-    StringBuilder sb,
-    boolean rawValue) {
+  public static StringBuilder appendFlatValue(Object value, StringBuilder sb) {
     if (value instanceof PersistedValue) {
       value = ((PersistedValue<?,?>)value).getEncodedValue();
     }
     if (appendValueIfLiteral(value, sb)) {
-      return;
+      return sb;
     }
-    appendStringIfValid(value, sb, rawValue);
+    if (appendValueIfUdt(value, sb)) {
+      return sb;
+    }
+    if (appendValueIfTuple(value, sb)) {
+      return sb;
+    }
+    appendStringIfValid(value, sb);
+    return sb;
   }
 
-  private static void appendStringIfValid(
-    Object value,
-    StringBuilder sb,
-    boolean rawValue) {
+  private static void appendStringIfValid(Object value, StringBuilder sb) {
     if (value instanceof Enum) {
       value = ((Enum<?>)value).name();
     } else if (value instanceof Locale) {
@@ -191,21 +218,15 @@ public abstract class Utils {
     if (value instanceof RawString) {
       sb.append(value.toString());
     } else {
-      if (!(value instanceof String)) {
-        String msg =
-          String.format(
-            "Invalid value %s of type unknown to the query builder",
-            value);
-        if (value instanceof byte[]) {
-          msg += " (for blob values, make sure to use a ByteBuffer)";
-        }
-        throw new IllegalArgumentException(msg);
-      }
-      if (rawValue) {
-        sb.append((String)value);
-      } else {
-        appendValueString((String)value, sb);
-      }
+      org.apache.commons.lang3.Validate.isTrue(
+        value instanceof String,
+        "invalid value %s of type unknown to the statement builder%s",
+        value,
+        !(value instanceof byte[])
+          ? ""
+          : " (for blob values, make sure to use a ByteBuffer)"
+      );
+      appendValueString((String)value, sb);
     }
   }
 
@@ -228,8 +249,11 @@ public abstract class Utils {
     } else if (value instanceof byte[]) {
       sb.append(Bytes.toHexString((byte[])value));
       return true;
-    } else if (value == StatementManagerImpl.BIND_MARKER) {
-      sb.append("?");
+    } else if (value instanceof BindMarker) {
+      sb.append(value);
+      return true;
+    } else if (value instanceof com.datastax.driver.core.querybuilder.BindMarker) {
+      sb.append(value);
       return true;
     } else if (value instanceof FCall) {
       FCall fcall = (FCall)value;
@@ -264,18 +288,15 @@ public abstract class Utils {
   }
 
   @SuppressWarnings("rawtypes")
-  private static boolean appendValueIfCollection(
-    Object value,
-    StringBuilder sb,
-    boolean rawValue) {
+  private static boolean appendValueIfCollection(Object value, StringBuilder sb) {
     if (value instanceof List) {
-      appendList((List)value, sb, rawValue);
+      appendList((List)value, sb);
       return true;
     } else if (value instanceof Set) {
-      appendSet((Set)value, sb, rawValue);
+      appendSet((Set)value, sb);
       return true;
     } else if (value instanceof Map) {
-      appendMap((Map)value, sb, rawValue);
+      appendMap((Map)value, sb);
       return true;
     } else {
       return false;
@@ -283,20 +304,18 @@ public abstract class Utils {
   }
 
   static StringBuilder appendCollection(Object value, StringBuilder sb) {
-    boolean wasCollection = appendValueIfCollection(value, sb, false);
-    assert wasCollection;
+    if (!isSerializable(value)) {
+      boolean wasCollection = appendValueIfCollection(value, sb);
+      assert wasCollection;
+    } else {
+      sb.append('?');
+      //variables.add(value);
+    }
     return sb;
   }
 
   static StringBuilder appendList(List<?> l, StringBuilder sb) {
-    return appendList(l, sb, false);
-  }
-
-  private static StringBuilder appendList(
-    List<?> l,
-    StringBuilder sb,
-    boolean rawValue) {
-    sb.append("[");
+    sb.append('[');
     if (l instanceof PersistedList) {
       l = ((PersistedList<?,?>)l).getPersistedList();
     }
@@ -307,24 +326,18 @@ public abstract class Utils {
         elt != null, "null are not supported in lists"
       );
       if (i > 0) {
-        sb.append(",");
+        sb.append('.');
       }
-      appendFlatValue(elt, sb, rawValue);
+      appendFlatValue(elt, sb);
     }
-    sb.append("]");
+    sb.append(']');
     return sb;
   }
 
   static StringBuilder appendSet(Set<?> s, StringBuilder sb) {
-    return appendSet(s, sb, false);
-  }
-
-  private static StringBuilder appendSet(
-    Set<?> s,
-    StringBuilder sb,
-    boolean rawValue) {
-    sb.append("{");
+    sb.append('{');
     boolean first = true;
+
     if (s instanceof PersistedSet) {
       s = ((PersistedSet<?,?>)s).getPersistedSet();
     }
@@ -335,24 +348,18 @@ public abstract class Utils {
       if (first) {
         first = false;
       } else {
-        sb.append(",");
+        sb.append(',');
       }
-      appendFlatValue(elt, sb, rawValue);
+      appendFlatValue(elt, sb);
     }
-    sb.append("}");
+    sb.append('}');
     return sb;
   }
 
   static StringBuilder appendMap(Map<?, ?> m, StringBuilder sb) {
-    return appendMap(m, sb, false);
-  }
-
-  private static StringBuilder appendMap(
-    Map<?, ?> m,
-    StringBuilder sb,
-    boolean rawValue) {
-    sb.append("{");
+    sb.append('{');
     boolean first = true;
+
     if (m instanceof PersistedMap) {
       m = ((PersistedMap<?,?,?>)m).getPersistedMap();
     }
@@ -365,13 +372,13 @@ public abstract class Utils {
       if (first) {
         first = false;
       } else {
-        sb.append(",");
+        sb.append(',');
       }
-      appendFlatValue(entry.getKey(), sb, rawValue);
-      sb.append(":");
-      appendFlatValue(eval, sb, rawValue);
+      appendFlatValue(entry.getKey(), sb);
+      sb.append(':');
+      appendFlatValue(eval, sb);
     }
-    sb.append("}");
+    sb.append('}');
     return sb;
   }
 
@@ -382,6 +389,26 @@ public abstract class Utils {
     } else if (value instanceof UDTValueWrapper) {
       sb.append(((UDTValueWrapper<?>)value).toString());
       return true;
+    } else if (value != null) {
+      // let's check if the value is annotated with @TypeEntity in which case it
+      // is a udt pojo
+      final Class<?> uclass = ReflectionUtils.findFirstClassAnnotatedWith(
+        value.getClass(), UDTEntity.class
+      );
+
+      if (uclass != null) { // we have a UDT type
+        final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(uclass);
+
+        org.apache.commons.lang3.Validate.isTrue(
+          cinfo instanceof UDTClassInfoImpl,
+          "unsupported element conversion from: %s to: %s; unknown user-defined type",
+          uclass.getName(), UDTValue.class.getName()
+        );
+        sb.append(
+          new UDTValueWrapper<>((UDTClassInfoImpl<?>)cinfo, value).toString()
+        );
+        return true;
+      }
     }
     return false;
   }
@@ -395,18 +422,19 @@ public abstract class Utils {
   }
 
   private static StringBuilder appendValueString(String value, StringBuilder sb) {
-    return sb.append("'").append(replace(value, '\'', "''")).append("'");
+    return sb.append('\'').append(replace(value, '\'', "''")).append('\'');
   }
 
   static boolean isRawValue(Object value) {
     return value != null
            && !(value instanceof FCall)
            && !(value instanceof CName)
-           && value != StatementManagerImpl.BIND_MARKER;
+           && !(value instanceof BindMarker)
+           && !(value instanceof com.datastax.driver.core.querybuilder.BindMarker);
   }
 
   static String toRawString(Object value) {
-    return appendValue(value, new StringBuilder(), true).toString();
+    return appendValue(value, new StringBuilder()).toString();
   }
 
   public static StringBuilder appendName(String name, StringBuilder sb) {
@@ -414,10 +442,12 @@ public abstract class Utils {
     // FIXME: checking for token( specifically is uber ugly, we'll need some
     // better solution.
     if (cnamePattern.matcher(name).matches()
-        || name.startsWith("\"") || name.startsWith("token(") || name.contains("|")) {
+        || name.startsWith("\"")
+        || name.startsWith("token(")
+        || name.contains("|")) {
       sb.append(name);
     } else {
-      sb.append("\"").append(name).append("\"");
+      sb.append('"').append(name).append('"');
     }
     return sb;
   }
@@ -527,14 +557,14 @@ public abstract class Utils {
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(getName()).append("(");
+      sb.append(getName()).append('(');
       for (int i = 0; i < parameters.length; i++ ) {
         if (i > 0) {
-          sb.append(",");
+          sb.append('.');
         }
         sb.append(parameters[i]);
       }
-      sb.append(")");
+      sb.append(')');
       return sb.toString();
     }
   }
@@ -573,7 +603,7 @@ public abstract class Utils {
       final StringBuilder sb = new StringBuilder();
 
       Utils.appendName(getColumnName(), sb);
-      return sb.append("[").append(idx).append("]").toString();
+      return sb.append('[').append(idx).append(']').toString();
     }
   }
 
@@ -590,9 +620,9 @@ public abstract class Utils {
       final StringBuilder sb = new StringBuilder();
 
       Utils.appendName(getColumnName(), sb);
-      sb.append("[");
+      sb.append('[');
       Utils.appendFlatValue(key, sb);
-      return sb.append("]").toString();
+      return sb.append(']').toString();
     }
   }
 
@@ -633,4 +663,20 @@ public abstract class Utils {
       return seq;
     }
   }
+
+  public static class Alias {
+    private final Object column;
+    private final String alias;
+
+    Alias(Object column, String alias) {
+      this.column = column;
+      this.alias = alias;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("%s AS %s", column, alias);
+    }
+  }
 }
+
