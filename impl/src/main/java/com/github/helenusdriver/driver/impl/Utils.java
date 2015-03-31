@@ -444,6 +444,8 @@ public abstract class Utils {
     if (cnamePattern.matcher(name).matches()
         || name.startsWith("\"")
         || name.startsWith("token(")
+        // | is used when a select statement requires searching multiple keyspaces
+        // as a result of using an IN with suffix keys
         || name.contains("|")) {
       sb.append(name);
     } else {
