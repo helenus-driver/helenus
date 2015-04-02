@@ -460,6 +460,18 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   /**
    * {@inheritDoc}
    *
+   * paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#isAlterableTo(com.github.helenusdriver.persistence.CQLDataType)
+   */
+  @Override
+  public boolean isAlterableTo(CQLDataType to) {
+    return false; // never alterable
+  }
+
+  /**
+   * {@inheritDoc}
+   *
    * @author paouelle
    *
    * @see com.github.helenusdriver.persistence.CQLDataType#toCQL()

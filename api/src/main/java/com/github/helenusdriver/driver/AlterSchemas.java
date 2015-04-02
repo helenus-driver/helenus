@@ -20,34 +20,37 @@ import java.util.Set;
 import com.github.helenusdriver.driver.info.ClassInfo;
 
 /**
- * The <code>CreateSchemas</code> interface provides support for a statement
- * which will create all the required elements (keyspace, tables, and indexes)
- * to support the schema for a given package of POJOs. It will take care of
- * creating the required keyspaces, tables, types, and indexes.
+ * The <code>AlterSchemas</code> interface provides support for a statement
+ * which will create and/or alter all the required elements (keyspace, tables,
+ * and indexes) to support the schema for a given package of POJOs. It will
+ * take care of creating the missing required keyspaces, tables, types, and
+ * indexes and it will alter existing keyspaces, tables, types, and indexes by
+ * first querying the system keyspace to determine the current schema.
  * <p>
- * <i>Note:</i> As opposed to the {@link CreateSchema} statement, this one is
- * designed to create schemas for multiple pojo classes; as such keyspace suffixes
- * are actually registered in the where clause using the suffix type which is
- * meant to organize suffixes across multiple pojo classes and not the suffix
- * name (a.k.a. the column name).
+ * <i>Note:</i> As opposed to the {@link AlterSchema} statement, this one is
+ * designed to create and/or alter schemas for multiple pojo classes; as such
+ * keyspace suffixes are actually registered in the where clause using the
+ * suffix type which is meant to organize suffixes across multiple pojo classes
+ * and not the suffix name (a.k.a. the column name).
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 15, 2015 - paouelle - Creation
+ * @version 1 - Apr 1, 2015 - paouelle - Creation
  *
  * @since 1.0
  */
-public interface CreateSchemas
+public interface AlterSchemas
   extends Statement<Void>, SequenceableStatement<Void, VoidFuture> {
   /**
    * {@inheritDoc}
    * <p>
    * <i>Note:</i> This will not be a valid query string since this statement
-   * will be creating keyspaces and all defined tables, types, and indexes for
-   * all POJO classes in the specified package. It will then be a representation
-   * of the query strings for the keyspaces and each table, type, and index
-   * creation similar to a "BATCH" statement.
+   * will be creating and/or altering keyspaces and all defined tables, types
+   * and indexes for all POJO
+   * classes in the specified package. It will then be a representation of the
+   * query strings for the keyspaces and each table, type, and index creation
+   * similar to a "BATCH" statement.
    *
    * @author paouelle
    *
@@ -57,7 +60,7 @@ public interface CreateSchemas
   public String getQueryString();
 
   /**
-   * Gets all POJO classes found for which schemas will be created.
+   * Gets all POJO classes found for which schemas will be created and/or altered.
    *
    * @author paouelle
    *
@@ -66,7 +69,8 @@ public interface CreateSchemas
   public Set<Class<?>> getObjectClasses();
 
   /**
-   * Gets all POJO class informations found for which schemas will be created.
+   * Gets all POJO class informations found for which schemas will be created
+   * and/or altered.
    *
    * @author paouelle
    *
@@ -83,25 +87,6 @@ public interface CreateSchemas
    * @return the non-<code>null</code> set of all POJO class infos found
    */
   public Set<ClassInfo<?>> getDefinedClassInfos();
-
-  /**
-   * Sets the 'IF NOT EXISTS' option for this CREATE SCHEMAS statement to be applied
-   * to the keyspaces, tables, types, and indexes creation.
-   * <p>
-   * A create with that option will not succeed unless the corresponding element
-   * does not exist at the time the creation is executing. The existence check
-   * and creations are done transactionally in the sense that if multiple clients
-   * attempt to create a given keyspace, table, type, or index with this option,
-   * then at most one may succeed.
-   * <p>
-   * Please keep in mind that using this option has a non negligible performance
-   * impact and should be avoided when possible.
-   *
-   * @author paouelle
-   *
-   * @return this CREATE SCHEMAS statement.
-   */
-  public CreateSchemas ifNotExists();
 
   /**
    * Adds a WHERE clause to this statement used to specify suffixes by types
@@ -126,14 +111,14 @@ public interface CreateSchemas
   public Where where();
 
   /**
-   * The <code>Where</code> interface defines a WHERE clause for the CREATE
+   * The <code>Where</code> interface defines a WHERE clause for the ALTER
    * SCHEMAS statement which can be used to specify suffix types used for
    * keyspace names as required by specific POJO class schema creation.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
-   * @version 1 - Jan 15, 2015 - paouelle - Creation
+   * @version 1 - Apr 1, 2015 - paouelle - Creation
    *
    * @since 1.0
    */

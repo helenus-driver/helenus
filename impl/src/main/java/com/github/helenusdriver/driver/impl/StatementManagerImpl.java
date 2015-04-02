@@ -43,6 +43,8 @@ import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.github.helenusdriver.commons.collections.iterators.SnapshotIterator;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
+import com.github.helenusdriver.driver.AlterSchema;
+import com.github.helenusdriver.driver.AlterSchemas;
 import com.github.helenusdriver.driver.Assignment;
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.BatchableStatement;
@@ -771,6 +773,56 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected CreateSchemas createMatchingSchemas(String pkg) {
     return new CreateSchemasImpl(
+      pkg,
+      true,
+      this,
+      bridge
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.StatementManager#alterSchema(java.lang.Class)
+   */
+  @Override
+  protected <T> AlterSchema<T> alterSchema(Class<T> clazz) {
+    return new AlterSchemaImpl<>(
+      getClassInfoImpl(clazz).newContext(),
+      this,
+      bridge
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.StatementManager#alterSchemas(java.lang.String)
+   */
+  @Override
+  protected AlterSchemas alterSchemas(String pkg) {
+    return new AlterSchemasImpl(
+      pkg,
+      false,
+      this,
+      bridge
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.StatementManager#alterMatchingSchemas(java.lang.String)
+   */
+  @Override
+  protected AlterSchemas alterMatchingSchemas(String pkg) {
+    return new AlterSchemasImpl(
       pkg,
       true,
       this,

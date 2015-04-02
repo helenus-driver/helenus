@@ -57,6 +57,21 @@ public interface CQLDataType {
   public boolean isUserDefined();
 
   /**
+   * Checks if altering a column from this data type to a specified data
+   * type is supported.
+   * <p>
+   * <i>Note:</i> For collections, the data type must remain the same and the
+   * arguments must also be alterable.
+   *
+   * @author paouelle
+   *
+   * @param  to the data type to change the column to
+   * @return <code>true</code> if the conversion is supported; <code>false</code>
+   *         otherwise
+   */
+  public boolean isAlterableTo(CQLDataType to);
+
+  /**
    * Get a CQL representation of this data type.
    *
    * @author paouelle

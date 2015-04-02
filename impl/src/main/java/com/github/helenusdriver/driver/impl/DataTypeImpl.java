@@ -164,7 +164,7 @@ public class DataTypeImpl {
      * @param arguments the non-<code>null</code> list of arguments' data types
      *        if the type represents a collection (may be empty)
      */
-    Definition(DataType type, DataType... arguments) {
+    public Definition(DataType type, DataType... arguments) {
       this.type = type;
       this.arguments = Arrays.asList((CQLDataType[])arguments);
     }
@@ -178,7 +178,7 @@ public class DataTypeImpl {
      * @param arguments the non-<code>null</code> list of arguments' data types
      *        if the type represents a collection (may be empty)
      */
-    Definition(DataType type, List<CQLDataType> arguments) {
+    public Definition(DataType type, List<CQLDataType> arguments) {
       this.type = type;
       this.arguments = arguments;
     }
@@ -192,7 +192,7 @@ public class DataTypeImpl {
      *        definition (the first one correspond to the data type and the
      *        remaining are the argument data types)
      */
-    Definition(List<CQLDataType> types) {
+    public Definition(List<CQLDataType> types) {
       this.type = types.remove(0);
       this.arguments = Collections.unmodifiableList(types);
     }
@@ -286,6 +286,39 @@ public class DataTypeImpl {
      */
     public CQLDataType getFirstArgumentType() {
       return (arguments.isEmpty() ? null : arguments.get(0));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.persistence.CQLDataType#isAlterableTo(com.github.helenusdriver.persistence.CQLDataType)
+     */
+    @Override
+    public boolean isAlterableTo(CQLDataType to) {
+      if (to instanceof Definition) {
+        final Definition tod = (Definition)to;
+
+        if (!type.isAlterableTo(tod.type)) {
+          return false;
+        }
+        if (isCollection()) { // check arguments
+          if (arguments.size() != tod.arguments.size()) {
+            return false;
+          }
+          for (int i = 0; i < arguments.size(); i++) {
+            if (!arguments.get(i).isAlterableTo(tod.arguments.get(i))) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+      if (isCollection() || isUserDefined()) {
+        return false;
+      }
+      return type.isAlterableTo(to);
     }
 
     /**

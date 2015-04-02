@@ -17,41 +17,36 @@ package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import com.datastax.driver.core.Row;
+import com.github.helenusdriver.driver.AlterSchema;
 import com.github.helenusdriver.driver.BatchableStatement;
 import com.github.helenusdriver.driver.Clause;
-import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.VoidFuture;
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.persistence.Keyspace;
 
 /**
- * The <code>CreateSchemaImpl</code> class defines a CREATE SCHEMA statement.
+ * The <code>AlterSchemaImpl</code> class defines a ALTER SCHEMA statement.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 19, 2015 - paouelle - Creation
+ * @version 1 - Apr 1, 2015 - paouelle - Creation
  *
  * @param <T> The type of POJO associated with this statement.
  *
  * @since 1.0
  */
-public class CreateSchemaImpl<T>
+public class AlterSchemaImpl<T>
   extends SequenceStatementImpl<Void, VoidFuture, T>
-  implements CreateSchema<T> {
-  /**
-   * Flag indicating if the "IF NOT EXIST" option has been selected.
-   *
-   * @author paouelle
-   */
-  private volatile boolean ifNotExists;
-
+  implements AlterSchema<T> {
   /**
    * Holds the where statement part.
    *
@@ -60,7 +55,7 @@ public class CreateSchemaImpl<T>
   private final WhereImpl<T> where;
 
   /**
-   * Instantiates a new <code>CreateSchemaImpl</code> object.
+   * Instantiates a new <code>AlterSchemaImpl</code> object.
    *
    * @author paouelle
    *
@@ -69,7 +64,7 @@ public class CreateSchemaImpl<T>
    * @param mgr the non-<code>null</code> statement manager
    * @param bridge the non-<code>null</code> statement bridge
    */
-  public CreateSchemaImpl(
+  public AlterSchemaImpl(
     ClassInfoImpl<T>.Context context,
     StatementManagerImpl mgr,
     StatementBridge bridge
@@ -79,57 +74,60 @@ public class CreateSchemaImpl<T>
   }
 
   /**
-   * Builds the query strings for this create schemas with the ability to
-   * optionally tracked and skipped already created keyspaces.
+   * Builds the query strings for this alter schemas with the ability to
+   * optionally tracked and skipped already created or altered keyspaces.
    *
    * @author paouelle
    *
-   * @param  keyspaces an optional set of keyspaces already created when
-   *         used as part of a create schemas statement or <code>null</code>
+   * @param  keyspaces an optional set of keyspaces already created or altered
+   *         when used as part of a create schemas statement or <code>null</code>
    * @return the string builders used to build the query strings or
    *         <code>null</code> if nothing to be done
    */
   StringBuilder[] buildQueryStrings(Set<Keyspace> keyspaces) {
     final List<StringBuilder> builders
       = new ArrayList<>(getContext().getClassInfo().getTables().size() + 2);
-    final CreateTypeImpl<T> cy;
-    final CreateTableImpl<T> ct;
+    final AlterCreateTypeImpl<T> cy;
+    final AlterCreateTableImpl<T> at;
     final CreateIndexImpl<T> ci;
 
     if (getClassInfo().supportsTablesAndIndexes()) {
       cy = null;
-      ct = new CreateTableImpl<>(getContext(), null, mgr, bridge);
+      at = new AlterCreateTableImpl<>(getContext(), mgr, bridge);
+      // for indexes, we blindly drop all of them and re-create them
+      for (final Map.Entry<String, List<Row>> e: at.getTableInfos().entrySet()) {
+        e.getValue().stream()
+          .map(r -> r.getString(4))
+          .filter(i -> i != null)
+          .distinct()
+          .forEach(i -> {
+            final StringBuilder builder = new StringBuilder("DROP INDEX ");
+
+            if (getKeyspace() != null) {
+              Utils.appendName(getKeyspace(), builder).append('.');
+            }
+            Utils.appendName(i, builder);
+            builder.append(';');
+            builders.add(builder);
+          });
+      }
       ci = new CreateIndexImpl<>(getContext(), null, null, mgr, bridge);
     } else {
-      cy = new CreateTypeImpl<>(getContext(), mgr, bridge);
-      ct = null;
+      cy = new AlterCreateTypeImpl<>(getContext(), mgr, bridge);
+      at = null;
       ci = null;
     }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     StringBuilder[] cbuilders;
 
-    if (ifNotExists) {
-      if (cy != null) {
-        cy.ifNotExists();
-      }
-      if (ct != null) {
-        ct.ifNotExists();
-      }
-      if (ci != null) {
-        ci.ifNotExists();
-      }
-    }
     // start by generating the keyspace
-    // --- do not attempt to create the same keyspace twice when a set of keyspaces
-    // --- is provided in the method calls (used by create schemas)
+    // --- do not attempt to create or alter the same keyspace twice when a set
+    // --- of keyspaces is provided in the method calls (used by alter schemas)
     if ((keyspaces == null) || !keyspaces.contains(keyspace)) {
-      final CreateKeyspaceImpl<T> ck = new CreateKeyspaceImpl<>(
+      final AlterCreateKeyspaceImpl<T> ck = new AlterCreateKeyspaceImpl<>(
         getContext(), mgr, bridge
       );
 
-      if (ifNotExists) {
-        ck.ifNotExists();
-      }
       cbuilders = ck.buildQueryStrings();
       if (cbuilders != null) {
         for (final StringBuilder builder: cbuilders) {
@@ -152,8 +150,8 @@ public class CreateSchemaImpl<T>
         }
       }
     }
-    if (ct != null) { // now deal with tables
-      cbuilders = ct.buildQueryStrings();
+    if (at != null) { // now deal with tables
+      cbuilders = at.buildQueryStrings();
       if (cbuilders != null) {
         for (final StringBuilder builder: cbuilders) {
           if (builder != null) {
@@ -223,7 +221,7 @@ public class CreateSchemaImpl<T>
    */
   @Override
   protected void appendGroupSubType(StringBuilder builder) {
-    builder.append(" CREATE");
+    builder.append(" ALTER");
   }
 
   /**
@@ -269,20 +267,6 @@ public class CreateSchemaImpl<T>
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.CreateSchema#ifNotExists()
-   */
-  @Override
-  public CreateSchema<T> ifNotExists() {
-    this.ifNotExists = true;
-    setDirty();
-    return this;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
    * @see com.github.helenusdriver.driver.CreateSchema#where(com.github.helenusdriver.driver.Clause)
    */
   @Override
@@ -317,7 +301,7 @@ public class CreateSchemaImpl<T>
    * @since 1.0
    */
   public static class WhereImpl<T>
-    extends ForwardingStatementImpl<Void, VoidFuture, T, CreateSchemaImpl<T>>
+    extends ForwardingStatementImpl<Void, VoidFuture, T, AlterSchemaImpl<T>>
     implements Where<T> {
     /**
      * Instantiates a new <code>WhereImpl</code> object.
@@ -326,7 +310,7 @@ public class CreateSchemaImpl<T>
      *
      * @param statement the encapsulated statement
      */
-    WhereImpl(CreateSchemaImpl<T> statement) {
+    WhereImpl(AlterSchemaImpl<T> statement) {
       super(statement);
     }
 

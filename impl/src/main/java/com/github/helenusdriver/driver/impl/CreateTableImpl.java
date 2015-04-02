@@ -16,9 +16,11 @@
 package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -50,7 +52,7 @@ public class CreateTableImpl<T>
    *
    * @author paouelle
    */
-  private final List<TableInfoImpl<T>> tables = new ArrayList<>(8);
+  protected final List<TableInfoImpl<T>> tables = new ArrayList<>(8);
 
   /**
    * Holds the "WITH" options.
@@ -125,14 +127,15 @@ public class CreateTableImpl<T>
   }
 
   /**
-   * Builds a query string for the specified table.
+   * Builds a query string or strings for the specified table.
    *
    * @author paouelle
    *
    * @param  table the non-<code>null</code> table for which to build a query
    *         string
-   * @return the string builder used to build the query string for the specified
-   *         table or <code>null</code> if there is none for the specified table
+   * @return the string builders used to build the query string or strings for
+   *         the specified table or <code>null</code> if there is none for the
+   *         specified table
    * @throws IllegalArgumentException if the keyspace has not yet been computed
    *         and cannot be computed with the provided suffixes yet or if
    *         assignments reference columns not defined in the POJO or invalid
@@ -141,10 +144,10 @@ public class CreateTableImpl<T>
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
-  StringBuilder buildQueryString(TableInfoImpl<T> table) {
+  StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
     final List<String> columns = new ArrayList<>(table.getColumns().size());
     final List<String> pkeys = new ArrayList<>(table.getPartitionKeys().size());
-    final Map<String, Ordering> ckeys = new LinkedHashMap<>(table.getClusteringKeys().size());
+    final Map<String, Ordering> ckeys = new LinkedHashMap<>(table.getClusteringKeys().size() * 3 / 2);
 
     for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
       columns.add(field.getColumnName() + " " + field.getDataType().toCQL());
@@ -196,7 +199,7 @@ public class CreateTableImpl<T>
       builder.append("IF NOT EXISTS ");
     }
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(getKeyspace(), builder).append('.');
     }
     Utils.appendName(table.getName(), builder);
     builder
@@ -222,7 +225,7 @@ public class CreateTableImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", with.options);
     }
     builder.append(';');
-    return builder;
+    return new StringBuilder[] { builder };
   }
 
   /**
@@ -234,15 +237,13 @@ public class CreateTableImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
-    final List<StringBuilder> builders = new ArrayList<>(tables.size());
+    final List<StringBuilder> builders = tables.stream()
+      .map(t -> buildQueryStrings(t))
+      .filter(bs -> bs != null)
+      .flatMap(bs -> Arrays.stream(bs))
+      .filter(b -> b != null)
+      .collect(Collectors.toList());
 
-    for (final TableInfoImpl<T> table: tables) {
-      final StringBuilder builder = buildQueryString(table);
-
-      if (builder != null) {
-        builders.add(builder);
-      }
-    }
     if (builders.isEmpty()) {
       return null;
     }

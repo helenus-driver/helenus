@@ -64,6 +64,42 @@ public enum DataType implements CQLDataType {
   MAP("map", 2, Map.class);
 
   /**
+   * Checks if altering a column from a specified data type to a specified data
+   * type is supported.
+   * <p>
+   * <i>Note:</i> For collections, the data type must remain the same and the
+   * arguments must also be alterable.
+   *
+   * @author paouelle
+   *
+   * @param  from the current data type of the column to be changed
+   * @param  to the data type to change the column to
+   * @return <code>true</code> if the conversion is supported; <code>false</code>
+   *         otherwise
+   */
+  private static boolean isAlterable(DataType from, DataType to) {
+    if (from == to) {
+      return true;
+    }
+    switch (from) {
+      case ASCII:
+        return (to == TEXT) || (to == VARCHAR);
+      case BIGINT:
+        return (to == TIMESTAMP);
+      case TEXT:
+        return (to == VARCHAR);
+      case TIMESTAMP:
+        return (to == BIGINT) || (to == VARINT);
+      case VARCHAR:
+        return (to == TEXT);
+      case TIMEUUID:
+        return (to == UUID);
+      default:
+        return false;
+    }
+  }
+
+  /**
    * Holds the non-<code>null</code> CQL name for the data type.
    *
    * @author paouelle
@@ -121,6 +157,21 @@ public enum DataType implements CQLDataType {
    */
   @Override
   public boolean isUserDefined() { // this enum only represents system types
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.persistence.CQLDataType#isAlterableTo(com.github.helenusdriver.persistence.CQLDataType)
+   */
+  @Override
+  public boolean isAlterableTo(CQLDataType to) {
+    if (to instanceof DataType) {
+      return DataType.isAlterable(this, (DataType)to);
+    }
     return false;
   }
 

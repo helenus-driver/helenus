@@ -16,6 +16,7 @@
 package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -76,14 +77,15 @@ public class CreateTypeImpl<T>
   }
 
   /**
-   * Builds a query string for the specified table.
+   * Builds a query string or strings for the specified table.
    *
    * @author paouelle
    *
    * @param  table the non-<code>null</code> table for which to build a query
    *         string
-   * @return the string builder used to build the query string for the specified
-   *         table or <code>null</code> if there is none for the specified table
+   * @return the string builders used to build the query string or strings for
+   *         the specified table or <code>null</code> if there is none for the
+   *         specified table
    * @throws IllegalArgumentException if the keyspace has not yet been computed
    *         and cannot be computed with the provided suffixes yet or if
    *         assignments reference columns not defined in the POJO or invalid
@@ -92,7 +94,7 @@ public class CreateTypeImpl<T>
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
-  StringBuilder buildQueryString(TableInfoImpl<T> table) {
+  StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
     final List<String> columns = new ArrayList<>(table.getColumns().size());
 
     for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
@@ -113,7 +115,7 @@ public class CreateTypeImpl<T>
       .append(StringUtils.join(columns, ","))
       .append(')');
     builder.append(';');
-    return builder;
+    return new StringBuilder[] { builder };
   }
 
   /**
@@ -127,7 +129,9 @@ public class CreateTypeImpl<T>
   protected StringBuilder[] buildQueryStrings() {
     // by design, there should only be one table!!!
     final List<StringBuilder> builders = ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
-      .map(t -> buildQueryString(t))
+      .map(t -> buildQueryStrings(t))
+      .filter(bs -> bs != null)
+      .flatMap(bs -> Arrays.stream(bs))
       .filter(b -> b != null)
       .collect(Collectors.toList());
 

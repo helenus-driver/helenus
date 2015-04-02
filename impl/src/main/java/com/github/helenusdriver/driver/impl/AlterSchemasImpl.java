@@ -30,8 +30,8 @@ import com.github.helenusdriver.commons.collections.DirectedGraph;
 import com.github.helenusdriver.commons.collections.GraphUtils;
 import com.github.helenusdriver.commons.collections.graph.ConcurrentHashDirectedGraph;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
+import com.github.helenusdriver.driver.AlterSchemas;
 import com.github.helenusdriver.driver.Clause;
-import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.VoidFuture;
 import com.github.helenusdriver.driver.info.ClassInfo;
@@ -40,23 +40,24 @@ import com.github.helenusdriver.persistence.Keyspace;
 import org.reflections.Reflections;
 
 /**
- * The <code>CreateSchemasImpl</code> class provides support for a statement
- * which will create all the required elements (keyspace, tables, types, and
- * indexes) to support the schema for a given package of POJOs. It will take
- * care of creating the required keyspace, tables, types, and indexes.
+ * The <code>AlterSchemasImpl</code> class provides support for a statement
+ * which will create and/or alter all the required elements (keyspace, tables,
+ * types, and indexes) to support the schema for a given package of POJOs. It
+ * will take care of creating and/or altering the required keyspace, tables,
+ * types, and indexes.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 19, 2015 - paouelle - Creation
+ * @version 1 - Apr 2, 2015 - paouelle - Creation
  *
  * @since 1.0
  */
-public class CreateSchemasImpl
+public class AlterSchemasImpl
   extends SequenceStatementImpl<Void, VoidFuture, Void>
-  implements CreateSchemas {
+  implements AlterSchemas {
   /**
-   * Holds the package for all POJO classes for which to create schemas.
+   * Holds the package for all POJO classes for which to alter schemas.
    *
    * @author paouelle
    */
@@ -71,25 +72,18 @@ public class CreateSchemasImpl
   private final boolean matching;
 
   /**
-   * Set of POJO class infos with their keyspace to be created.
+   * Set of POJO class infos with their keyspace to be altered.
    *
    * @author paouelle
    */
   private final Map<Keyspace, List<ClassInfoImpl<?>>> keyspaces;
 
   /**
-   * Holds the cache of contexts for POJOs that will have schemas created.
+   * Holds the cache of contexts for POJOs that will have schemas altered.
    *
    * @author paouelle
    */
   private volatile List<ClassInfoImpl<?>.Context> contexts;
-
-  /**
-   * Flag indicating if the "IF NOT EXIST" option has been selected.
-   *
-   * @author paouelle
-   */
-  private volatile boolean ifNotExists;
 
   /**
    * Holds the where statement part.
@@ -99,11 +93,11 @@ public class CreateSchemasImpl
   private final WhereImpl where;
 
   /**
-   * Instantiates a new <code>CreateSchemaImpl</code> object.
+   * Instantiates a new <code>AlterSchemaImpl</code> object.
    *
    * @author paouelle
    *
-   * @param  pkg the package where to find all POJO classes to create schemas for
+   * @param  pkg the package where to find all POJO classes to alter schemas for
    *         associated with this statement
    * @param  matching <code>true</code> to only consider POJOs with keyspace names
    *         that can be computed with exactly the set of suffixes provided
@@ -115,7 +109,7 @@ public class CreateSchemasImpl
    *         the same keyspace with different options or an entity class doesn't
    *         represent a valid POJO class or if no entities are found
    */
-  public CreateSchemasImpl(
+  public AlterSchemasImpl(
     String pkg,
     boolean matching,
     StatementManagerImpl mgr,
@@ -271,7 +265,7 @@ public class CreateSchemasImpl
   }
 
   /**
-   * Gets the contexts for all POJO classes for which we should create schemas.
+   * Gets the contexts for all POJO classes for which we should alter schemas.
    *
    * @author paouelle
    *
@@ -361,11 +355,8 @@ public class CreateSchemasImpl
     final Set<Keyspace> keyspaces = new HashSet<>(contexts.size());
 
     for (final ClassInfoImpl<?>.Context context: contexts) {
-      final CreateSchemaImpl cs = new CreateSchemaImpl(context, mgr, bridge);
+      final AlterSchemaImpl cs = new AlterSchemaImpl(context, mgr, bridge);
 
-      if (ifNotExists) {
-        cs.ifNotExists();
-      }
       final StringBuilder[] cbuilders = cs.buildQueryStrings(keyspaces);
 
       if (cbuilders != null) {
@@ -391,7 +382,7 @@ public class CreateSchemasImpl
    */
   @Override
   protected void appendGroupSubType(StringBuilder builder) {
-    builder.append(" CREATE");
+    builder.append(" ALTER");
   }
 
   /**
@@ -454,20 +445,6 @@ public class CreateSchemasImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.CreateSchemas#ifNotExists()
-   */
-  @Override
-  public CreateSchemas ifNotExists() {
-    this.ifNotExists = true;
-    setDirty();
-    return this;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
    * @see com.github.helenusdriver.driver.CreateSchemas#where(com.github.helenusdriver.driver.Clause)
    */
   @Override
@@ -488,19 +465,19 @@ public class CreateSchemasImpl
   }
 
   /**
-   * The <code>WhereImpl</code> class defines a WHERE clause for the CREATE
+   * The <code>WhereImpl</code> class defines a WHERE clause for the ALTER
    * SCHEMAS statement which can be used to specify suffix types used for
    * keyspace names.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
-   * @version 1 - Jan 19, 2015 - paouelle - Creation
+   * @version 1 - Apr 2, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
   public static class WhereImpl
-    extends ForwardingStatementImpl<Void, VoidFuture, Void, CreateSchemasImpl>
+    extends ForwardingStatementImpl<Void, VoidFuture, Void, AlterSchemasImpl>
     implements Where {
     /**
      * Holds the suffixes with their values.
@@ -516,7 +493,7 @@ public class CreateSchemasImpl
      *
      * @param statement the encapsulated statement
      */
-    WhereImpl(CreateSchemasImpl statement) {
+    WhereImpl(AlterSchemasImpl statement) {
       super(statement);
     }
 
@@ -537,7 +514,7 @@ public class CreateSchemasImpl
       );
       org.apache.commons.lang3.Validate.isTrue(
         !(clause instanceof ClauseImpl.DelayedWithObject),
-        "unsupported clause '%s' for a CREATE SCHEMAS statement",
+        "unsupported clause '%s' for a ALTER SCHEMAS statement",
         clause
       );
       if (clause instanceof ClauseImpl.Delayed) {

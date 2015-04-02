@@ -44,7 +44,7 @@ public class CreateKeyspaceImpl<T>
    *
    * @author paouelle
    */
-  private final OptionsImpl<T> with;
+  protected final OptionsImpl<T> with;
 
   /**
    * Flag indicating if the "IF NOT EXIST" option has been selected.
@@ -211,14 +211,14 @@ public class CreateKeyspaceImpl<T>
      *
      * @author paouelle
      */
-    private KeyspaceWithImpl.ReplicationWithImpl replication;
+    protected KeyspaceWithImpl.ReplicationWithImpl replication;
 
     /**
      * Holds options for this statement.
      *
      * @author paouelle
      */
-    private final List<KeyspaceWithImpl> options = new ArrayList<>(2);
+    protected final List<KeyspaceWithImpl> options = new ArrayList<>(2);
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.

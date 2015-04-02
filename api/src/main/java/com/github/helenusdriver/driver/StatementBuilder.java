@@ -647,6 +647,98 @@ public final class StatementBuilder {
   }
 
   /**
+   * Starts building a new ALTER SCHEMA statement for the given POJO class.
+   * This will create and/or alter all the required elements to support the
+   * schema for a given POJO. It will take care of creating and/or altering the
+   * required keyspace, user-defined types, tables, and indexes.
+   * <p>
+   * <i>Note:</i> If the POJO defines multiple tables and indexes, executing this
+   * statement will potentially create and/or alter the keyspace, all tables and
+   * all indexes for all tables. Since keyspace, table, and index creation and/or
+   * alteration cannot be batched with Cassandra, this will result in a non-atomic
+   * creation and/or alteration of everything. The process will stop at first
+   * failure and will not revert back the created and/or altered keyspace, tables,
+   * or indexes if any.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @param  clazz the class of POJO associated with this statement
+   * @return an in-build construct for the ALTER SCHEMA statement
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
+   *         valid POJO class
+   */
+  public static <T> AlterSchema<T> alterSchema(Class<T> clazz) {
+    return StatementManager.getManager().alterSchema(clazz);
+  }
+
+  /**
+   * Starts building a new ALTER SCHEMAS statement for all POJO classes defined
+   * in a given package. This will create and/or alter all the required elements
+   * to support the schema for each POJO. It will take care of creating and/or
+   * altering the required keyspaces, user-defined types, tables, and indexes.
+   * <p>
+   * <i>Note:</i> This statement will create and/or alter the schemas for all
+   * POJOs for which the defined keyspace can be computed with any of the
+   * specified suffixes via the WHERE clauses.
+   * <p>
+   * <i>Note:</i> Executing this statement will potentially create and/or alter
+   * the keyspaces, all user-defined types, all tables and all indexes for all
+   * tables. Since keyspace, user-defined type, table, and index creation and/or
+   * alteration cannot be batched with Cassandra, this will result in a non-atomic
+   * creation and/or alteration of everything. The process will stop at first
+   * failure and will not revert back the created and/or altered keyspaces,
+   * user-defined types, tables, or indexes if any.
+   *
+   * @author paouelle
+   *
+   * @param  pkg the package where the POJOs for which to create and/or alter
+   *         schemas are defined
+   * @return a new ALTER SCHEMAS statement
+   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws IllegalArgumentException if two entities defines the same keyspace
+   *         with different options or an entity class doesn't represent
+   *         a valid POJO class or if no entities are found
+   */
+  public static AlterSchemas alterSchemas(String pkg) {
+    return StatementManager.getManager().alterSchemas(pkg);
+  }
+
+  /**
+   * Starts building a new ALTER SCHEMAS statement for all POJO classes defined
+   * in a given package. This will create and/or alter all the required elements
+   * to support the schema for each POJO. It will take care of creating and/or
+   * altering the required keyspaces, user-defined types, tables, and indexes.
+   * <p>
+   * <i>Note:</i> This statement will create and/or alter the schemas for only
+   * the POJOs for which the defined keyspace can be computed with exactly all
+   * of the specified suffixes via the WHERE clauses.
+   * <p>
+   * <i>Note:</i> Executing this statement will potentially create and/or alter
+   * the keyspaces, all user-defined types, all tables and all indexes for all
+   * tables. Since keyspace, user-defined type, table, and index creation and/or
+   * alteration cannot be batched with Cassandra, this will result in a non-atomic
+   * creation or alteration of everything. The process will stop at first failure
+   * and will not revert back the created and/or altered keyspaces, user-defined
+   * types, tables, or indexes if any.
+   *
+   * @author paouelle
+   *
+   * @param  pkg the package where the POJOs for which to create and/or alter
+   *         schemas are defined
+   * @return a new ALTER SCHEMAS statement
+   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws IllegalArgumentException if two entities defines the same keyspace
+   *         with different options or an @Entitiy annotated class doesn't represent
+   *         a valid POJO class or if no entities are found
+   */
+  public static AlterSchemas alterMatchingSchemas(String pkg) {
+    return StatementManager.getManager().alterMatchingSchemas(pkg);
+  }
+
+  /**
    * Starts building a new TRUNCATE statement for the given POJO class. This
    * might actually results in multiple TRUNCATE statements.
    *

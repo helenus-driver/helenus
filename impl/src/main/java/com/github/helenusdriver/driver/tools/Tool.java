@@ -66,6 +66,8 @@ import com.github.helenusdriver.commons.collections.graph.ConcurrentHashDirected
 import com.github.helenusdriver.commons.lang3.IllegalCycleException;
 import com.github.helenusdriver.commons.lang3.SerializationUtils;
 import com.github.helenusdriver.commons.lang3.reflect.ReflectionUtils;
+import com.github.helenusdriver.driver.AlterSchema;
+import com.github.helenusdriver.driver.AlterSchemas;
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
@@ -106,6 +108,13 @@ public class Tool {
    * @author paouelle
    */
   private static boolean vflag = false;
+
+  /**
+   * Holds the full verbose flag.
+   *
+   * @author paouelle
+   */
+  private static boolean fvflag = false;
 
   /**
    * Holds the schemas creation action.
@@ -296,6 +305,22 @@ public class Tool {
     };
 
   /**
+   * Holds the full_verbose option.
+   *
+   * @author paouelle
+   */
+  @SuppressWarnings("serial")
+  private final static RunnableOption full_verbose
+    = new RunnableOption(null, "full", false, "to enable full verbose output") {
+      @SuppressWarnings("synthetic-access")
+      @Override
+      public void run(CommandLine line) {
+        Tool.vflag = true;
+        Tool.fvflag = true;
+      }
+    };
+
+  /**
    * Holds the trace option.
    *
    * @author paouelle
@@ -360,6 +385,17 @@ public class Tool {
   private final static Option matches_only = OptionBuilder
     .withLongOpt("matches-only")
     .withDescription("to specify that only keyspace that matches the specified suffixes should be created")
+    .create();
+
+  /**
+   * Holds the alter option.
+   *
+   * @author paouelle
+   */
+  @SuppressWarnings("static-access")
+  private final static Option alter = OptionBuilder
+    .withLongOpt("alter")
+    .withDescription("to alter the existing schemas instead of creating it if it doesn't exist")
     .create();
 
   /**
@@ -442,11 +478,13 @@ public class Tool {
        .addOption(Tool.filters)
        .addOption(Tool.deserialize)
        .addOption(Tool.matches_only)
+       .addOption(Tool.alter)
        .addOption(Tool.no_dependents)
        .addOption(Tool.replicationFactor)
        .addOption(Tool.dataCenters)
        .addOption(Tool.output)
        .addOption(Tool.verbose)
+       .addOption(Tool.full_verbose)
        .addOption(Tool.trace)
        .addOption(Tool.help)
       );
@@ -489,7 +527,7 @@ public class Tool {
 
       if (query == null) {
         System.out.println(Tool.class.getSimpleName() + ": CQL -> null");
-      } else if ((query.length() < 2048) || !((s instanceof Batch) || (s instanceof Sequence))) {
+      } else if (fvflag || (query.length() < 2048) || !((s instanceof Batch) || (s instanceof Sequence))) {
         System.out.println(
           Tool.class.getSimpleName()
           + ": CQL -> "
@@ -528,6 +566,7 @@ public class Tool {
    * @param  suffixes the map of provided suffix values
    * @param  matching whether or not to only create schemas for keyspaces that
    *         matches the specified set of suffixes
+   * @param  alter whether to alter or create the schemas
    * @param  s the sequence where to add the generated statements
    * @throws LinkageError if the linkage fails for one of the specified entity
    *         class
@@ -538,6 +577,7 @@ public class Tool {
     String[] cnames,
     Map<String, String> suffixes,
     boolean matching,
+    boolean alter,
     Sequence s
   ) {
     next_class:
@@ -546,33 +586,63 @@ public class Tool {
         final Class<?> clazz = Class.forName(cnames[i]);
 
         cnames[i] = null; // clear since we found a class
-        final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
+        if (alter) {
+          final AlterSchema<?> cs = StatementBuilder.alterSchema(clazz);
 
-        cs.ifNotExists();
-        // pass all required suffixes
-        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-          // check if this suffix type is defined
-          final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
+          // pass all required suffixes
+          for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+            // check if this suffix type is defined
+            final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
 
-          if (suffix != null) {
-            // register the suffix value with the corresponding suffix name
-            cs.where(
-              StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
-            );
-          } else if (matching) {
-            // we have one more suffix then defined with this pojo
-            // and we were requested to only do does that match the provided
-            // suffixes so skip the class
-            continue next_class;
+            if (suffix != null) {
+              // register the suffix value with the corresponding suffix name
+              cs.where(
+                StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
+              );
+            } else if (matching) {
+              // we have one more suffix then defined with this pojo
+              // and we were requested to only do does that match the provided
+              // suffixes so skip the class
+              continue next_class;
+            }
           }
-        }
-        s.add(cs);
-        for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": creating schema for "
-            + cinfo.getObjectClass().getName()
-          );
+          s.add(cs);
+          for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
+            System.out.println(
+              Tool.class.getSimpleName()
+              + ": altering schema for "
+              + cinfo.getObjectClass().getName()
+            );
+          }
+        } else {
+          final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
+
+          cs.ifNotExists();
+          // pass all required suffixes
+          for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+            // check if this suffix type is defined
+            final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
+
+            if (suffix != null) {
+              // register the suffix value with the corresponding suffix name
+              cs.where(
+                StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
+              );
+            } else if (matching) {
+              // we have one more suffix then defined with this pojo
+              // and we were requested to only do does that match the provided
+              // suffixes so skip the class
+              continue next_class;
+            }
+          }
+          s.add(cs);
+          for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
+            System.out.println(
+              Tool.class.getSimpleName()
+              + ": creating schema for "
+              + cinfo.getObjectClass().getName()
+            );
+          }
         }
       } catch (ClassNotFoundException e) { // ignore and continue
       }
@@ -589,6 +659,7 @@ public class Tool {
    * @param  suffixes the map of provided suffix values
    * @param  matching whether or not to only create schemas for keyspaces that
    *         matches the specified set of suffixes
+   * @param  alter whether to alter or create the schemas
    * @param  s the sequence where to add the generated statements
    * @throws LinkageError if the linkage fails for one of the specified entity
    *         class
@@ -601,33 +672,57 @@ public class Tool {
     String[] pkgs,
     Map<String, String> suffixes,
     boolean matching,
+    boolean alter,
     Sequence s
   ) {
     for (final String pkg: pkgs) {
       if (pkg == null) {
         continue;
       }
-      final CreateSchemas cs
-        = (matching
-            ? StatementBuilder.createMatchingSchemas(pkg)
-            : StatementBuilder.createSchemas(pkg));
+      if (alter) {
+        final AlterSchemas cs
+          = (matching
+              ? StatementBuilder.alterMatchingSchemas(pkg)
+              : StatementBuilder.alterSchemas(pkg));
 
-      cs.ifNotExists();
-      // pass all suffixes
-      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-        // register the suffix value with the corresponding suffix type
-        cs.where(
-          StatementBuilder.eq(e.getKey(), e.getValue())
-        );
+        // pass all suffixes
+        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+          // register the suffix value with the corresponding suffix type
+          cs.where(
+            StatementBuilder.eq(e.getKey(), e.getValue())
+          );
+        }
+        for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
+          System.out.println(
+            Tool.class.getSimpleName()
+            + ": altering schema for "
+            + cinfo.getObjectClass().getName()
+          );
+        }
+        s.add(cs);
+      } else {
+        final CreateSchemas cs
+          = (matching
+              ? StatementBuilder.createMatchingSchemas(pkg)
+              : StatementBuilder.createSchemas(pkg));
+
+        cs.ifNotExists();
+        // pass all suffixes
+        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+          // register the suffix value with the corresponding suffix type
+          cs.where(
+            StatementBuilder.eq(e.getKey(), e.getValue())
+          );
+        }
+        for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
+          System.out.println(
+            Tool.class.getSimpleName()
+            + ": creating schema for "
+            + cinfo.getObjectClass().getName()
+          );
+        }
+        s.add(cs);
       }
-      for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
-        System.out.println(
-          Tool.class.getSimpleName()
-          + ": creating schema for "
-          + cinfo.getObjectClass().getName()
-        );
-      }
-      s.add(cs);
     }
   }
 
@@ -651,6 +746,7 @@ public class Tool {
     final Map<String, String> suffixes
       = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
     final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
+    final boolean alter = line.hasOption(Tool.alter.getLongOpt());
     final Sequence s = StatementBuilder.sequence();
 
     System.out.print(
@@ -668,9 +764,9 @@ public class Tool {
     }
     System.out.println();
     // start by assuming we have classes; if we do they will be nulled from the array
-    Tool.createSchemasFromClasses(opts, suffixes, matching, s);
+    Tool.createSchemasFromClasses(opts, suffixes, matching, alter, s);
     // now deal with the rest as if they were packages
-    Tool.createSchemasFromPackages(opts, suffixes, matching, s);
+    Tool.createSchemasFromPackages(opts, suffixes, matching, alter, s);
     if (s.isEmpty() || (s.getQueryString() == null)) {
       System.out.println(
         Tool.class.getSimpleName()

@@ -138,7 +138,7 @@ public class CreateIndexImpl<T>
     }
     builder.append(" ON ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(getKeyspace(), builder).append('.');
     }
     Utils.appendName(table.getName(), builder);
     builder
