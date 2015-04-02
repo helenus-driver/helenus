@@ -126,6 +126,13 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final Class<?> type;
 
   /**
+   * Holds a flag indicating if the field is optional or not.
+   *
+   * @author paouelle
+   */
+  private final boolean isOptional;
+
+  /**
    * This variable is used to cache Column annotation
    *
    * @author vasu
@@ -273,6 +280,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.field = field.field;
     this.name = field.name;
     this.type = field.type;
+    this.isOptional = field.isOptional;
     this.column = field.column;
     this.persisted = field.persisted;
     this.persister = field.persister;
@@ -315,6 +323,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.type = ClassUtils.primitiveToWrapper(
       DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType())
     );
+    this.isOptional = Optional.class.isAssignableFrom(field.getType());
     this.column = null;
     this.persisted = null;
     this.persister = null;
@@ -355,6 +364,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.type = ClassUtils.primitiveToWrapper(
       DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType())
     );
+    this.isOptional = Optional.class.isAssignableFrom(field.getType());
     this.persisted = field.getAnnotation(Persisted.class);
     if (persisted != null) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -598,6 +608,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.isFinal = true;
     this.name = suffix.name();
     this.type = String.class;
+    this.isOptional = false;
     this.column = null;
     this.persisted = null;
     this.persister = null;
@@ -744,7 +755,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     final String mname = "set" + WordUtils.capitalize(name, '_', '-');
 
     try {
-      final Method m = declaringClass.getDeclaredMethod(mname, type);
+      final Method m = declaringClass.getDeclaredMethod(mname, field.getType());
       final int mods = m.getModifiers();
 
       if (Modifier.isAbstract(mods) || Modifier.isStatic(mods)) {
@@ -760,12 +771,21 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         DataTypeImpl.unwrapOptionalIfPresent(m.getParameterTypes()[0], m.getParameters()[0].getParameterizedType())
       );
 
-      org.apache.commons.lang3.Validate.isTrue(
-        wtype.isAssignableFrom(wptype),
-        "expecting setter for field '%s' with parameter type: %s",
-        field,
-        type.getName()
-      );
+      if (isOptional) {
+        org.apache.commons.lang3.Validate.isTrue(
+          wtype.isAssignableFrom(wptype),
+          "expecting setter for field '%s' with parameter type: Optional<%s>",
+          field,
+          type.getName()
+        );
+      } else {
+        org.apache.commons.lang3.Validate.isTrue(
+          wtype.isAssignableFrom(wptype),
+          "expecting setter for field '%s' with parameter type: %s",
+          field,
+          type.getName()
+        );
+      }
       m.setAccessible(true);
       return m;
     } catch (NoSuchMethodException e) {
@@ -1534,7 +1554,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     if (isFinal && (setter == null)) {
       return;
     }
-    if (Optional.class.isAssignableFrom(field.getType())) {
+    if (isOptional) {
       value = Optional.ofNullable(value);
     }
     if (value == null) {
