@@ -56,6 +56,7 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
 import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 import com.github.helenusdriver.commons.cli.RunnableFirstOption;
@@ -837,7 +838,7 @@ public class Tool {
           final ObjectMapper m = new ObjectMapper();
           final SchemaFactoryWrapper visitor = new SchemaFactoryWrapper();
 
-          m.registerModule(new Jdk8Module());
+          m.registerModules(new Jdk8Module(), new JSR310Module());
           m.enable(SerializationFeature.INDENT_OUTPUT);
           m.acceptJsonFormatVisitor(m.constructType(c), visitor);
           schemas.put(c, visitor.finalSchema());
