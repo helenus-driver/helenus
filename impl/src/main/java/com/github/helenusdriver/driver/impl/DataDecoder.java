@@ -941,11 +941,19 @@ public abstract class DataDecoder<V> {
         }
         return cinfo.getObject(uval);
       }
+      @SuppressWarnings("unchecked")
       @Override
-      protected Object decodeImpl(UDTValue uval, String name, Class clazz) { // not supported????
-        throw new IllegalArgumentException(
-          "user-defined types based on other user-defined types are not supported"
+      protected Object decodeImpl(UDTValue uval, String name, Class clazz) {
+        org.apache.commons.lang3.Validate.isTrue(
+          clazz.isAssignableFrom(cinfo.getObjectClass()),
+          "unsupported class '%s' to decode to", clazz.getName()
         );
+        final UDTValue fuval = uval.getUDTValue(name);
+
+        if (fuval == null) {
+          return null;
+        }
+        return cinfo.getObject(fuval);
       }
     };
   }
