@@ -719,7 +719,7 @@ public abstract class DataDecoder<V> {
           // returns null for empty lists and the schema definition requires
           // that mandatory and primary keys be non null
           if (mandatory) {
-            return new ArrayList(16);
+            return new ArrayList(8);
           }
           return list;
         }
@@ -787,7 +787,7 @@ public abstract class DataDecoder<V> {
               // the entries were added but that should be fine anyways in this case
               return EnumSet.noneOf((Class<? extends Enum>)eclazz);
             }
-            return new LinkedHashSet(16); // to keep order
+            return new LinkedHashSet(8); // to keep order
           }
           return set;
         }
@@ -863,7 +863,7 @@ public abstract class DataDecoder<V> {
               // the entries were added but that should be fine anyways in this case
               return new EnumMap(ekclazz);
             }
-            return new LinkedHashMap(16); // to keep order
+            return new LinkedHashMap(8); // to keep order
           }
           return map;
         }
