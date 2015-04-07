@@ -131,6 +131,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         context
      * @throws IllegalArgumentException if unable to compute the keyspace name
      *         based on provided suffixes
+     * @throws ExcludedSuffixKeyException if the context defines a suffix value
+     *         which is marked as excluded for a given suffix key
      */
     @SuppressWarnings("synthetic-access")
     public String getKeyspace() {
@@ -143,14 +145,19 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         // let's make sure we can resolve all suffix keys
         for (int i = 0; i < types.length; i++) {
           final FieldInfoImpl<T> finfo = (FieldInfoImpl<T>)getSuffixKeyByType(types[i]);
-          final String key = finfo.getSuffixKey().name();
+          final SuffixKey skey = finfo.getSuffixKey();
+          final String key = skey.name();
           final Object value = suffixes.get(key);
 
           org.apache.commons.lang3.Validate.isTrue(
-            value != null,
-            "missing suffix key '%s'",
-            key
+            value != null, "missing suffix key '%s'", key
           );
+          if (ArrayUtils.contains(skey.exclude(), value)) {
+            throw new ExcludedSuffixKeyException(
+              "excluded suffix key '" + key + "' value '" + value + "' for object class: "
+              + clazz.getName()
+            );
+          }
           // use the natural toString() to convert the value into a string
           svalues[i] = String.valueOf(value);
         }

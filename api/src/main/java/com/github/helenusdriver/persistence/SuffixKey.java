@@ -69,4 +69,14 @@ public @interface SuffixKey {
    * @return the suffix type
    */
   String type();
+
+  /**
+   * The suffix values to exclude.
+   *
+   * @author paouelle
+   *
+   * @return a list of suffix values that should be excluded (or for which no
+   *         keyspace would be created)
+   */
+  String[] exclude() default {};
 }
