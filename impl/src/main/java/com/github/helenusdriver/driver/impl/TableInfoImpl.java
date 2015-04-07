@@ -203,6 +203,13 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     = new ArrayList<>(2);
 
   /**
+   * Flag indicating if at least one column is defined as a collection.
+   *
+   * @author paouelle
+   */
+  private boolean hasCollectionColumns = false;
+
+  /**
    * Instantiates a new <code>TableInfo</code> object.
    *
    * @author paouelle
@@ -290,6 +297,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + field.getName()
           + "'"
         );
+      }
+      if (field.getDataType().isCollection()) {
+        this.hasCollectionColumns = true;
       }
       if (field.isTypeKey()) { // by design will be false if no table is defined
         final FieldInfoImpl<T> oldk = typeKeyColumn.getValue();
@@ -1036,6 +1046,18 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   @Override
   public String getName() {
     return name;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.TableInfo#hasCollectionColumns()
+   */
+  @Override
+  public boolean hasCollectionColumns() {
+    return hasCollectionColumns;
   }
 
   /**

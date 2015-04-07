@@ -77,6 +77,16 @@ public interface TableInfo<T> extends Iterable<FieldInfo<T>> {
   public String getName();
 
   /**
+   * Checks if this table defines columns as collections.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if at least one column for this table is defined
+   *         as a collection; <code>false</code> otherwise
+   */
+  public boolean hasCollectionColumns();
+
+  /**
    * {@inheritDoc}
    *
    * Gets an iterator of all fields defined as columns in this table.
