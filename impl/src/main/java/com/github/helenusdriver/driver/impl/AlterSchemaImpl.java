@@ -91,6 +91,12 @@ public class AlterSchemaImpl<T>
     final AlterCreateTableImpl<T> at;
     final CreateIndexImpl<T> ci;
 
+    // make sure we have a valid keyspace (handling suffix exclusions if any)
+    try {
+      getKeyspace();
+    } catch (ExcludedSuffixKeyException e) { // skip it
+      return null;
+    }
     if (getClassInfo().supportsTablesAndIndexes()) {
       cy = null;
       at = new AlterCreateTableImpl<>(getContext(), mgr, bridge);
