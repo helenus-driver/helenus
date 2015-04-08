@@ -1,5 +1,7 @@
 package com.github.helenusdriver.driver.info;
 
+import java.util.stream.Stream;
+
 /**
  * The <code>RootClassInfo</code> interface extends on the {@link ClassInfo}
  * interface to provide addition information for root entity POJO class.
@@ -39,6 +41,15 @@ public interface RootClassInfo<T> extends ClassInfo<T> {
    *         if none defined for the given name
    */
   public TypeClassInfo<? extends T> getType(String name);
+
+  /**
+   * Gets all type entities defined from this root entity.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all type entities defined from this root entity
+   */
+  public Stream<TypeClassInfo<? extends T>> types();
 
   /**
    * Gets the number of type entities defined from this root entity.

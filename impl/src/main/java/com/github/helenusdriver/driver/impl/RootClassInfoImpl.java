@@ -31,6 +31,7 @@ import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
 import com.github.helenusdriver.driver.ObjectConversionException;
 import com.github.helenusdriver.driver.info.RootClassInfo;
+import com.github.helenusdriver.driver.info.TypeClassInfo;
 import com.github.helenusdriver.persistence.RootEntity;
 
 /**
@@ -571,6 +572,19 @@ public class RootClassInfoImpl<T>
   @Override
   public TypeClassInfoImpl<? extends T> getType(String name) {
     return ntypes.get(name);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.RootClassInfo#types()
+   */
+  @SuppressWarnings({"cast", "rawtypes", "unchecked"})
+  @Override
+  public Stream<TypeClassInfo<? extends T>> types() {
+    return (Stream<TypeClassInfo<? extends T>>)(Stream)ntypes.values().stream();
   }
 
   /**
