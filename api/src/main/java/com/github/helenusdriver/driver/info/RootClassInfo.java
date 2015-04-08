@@ -39,4 +39,13 @@ public interface RootClassInfo<T> extends ClassInfo<T> {
    *         if none defined for the given name
    */
   public TypeClassInfo<? extends T> getType(String name);
+
+  /**
+   * Gets the number of type entities defined from this root entity.
+   *
+   * @author paouelle
+   *
+   * @return the number of type entities defined from this root entity
+   */
+  public int getNumTypes();
 }

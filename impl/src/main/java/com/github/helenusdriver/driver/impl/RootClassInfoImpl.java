@@ -578,6 +578,18 @@ public class RootClassInfoImpl<T>
    *
    * @author paouelle
    *
+   * @see com.github.helenusdriver.driver.info.RootClassInfo#getNumTypes()
+   */
+  @Override
+  public int getNumTypes() {
+    return ctypes.size();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see com.github.helenusdriver.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
    */
   @Override
