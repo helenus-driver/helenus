@@ -349,11 +349,17 @@ public class DeleteImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", cs.values());
     } else {
       // add where clauses for all primary key columns
-      final Map<String, Object> pkeys
-        = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
+      final Map<String, Object> pkeys;
 
-      if (pkeys_override != null) {
-        pkeys.putAll(pkeys_override);
+      try {
+        if (pkeys_override == null) {
+          pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
+        } else {
+          pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName(), pkeys_override);
+        }
+      } catch (EmptyOptionalPrimaryKeyException e) {
+        // ignore and continue without updating this table
+        return;
       }
       if (!pkeys.isEmpty()) {
         builder.append(" WHERE ");

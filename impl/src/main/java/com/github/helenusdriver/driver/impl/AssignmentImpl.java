@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.github.helenusdriver.driver.Assignment;
 import com.github.helenusdriver.driver.ColumnPersistenceException;
@@ -165,6 +166,9 @@ public abstract class AssignmentImpl
      */
     SetAssignmentImpl(CharSequence name, Object value) {
       super(name);
+      if (value instanceof Optional) {
+        value = ((Optional<?>)value).orElse(null);
+      }
       this.value = value;
     }
 
@@ -241,6 +245,9 @@ public abstract class AssignmentImpl
      */
     ReplaceAssignmentImpl(CharSequence name, Object value, Object old) {
       super(name, value);
+      if (old instanceof Optional) {
+        old = ((Optional<?>)old).orElse(null);
+      }
       this.old = old;
     }
 
@@ -253,6 +260,7 @@ public abstract class AssignmentImpl
      */
     @Override
     void validate(TableInfoImpl<?> table) {
+      // special case for assignment as we want to remember optional primary keys set as null
       super.validate(table); // take care of set assignment
       // make sure the old value is valid too
       table.validateColumnAndValue(name, old);

@@ -140,21 +140,26 @@ public class InsertImpl<T>
   void buildQueryStrings(TableInfoImpl<T> table, List<StringBuilder> builders) {
     final Map<String, Object> columns;
 
-    if (allValuesAdded || this.columns.isEmpty()) {
-      // either all columns were added so just get all of them from the table
-      // or again no columns were added so fallback to all
-      columns = getPOJOContext().getColumnValues(table.getName());
-    } else {
-      // we need to make sure all primary and mandatory columns are in there first
-      final Map<String, Object> mpkcolumns
-        = getPOJOContext().getMandatoryAndPrimaryKeyColumnValues(table.getName());
+    try {
+      if (allValuesAdded || this.columns.isEmpty()) {
+        // either all columns were added so just get all of them from the table
+        // or again no columns were added so fallback to all
+        columns = getPOJOContext().getColumnValues(table.getName());
+      } else {
+        // we need to make sure all primary and mandatory columns are in there first
+        final Map<String, Object> mpkcolumns
+          = getPOJOContext().getMandatoryAndPrimaryKeyColumnValues(table.getName());
 
-      columns = new LinkedHashMap<>(mpkcolumns.size() + this.columns.size());
-      columns.putAll(mpkcolumns);
-      // now add those that were manually added
-      columns.putAll(getPOJOContext().getColumnValues(
-        table.getName(), (Collection<CharSequence>)(Collection)this.columns)
-      );
+        columns = new LinkedHashMap<>(mpkcolumns.size() + this.columns.size());
+        columns.putAll(mpkcolumns);
+        // now add those that were manually added
+        columns.putAll(getPOJOContext().getColumnValues(
+          table.getName(), (Collection<CharSequence>)(Collection)this.columns)
+        );
+      }
+    } catch (EmptyOptionalPrimaryKeyException e) {
+      // ignore and continue without updating this table
+      return;
     }
     // check if the table has multi-keys in which case we need to iterate all
     // possible combinations/values for all keys and generate separate insert

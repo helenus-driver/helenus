@@ -585,11 +585,24 @@ public class TableInfoImpl<T> implements TableInfo<T> {
             "missing mandatory column '%s' from table '%s'",
             name, table.name()
           );
-          org.apache.commons.lang3.Validate.isTrue(
-            !field.isPartitionKey() && !field.isClusteringKey(),
-            "missing primary key column '%s' from table '%s'",
-            name, table.name()
-          );
+          if (field.isPartitionKey() || field.isClusteringKey()) {
+            if (field.isOptional()) {
+              throw new EmptyOptionalPrimaryKeyException(
+                "missing primary key column '"
+                + name
+                + "' in table '"
+                + table.name()
+                + "'"
+              );
+            }
+            throw new IllegalArgumentException(
+              "missing primary key column '"
+              + name
+              + "' in table '"
+              + table.name()
+              + "'"
+            );
+          }
           org.apache.commons.lang3.Validate.isTrue(
             !field.isTypeKey(),
             "missing type key column '%s' from table '%s'",
@@ -718,12 +731,77 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       final FieldInfoImpl<T> field = e.getValue();
       final Object value = field.getValue(object);
 
-      org.apache.commons.lang3.Validate.isTrue(
-        value != null,
-        "missing primary key column '%s' from table '%s'",
-        name,
-        table.name()
-      );
+      if (value == null) {
+        if (field.isOptional()) {
+          throw new EmptyOptionalPrimaryKeyException(
+            "missing primary key column '"
+            + name
+            + "' in table '"
+            + table.name()
+            + "'"
+          );
+        }
+        throw new IllegalArgumentException(
+          "missing primary key column '"
+          + name
+          + "' in table '"
+          + table.name()
+          + "'"
+        );
+      }
+      values.put(name, value);
+    }
+    return values;
+  }
+
+  /**
+   * Retrieves all primary key columns and their values from the POJO while
+   * giving priority to values provided by the specified override map.
+   *
+   * @author paouelle
+   *
+   * @param  object the non-<code>null</code> POJO object
+   * @param  pkeys_override a non-<code>null</code> map of primary key values
+   *         to use instead of those provided by the object
+   * @return a non-<code>null</code> map of all primary key column/value pairs
+   *         for the POJO
+   * @throws IllegalArgumentException if a column is missing from the POJO
+   * @throws ColumnPersistenceException if unable to persist a column's value
+   */
+  Map<String, Object> getPrimaryKeyColumnValues(
+    T object, Map<String, Object> pkeys_override
+  ) {
+    if (table == null) {
+      return Collections.emptyMap();
+    }
+    final Map<String, Object> values = new LinkedHashMap<>(primaryKeyColumns.size());
+
+    for (final Map.Entry<String, FieldInfoImpl<T>> e: primaryKeyColumns.entrySet()) {
+      final String name = e.getKey();
+      final FieldInfoImpl<T> field = e.getValue();
+      Object value = pkeys_override.getOrDefault(name, this);
+
+      if (value == this) { // special case to detect that no override was provided
+        value = field.getValue(object); // so get it from the object
+      }
+      if (value == null) {
+        if (field.isOptional()) {
+          throw new EmptyOptionalPrimaryKeyException(
+            "missing primary key column '"
+            + name
+            + "' in table '"
+            + table.name()
+            + "'"
+          );
+        }
+        throw new IllegalArgumentException(
+          "missing primary key column '"
+          + name
+          + "' in table '"
+          + table.name()
+          + "'"
+        );
+      }
       values.put(name, value);
     }
     return values;
@@ -800,15 +878,28 @@ public class TableInfoImpl<T> implements TableInfo<T> {
             "missing mandatory column '%s' from table '%s'",
             name, table.name()
           );
-          org.apache.commons.lang3.Validate.isTrue(
-            !field.isPartitionKey() && !field.isClusteringKey(),
-            "missing primary key column '%s' from table '%s'",
-            table.name(), name
-          );
+          if (field.isPartitionKey() || field.isClusteringKey()) {
+            if (field.isOptional()) {
+              throw new EmptyOptionalPrimaryKeyException(
+                "missing primary key column '"
+                + name
+                + "' in table '"
+                + table.name()
+                + "'"
+              );
+            }
+            throw new IllegalArgumentException(
+              "missing primary key column '"
+              + name
+              + "' in table '"
+              + table.name()
+              + "'"
+            );
+          }
           org.apache.commons.lang3.Validate.isTrue(
             !field.isTypeKey(),
             "missing type key column '%s' from table '%s'",
-            table.name(), name
+            name, table.name()
           );
         } else {
           org.apache.commons.lang3.Validate.isTrue(
@@ -910,11 +1001,24 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           "missing mandatory column '%s' in table '%s'",
           n, table.name()
         );
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isPartitionKey() && !field.isClusteringKey(),
-          "missing primary key column '%s' in table '%s'",
-          n, table.name()
-        );
+        if (field.isPartitionKey() || field.isClusteringKey()) {
+          if (field.isOptional()) {
+            throw new EmptyOptionalPrimaryKeyException(
+              "missing primary key column '"
+              + n
+              + "' in table '"
+              + table.name()
+              + "'"
+            );
+          }
+          throw new IllegalArgumentException(
+            "missing primary key column '"
+            + n
+            + "' in table '"
+            + table.name()
+            + "'"
+          );
+        }
         org.apache.commons.lang3.Validate.isTrue(
           !field.isTypeKey(),
           "missing type key column '%s' in table '%s'",

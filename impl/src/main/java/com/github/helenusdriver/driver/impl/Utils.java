@@ -326,7 +326,7 @@ public abstract class Utils {
         elt != null, "null are not supported in lists"
       );
       if (i > 0) {
-        sb.append('.');
+        sb.append(',');
       }
       appendFlatValue(elt, sb);
     }

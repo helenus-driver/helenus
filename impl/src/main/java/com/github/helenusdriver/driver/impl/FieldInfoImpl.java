@@ -1029,6 +1029,18 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
+   * Checks if the field is defined as optional.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if the field is defined as optional; <code>false</code>
+   *         otherwise
+   */
+  public boolean isOptional() {
+    return isOptional;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -1194,17 +1206,29 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         right type or is <code>null</code> when the field is mandatory
    */
   public void validateValue(Object value) {
+    if (value instanceof Optional) { // unwrapped optional if present
+      value = ((Optional<?>)value).orElse(null);
+    }
     if (value == null) {
       org.apache.commons.lang3.Validate.isTrue(
         !isMandatory(),
         "invalid null value for mandatory column '%s'",
         getColumnName()
       );
-      org.apache.commons.lang3.Validate.isTrue(
-        !isPartitionKey() && !isClusteringKey(),
-        "invalid null value for primary key column '%s'",
-        getColumnName()
-      );
+      if (isPartitionKey() || isClusteringKey()) {
+        if (isOptional()) {
+          throw new EmptyOptionalPrimaryKeyException(
+            "invalid null value for primary key column '"
+            + getColumnName()
+            + "'"
+          );
+        }
+        throw new IllegalArgumentException(
+          "invalid null value for primary key column '"
+          + getColumnName()
+          + "'"
+        );
+      }
       org.apache.commons.lang3.Validate.isTrue(
         !isTypeKey(),
         "invalid null value for type key column '%s'",

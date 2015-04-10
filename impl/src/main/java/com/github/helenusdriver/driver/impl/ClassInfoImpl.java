@@ -400,6 +400,32 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
+     * Retrieves all primary key columns and their values from the POJO and the
+     * specified table while giving priority to values provided by the specified
+     * override map.
+     *
+     * @author paouelle
+     *
+     * @param  tname the name of the table from which to retrieve columns
+     * @param  pkeys_override a non-<code>null</code> map of primary key values
+     *         to use instead of those provided by the object
+     * @return a non-<code>null</code> map of all primary key column/value pairs
+     *         for the POJO
+     * @throws IllegalArgumentException if a column is missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    public Map<String, Object> getPrimaryKeyColumnValues(
+      String tname, Map<String, Object> pkeys_override
+    ) {
+      final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
+
+      if (table == null) { // table not defined so nothing to return
+        return Collections.emptyMap();
+      }
+      return table.getPrimaryKeyColumnValues(object, pkeys_override);
+    }
+
+    /**
      * Retrieves all suffix keys and their values from the POJO.
      *
      * @author paouelle

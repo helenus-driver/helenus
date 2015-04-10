@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1269,10 +1268,13 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Assignment set(CharSequence name, Object value, Object old) {
-    if (!Objects.equals(value, old)) {
+    // paouelle: 04/10/2015 - handling it as a normal Set causes problem in cases
+    //                        where the primary key is optional as going from empty
+    //                        to empty now generates an exception up
+//    if (!Objects.equals(value, old)) {
       return new AssignmentImpl.ReplaceAssignmentImpl(name, value, old);
-    } // else - no change so handle as normal set
-    return new AssignmentImpl.SetAssignmentImpl(name, value);
+//    } // else - no change so handle as normal set
+//    return new AssignmentImpl.SetAssignmentImpl(name, value);
   }
 
   /**

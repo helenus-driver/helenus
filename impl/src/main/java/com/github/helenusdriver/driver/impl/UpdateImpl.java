@@ -179,7 +179,18 @@ public class UpdateImpl<T>
     } else {
       // only pay attention if the referenced column name is defined in the table
       if (table.hasColumn(assignment.getColumnName())) {
-        assignment.validate(table);
+        try {
+          assignment.validate(table);
+        } catch (EmptyOptionalPrimaryKeyException e) {
+          if (assignment instanceof AssignmentImpl.ReplaceAssignmentImpl) {
+            // special case for replace assignment as we will need to potentially
+            // delete the old row if old was not null or add only a new row if
+            // old was null but not new
+            // so fall through in all cases and let the update take care of it
+          } else {
+            throw e;
+          }
+        }
         assignments.add(assignment);
       }
     }
@@ -416,48 +427,53 @@ public class UpdateImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", cs.values());
     } else {
       // add where clauses for all primary key columns
-      final Map<String, Object> pkeys
-        = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
+      try {
+        final Map<String, Object> pkeys
+          = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
 
-      if (!pkeys.isEmpty()) {
-        builder.append(" WHERE ");
-        if (!multiKeys.isEmpty()) {
-          // prepare all sets of values for all multi-keys present in the clause
-          final List<String> cnames = new ArrayList<>(multiKeys.size());
-          final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
+        if (!pkeys.isEmpty()) {
+          builder.append(" WHERE ");
+          if (!multiKeys.isEmpty()) {
+            // prepare all sets of values for all multi-keys present in the clause
+            final List<String> cnames = new ArrayList<>(multiKeys.size());
+            final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
 
-          for (final FieldInfoImpl<T> finfo: multiKeys) {
-            @SuppressWarnings("unchecked")
-            final Set<Object> set = (Set<Object>)pkeys.remove(finfo.getColumnName());
+            for (final FieldInfoImpl<T> finfo: multiKeys) {
+              @SuppressWarnings("unchecked")
+              final Set<Object> set = (Set<Object>)pkeys.remove(finfo.getColumnName());
 
-            if (set != null) { // we have keys for this multi-key column
-              cnames.add(finfo.getColumnName());
-              sets.add(set);
-            }
-          }
-          if (!sets.isEmpty()) {
-            // now iterate all combination of these sets to generate update statements
-            // for each combination
-            @SuppressWarnings("unchecked")
-            final Collection<Object>[] asets = new Collection[sets.size()];
-
-            for (final Iterator<List<Object>> i = new CombinationIterator<>(Object.class, sets.toArray(asets)); i.hasNext(); ) {
-              // add the multi-key clause values from this combination to the map of primary keys
-              int j = -1;
-              for (final Object k: i.next()) {
-                pkeys.put(StatementImpl.MK_PREFIX + cnames.get(++j), k);
+              if (set != null) { // we have keys for this multi-key column
+                cnames.add(finfo.getColumnName());
+                sets.add(set);
               }
-              final StringBuilder sb = new StringBuilder(builder);
-
-              Utils.joinAndAppendNamesAndValues(sb, " AND ", "=", pkeys);
-              builders.add(finishBuildingQueryString(table, sb));
             }
-            return;
+            if (!sets.isEmpty()) {
+              // now iterate all combination of these sets to generate update statements
+              // for each combination
+              @SuppressWarnings("unchecked")
+              final Collection<Object>[] asets = new Collection[sets.size()];
+
+              for (final Iterator<List<Object>> i = new CombinationIterator<>(Object.class, sets.toArray(asets)); i.hasNext(); ) {
+                // add the multi-key clause values from this combination to the map of primary keys
+                int j = -1;
+                for (final Object k: i.next()) {
+                  pkeys.put(StatementImpl.MK_PREFIX + cnames.get(++j), k);
+                }
+                final StringBuilder sb = new StringBuilder(builder);
+
+                Utils.joinAndAppendNamesAndValues(sb, " AND ", "=", pkeys);
+                builders.add(finishBuildingQueryString(table, sb));
+              }
+              return;
+            }
           }
+          // we didn't have any multi-keys in the list (unlikely) so just update it
+          // based on the provided list
+          Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
         }
-        // we didn't have any multi-keys in the list (unlikely) so just update it
-        // based on the provided list
-        Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
+      } catch (EmptyOptionalPrimaryKeyException e) {
+        // ignore and continue without updating this table
+        return;
       }
     }
     builders.add(finishBuildingQueryString(table, builder));
