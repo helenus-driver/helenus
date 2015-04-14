@@ -1160,42 +1160,6 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
-   * Gets the initial objects to insert in a newly created table for this
-   * entity.
-   *
-   * @author paouelle
-   *
-   * @param  suffixes the map of all suffixes values (if any) keyed by the suffix
-   *         type
-   * @return the initial objects to insert in the table or <code>null</code>
-   *         if none needs to be inserted
-   */
-  @SuppressWarnings("unchecked")
-  private T[] getInitialObjects(Map<String, String> suffixes) {
-    if (initial == null) {
-      return null;
-    }
-    try {
-      if (suffixesByType.isEmpty()) {
-        return (T[])initial.invoke(null);
-      }
-      return (T[])initial.invoke(null, suffixes);
-    } catch (IllegalAccessException e) { // should not happen
-      throw new IllegalStateException(e);
-    } catch (InvocationTargetException e) {
-      final Throwable t = e.getTargetException();
-
-      if (t instanceof Error) {
-        throw (Error)t;
-      } else if (t instanceof RuntimeException) {
-        throw (RuntimeException)t;
-      } else { // we don't expect any of those
-        throw new IllegalStateException(t);
-      }
-    }
-  }
-
-  /**
    * Decodes the column fields from a row and sets the decoded value in the POJO
    * object.
    *
@@ -1764,5 +1728,38 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       getEntityAnnotationClass().getSimpleName()
       + " POJOs cannot be retrieved from UDT values"
     );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.info.ClassInfo#getInitialObjects(java.util.Map)
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  public T[] getInitialObjects(Map<String, String> suffixes) {
+    if (initial == null) {
+      return null;
+    }
+    try {
+      if (suffixesByType.isEmpty()) {
+        return (T[])initial.invoke(null);
+      }
+      return (T[])initial.invoke(null, suffixes);
+    } catch (IllegalAccessException e) { // should not happen
+      throw new IllegalStateException(e);
+    } catch (InvocationTargetException e) {
+      final Throwable t = e.getTargetException();
+
+      if (t instanceof Error) {
+        throw (Error)t;
+      } else if (t instanceof RuntimeException) {
+        throw (RuntimeException)t;
+      } else { // we don't expect any of those
+        throw new IllegalStateException(t);
+      }
+    }
   }
 }

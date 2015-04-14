@@ -17,6 +17,7 @@ package com.github.helenusdriver.driver.info;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import com.github.helenusdriver.persistence.Keyspace;
@@ -137,4 +138,16 @@ public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
    */
   @Override
   public Iterator<TableInfo<T>> iterator();
+
+  /**
+   * Gets the initial objects for the corresponding entity.
+   *
+   * @author paouelle
+   *
+   * @param  suffixes the map of all suffixes values (if any) keyed by the suffix
+   *         type
+   * @return the initial objects to insert in the table or <code>null</code>
+   *         if none needs to be inserted
+   */
+  public T[] getInitialObjects(Map<String, String> suffixes);
 }
