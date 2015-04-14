@@ -808,28 +808,34 @@ public class Tool {
     for (int i = 0; i < cnames.length; i++) {
       try {
         final Class<?> clazz = Class.forName(cnames[i]);
+        Collection<Class<?>> classes;
 
         cnames[i] = null; // clear since we found a class
-        final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
+        try {
+          final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
-        // pass all required suffixes
-        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-          // check if this suffix type is defined
-          final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
+          // pass all required suffixes
+          for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+            // check if this suffix type is defined
+            final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
 
-          if (suffix != null) {
-            // register the suffix value with the corresponding suffix name
-            cs.where(
-              StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
-            );
-          } else if (matching) {
-            // we have one more suffix then defined with this pojo
-            // and we were requested to only do does that match the provided
-            // suffixes so skip the class
-            continue next_class;
+            if (suffix != null) {
+              // register the suffix value with the corresponding suffix name
+              cs.where(
+                StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
+              );
+            } else if (matching) {
+              // we have one more suffix then defined with this pojo
+              // and we were requested to only do does that match the provided
+              // suffixes so skip the class
+              continue next_class;
+            }
           }
+          classes = cs.getObjectClasses();
+        } catch (IllegalArgumentException e) { // ignore and continue with class only
+          classes = Arrays.asList(clazz);
         }
-        for (final Class<?> c: cs.getObjectClasses()) {
+        for (final Class<?> c: classes) {
           System.out.println(
             Tool.class.getSimpleName()
             + ": creating Json schema for "
