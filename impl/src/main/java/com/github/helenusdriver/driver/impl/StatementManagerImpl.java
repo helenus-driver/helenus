@@ -1827,7 +1827,20 @@ public class StatementManagerImpl extends StatementManager {
    * @return a non-<code>null</code> future on the completion of the shutdown
    *         process
    */
-  public CloseFuture close() {
+  public CloseFuture closeAsync() {
     return cluster.closeAsync();
+  }
+
+  /**
+   * Initiates a shutdown of this cluster instance and blocks until
+   * that shutdown completes.
+   * <p>
+   * This method has no particular effect if the statement manager was already
+   * shut down.
+   *
+   * @author paouelle
+   */
+  public void close() {
+    cluster.close();
   }
 }

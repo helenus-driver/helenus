@@ -337,7 +337,7 @@ public class Tool {
     };
 
   /**
-   * Holds the verbose option.
+   * Holds the filtered classes option.
    *
    * @author paouelle
    */
@@ -371,7 +371,7 @@ public class Tool {
   @SuppressWarnings("static-access")
   private final static Option port = OptionBuilder
     .withLongOpt("port")
-    .withDescription("to specify the port number for Cassandra (defaults to 9160)")
+    .withDescription("to specify the port number for Cassandra (defaults to 9042)")
     .hasArg()
     .withArgName("number")
     .create();
@@ -1388,6 +1388,10 @@ public class Tool {
       final String server = line.getOptionValue(
         Tool.server.getLongOpt(), "127.0.0.1" // defaults to local host
       );
+      final int port = Integer.parseInt(line.getOptionValue(
+        Tool.port.getLongOpt(), "9042"
+      ));
+
       final boolean connect = (
         line.hasOption(Tool.objects.getLongOpt())
         || line.hasOption(Tool.schemas.getLongOpt())
@@ -1396,6 +1400,7 @@ public class Tool {
       Tool.mgr = new StatementManagerImpl(
         Cluster
           .builder()
+          .withPort(port)
           .addContactPoint(server)
           .withQueryOptions(null),
         connect,
@@ -1433,7 +1438,7 @@ public class Tool {
           }
         }
       } finally {
-        Tool.mgr.close().get(); // shutdown and wait for its completion
+        Tool.mgr.close(); // shutdown and wait for its completion
       }
     } catch (Exception e) {
       System.err.print(
