@@ -21,10 +21,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import javax.json.JsonObject;
 
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.Row;
 import com.github.helenusdriver.driver.info.ClassInfo;
 import com.github.helenusdriver.persistence.Column;
 
@@ -47,6 +52,22 @@ public final class StatementBuilder {
    * @author paouelle
    */
   private StatementBuilder() {}
+
+  /**
+   * Gets a stream of the remaining rows for the specified result set.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  set the result set for which to get a stream of rows
+   * @return a stream of all remaining rows in the specified result set
+   * @throws NullPointerException if <code>set</code> is <code>null</code>
+   */
+  public static Stream<Row> stream(ResultSet set) {
+    return StreamSupport.stream(Spliterators.spliteratorUnknownSize(
+      set.iterator(),
+      Spliterator.ORDERED | Spliterator.IMMUTABLE | Spliterator.NONNULL
+    ), false);
+  }
 
   /**
    * Gets a class info structure that defines the specified POJO class.
