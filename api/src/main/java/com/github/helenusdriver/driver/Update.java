@@ -88,7 +88,7 @@ public interface Update<T>
    * @throws IllegalArgumentException if the condition reference a column not
    *         defined by the POJO
    */
-  public Conditions<T> onlyIf(Clause.Equality condition);
+  public Conditions<T> onlyIf(Clause condition);
 
   /**
    * Adds a conditions clause (IF) to this statement.
@@ -170,7 +170,7 @@ public interface Update<T>
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO
      */
-    public Conditions<T> onlyIf(Clause.Equality condition);
+    public Conditions<T> onlyIf(Clause condition);
   }
 
   /**
@@ -233,7 +233,7 @@ public interface Update<T>
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO
      */
-    public Conditions<T> onlyIf(Clause.Equality condition);
+    public Conditions<T> onlyIf(Clause condition);
   }
 
   /**
@@ -284,7 +284,7 @@ public interface Update<T>
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO
      */
-    public Conditions<T> onlyIf(Clause.Equality condition);
+    public Conditions<T> onlyIf(Clause condition);
   }
 
   /**
@@ -317,7 +317,7 @@ public interface Update<T>
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO
      */
-    public Conditions<T> and(Clause.Equality condition);
+    public Conditions<T> and(Clause condition);
 
     /**
      * Adds an assignment to the UPDATE statement those conditions are part of.

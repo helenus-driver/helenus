@@ -606,10 +606,10 @@ public class UpdateImpl<T>
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Update#onlyIf(com.github.helenusdriver.driver.Clause.Equality)
+   * @see com.github.helenusdriver.driver.Update#onlyIf(com.github.helenusdriver.driver.Clause)
    */
   @Override
-  public Conditions<T> onlyIf(Clause.Equality condition) {
+  public Conditions<T> onlyIf(Clause condition) {
     return conditions.and(condition);
   }
 
@@ -770,10 +770,10 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
-     * @see com.github.helenusdriver.driver.Update.Assignments#onlyIf(com.github.helenusdriver.driver.Clause.Equality)
+     * @see com.github.helenusdriver.driver.Update.Assignments#onlyIf(com.github.helenusdriver.driver.Clause)
      */
     @Override
-    public Conditions<T> onlyIf(Clause.Equality condition) {
+    public Conditions<T> onlyIf(Clause condition) {
       return statement.onlyIf(condition);
     }
   }
@@ -899,10 +899,10 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
-     * @see com.github.helenusdriver.driver.Update.Where#onlyIf(com.github.helenusdriver.driver.Clause.Equality)
+     * @see com.github.helenusdriver.driver.Update.Where#onlyIf(com.github.helenusdriver.driver.Clause)
      */
     @Override
-    public Conditions<T> onlyIf(Clause.Equality condition) {
+    public Conditions<T> onlyIf(Clause condition) {
       return statement.onlyIf(condition);
     }
   }
@@ -978,10 +978,10 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
-     * @see com.github.helenusdriver.driver.Update.Options#onlyIf(com.github.helenusdriver.driver.Clause.Equality)
+     * @see com.github.helenusdriver.driver.Update.Options#onlyIf(com.github.helenusdriver.driver.Clause)
      */
     @Override
-    public Conditions<T> onlyIf(Clause.Equality condition) {
+    public Conditions<T> onlyIf(Clause condition) {
       return statement.onlyIf(condition);
     }
   }
@@ -1031,10 +1031,10 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
-     * @see com.github.helenusdriver.driver.Update.Conditions#and(com.github.helenusdriver.driver.Clause.Equality)
+     * @see com.github.helenusdriver.driver.Update.Conditions#and(com.github.helenusdriver.driver.Clause)
      */
     @Override
-    public Conditions<T> and(Clause.Equality condition) {
+    public Conditions<T> and(Clause condition) {
       org.apache.commons.lang3.Validate.notNull(condition, "invalid null condition");
       org.apache.commons.lang3.Validate.isTrue(
         condition instanceof ClauseImpl,
