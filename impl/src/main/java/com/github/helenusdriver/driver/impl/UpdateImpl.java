@@ -89,6 +89,13 @@ public class UpdateImpl<T>
   private final ConditionsImpl<T> conditions;
 
   /**
+   * Flag indicating if the "IF EXISTS" option has been selected.
+   *
+   * @author paouelle
+   */
+  private volatile boolean ifExists;
+
+  /**
    * Instantiates a new <code>UpdateImpl</code> object.
    *
    * @author paouelle
@@ -495,7 +502,9 @@ public class UpdateImpl<T>
   private StringBuilder finishBuildingQueryString(
     TableInfoImpl<T> table, StringBuilder builder
   ) {
-    if (!conditions.conditions.isEmpty()) {
+    if (ifExists) {
+      builder.append(" IF EXISTS");
+    } else if (!conditions.conditions.isEmpty()) {
       // TODO: we need to also filter based on this table as there might not be any condition to set
       // let's first validate the condition for this table
       for (final ClauseImpl c: conditions.conditions) {
@@ -551,6 +560,20 @@ public class UpdateImpl<T>
     if (isCounterOp()) {
       builder.append(" COUNTER");
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Update#ifExists()
+   */
+  @Override
+  public Update<T> ifExists() {
+    this.ifExists = true;
+    setDirty();
+    return this;
   }
 
   /**
@@ -622,6 +645,10 @@ public class UpdateImpl<T>
    */
   @Override
   public Conditions<T> onlyIf() {
+    org.apache.commons.lang3.Validate.isTrue(
+      !ifExists,
+      "cannot combined additional conditions with IF EXISTS"
+    );
     return conditions;
   }
 
@@ -1033,9 +1060,14 @@ public class UpdateImpl<T>
      *
      * @see com.github.helenusdriver.driver.Update.Conditions#and(com.github.helenusdriver.driver.Clause)
      */
+    @SuppressWarnings("synthetic-access")
     @Override
     public Conditions<T> and(Clause condition) {
       org.apache.commons.lang3.Validate.notNull(condition, "invalid null condition");
+      org.apache.commons.lang3.Validate.isTrue(
+        !statement.ifExists,
+        "cannot combined additional conditions with IF EXISTS"
+      );
       org.apache.commons.lang3.Validate.isTrue(
         condition instanceof ClauseImpl,
         "unsupported class of clauses: %s",

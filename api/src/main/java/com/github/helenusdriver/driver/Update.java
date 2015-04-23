@@ -15,7 +15,6 @@
  */
 package com.github.helenusdriver.driver;
 
-
 /**
  * The <code>Update</code> interface extends the functionality of Cassandra's
  * {@link com.datastax.driver.core.querybuilder.Update} class to provide support
@@ -32,6 +31,22 @@ package com.github.helenusdriver.driver;
  */
 public interface Update<T>
   extends Statement<T>, BatchableStatement<Void, VoidFuture> {
+  /**
+   * Sets the 'IF EXISTS' option for this UPDATE statement.
+   * <p>
+   * An update with that option will not succeed unless the row exist at the
+   * time the update is executed.
+   * <p>
+   * Please keep in mind that using this option has a non negligible performance
+   * impact and should be avoided when possible and that no other 'if' conditions
+   * can be combined.
+   *
+   * @author paouelle
+   *
+   * @return this UPDATE statement.
+   */
+  public Update<T> ifExists();
+
   /**
    * Adds an assignment to this UPDATE statement.
    *
@@ -86,7 +101,8 @@ public interface Update<T>
    * @param  condition the condition to add.
    * @return the conditions of this query to which more conditions can be added.
    * @throws IllegalArgumentException if the condition reference a column not
-   *         defined by the POJO
+   *         defined by the POJO or if the {@link #ifExists} option was first
+   *         selected
    */
   public Conditions<T> onlyIf(Clause condition);
 
@@ -94,6 +110,8 @@ public interface Update<T>
    * Adds a conditions clause (IF) to this statement.
    *
    * @return the conditions of this query to which more conditions can be added.
+   * @throws IllegalArgumentException if the {@link #ifExists} option was first
+   *         selected
    */
   public Conditions<T> onlyIf();
 
@@ -168,7 +186,8 @@ public interface Update<T>
      * @return the conditions for the UPDATE statement those assignments are
      *         part of.
      * @throws IllegalArgumentException if the condition reference a column not
-     *         defined by the POJO
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
      */
     public Conditions<T> onlyIf(Clause condition);
   }
@@ -231,7 +250,8 @@ public interface Update<T>
      * @return the conditions for the UPDATE statement this WHERE clause is part
      *         of.
      * @throws IllegalArgumentException if the condition reference a column not
-     *         defined by the POJO
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
      */
     public Conditions<T> onlyIf(Clause condition);
   }
@@ -282,7 +302,8 @@ public interface Update<T>
      * @return the conditions for the UPDATE statement these options are part
      *         of.
      * @throws IllegalArgumentException if the condition reference a column not
-     *         defined by the POJO
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
      */
     public Conditions<T> onlyIf(Clause condition);
   }

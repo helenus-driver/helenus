@@ -75,7 +75,7 @@ public class InsertImpl<T>
   private final OptionsImpl<T> usings;
 
   /**
-   * Flag indicating if the "IF NOT EXIST" option has been selected.
+   * Flag indicating if the "IF NOT EXISTS" option has been selected.
    *
    * @author paouelle
    */
