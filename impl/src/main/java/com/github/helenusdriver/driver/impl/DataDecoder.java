@@ -163,7 +163,7 @@ public abstract class DataDecoder<V> {
         return null;
       }
       try {
-        return Class.forName(cname);
+        return DataDecoder.findClass(cname);
       } catch (ClassNotFoundException e) {
         throw new IllegalArgumentException(e);
       }
@@ -181,7 +181,7 @@ public abstract class DataDecoder<V> {
         return null;
       }
       try {
-        return Class.forName(cname);
+        return DataDecoder.findClass(cname);
       } catch (ClassNotFoundException e) {
         throw new IllegalArgumentException(e);
       }
@@ -695,6 +695,27 @@ public abstract class DataDecoder<V> {
    * @author paouelle
    */
   public final static DataDecoder<UUID> timeuuidToUUID = DataDecoder.uuidToUUID;
+
+  /**
+   * Finds and loads the specified class.
+   * <p>
+   * <i>Note:</i> This method is designed to use the thread context class loader
+   * if set; otherwise it falls back to the primordial class loader.
+   *
+   * @author paouelle
+   *
+   * @param  name the name of the class to find and load
+   * @return the corresponding non-<code>null</code> class
+   * @throws LinkageError if the linkage fails
+   * @throws ExceptionInInitializerError if the initialization provoked by this
+   *         method fails
+   * @throws ClassNotFoundException if the class cannot be located
+   */
+  public static Class<?> findClass(String name) throws ClassNotFoundException {
+    final ClassLoader otccl = Thread.currentThread().getContextClassLoader();
+
+    return (otccl != null) ? Class.forName(name, true, otccl) : Class.forName(name);
+  }
 
   /**
    * Gets a "list" to {@link List} decoder based on the given element class.

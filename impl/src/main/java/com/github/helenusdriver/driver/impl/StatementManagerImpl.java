@@ -308,7 +308,7 @@ public class StatementManagerImpl extends StatementManager {
     this(initializer, connect);
     if (cnames != null) {
       for (final String cname: cnames) {
-        final Class<?> clazz = Class.forName(cname);
+        final Class<?> clazz = DataDecoder.findClass(cname);
 
         org.apache.commons.lang3.Validate.isTrue(
           EntityFilter.class.isAssignableFrom(clazz),
