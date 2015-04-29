@@ -365,7 +365,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         !partitionKeyColumns.isEmpty(),
-        "%s must annotate one field as a partition primary key for table '%s'",
+        "pojo '%s' must annotate one field as a partition primary key for table '%s'",
         clazz.getSimpleName(),
         table.name()
       );
@@ -405,7 +405,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "@Table partition key '%s' not found in %s for table '%s'",
+        "@Table partition key '%s' not found in pojo '%s' for table '%s'",
         columnName,
         clazz.getSimpleName(),
         table.name()
@@ -422,7 +422,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "@Table clustering key '%s' not found in %s for table '%s'",
+        "@Table clustering key '%s' not found in pojo '%s' for table '%s'",
         columnName,
         clazz.getSimpleName(),
         table.name()
@@ -474,17 +474,27 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       }
       if (table == null) {
         throw new IllegalArgumentException(
-          "unexpected column name '" + name + "'"
+          "unexpected column name '"
+          + name
+          + "' for pojo '"
+          + clazz.getSimpleName()
+          + "'"
         );
       }
       throw new IllegalArgumentException(
-        "unexpected column name '" + name + "' in table '" + table.name() + "'"
+        "unexpected column name '"
+        + name
+        + "' in table '"
+        + table.name()
+        + "' for udt '"
+        + clazz.getSimpleName()
+        + "'"
       );
     }
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         columns.containsKey(n),
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -492,7 +502,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         columns.containsKey(n),
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -520,7 +530,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   void addNonPrimaryColumn(FieldInfoImpl<? extends T> col) {
     org.apache.commons.lang3.Validate.isTrue(
       cinfo instanceof RootClassInfoImpl,
-      "should not have been called for class '%s'", cinfo.getClass()
+      "should not have been called for class '%s'", cinfo.getClass().getName()
     );
     final FieldInfoImpl<T> old = columns.get(col.getColumnName());
 
@@ -533,14 +543,15 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       // check data type
       org.apache.commons.lang3.Validate.isTrue(
         old.getDataType().getType() == col.getDataType().getType(),
-        "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s'",
+        "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
         old.getDeclaringClass().getSimpleName(),
         old.getName(),
         old.getDataType().getType(),
         col.getDeclaringClass().getSimpleName(),
         col.getName(),
         col.getDataType().getType(),
-        name
+        name,
+        clazz.getSimpleName()
       );
       return;
     }
@@ -582,8 +593,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         if (table != null) {
           org.apache.commons.lang3.Validate.isTrue(
             !field.isMandatory(),
-            "missing mandatory column '%s' from table '%s'",
-            name, table.name()
+            "missing mandatory column '%s' from table '%s' in pojo '%s'",
+            name, table.name(), clazz.getSimpleName()
           );
           if (field.isPartitionKey() || field.isClusteringKey()) {
             if (field.isOptional()) {
@@ -592,6 +603,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
                 + name
                 + "' in table '"
                 + table.name()
+                + "' in pojo '"
+                + clazz.getSimpleName()
                 + "'"
               );
             }
@@ -600,19 +613,21 @@ public class TableInfoImpl<T> implements TableInfo<T> {
               + name
               + "' in table '"
               + table.name()
+              + "' in pojo '"
+              + clazz.getSimpleName()
               + "'"
             );
           }
           org.apache.commons.lang3.Validate.isTrue(
             !field.isTypeKey(),
-            "missing type key column '%s' from table '%s'",
-            name, table.name()
+            "missing type key column '%s' from table '%s' in pojo '%s'",
+            name, table.name(), clazz.getSimpleName()
           );
         } else {
           org.apache.commons.lang3.Validate.isTrue(
             !field.isMandatory(),
-            "missing mandatory column '%s'",
-            name
+            "missing mandatory column '%s' in udt '%s'",
+            name, clazz.getSimpleName()
           );
         }
       }
@@ -645,9 +660,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         value != null,
-        "missing partition key column '%s' from table '%s'",
+        "missing partition key column '%s' from table '%s' for pojop '%s'",
         name,
-        table.name()
+        table.name(),
+        clazz.getSimpleName()
       );
       values.put(name, value);
     }
@@ -700,9 +716,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         value != null,
-        "missing suffix or partition key column '%s' from table '%s'",
+        "missing suffix or partition key column '%s' from table '%s' for pojo '%s'",
         name,
-        table.name()
+        table.name(),
+        clazz.getSimpleName()
       );
       values.put(name, value);
     }
@@ -738,6 +755,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
             + name
             + "' in table '"
             + table.name()
+            + "' for pojo '"
+            + clazz.getSimpleName()
             + "'"
           );
         }
@@ -746,6 +765,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + name
           + "' in table '"
           + table.name()
+          + "' for pojo '"
+          + clazz.getSimpleName()
           + "'"
         );
       }
@@ -791,6 +812,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
             + name
             + "' in table '"
             + table.name()
+            + "' for pojo '"
+            + clazz.getSimpleName()
             + "'"
           );
         }
@@ -799,6 +822,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + name
           + "' in table '"
           + table.name()
+          + "' for pojo '"
+          + clazz.getSimpleName()
           + "'"
         );
       }
@@ -841,9 +866,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         value != null,
-        "missing suffix or primary key column '%s' from table '%s'; null value",
+        "missing suffix or primary key column '%s' from table '%s' for pojo '%s'; null value",
         name,
-        table.name()
+        table.name(),
+        clazz.getSimpleName()
       );
       values.put(name, value);
     }
@@ -875,8 +901,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         if (table != null) {
           org.apache.commons.lang3.Validate.isTrue(
             !field.isMandatory(),
-            "missing mandatory column '%s' from table '%s'",
-            name, table.name()
+            "missing mandatory column '%s' from table '%s' for pojo '%s'",
+            name, table.name(), clazz.getSimpleName()
           );
           if (field.isPartitionKey() || field.isClusteringKey()) {
             if (field.isOptional()) {
@@ -885,6 +911,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
                 + name
                 + "' in table '"
                 + table.name()
+                + "' for pojo '"
+                + clazz.getSimpleName()
                 + "'"
               );
             }
@@ -893,19 +921,21 @@ public class TableInfoImpl<T> implements TableInfo<T> {
               + name
               + "' in table '"
               + table.name()
+              + "' for pojo '"
+              + clazz.getSimpleName()
               + "'"
             );
           }
           org.apache.commons.lang3.Validate.isTrue(
             !field.isTypeKey(),
-            "missing type key column '%s' from table '%s'",
-            name, table.name()
+            "missing type key column '%s' from table '%s' for pojo '%s'",
+            name, table.name(), clazz.getSimpleName()
           );
         } else {
           org.apache.commons.lang3.Validate.isTrue(
             !field.isMandatory(),
-            "missing mandatory column '%s'",
-            name
+            "missing mandatory column '%s' for udt '%s'",
+            name, clazz.getSimpleName()
           );
         }
       }
@@ -938,15 +968,16 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       if (table != null) {
         org.apache.commons.lang3.Validate.isTrue(
           !(field.isMandatory() && (value == null)),
-          "missing mandatory column '%s' from table '%s'",
+          "missing mandatory column '%s' from table '%s' for pojo '%s'",
           name,
-          table.name()
+          table.name(),
+          clazz.getSimpleName()
         );
       } else {
         org.apache.commons.lang3.Validate.isTrue(
           !(field.isMandatory() && (value == null)),
-          "missing mandatory column '%s'",
-          name
+          "missing mandatory column '%s' for udt '%s'",
+          name, clazz.getSimpleName()
         );
       }
       values.put(name, value);
@@ -979,7 +1010,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -987,7 +1018,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -998,8 +1029,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       if (table != null) {
         org.apache.commons.lang3.Validate.isTrue(
           !field.isMandatory(),
-          "missing mandatory column '%s' in table '%s'",
-          n, table.name()
+          "missing mandatory column '%s' in table '%s' for pojo '%s'",
+          n, table.name(), clazz.getSimpleName()
         );
         if (field.isPartitionKey() || field.isClusteringKey()) {
           if (field.isOptional()) {
@@ -1008,6 +1039,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
               + n
               + "' in table '"
               + table.name()
+              + "' for pojo '"
+              + clazz.getSimpleName()
               + "'"
             );
           }
@@ -1016,19 +1049,21 @@ public class TableInfoImpl<T> implements TableInfo<T> {
             + n
             + "' in table '"
             + table.name()
+            + "' for pojo '"
+            + clazz.getSimpleName()
             + "'"
           );
         }
         org.apache.commons.lang3.Validate.isTrue(
           !field.isTypeKey(),
-          "missing type key column '%s' in table '%s'",
-          n, table.name()
+          "missing type key column '%s' in table '%s' for pojo '%s'",
+          n, table.name(), clazz.getSimpleName()
         );
       } else {
         org.apache.commons.lang3.Validate.isTrue(
           !field.isMandatory(),
-          "missing mandatory column '%s'",
-          n
+          "missing mandatory column '%s' for udt '%s'",
+          n, clazz.getSimpleName()
         );
       }
     }
@@ -1718,7 +1753,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         !mandatoryAndPrimaryKeyColumns.containsKey(n),
-        "%s defines mandatory or primary key column '%s' in table '%s'",
+        "pojo '%s' defines mandatory or primary key column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -1726,7 +1761,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         !mandatoryAndPrimaryKeyColumns.containsKey(n),
-        "%s defines mandatory column '%s'",
+        "udt '%s' defines mandatory column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -1771,14 +1806,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
       );
       org.apache.commons.lang3.Validate.isTrue(
         field.isPartitionKey() || field.isClusteringKey() || field.isIndex(),
-        "%s doesn't define primary key or index column '%s' in table '%s'",
+        "pojo '%s' doesn't define primary key or index column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -1786,7 +1821,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -1835,14 +1870,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column or suffix key '%s' in table '%s'",
+        "pojo '%s' doesn't define column or suffix key '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
       );
       org.apache.commons.lang3.Validate.isTrue(
         field.isPartitionKey() || field.isClusteringKey() || field.isSuffixKey() || field.isIndex(),
-        "%s doesn't define suffix key, primary key, or index column '%s' in table '%s'",
+        "pojo '%s' doesn't define suffix key, primary key, or index column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -1850,7 +1885,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -1894,14 +1929,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
       );
       org.apache.commons.lang3.Validate.isTrue(
         field.isCounter(),
-        "%s doesn't define counter column '%s' in table '%s'",
+        "pojo '%s' doesn't define counter column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -1909,7 +1944,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -1943,7 +1978,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -1951,7 +1986,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -1992,7 +2027,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column or suffix key '%s' in table '%s'",
+        "pojo '%s' doesn't define column or suffix key '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2000,7 +2035,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -2037,7 +2072,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2045,7 +2080,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -2089,7 +2124,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2097,7 +2132,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -2139,7 +2174,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2147,7 +2182,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -2188,7 +2223,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2196,7 +2231,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
@@ -2235,7 +2270,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s' in table '%s'",
+        "pojo '%s' doesn't define column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2243,7 +2278,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define column '%s'",
+        "udt '%s' doesn't define column '%s'",
         clazz.getSimpleName(),
         n
       );
