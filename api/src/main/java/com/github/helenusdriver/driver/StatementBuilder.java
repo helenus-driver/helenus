@@ -37,6 +37,10 @@ import com.github.helenusdriver.persistence.Column;
  * The <code>StatementBuilder</code> class extends the functionality of Cassandra's
  * {@link com.datastax.driver.core.querybuilder.QueryBuilder} class in order to
  * provide support for POJOs.
+ * <p>
+ * The Helenus driver will take advantage of the {@link Thread#getContextClassLoader}
+ * method to retrieve a class loader to use when it needs to find classes. If not
+ * available, it will fallback to using {@link Class#forName(String)} directly.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
