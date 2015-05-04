@@ -138,7 +138,7 @@ public abstract class Utils {
     return sb;
   }
 
-  // Returns null if it's not really serializable (function call, bind markers, ...)
+  // Returns false if it's not really serializable (function call, bind markers, ...)
   public static boolean isSerializable(Object value) {
     if ((value instanceof BindMarker)
         || (value instanceof com.datastax.driver.core.querybuilder.BindMarker)
@@ -155,9 +155,8 @@ public abstract class Utils {
     return true;
   }
 
-
-  public static StringBuilder appendValue(Object value, StringBuilder sb, List<Object> variables) {
-    if ((variables == null) || !isSerializable(value)) {
+  static StringBuilder appendValue(Object value, StringBuilder sb, List<Object> variables) {
+    if (variables == null || !isSerializable(value)) {
       return appendValue(value, sb);
     }
     sb.append('?');
@@ -220,7 +219,7 @@ public abstract class Utils {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         value instanceof String,
-        "invalid value %s of type unknown to the statement builder%s",
+        "invalid value %s of type unknown to the statement builder: %s",
         value,
         !(value instanceof byte[])
           ? ""
@@ -303,13 +302,13 @@ public abstract class Utils {
     }
   }
 
-  static StringBuilder appendCollection(Object value, StringBuilder sb) {
-    if (!isSerializable(value)) {
+  static StringBuilder appendCollection(Object value, StringBuilder sb, List<Object> variables) {
+    if (variables == null || !isSerializable(value)) {
       boolean wasCollection = appendValueIfCollection(value, sb);
       assert wasCollection;
     } else {
       sb.append('?');
-      //variables.add(value);
+      variables.add(value);
     }
     return sb;
   }
@@ -431,10 +430,6 @@ public abstract class Utils {
            && !(value instanceof CName)
            && !(value instanceof BindMarker)
            && !(value instanceof com.datastax.driver.core.querybuilder.BindMarker);
-  }
-
-  static String toRawString(Object value) {
-    return appendValue(value, new StringBuilder()).toString();
   }
 
   public static StringBuilder appendName(String name, StringBuilder sb) {

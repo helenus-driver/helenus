@@ -755,7 +755,7 @@ public abstract class AssignmentImpl
       Utils.appendName(name, sb).append(isAdd ? "+" : "-");
       final FieldInfoImpl<?> finfo = tinfo.getColumn(name);
 
-      Utils.appendCollection(finfo.encodeValue(collection), sb);
+      Utils.appendCollection(finfo.encodeValue(collection), sb, null);
     }
 
     /**
