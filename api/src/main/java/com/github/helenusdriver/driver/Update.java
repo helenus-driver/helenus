@@ -151,6 +151,16 @@ public interface Update<T>
     public Assignments<T> and(Assignment... assignments);
 
     /**
+     * Checks if there are no assignments registered with this UPDATE statement.
+     *
+     * @author paouelle
+     *
+     * @return <code>true</code> if there are no assignments registered;
+     *         <code>false</code> otherwise
+     */
+    public boolean isEmpty();
+
+    /**
      * Adds a WHERE clause to the UPDATE statement those assignments are part
      * of.
      *

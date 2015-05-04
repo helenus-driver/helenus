@@ -282,7 +282,7 @@ public class UpdateImpl<T>
     // TBR: final String mkname = (multiKey != null) ? multiKey.getColumnName() : null;
     AssignmentsImpl<T> assignments = this.assignments;
 
-    if (assignments.assignments.isEmpty()) {
+    if (assignments.isEmpty()) {
       // if it is empty then fallback to all non-primary columns
       assignments = (AssignmentsImpl<T>)new AssignmentsImpl<>(this).and(
         new AssignmentImpl.DelayedSetAllAssignmentImpl()
@@ -766,6 +766,18 @@ public class UpdateImpl<T>
         setDirty();
       }
       return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Update.Assignments#isEmpty()
+     */
+    @Override
+    public boolean isEmpty() {
+      return assignments.isEmpty();
     }
 
     /**
