@@ -770,7 +770,15 @@ public abstract class AssignmentImpl
       if (ctype == DataType.MAP) {
         table.validateMapColumnAndKeyValues(name, (Map<?, ?>)collection);
       } else {
-        table.validateCollectionColumnAndValues(name, ctype, (Collection<?>)collection);
+        final FieldInfoImpl<?> finfo = table.getColumn(name);
+
+        if ((finfo != null) && (finfo.getDataType().getType() == DataType.MAP)) {
+          table.validateMapColumnAndKeys(name, (Collection<?>)collection);
+        } else {
+          table.validateCollectionColumnAndValues(
+            name, ctype, (Collection<?>)collection
+          );
+        }
       }
     }
   }

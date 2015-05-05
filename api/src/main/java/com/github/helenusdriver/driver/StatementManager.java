@@ -1336,28 +1336,31 @@ public abstract class StatementManager {
   protected abstract Assignment addAll(CharSequence name, Set<?> values);
 
   /**
-   * Remove a value from a set column.
+   * Remove a value from a set column or a mapping from a map column.
    * <p>
    * This will generate: {@code name = name - value}}.
    *
    * @author paouelle
    *
    * @param  name the column name (must be of type set).
-   * @param  value the value to remove
+   * @param  value the value to remove from the set or the key to remove from
+   *         the map
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Assignment remove(CharSequence name, Object value);
 
   /**
-   * Remove a set of values from a set column.
+   * Remove a set of values from a set column or a set of mappings from a map
+   * column.
    * <p>
    * This will generate: {@code name = name - set}.
    *
    * @author paouelle
    *
    * @param  name the column name (must be of type set).
-   * @param  values the set of values to remove
+   * @param  values the set of values to remove from the set or the set of keys
+   *         to remove from the map
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> or <code>values</code> is
    *         <code>null</code>

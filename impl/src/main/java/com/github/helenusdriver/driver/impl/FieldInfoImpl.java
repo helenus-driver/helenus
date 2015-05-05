@@ -1336,6 +1336,19 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   public void validateMapKeyValue(Object key, Object value) {
     validateCollectionValue(DataType.MAP, value);
+    validateMapKey(key);
+  }
+
+  /**
+   * Validate the provided mapping key for this map field.
+   *
+   * @author paouelle
+   *
+   * @param  key the mapping key to be validated
+   * @throws IllegalArgumentException if the specified key is not
+   *         of the right mapping types
+   */
+  public void validateMapKey(Object key) {
     final CQLDataType ktype = definition.getArgumentTypes().get(0); // #0 is the data type for the key
 
     org.apache.commons.lang3.Validate.isTrue(

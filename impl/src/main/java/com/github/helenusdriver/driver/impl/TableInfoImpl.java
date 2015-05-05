@@ -2289,6 +2289,54 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
+   * Validates if a column is defined as a map by the POJO and its potential
+   * mapping keys in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  keys the mappings keys to be validated for the map
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not defined
+   *         by the POJO as a map or if the specified keys are not of
+   *         the right mapping types
+   */
+  public void validateMapColumnAndKeys(
+    CharSequence name, Collection<?> keys
+  ) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        validateMapColumnAndKeys(n, keys); // recurse to validate
+      }
+      return;
+    }
+    org.apache.commons.lang3.Validate.notNull(keys, "invalid null collection of keys");
+    final String n = name.toString();
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    for (final Object key: keys) {
+      field.validateMapKey(key);
+    }
+  }
+
+  /**
    * Gets all user-defined types the pojo class represented by this table is
    * dependent on.
    *
