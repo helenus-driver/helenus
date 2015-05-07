@@ -383,6 +383,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       // primitive types for fields must be mandatory since null is not possible
       field.getType().isPrimitive() || (field.getAnnotation(Mandatory.class) != null)
     );
+    org.apache.commons.lang3.Validate.isTrue(
+      !isOptional || !mandatory,
+      "field cannot be annotated with @Mandatory if it is optional: %s.%s",
+      declaringClass.getName(),
+      field.getName()
+    );
     final Map<String, Column> columns
       = ReflectionUtils.getAnnotationsByType(String.class, Column.class, field);
     final Map<String, Index> indexes
