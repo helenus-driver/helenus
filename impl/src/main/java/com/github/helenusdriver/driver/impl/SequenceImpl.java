@@ -16,16 +16,21 @@
 package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
-import com.datastax.driver.core.RegularStatement;
-import com.google.common.util.concurrent.ListenableFuture;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import com.datastax.driver.core.RegularStatement;
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.SequenceableStatement;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.VoidFuture;
+import com.github.helenusdriver.util.Inhibit;
+import com.github.helenusdriver.util.function.ERunnable;
+import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * The <code>SequenceImpl</code> class defines support for a statement that
@@ -43,11 +48,25 @@ public class SequenceImpl
   extends SequenceStatementImpl<Void, VoidFuture, Void>
   implements Sequence {
   /**
+   * Holds the logger.
+   *
+   * @author paouelle
+   */
+  private final static Logger logger = LogManager.getFormatterLogger(SequenceImpl.class);
+
+  /**
    * Holds the statements to be sequenced together.
    *
    * @author paouelle
    */
   private final List<StatementImpl<?, ?, ?>> statements;
+
+  /**
+   * Holds the registered error handlers.
+   *
+   * @author paouelle
+   */
+  private final List<ERunnable<?>> errorHandlers;
 
   /**
    * Instantiates a new <code>SequenceImpl</code> object.
@@ -70,6 +89,7 @@ public class SequenceImpl
     for (final SequenceableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -93,6 +113,7 @@ public class SequenceImpl
     for (final SequenceableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -244,5 +265,43 @@ public class SequenceImpl
   @Override
   public Sequence add(RegularStatement statement) {
     return add(new SimpleStatementImpl(statement, mgr, bridge));
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Sequence#addErrorHandler(ERunnable)
+   */
+  @Override
+  public Sequence addErrorHandler(ERunnable<?> run) {
+    org.apache.commons.lang3.Validate.notNull(run, "invalid null error handler");
+    errorHandlers.add(run);
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Sequence#runErrorHandlers()
+   */
+  @SuppressWarnings("unchecked")
+  @Override
+  public void runErrorHandlers() {
+    for (final ERunnable<?> run: errorHandlers) {
+      Inhibit.throwables((ERunnable<Throwable>)run, t -> logger.catching(t));
+    }
+    // now recurse in contained sequences and batches that have been added
+    statements.stream()
+      .forEach(s -> {
+        if (s instanceof BatchImpl) {
+          ((BatchImpl)s).runErrorHandlers();
+        } else if (s instanceof SequenceImpl) {
+          ((SequenceImpl)s).runErrorHandlers();
+        }
+      });
   }
 }

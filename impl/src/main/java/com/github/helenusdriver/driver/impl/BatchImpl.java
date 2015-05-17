@@ -16,17 +16,22 @@
 package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
-import com.datastax.driver.core.RegularStatement;
-import com.google.common.util.concurrent.AbstractFuture;
-import com.google.common.util.concurrent.ListenableFuture;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import com.datastax.driver.core.RegularStatement;
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.BatchableStatement;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.Using;
 import com.github.helenusdriver.driver.VoidFuture;
+import com.github.helenusdriver.util.Inhibit;
+import com.github.helenusdriver.util.function.ERunnable;
+import com.google.common.util.concurrent.AbstractFuture;
+import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * The <code>BatchImpl</code> class extends the functionality of Cassandra's
@@ -44,11 +49,25 @@ public class BatchImpl
   extends StatementImpl<Void, VoidFuture, Void>
   implements Batch {
   /**
+   * Holds the logger.
+   *
+   * @author paouelle
+   */
+  private final static Logger logger = LogManager.getFormatterLogger(BatchImpl.class);
+
+  /**
    * Holds the statements to be batched together.
    *
    * @author paouelle
    */
   private final List<StatementImpl<?, ?, ?>> statements;
+
+  /**
+   * Holds the registered error handlers.
+   *
+   * @author paouelle
+   */
+  private final List<ERunnable<?>> errorHandlers;
 
   /**
    * Flag indicating if batches were added to this batch.
@@ -100,6 +119,7 @@ public class BatchImpl
     for (final BatchableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -131,6 +151,7 @@ public class BatchImpl
     for (final BatchableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -145,6 +166,7 @@ public class BatchImpl
     this.statements = new ArrayList<>(b.statements);
     this.logged = b.logged;
     this.usings = new OptionsImpl(this, b.usings);
+    this.errorHandlers = new LinkedList<>(b.errorHandlers);
   }
 
   /**
@@ -394,6 +416,39 @@ public class BatchImpl
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Batch#addErrorHandler(ERunnable)
+   */
+  @Override
+  public Batch addErrorHandler(ERunnable<?> run) {
+    org.apache.commons.lang3.Validate.notNull(run, "invalid null error handler");
+    errorHandlers.add(run);
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Batch#runErrorHandlers()
+   */
+  @SuppressWarnings("unchecked")
+  @Override
+  public void runErrorHandlers() {
+    for (final ERunnable<?> run: errorHandlers) {
+      Inhibit.throwables((ERunnable<Throwable>)run, t -> logger.catching(t));
+    }
+    // now recurse in contained batches that have been added
+    statements.stream()
+      .filter(s -> s instanceof BatchImpl)
+      .forEach(s -> ((BatchImpl)s).runErrorHandlers());
+  }
+
+  /**
    * Adds a new options for this BATCH statement.
    *
    * @author paouelle
@@ -507,6 +562,18 @@ public class BatchImpl
     @Override
     public Batch add(RegularStatement statement) {
       return this.statement.add(statement);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Batch.Options#addErrorHandler(ERunnable)
+     */
+    @Override
+    public Batch addErrorHandler(ERunnable<?> run) {
+      return this.statement.addErrorHandler(run);
     }
   }
 }

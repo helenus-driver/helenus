@@ -15,6 +15,7 @@
  */
 package com.github.helenusdriver.driver;
 
+import com.github.helenusdriver.util.function.ERunnable;
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -136,6 +137,33 @@ public interface Batch
   public Batch add(com.datastax.driver.core.RegularStatement statement);
 
   /**
+   * Registers an error handler with this batch. Error handlers are simply
+   * attached to the batch and must be specifically executed via the
+   * {@link #runErrorHandlers} method by the user when an error occurs either
+   * from the execution of the batch of before executing the batch to make sure
+   * that allocated resources can be properly released if no longer required.
+   *
+   * @author paouelle
+   *
+   * @param  run the error handler to register
+   * @return this batch
+   * @throws NullPointerException if <code>run</code> is <code>null</code>
+   */
+  public Batch addErrorHandler(ERunnable<?> run);
+
+  /**
+   * Runs all registered error handlers in sequence from the current thread. This
+   * method will recursively runs all registered error handlers in batches that
+   * have been added to this batch.
+   * <p>
+   * <i>Note:</i> Errors thrown out of the error handlers will not be
+   * propagated up.
+   *
+   * @author paouelle
+   */
+  public void runErrorHandlers();
+
+  /**
    * Adds a new options for this BATCH statement.
    *
    * @author paouelle
@@ -211,5 +239,20 @@ public interface Batch
      *         "batch" statement
      */
     public Batch add(com.datastax.driver.core.RegularStatement statement);
+
+    /**
+     * Registers an error handler with this batch. Error handlers are simply
+     * attached to the batch and must be specifically executed via the
+     * {@link #runErrorHandlers} method by the user when an error occurs either
+     * from the execution of the batch of before executing the batch to make sure
+     * that allocated resources can be properly released if no longer required.
+     *
+     * @author paouelle
+     *
+     * @param  run the error handler to register
+     * @return this batch
+     * @throws NullPointerException if <code>run</code> is <code>null</code>
+     */
+    public Batch addErrorHandler(ERunnable<?> run);
   }
 }

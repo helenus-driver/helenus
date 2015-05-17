@@ -17,6 +17,7 @@ package com.github.helenusdriver.driver;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
+import com.github.helenusdriver.util.function.ERunnable;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
@@ -99,6 +100,33 @@ public interface Sequence
    * @throws NullPointerException if <code>statement</code> is <code>null</code>
    */
   public Sequence add(com.datastax.driver.core.RegularStatement statement);
+
+  /**
+   * Registers an error handler with this sequence. Error handlers are simply
+   * attached to the sequence and must be specifically executed via the
+   * {@link #runErrorHandlers} method by the user when an error occurs either
+   * from the execution of the sequence of before executing the sequence to make
+   * sure that allocated resources can be properly released if no longer required.
+   *
+   * @author paouelle
+   *
+   * @param  run the error handler to register
+   * @return this sequence
+   * @throws NullPointerException if <code>run</code> is <code>null</code>
+   */
+  public Sequence addErrorHandler(ERunnable<?> run);
+
+  /**
+   * Runs all registered error handlers in sequence from the current thread. This
+   * method will recursively runs all registered error handlers in sequences and
+   * batches that have been added to this sequence.
+   * <p>
+   * <i>Note:</i> Errors thrown out of the error handlers will not be
+   * propagated up.
+   *
+   * @author paouelle
+   */
+  public void runErrorHandlers();
 
   /**
    * {@inheritDoc}
