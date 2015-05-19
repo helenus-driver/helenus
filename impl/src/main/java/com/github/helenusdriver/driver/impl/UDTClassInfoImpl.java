@@ -217,10 +217,10 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      *
      * @author paouelle
      *
-     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnValues(java.lang.String)
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getNonPrimaryKeyColumnValues(String tname) {
+    public Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 

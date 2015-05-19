@@ -1389,7 +1389,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Retrieves the field's value from the specified POJO.
+   * Retrieves the field's encoded value from the specified POJO.
    *
    * @author paouelle
    *
@@ -1416,7 +1416,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Retrieves the field's value from the specified POJO.
+   * Retrieves the field's encoded value from the specified POJO.
    *
    * @author paouelle
    *

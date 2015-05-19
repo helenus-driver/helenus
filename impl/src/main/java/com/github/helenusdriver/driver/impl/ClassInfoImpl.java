@@ -497,8 +497,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Retrieves all non primary key columns and their values from the POJO
-     * from the specified table.
+     * Retrieves all non primary key columns and their non-encoded values from
+     * the POJO from the specified table.
      * <p>
      * <i>Note:</i> The returned values should not be encoded.
      *
@@ -506,20 +506,42 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *
      * @param  tname the name of the table from which to retrieve columns
      * @return a non-<code>null</code> map of all non primary key column/value
-     *         pairs for the POJO
+     *         (non-encoded) pairs for the POJO
      * @throws IllegalArgumentException if a mandatory column is missing from
      *         the POJO
      */
-    public Map<String, Object> getNonPrimaryKeyColumnValues(String tname) {
+    public Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getNonPrimaryKeyColumnValues(object);
+      return table.getNonPrimaryKeyColumnNonEncodedValues(object);
     }
 
     /**
+     * Retrieves the specified column non-encoded value from the POJO and the
+     * specified table.
+     *
+     * @author paouelle
+     *
+     * @param  tname the name of the table from which to retrieve the column
+     * @param  name the name of the column to retrieve
+     * @return the column non-encoded value for the POJO
+     * @throws IllegalArgumentException if the column name is not defined by the
+     *         POJO or is mandatory and missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a column's value
+     */
+    public Object getColumnNonEncodedValue(String tname, CharSequence name) {
+      final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
+
+      if (table == null) { // table not defined so nothing to return
+        return Collections.emptyMap();
+      }
+      return table.getColumnNonEncodedValue(object, name);
+    }
+
+   /**
      * Retrieves the specified column value from the POJO and the specified
      * table.
      *

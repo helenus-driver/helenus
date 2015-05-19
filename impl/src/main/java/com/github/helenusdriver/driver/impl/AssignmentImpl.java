@@ -354,7 +354,7 @@ public abstract class AssignmentImpl
         return Collections.emptyList();
       }
       return (List<AssignmentImpl>)(List)Arrays.asList(
-        new SetAssignmentImpl(name, context.getColumnValue(table.getName(), name))
+        new SetAssignmentImpl(name, context.getColumnNonEncodedValue(table.getName(), name))
       );
     }
 
@@ -453,7 +453,7 @@ public abstract class AssignmentImpl
         // get a POJO context for the POJO passed on the setAllFrom()
         context = context.getClassInfo().newContext((T)object);
       }
-      for (final Map.Entry<String, Object> e: context.getNonPrimaryKeyColumnValues(
+      for (final Map.Entry<String, Object> e: context.getNonPrimaryKeyColumnNonEncodedValues(
         table.getName()
       ).entrySet()) {
         assignments.add(new SetAssignmentImpl(e.getKey(), e.getValue()));

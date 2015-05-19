@@ -304,11 +304,11 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnValues(java.lang.String)
+     * @see com.github.helenusdriver.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getNonPrimaryKeyColumnValues(String tname) {
-      return tcontext.getNonPrimaryKeyColumnValues(tname);
+    public Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
+      return tcontext.getNonPrimaryKeyColumnNonEncodedValues(tname);
     }
 
     /**

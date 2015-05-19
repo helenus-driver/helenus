@@ -945,7 +945,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Retrieves all non primary key columns and their values from the POJO.
+   * Retrieves all non primary key columns and their non-encoded values from
+   * the POJO.
    * <p>
    * <i>Note:</i> The returned values should not be encoded.
    *
@@ -953,11 +954,11 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all non primary key column/value
-   *         pairs for the POJO
+   *         (non-encoded) pairs for the POJO
    * @throws IllegalArgumentException if a mandatory column is missing from
    *         the POJO
    */
-  Map<String, Object> getNonPrimaryKeyColumnValues(T object) {
+  Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(T object) {
     final Map<String, Object> values = new LinkedHashMap<>(nonPrimaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: nonPrimaryKeyColumns.entrySet()) {
@@ -1024,6 +1025,91 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       );
     }
     final Object value = field.getValue(object);
+
+    if (value == null) {
+      if (table != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isMandatory(),
+          "missing mandatory column '%s' in table '%s' for pojo '%s'",
+          n, table.name(), clazz.getSimpleName()
+        );
+        if (field.isPartitionKey() || field.isClusteringKey()) {
+          if (field.isOptional()) {
+            throw new EmptyOptionalPrimaryKeyException(
+              "missing primary key column '"
+              + n
+              + "' in table '"
+              + table.name()
+              + "' for pojo '"
+              + clazz.getSimpleName()
+              + "'"
+            );
+          }
+          throw new IllegalArgumentException(
+            "missing primary key column '"
+            + n
+            + "' in table '"
+            + table.name()
+            + "' for pojo '"
+            + clazz.getSimpleName()
+            + "'"
+          );
+        }
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isTypeKey(),
+          "missing type key column '%s' in table '%s' for pojo '%s'",
+          n, table.name(), clazz.getSimpleName()
+        );
+      } else {
+        org.apache.commons.lang3.Validate.isTrue(
+          !field.isMandatory(),
+          "missing mandatory column '%s' for udt '%s'",
+          n, clazz.getSimpleName()
+        );
+      }
+    }
+    return value;
+  }
+
+  /**
+   * Retrieves the specified column non-encoded value from the POJO.
+   *
+   * @author paouelle
+   *
+   * @param  object the non-<code>null</code> POJO object
+   * @param  name the name of the column to retrieve
+   * @return the column non-encoded value for the POJO
+   * @throws IllegalArgumentException if the column name is not defined by the
+   *         POJO or is mandatory and missing from the POJO
+   * @throws ColumnPersistenceException if unable to persist a column's value
+   */
+  Object getColumnNonEncodedValue(T object, CharSequence name) {
+    final String n;
+
+    if (name instanceof Utils.CNameSequence) {
+      n = ((Utils.CNameSequence)name).getName();
+    } else {
+      n = name.toString();
+    }
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    final Object value = field.getNonEncodedValue(object);
 
     if (value == null) {
       if (table != null) {
