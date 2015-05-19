@@ -1119,6 +1119,7 @@ abstract class ElementConverter {
    *
    * @param  re the non-<code>null</code> row element to convert
    * @return the converted object
+   * @throws IllegalArgumentException if unable to convert the row element
    */
   public abstract Object convert(Object re);
 
@@ -1159,6 +1160,17 @@ abstract class ElementConverter {
         @Override
         public Object convert(Object re) {
           return Enum.valueOf(eclass, (String)re);
+        }
+      };
+    } else if (Class.class.isAssignableFrom(eclass) && (String.class == reclass)) {
+      return new ElementConverter() {
+        @Override
+        public Object convert(Object re) {
+          try {
+            return DataDecoder.findClass((String)re);
+          } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException(e);
+          }
         }
       };
     } else if (Locale.class.isAssignableFrom(eclass) && (String.class == reclass)) {
