@@ -524,6 +524,18 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
+   * Gets the POJO object associated with this statement or <code>null</code>
+   * if this statement is not associated with a POJO object.
+   *
+   * @author paouelle
+   *
+   * @return the POJO object if associated with one
+   */
+  public T getObject() {
+    return (pojoContext != null) ? pojoContext.getObject() : null;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle

@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -54,11 +55,11 @@ import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.CreateTable;
 import com.github.helenusdriver.driver.CreateType;
-import com.github.helenusdriver.driver.Delete;
 import com.github.helenusdriver.driver.Delete.Builder;
 import com.github.helenusdriver.driver.Insert;
 import com.github.helenusdriver.driver.KeyspaceWith;
 import com.github.helenusdriver.driver.Ordering;
+import com.github.helenusdriver.driver.Recorder;
 import com.github.helenusdriver.driver.RegularStatement;
 import com.github.helenusdriver.driver.Select;
 import com.github.helenusdriver.driver.Select.Selection;
@@ -510,24 +511,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#delete(java.lang.Class, java.lang.String[])
+   * @see com.github.helenusdriver.driver.StatementManager#batch(java.util.Optional, com.github.helenusdriver.driver.BatchableStatement[])
    */
   @Override
-  protected <T> Delete.Builder<T> delete(Class<T> clazz, String... columns) {
-    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
-    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
-
-    org.apache.commons.lang3.Validate.isTrue(
-      cinfo.supportsTablesAndIndexes(),
-      "unsupported %s POJO class '%s' for a delete statement",
-      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
-    );
-    return new DeleteImpl.BuilderImpl<>(
-      cinfo.newContext(),
-      Arrays.asList((Object[])columns),
-      this,
-      bridge
-    );
+  protected Batch batch(Optional<Recorder> recorder, BatchableStatement<?, ?>... statements) {
+    return new BatchImpl(recorder, statements, true, this, bridge);
   }
 
   /**
@@ -535,35 +523,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#delete(java.lang.Class)
+   * @see com.github.helenusdriver.driver.StatementManager#batch(java.util.Optional, java.lang.Iterable)
    */
   @Override
-  protected <T> Delete.Selection<T> delete(Class<T> clazz) {
-    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
-    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
-
-    org.apache.commons.lang3.Validate.isTrue(
-      cinfo.supportsTablesAndIndexes(),
-      "unsupported %s POJO class '%s' for a delete statement",
-      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
-    );
-    return new DeleteImpl.SelectionImpl<>(
-      cinfo.newContext(),
-      this,
-      bridge
-    );
-  };
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see com.github.helenusdriver.driver.StatementManager#batch(com.github.helenusdriver.driver.BatchableStatement[])
-   */
-  @Override
-  protected Batch batch(BatchableStatement<?, ?>... statements) {
-    return new BatchImpl(statements, true, this, bridge);
+  protected Batch batch(Optional<Recorder> recorder, Iterable<BatchableStatement<?, ?>> statements) {
+    return new BatchImpl(recorder, statements, true, this, bridge);
   }
 
   /**
@@ -571,11 +535,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#batch(java.lang.Iterable)
+   * @see com.github.helenusdriver.driver.StatementManager#unloggedBatch(java.util.Optional, com.github.helenusdriver.driver.BatchableStatement[])
    */
   @Override
-  protected Batch batch(Iterable<BatchableStatement<?, ?>> statements) {
-    return new BatchImpl(statements, true, this, bridge);
+  protected Batch unloggedBatch(Optional<Recorder> recorder, BatchableStatement<?, ?>... statements) {
+    return new BatchImpl(recorder, statements, false, this, bridge);
   }
 
   /**
@@ -583,23 +547,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#unloggedBatch(com.github.helenusdriver.driver.BatchableStatement[])
+   * @see com.github.helenusdriver.driver.StatementManager#unloggedBatch(java.util.Optional, java.lang.Iterable)
    */
   @Override
-  protected Batch unloggedBatch(BatchableStatement<?, ?>... statements) {
-    return new BatchImpl(statements, false, this, bridge);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see com.github.helenusdriver.driver.StatementManager#unloggedBatch(java.lang.Iterable)
-   */
-  @Override
-  protected Batch unloggedBatch(Iterable<BatchableStatement<?, ?>> statements) {
-    return new BatchImpl(statements, false, this, bridge);
+  protected Batch unloggedBatch(Optional<Recorder> recorder, Iterable<BatchableStatement<?, ?>> statements) {
+    return new BatchImpl(recorder, statements, false, this, bridge);
   }
 
   /**
@@ -881,11 +833,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#sequence(com.github.helenusdriver.driver.SequenceableStatement[])
+   * @see com.github.helenusdriver.driver.StatementManager#sequence(java.util.Optional, com.github.helenusdriver.driver.SequenceableStatement[])
    */
   @Override
-  protected Sequence sequence(SequenceableStatement<?, ?>... statements) {
+  protected Sequence sequence(Optional<Recorder> recorder, SequenceableStatement<?, ?>... statements) {
     return new SequenceImpl(
+      recorder,
       statements,
       this,
       bridge
@@ -897,11 +850,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.StatementManager#sequence(java.lang.Iterable)
+   * @see com.github.helenusdriver.driver.StatementManager#sequence(java.util.Optional, java.lang.Iterable)
    */
   @Override
-  protected Sequence sequence(Iterable<SequenceableStatement<?, ?>> statements) {
+  protected Sequence sequence(Optional<Recorder> recorder, Iterable<SequenceableStatement<?, ?>> statements) {
     return new SequenceImpl(
+      recorder,
       statements,
       this,
       bridge

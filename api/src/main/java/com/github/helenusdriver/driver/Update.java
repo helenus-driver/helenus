@@ -30,7 +30,7 @@ package com.github.helenusdriver.driver;
  * @since 1.0
  */
 public interface Update<T>
-  extends Statement<T>, BatchableStatement<Void, VoidFuture> {
+  extends ObjectStatement<T>, BatchableStatement<Void, VoidFuture> {
   /**
    * Sets the 'IF EXISTS' option for this UPDATE statement.
    * <p>

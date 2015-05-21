@@ -17,7 +17,6 @@ package com.github.helenusdriver.driver;
 
 import com.github.helenusdriver.util.function.ERunnable;
 import com.google.common.util.concurrent.AbstractFuture;
-import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * The <code>Batch</code> interface extends the functionality of Cassandra's
@@ -32,7 +31,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * @since 1.0
  */
 public interface Batch
-  extends Statement<Void>, BatchableStatement<Void, VoidFuture> {
+  extends Statement<Void>, BatchableStatement<Void, VoidFuture>, RecordingStatement<Batch> {
   /**
    * Holds the max size of the batch after which we should be committing it to
    * Cassandra while processing the CSV file.
@@ -68,16 +67,6 @@ public interface Batch
   public String getKeyspace();
 
   /**
-   * Checks if the batch has no statements added.
-   *
-   * @author paouelle
-   *
-   * @return <code>true</code> if no statements were added to the batch;
-   *         <code>false</code> otherwise
-   */
-  public boolean isEmpty();
-
-  /**
    * Checks the this batch has reached the recommended size for a batch in
    * system with a high number of concurrent writers.
    *
@@ -87,81 +76,6 @@ public interface Batch
    *         exceeded for this batch; <code>false</code> otherwise
    */
   public boolean hasReachedRecommendedSize();
-
-  /**
-   * Gets the number of statements that are part of this batch (recursively).
-   *
-   * @author paouelle
-   *
-   * @return the number of statements in this batch
-   */
-  public int size();
-
-  /**
-   * Removes all statements already added to this batch.
-   *
-   * @author paouelle
-   */
-  public void clear();
-
-  /**
-   * Adds a new statement to this batch.
-   *
-   * @author paouelle
-   *
-   * @param <R> The type of result returned when executing the statement to batch
-   * @param <F> The type of future result returned when executing the statement
-   *            to batch
-   *
-   * @param  statement the new statement to add
-   * @return this batch
-   * @throws NullPointerException if <code>statement</code> is <code>null</code>
-   * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if the statement represents a "select" statement or a
-   *         "batch" statement
-   */
-  public <R, F extends ListenableFuture<R>> Batch add(BatchableStatement<R, F> statement);
-
-  /**
-   * Adds a new raw Cassandra statement to this batch.
-   *
-   * @author paouelle
-   *
-   * @param  statement the new statement to add
-   * @return this batch
-   * @throws NullPointerException if <code>statement</code> is <code>null</code>
-   * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if the statement represents a "select" statement or a
-   *         "batch" statement or if the statement is not of a supported class
-   */
-  public Batch add(com.datastax.driver.core.RegularStatement statement);
-
-  /**
-   * Registers an error handler with this batch. Error handlers are simply
-   * attached to the batch and must be specifically executed via the
-   * {@link #runErrorHandlers} method by the user when an error occurs either
-   * from the execution of the batch of before executing the batch to make sure
-   * that allocated resources can be properly released if no longer required.
-   *
-   * @author paouelle
-   *
-   * @param  run the error handler to register
-   * @return this batch
-   * @throws NullPointerException if <code>run</code> is <code>null</code>
-   */
-  public Batch addErrorHandler(ERunnable<?> run);
-
-  /**
-   * Runs all registered error handlers in sequence from the current thread. This
-   * method will recursively runs all registered error handlers in batches that
-   * have been added to this batch.
-   * <p>
-   * <i>Note:</i> Errors thrown out of the error handlers will not be
-   * propagated up.
-   *
-   * @author paouelle
-   */
-  public void runErrorHandlers();
 
   /**
    * Adds a new options for this BATCH statement.
@@ -175,12 +89,26 @@ public interface Batch
 
   /**
    * Duplicates this batch statement.
+   * <p>
+   * <i>Note:</i> The registered recorder is not copied over to the duplicated
+   * batch.
    *
    * @author paouelle
    *
    * @return a new batch statement which is a duplicate of this one
    */
   public Batch duplicate();
+
+  /**
+   * Duplicates this batch statement.
+   *
+   * @author paouelle
+   *
+   * @param  recorder the recorder to register with the duplicated batch
+   * @return a new batch statement which is a duplicate of this one
+   * @throws NullPointerException if <code>recorder</code> is <code>null</code>
+   */
+  public Batch duplicate(Recorder recorder);
 
   /**
    * The <code>Options</code> interface defines the options of a BATCH statement.

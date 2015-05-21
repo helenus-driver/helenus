@@ -32,7 +32,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface Delete<T>
-  extends Statement<T>, BatchableStatement<Void, VoidFuture> {
+  extends ObjectStatement<T>, BatchableStatement<Void, VoidFuture> {
   /**
    * Adds a WHERE clause to this statement.
    *

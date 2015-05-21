@@ -16,26 +16,27 @@
 package com.github.helenusdriver.driver;
 
 /**
- * The <code>ObjectStatement</code> interface extends the functionality of
- * the {@link Statement} interface for statements that are associated
- * with a POJO object.
+ * The <code>ObjectClassStatement</code> interface extends the functionality of
+ * the {@link GenericStatement} interface for statements that are associated
+ * with a POJO class and returns POJO objects.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - May 21, 2015 - paouelle - Creation
+ * @version 1 - Jan 15, 2015 - paouelle - Creation
  *
  * @param <T> The type of POJO associated with this statement
  *
  * @since 1.0
  */
-public interface ObjectStatement<T> extends Statement<T> {
+public interface ObjectClassStatement<T>
+  extends GenericStatement<ObjectSet<T>, ObjectSetFuture<T>> {
   /**
-   * Gets the POJO object associated with this statement.
+   * Gets the POJO class associated with this statement.
    *
    * @author paouelle
    *
-   * @return the POJO object associated with this statement
+   * @return the POJO class associated with this statement
    */
-  public T getObject();
+  public Class<T> getObjectClass();
 }

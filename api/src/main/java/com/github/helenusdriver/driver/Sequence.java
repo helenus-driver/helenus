@@ -17,7 +17,6 @@ package com.github.helenusdriver.driver;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
-import com.github.helenusdriver.util.function.ERunnable;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
@@ -33,7 +32,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * @since 1.0
  */
 public interface Sequence
-  extends GenericStatement<Void, VoidFuture>, SequenceableStatement<Void, VoidFuture> {
+  extends RecordingStatement<Sequence>, SequenceableStatement<Void, VoidFuture> {
   /**
    * {@inheritDoc}
    * <p>
@@ -50,32 +49,6 @@ public interface Sequence
   public String getKeyspace();
 
   /**
-   * Checks if the sequence has no statements added.
-   *
-   * @author paouelle
-   *
-   * @return <code>true</code> if no statements were added to the sequence;
-   *         <code>false</code> otherwise
-   */
-  public boolean isEmpty();
-
-  /**
-   * Gets the number of statements that are part of this sequence.
-   *
-   * @author paouelle
-   *
-   * @return the number of statements in this sequence
-   */
-  public int size();
-
-  /**
-   * Removes all statements already added to this sequence.
-   *
-   * @author paouelle
-   */
-  public void clear();
-
-  /**
    * Adds a new statement to this sequence.
    *
    * @author paouelle
@@ -89,44 +62,6 @@ public interface Sequence
    * @throws NullPointerException if <code>statement</code> is <code>null</code>
    */
   public <R, F extends ListenableFuture<R>> Sequence add(SequenceableStatement<R, F> statement);
-
-  /**
-   * Adds a new raw Cassandra statement to this sequence.
-   *
-   * @author paouelle
-   *
-   * @param  statement the new statement to add
-   * @return this sequence
-   * @throws NullPointerException if <code>statement</code> is <code>null</code>
-   */
-  public Sequence add(com.datastax.driver.core.RegularStatement statement);
-
-  /**
-   * Registers an error handler with this sequence. Error handlers are simply
-   * attached to the sequence and must be specifically executed via the
-   * {@link #runErrorHandlers} method by the user when an error occurs either
-   * from the execution of the sequence of before executing the sequence to make
-   * sure that allocated resources can be properly released if no longer required.
-   *
-   * @author paouelle
-   *
-   * @param  run the error handler to register
-   * @return this sequence
-   * @throws NullPointerException if <code>run</code> is <code>null</code>
-   */
-  public Sequence addErrorHandler(ERunnable<?> run);
-
-  /**
-   * Runs all registered error handlers in sequence from the current thread. This
-   * method will recursively runs all registered error handlers in sequences and
-   * batches that have been added to this sequence.
-   * <p>
-   * <i>Note:</i> Errors thrown out of the error handlers will not be
-   * propagated up.
-   *
-   * @author paouelle
-   */
-  public void runErrorHandlers();
 
   /**
    * {@inheritDoc}

@@ -18,6 +18,8 @@ package com.github.helenusdriver.driver.impl;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,6 +27,9 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.RegularStatement;
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.BatchableStatement;
+import com.github.helenusdriver.driver.ObjectStatement;
+import com.github.helenusdriver.driver.Recorder;
+import com.github.helenusdriver.driver.RecordingStatement;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.Using;
 import com.github.helenusdriver.driver.VoidFuture;
@@ -47,7 +52,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class BatchImpl
   extends StatementImpl<Void, VoidFuture, Void>
-  implements Batch {
+  implements Batch, ParentStatementImpl {
   /**
    * Holds the logger.
    *
@@ -61,6 +66,21 @@ public class BatchImpl
    * @author paouelle
    */
   private final List<StatementImpl<?, ?, ?>> statements;
+
+  /**
+   * Holds the parent of this batch. This is the sequence or batch this batch
+   * was last added to.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   */
+  private volatile ParentStatementImpl parent = null;
+
+  /**
+   * Holds the registered recorder.
+   *
+   * @author paouelle
+   */
+  private final Optional<Recorder> recorder;
 
   /**
    * Holds the registered error handlers.
@@ -95,6 +115,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
+   * @param  recorder the optional recorder to register with this batch
    * @param  statements the statements to batch
    * @param  logged <code>true</code> if the batch should be logged; <code>false</code>
    *         if it should be unlogged
@@ -103,10 +124,10 @@ public class BatchImpl
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if any statement represents a "select" statement or a
-   *         "batch" statement
+   *         are mixed
    */
   public BatchImpl(
+    Optional<Recorder> recorder,
     BatchableStatement<?, ?>[] statements,
     boolean logged,
     StatementManagerImpl mgr,
@@ -119,6 +140,7 @@ public class BatchImpl
     for (final BatchableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.recorder = recorder;
     this.errorHandlers = new LinkedList<>();
   }
 
@@ -127,6 +149,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
+   * @param  recorder the optional recorder to register with this batch
    * @param  statements the statements to batch
    * @param  logged <code>true</code> if the batch should be logged; <code>false</code>
    *         if it should be unlogged
@@ -135,10 +158,10 @@ public class BatchImpl
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if any statement represents a "select" statement or a
-   *         "batch" statement
+   *         are mixed
    */
   public BatchImpl(
+    Optional<Recorder> recorder,
     Iterable<BatchableStatement<?, ?>> statements,
     boolean logged,
     StatementManagerImpl mgr,
@@ -151,6 +174,7 @@ public class BatchImpl
     for (final BatchableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.recorder = recorder;
     this.errorHandlers = new LinkedList<>();
   }
 
@@ -159,13 +183,15 @@ public class BatchImpl
    *
    * @author paouelle
    *
+   * @param recorder the optional recorder to register with this batch
    * @param b the non-<code>null</code> batch statement to duplicate
    */
-  private BatchImpl(BatchImpl b) {
+  private BatchImpl(BatchImpl b, Optional<Recorder> recorder) {
     super(Void.class, (String)null, b.mgr, b.bridge);
     this.statements = new ArrayList<>(b.statements);
     this.logged = b.logged;
     this.usings = new OptionsImpl(this, b.usings);
+    this.recorder = recorder;
     this.errorHandlers = new LinkedList<>(b.errorHandlers);
   }
 
@@ -261,6 +287,67 @@ public class BatchImpl
 
   /**
    * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ParentStatementImpl#setParent(com.github.helenusdriver.driver.impl.ParentStatementImpl)
+   */
+  @Override
+  public void setParent(ParentStatementImpl parent) {
+    this.parent = parent;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ParentStatementImpl#recorded(com.github.helenusdriver.driver.ObjectStatement)
+   */
+  @Override
+  public void recorded(ObjectStatement<?> statement) {
+    // start by notifying the registered recorder
+    recorder.ifPresent(
+      r -> Inhibit.throwables(
+        () -> r.recorded(statement), t -> logger.catching(t)
+      )
+    );
+    // now notify our parent if any
+    final ParentStatementImpl p = parent;
+
+    Inhibit.throwables(
+      () -> {
+        if (p != null) {
+          p.recorded(statement);
+        }
+      }, t -> logger.catching(t)
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ParentStatementImpl#objectStatements()
+   */
+  @SuppressWarnings("rawtypes")
+  @Override
+  public Stream<ObjectStatement<?>> objectStatements() {
+    return statements.stream()
+      .flatMap(s -> {
+        if (s instanceof ParentStatementImpl) {
+          return ((ParentStatementImpl)s).objectStatements();
+        } else if (s instanceof ObjectStatement) {
+          return Stream.of((ObjectStatement<?>)(ObjectStatement)s); // typecast is required for cmd line compilation
+        } else {
+          return Stream.empty();
+        }
+      });
+  }
+
+  /**
+   * {@inheritDoc}
    * <p>
    * Gets the keyspace of the first statement in this batch.
    *
@@ -281,7 +368,19 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Batch#isEmpty()
+   * @see com.github.helenusdriver.driver.RecordingStatement#getRecorder()
+   */
+  @Override
+  public Optional<Recorder> getRecorder() {
+    return recorder;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.RecordingStatement#isEmpty()
    */
   @Override
   public boolean isEmpty() {
@@ -305,7 +404,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Batch#size()
+   * @see com.github.helenusdriver.driver.RecordingStatement#size()
    */
   @Override
   public int size() {
@@ -330,7 +429,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Batch#clear()
+   * @see com.github.helenusdriver.driver.RecordingStatement#clear()
    */
   @Override
   public void clear() {
@@ -344,7 +443,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Batch#add(com.github.helenusdriver.driver.BatchableStatement)
+   * @see com.github.helenusdriver.driver.RecordingStatement#add(com.github.helenusdriver.driver.BatchableStatement)
    */
   @Override
   public <R, F extends ListenableFuture<R>> Batch add(
@@ -379,9 +478,15 @@ public class BatchImpl
         !ss.isBatch(),
         "batch simple statements are not supported in batch statements"
       );
-    }
-    if (s instanceof BatchImpl) {
+    } else if (s instanceof BatchImpl) {
+      final BatchImpl bs = (BatchImpl)s;
+
+      bs.setParent(this); // set us as their parent going forward
       this.includesBatches = true;
+      // now recurse all contained object statements for the batch and report them as recorded
+      bs.objectStatements().forEach(cs -> recorded(cs));
+    } else if (s instanceof ObjectStatement) {
+      recorded((ObjectStatement<?>)s);
     }
     this.statements.add(s);
     setDirty();
@@ -389,16 +494,11 @@ public class BatchImpl
   }
 
   /**
-   * Adds a new raw Cassandra statement to this batch.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @param  statement the new statement to add
-   * @return this batch
-   * @throws NullPointerException if <code>statement</code> is <code>null</code>
-   * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if the statement represents a "select" statement or a
-   *         "batch" statement
+   * @see com.github.helenusdriver.driver.RecordingStatement#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
   public Batch add(com.datastax.driver.core.RegularStatement statement) {
@@ -420,7 +520,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Batch#addErrorHandler(ERunnable)
+   * @see com.github.helenusdriver.driver.RecordingStatement#addErrorHandler(com.github.helenusdriver.util.function.ERunnable)
    */
   @Override
   public Batch addErrorHandler(ERunnable<?> run) {
@@ -434,9 +534,9 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Batch#runErrorHandlers()
+   * @see com.github.helenusdriver.driver.RecordingStatement#runErrorHandlers()
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   public void runErrorHandlers() {
     for (final ERunnable<?> run: errorHandlers) {
@@ -444,8 +544,8 @@ public class BatchImpl
     }
     // now recurse in contained batches that have been added
     statements.stream()
-      .filter(s -> s instanceof BatchImpl)
-      .forEach(s -> ((BatchImpl)s).runErrorHandlers());
+      .filter(s -> s instanceof RecordingStatement)
+      .forEach(s -> ((RecordingStatement)s).runErrorHandlers());
   }
 
   /**
@@ -470,7 +570,19 @@ public class BatchImpl
    */
   @Override
   public Batch duplicate() {
-    return new BatchImpl(this);
+    return new BatchImpl(this, Optional.empty());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Batch#duplicate(com.github.helenusdriver.driver.Recorder)
+   */
+  @Override
+  public Batch duplicate(Recorder recorder) {
+    return new BatchImpl(this, Optional.of(recorder));
   }
 
   /**
@@ -548,7 +660,8 @@ public class BatchImpl
      */
     @Override
     public <R, F extends AbstractFuture<R>> Batch add(
-      BatchableStatement<R, F> statement) {
+      BatchableStatement<R, F> statement
+    ) {
       return this.statement.add(statement);
     }
 
@@ -573,7 +686,7 @@ public class BatchImpl
      */
     @Override
     public Batch addErrorHandler(ERunnable<?> run) {
-      return this.statement.addErrorHandler(run);
+      return statement.addErrorHandler(run);
     }
   }
 }

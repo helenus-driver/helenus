@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -276,36 +277,30 @@ public abstract class StatementManager {
   protected abstract <T> Delete.Selection<T> delete(T object);
 
   /**
-   * Start building a new DELETE statement that deletes the provided columns from
-   * the specified POJO.
+   * Starts building a new BATCH statement on the provided statements.
+   * <p>
+   * This method will build a logged batch (this is the default in CQL3). To
+   * create unlogged batches, use {@link #unloggedBatch}. Also note that
+   * for convenience, if the provided statements are counter statements, this
+   * method will create a COUNTER batch even though COUNTER batches are never
+   * logged (so for counters, using this method is effectively equivalent to
+   * using {@link #unloggedBatch}).
+   * <p>
+   * <i>Note:</i> This method allows one to register a recorder with the batch
+   * such as to be notified whenever a pojo-specific statement is added to the
+   * batch or any batches added to the returned batch recursively.
    *
-   * @param <T> The type of POJO associated with the statement.
-   *
-   * @param  clazz the class of POJO to delete columns for
-   * @param  columns the columns names that should be deleted by the statement
-   * @return an in-construction DELETE statement (At least a FROM and a WHERE
-   *         clause needs to be provided to complete the statement).
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
-   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
-   *         valid POJO class or any of the specified columns are not defined
-   *         by the POJO
+   * @param  recorder the optional recorder to register
+   * @param  statements the statements to batch
+   * @return a new {@code BatchableStatement} that batch {@code statements}
+   * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
+   *         or any of the statements are <code>null</code>
+   * @throws IllegalArgumentException if counter and non-counter operations
+   *         are mixed
    */
-  protected abstract <T> Delete.Builder<T> delete(Class<T> clazz, String... columns);
-
-  /**
-   * Start building a new DELETE statement for the specified POJO.
-   *
-   * @param <T> The type of POJO associated with the statement.
-   *
-   * @param  clazz the class of POJO to delete columns for
-   * @return an in-construction SELECT statement (you will need to provide a
-   *         column selection and at least a FROM and a WHERE clause to complete
-   *         the statement).
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
-   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
-   *         valid POJO class
-   */
-  protected abstract <T> Delete.Selection<T> delete(Class<T> clazz);
+  protected abstract Batch batch(
+    Optional<Recorder> recorder, BatchableStatement<?, ?>... statements
+  );
 
   /**
    * Starts building a new BATCH statement on the provided statements.
@@ -316,36 +311,22 @@ public abstract class StatementManager {
    * method will create a COUNTER batch even though COUNTER batches are never
    * logged (so for counters, using this method is effectively equivalent to
    * using {@link #unloggedBatch}).
-   *
-   * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
-   * @throws NullPointerException if <code>statement</code> or any of the
-   *         statements are <code>null</code>
-   * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if any statement represents a "select" statement or a
-   *         "batch" statement
-   */
-  protected abstract Batch batch(BatchableStatement<?, ?>... statements);
-
-  /**
-   * Starts building a new BATCH statement on the provided statements.
    * <p>
-   * This method will build a logged batch (this is the default in CQL3). To
-   * create unlogged batches, use {@link #unloggedBatch}. Also note that
-   * for convenience, if the provided statements are counter statements, this
-   * method will create a COUNTER batch even though COUNTER batches are never
-   * logged (so for counters, using this method is effectively equivalent to
-   * using {@link #unloggedBatch}).
+   * <i>Note:</i> This method allows one to register a recorder with the batch
+   * such as to be notified whenever a pojo-specific statement is added to the
+   * batch or any batches added to the returned batch recursively.
    *
+   * @param  recorder the optional recorder to register
    * @param  statements the statements to batch
    * @return a new {@code BatchableStatement} that batch {@code statements}
-   * @throws NullPointerException if <code>statement</code> or any of the
-   *         statements are <code>null</code>
+   * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
+   *         or any of the statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if any statement represents a "select" statement or a
-   *         "batch" statement
+   *         are mixed
    */
-  protected abstract Batch batch(Iterable<BatchableStatement<?, ?>> statements);
+  protected abstract Batch batch(
+    Optional<Recorder> recorder, Iterable<BatchableStatement<?, ?>> statements
+  );
 
   /**
    * Built a new UNLOGGED BATCH statement on the provided statements.
@@ -359,17 +340,23 @@ public abstract class StatementManager {
    * <p>
    * If the statements added to the batch are counter statements, the
    * resulting batch will be a COUNTER one.
+   * <p>
+   * <i>Note:</i> This method allows one to register a recorder with the batch
+   * such as to be notified whenever a pojo-specific statement is added to the
+   * batch or any batches added to the returned batch recursively.
    *
+   * @param  recorder the optional recorder to register
    * @param  statements the statements to batch
    * @return a new {@code BatchableStatement} that batch {@code statements}
    *         without using the batch log
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if any statement represents a "select" statement or a
-   *         "batch" statement
+   *         are mixed
    */
-  protected abstract Batch unloggedBatch(BatchableStatement<?, ?>... statements);
+  protected abstract Batch unloggedBatch(
+    Optional<Recorder> recorder, BatchableStatement<?, ?>... statements
+  );
 
   /**
    * Built a new UNLOGGED BATCH statement on the provided statements.
@@ -383,17 +370,23 @@ public abstract class StatementManager {
    * <p>
    * If the statements added to the batch are counter statements, the
    * resulting batch will be a COUNTER one.
+   * <p>
+   * <i>Note:</i> This method allows one to register a recorder with the batch
+   * such as to be notified whenever a pojo-specific statement is added to the
+   * batch or any batches added to the returned batch recursively.
    *
+   * @param  recorder the optional recorder to register
    * @param  statements the statements to batch
    * @return a new {@code BatchableStatement} that batch {@code statements}
    *         without using the batch log
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
-   *         are mixed or if any statement represents a "select" statement or a
-   *         "batch" statement
+   *         are mixed
    */
-  protected abstract Batch unloggedBatch(Iterable<BatchableStatement<?, ?>> statements);
+  protected abstract Batch unloggedBatch(
+    Optional<Recorder> recorder, Iterable<BatchableStatement<?, ?>> statements
+  );
 
   /**
    * Wraps a Cassandra regular statement into a statement that can be executed
@@ -726,13 +719,21 @@ public abstract class StatementManager {
    * in a non-atomic execution of the statements. The process will stop
    * at first failure and will not revert back any of the previously executed
    * statements.
+   * <p>
+   * <i>Note:</i> This method allows one to register a recorder with the
+   * sequence such as to be notified whenever a pojo-specific statement is added
+   * to the sequence or any batches/sequences added to the returned sequence
+   * recursively.
    *
+   * @param  recorder the optional recorder to register
    * @param  statements the statements to sequence
    * @return a new {@code SequenceableStatement} that sequence {@code statements}
-   * @throws NullPointerException if <code>statement</code> or any of the
-   *         statements are <code>null</code>
+   * @throws NullPointerException if <code>sequence</code>, <code>statement</code>,
+   *         or any of the statements are <code>null</code>
    */
-  protected abstract Sequence sequence(SequenceableStatement<?, ?>... statements);
+  protected abstract Sequence sequence(
+    Optional<Recorder> recorder, SequenceableStatement<?, ?>... statements
+  );
 
   /**
    * Starts building a new set of statements that will execute all of them in
@@ -743,13 +744,20 @@ public abstract class StatementManager {
    * in a non-atomic execution of the statements. The process will stop
    * at first failure and will not revert back any of the previously executed
    * statements.
+   * <p>
+   * <i>Note:</i> This method allows one to register a recorder with the sequence
+   * such as to be notified whenever a pojo-specific statement is added to the
+   * sequence or any batches/sequences added to the returned sequence recursively.
    *
+   * @param  recorder the optional recorder to register
    * @param  statements the statements to sequence
    * @return a new {@code SequenceableStatement} that sequence {@code statements}
-   * @throws NullPointerException if <code>statement</code> or any of the
-   *         statements are <code>null</code>
+   * @throws NullPointerException if <code>sequence</code>, <code>statement</code>,
+   *         or any of the statements are <code>null</code>
    */
-  protected abstract Sequence sequence(Iterable<SequenceableStatement<?, ?>> statements);
+  protected abstract Sequence sequence(
+    Optional<Recorder> recorder, Iterable<SequenceableStatement<?, ?>> statements
+  );
 
   /**
    * Quotes a column name to make it case sensitive.

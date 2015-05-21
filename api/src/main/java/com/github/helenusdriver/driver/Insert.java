@@ -32,7 +32,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface Insert<T>
-  extends Statement<T>, BatchableStatement<Void, VoidFuture> {
+  extends ObjectStatement<T>, BatchableStatement<Void, VoidFuture> {
   /**
    * Adds all column/value pairs from the POJO object to the values inserted by
    * this INSERT statement.

@@ -18,12 +18,18 @@ package com.github.helenusdriver.driver.impl;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.RegularStatement;
 import com.github.helenusdriver.driver.Batch;
+import com.github.helenusdriver.driver.BatchableStatement;
+import com.github.helenusdriver.driver.ObjectStatement;
+import com.github.helenusdriver.driver.Recorder;
+import com.github.helenusdriver.driver.RecordingStatement;
 import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.SequenceableStatement;
 import com.github.helenusdriver.driver.StatementBridge;
@@ -46,7 +52,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class SequenceImpl
   extends SequenceStatementImpl<Void, VoidFuture, Void>
-  implements Sequence {
+  implements Sequence, ParentStatementImpl {
   /**
    * Holds the logger.
    *
@@ -62,6 +68,21 @@ public class SequenceImpl
   private final List<StatementImpl<?, ?, ?>> statements;
 
   /**
+   * Holds the parent of this sequence. This is the sequence this one was last
+   * added to.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   */
+  private volatile ParentStatementImpl parent = null;
+
+  /**
+   * Holds the registered recorder.
+   *
+   * @author paouelle
+   */
+  private final Optional<Recorder> recorder;
+
+  /**
    * Holds the registered error handlers.
    *
    * @author paouelle
@@ -73,6 +94,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
+   * @param  recorder the optional recorder to register with this sequence
    * @param  statements the statements to sequence
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
@@ -80,6 +102,7 @@ public class SequenceImpl
    *         statements are <code>null</code>
    */
   public SequenceImpl(
+    Optional<Recorder> recorder,
     SequenceableStatement<?, ?>[] statements,
     StatementManagerImpl mgr,
     StatementBridge bridge
@@ -89,6 +112,7 @@ public class SequenceImpl
     for (final SequenceableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.recorder = recorder;
     this.errorHandlers = new LinkedList<>();
   }
 
@@ -97,6 +121,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
+   * @param  recorder the optional recorder to register with this sequence
    * @param  statements the statements to sequence
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
@@ -104,6 +129,7 @@ public class SequenceImpl
    *         statements are <code>null</code>
    */
   public SequenceImpl(
+    Optional<Recorder> recorder,
     Iterable<SequenceableStatement<?, ?>> statements,
     StatementManagerImpl mgr,
     StatementBridge bridge
@@ -113,6 +139,7 @@ public class SequenceImpl
     for (final SequenceableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    this.recorder = recorder;
     this.errorHandlers = new LinkedList<>();
   }
 
@@ -180,6 +207,67 @@ public class SequenceImpl
 
   /**
    * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ParentStatementImpl#setParent(com.github.helenusdriver.driver.impl.ParentStatementImpl)
+   */
+  @Override
+  public void setParent(ParentStatementImpl parent) {
+    this.parent = parent;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ParentStatementImpl#recorded(com.github.helenusdriver.driver.ObjectStatement)
+   */
+  @Override
+  public void recorded(ObjectStatement<?> statement) {
+    // start by notifying the registered recorder
+    recorder.ifPresent(
+      r -> Inhibit.throwables(
+        () -> r.recorded(statement), t -> logger.catching(t)
+      )
+    );
+    // now notify our parent if any
+    final ParentStatementImpl p = parent;
+
+    Inhibit.throwables(
+      () -> {
+        if (p != null) {
+          p.recorded(statement);
+        }
+      }, t -> logger.catching(t)
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.impl.ParentStatementImpl#objectStatements()
+   */
+  @SuppressWarnings("rawtypes")
+  @Override
+  public Stream<ObjectStatement<?>> objectStatements() {
+    return statements.stream()
+      .flatMap(s -> {
+        if (s instanceof ParentStatementImpl) {
+          return ((ParentStatementImpl)s).objectStatements();
+        } else if (s instanceof ObjectStatement) {
+          return Stream.of((ObjectStatement<?>)(ObjectStatement)s); // typecast is required for cmd line compilation
+        } else {
+          return Stream.empty();
+        }
+      });
+  }
+
+  /**
+   * {@inheritDoc}
    * <p>
    * Gets the keyspace of the first statement in this sequence.
    *
@@ -200,7 +288,19 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Sequence#isEmpty()
+   * @see com.github.helenusdriver.driver.RecordingStatement#getRecorder()
+   */
+  @Override
+  public Optional<Recorder> getRecorder() {
+    return recorder;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.RecordingStatement#isEmpty()
    */
   @Override
   public boolean isEmpty() {
@@ -212,7 +312,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Sequence#size()
+   * @see com.github.helenusdriver.driver.RecordingStatement#size()
    */
   @Override
   public int size() {
@@ -224,7 +324,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Sequence#clear()
+   * @see com.github.helenusdriver.driver.RecordingStatement#clear()
    */
   @Override
   public void clear() {
@@ -251,6 +351,15 @@ public class SequenceImpl
       statement.getClass().getName()
     );
     this.statements.add((StatementImpl<R, F, ?>)statement);
+    if (statement instanceof ParentStatementImpl) {
+      final ParentStatementImpl ps = (ParentStatementImpl)statement;
+
+      ps.setParent(this); // set us as their parent going forward
+      // now recurse all contained object statements for the parent and report them as recorded
+      ps.objectStatements().forEach(cs -> recorded(cs));
+    } else if (statement instanceof ObjectStatement) {
+      recorded((ObjectStatement<?>)statement);
+    }
     setDirty();
     return this;
   }
@@ -260,7 +369,22 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Sequence#add(com.datastax.driver.core.RegularStatement)
+   * @see com.github.helenusdriver.driver.RecordingStatement#add(com.github.helenusdriver.driver.BatchableStatement)
+   */
+  @SuppressWarnings("unchecked")
+  @Override
+  public <R, F extends ListenableFuture<R>> Sequence add(
+    BatchableStatement<R, F> statement
+  ) {
+    return add((SequenceableStatement<R, F>)statement);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.RecordingStatement#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
   public Sequence add(RegularStatement statement) {
@@ -272,7 +396,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Sequence#addErrorHandler(ERunnable)
+   * @see com.github.helenusdriver.driver.RecordingStatement#addErrorHandler(com.github.helenusdriver.util.function.ERunnable)
    */
   @Override
   public Sequence addErrorHandler(ERunnable<?> run) {
@@ -286,9 +410,9 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.Sequence#runErrorHandlers()
+   * @see com.github.helenusdriver.driver.RecordingStatement#runErrorHandlers()
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   public void runErrorHandlers() {
     for (final ERunnable<?> run: errorHandlers) {
@@ -296,12 +420,7 @@ public class SequenceImpl
     }
     // now recurse in contained sequences and batches that have been added
     statements.stream()
-      .forEach(s -> {
-        if (s instanceof BatchImpl) {
-          ((BatchImpl)s).runErrorHandlers();
-        } else if (s instanceof SequenceImpl) {
-          ((SequenceImpl)s).runErrorHandlers();
-        }
-      });
+      .filter(s -> s instanceof RecordingStatement)
+      .forEach(s -> ((RecordingStatement)s).runErrorHandlers());
   }
 }

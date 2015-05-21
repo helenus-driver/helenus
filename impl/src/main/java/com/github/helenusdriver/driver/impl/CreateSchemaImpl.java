@@ -17,6 +17,7 @@ package com.github.helenusdriver.driver.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -183,7 +184,7 @@ public class CreateSchemaImpl<T>
 
     if (!ArrayUtils.isEmpty(ios)) {
       final BatchImpl batch = new BatchImpl(
-        new BatchableStatement[0], true, mgr, bridge
+        Optional.empty(), new BatchableStatement[0], true, mgr, bridge
       );
 
       for (final T io: ios) {

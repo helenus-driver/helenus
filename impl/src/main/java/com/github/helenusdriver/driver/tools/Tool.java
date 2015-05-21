@@ -74,7 +74,7 @@ import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.GenericStatement;
 import com.github.helenusdriver.driver.ObjectSet;
-import com.github.helenusdriver.driver.ObjectStatement;
+import com.github.helenusdriver.driver.ObjectClassStatement;
 import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.StatementBuilder;
 import com.github.helenusdriver.driver.impl.StatementManagerImpl;
@@ -501,7 +501,7 @@ public class Tool {
    * @return the result set from the execution
    */
   @SuppressWarnings("unused")
-  private static <T> ObjectSet<T> executeCQL(ObjectStatement<T> s) {
+  private static <T> ObjectSet<T> executeCQL(ObjectClassStatement<T> s) {
     s.setConsistencyLevel(ConsistencyLevel.ONE);
     if (Tool.vflag) {
       System.out.println(

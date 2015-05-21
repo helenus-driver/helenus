@@ -316,6 +316,17 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
+     * Gets the POJO object associated with this context.
+     *
+     * @author paouelle
+     *
+     * @return the POJO object associated with this context
+     */
+    public T getObject() {
+      return object;
+    }
+
+    /**
      * Retrieves all columns and their values from the POJO and the specified
      * table.
      *

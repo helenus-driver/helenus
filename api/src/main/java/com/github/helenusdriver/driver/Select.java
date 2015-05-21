@@ -30,7 +30,7 @@ package com.github.helenusdriver.driver;
  *
  * @since 1.0
  */
-public interface Select<T> extends ObjectStatement<T> {
+public interface Select<T> extends ObjectClassStatement<T> {
   /**
    * Adds a WHERE clause to this statement.
    *
@@ -103,7 +103,7 @@ public interface Select<T> extends ObjectStatement<T> {
    *
    * @since 1.0
    */
-  public interface Where<T> extends ObjectStatement<T> {
+  public interface Where<T> extends ObjectClassStatement<T> {
     /**
      * Adds the provided clause to this WHERE clause.
      *
