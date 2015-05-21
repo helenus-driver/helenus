@@ -38,7 +38,7 @@ public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture
   /**
    * Gets the recorder registered with this recording statement if any.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @return the recorder registered with this recording statement or empty if
    *         none was registered at the time of creation

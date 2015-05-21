@@ -49,7 +49,7 @@ public class AlterCreateTableImpl<T> extends CreateTableImpl<T> {
   /**
    * Holds the queried table infos for the POJO type keyed by the table name.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private final Map<String, List<Row>> tinfos;
 
@@ -234,7 +234,7 @@ public class AlterCreateTableImpl<T> extends CreateTableImpl<T> {
    * Gets the table information for the tables defined by the POJO class as
    * queried from Cassandra.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @return the table info from Cassandra for the POJO class
    */

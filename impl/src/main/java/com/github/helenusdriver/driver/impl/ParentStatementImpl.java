@@ -52,7 +52,7 @@ public interface ParentStatementImpl {
   /**
    * Gets all object statements contained recursively in this parent statement.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @return a stream of all object statements contained recursively in this parent
    */

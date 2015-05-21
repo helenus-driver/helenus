@@ -71,7 +71,7 @@ public class SequenceImpl
    * Holds the parent of this sequence. This is the sequence this one was last
    * added to.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private volatile ParentStatementImpl parent = null;
 

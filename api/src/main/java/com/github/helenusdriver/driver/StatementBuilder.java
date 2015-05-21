@@ -61,7 +61,7 @@ public final class StatementBuilder {
   /**
    * Gets a stream of the remaining rows for the specified result set.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  set the result set for which to get a stream of rows
    * @return a stream of all remaining rows in the specified result set

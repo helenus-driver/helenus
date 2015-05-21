@@ -1065,7 +1065,7 @@ public abstract class StatementManager {
   /**
    * Appends the specified string as a CQL name to the given string builder.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  name the name string to append as a CQL name
    * @param  sb the string builder where to append the name
