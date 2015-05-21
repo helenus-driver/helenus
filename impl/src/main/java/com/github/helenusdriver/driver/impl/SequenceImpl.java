@@ -292,7 +292,11 @@ public class SequenceImpl
    */
   @Override
   public Optional<Recorder> getRecorder() {
-    return recorder;
+    final ParentStatementImpl p = parent;
+
+    return Optional.ofNullable(
+      recorder.orElseGet(() -> (p != null) ? p.getRecorder().orElse(null) : null)
+    );
   }
 
   /**

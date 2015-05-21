@@ -36,12 +36,16 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture> {
   /**
-   * Gets the recorder registered with this recording statement if any.
+   * Gets the recorder registered with this recording statement or with a parent
+   * if any.
+   * <p>
+   * <i>Note:</i> A parent is another recording statement to which this one was
+   * added.
    *
    * @author paouelle
    *
-   * @return the recorder registered with this recording statement or empty if
-   *         none was registered at the time of creation
+   * @return the recorder registered with this recording statement (or a parent)
+   *         or empty if none was registered at the time of creation
    */
   public Optional<Recorder> getRecorder();
 

@@ -15,9 +15,11 @@
  */
 package com.github.helenusdriver.driver.impl;
 
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import com.github.helenusdriver.driver.ObjectStatement;
+import com.github.helenusdriver.driver.Recorder;
 
 /**
  * The <code>ParentStatementImpl</code> interface should be used by statements
@@ -39,6 +41,20 @@ public interface ParentStatementImpl {
    * @param parent the parent for this statement
    */
   public void setParent(ParentStatementImpl parent);
+
+  /**
+   * Gets the recorder registered with this parent statement or with a parent
+   * if any.
+   * <p>
+   * <i>Note:</i> A parent is another parent statement to which this one was
+   * added.
+   *
+   * @author paouelle
+   *
+   * @return the recorder registered with this parent statement (or one of its
+   *         parent) or empty if none was registered at the time of creation
+   */
+  public Optional<Recorder> getRecorder();
 
   /**
    * Notifies the registered recorder and parent of the specified object statement.
