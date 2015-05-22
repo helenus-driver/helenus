@@ -32,7 +32,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * @since 1.0
  */
 public interface Sequence
-  extends RecordingStatement<Sequence>, SequenceableStatement<Void, VoidFuture> {
+  extends Group<Sequence>, SequenceableStatement<Void, VoidFuture> {
   /**
    * {@inheritDoc}
    * <p>

@@ -29,7 +29,7 @@ import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.BatchableStatement;
 import com.github.helenusdriver.driver.ObjectStatement;
 import com.github.helenusdriver.driver.Recorder;
-import com.github.helenusdriver.driver.RecordingStatement;
+import com.github.helenusdriver.driver.Group;
 import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.SequenceableStatement;
 import com.github.helenusdriver.driver.StatementBridge;
@@ -288,7 +288,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#getRecorder()
+   * @see com.github.helenusdriver.driver.Group#getRecorder()
    */
   @Override
   public Optional<Recorder> getRecorder() {
@@ -304,7 +304,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#isEmpty()
+   * @see com.github.helenusdriver.driver.Group#isEmpty()
    */
   @Override
   public boolean isEmpty() {
@@ -316,7 +316,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#size()
+   * @see com.github.helenusdriver.driver.Group#size()
    */
   @Override
   public int size() {
@@ -328,7 +328,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#clear()
+   * @see com.github.helenusdriver.driver.Group#clear()
    */
   @Override
   public void clear() {
@@ -373,7 +373,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#add(com.github.helenusdriver.driver.BatchableStatement)
+   * @see com.github.helenusdriver.driver.Group#add(com.github.helenusdriver.driver.BatchableStatement)
    */
   @SuppressWarnings("unchecked")
   @Override
@@ -388,7 +388,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#add(com.datastax.driver.core.RegularStatement)
+   * @see com.github.helenusdriver.driver.Group#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
   public Sequence add(RegularStatement statement) {
@@ -400,7 +400,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#addErrorHandler(com.github.helenusdriver.util.function.ERunnable)
+   * @see com.github.helenusdriver.driver.Group#addErrorHandler(com.github.helenusdriver.util.function.ERunnable)
    */
   @Override
   public Sequence addErrorHandler(ERunnable<?> run) {
@@ -414,7 +414,7 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see com.github.helenusdriver.driver.RecordingStatement#runErrorHandlers()
+   * @see com.github.helenusdriver.driver.Group#runErrorHandlers()
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
@@ -424,7 +424,7 @@ public class SequenceImpl
     }
     // now recurse in contained sequences and batches that have been added
     statements.stream()
-      .filter(s -> s instanceof RecordingStatement)
-      .forEach(s -> ((RecordingStatement)s).runErrorHandlers());
+      .filter(s -> s instanceof Group)
+      .forEach(s -> ((Group)s).runErrorHandlers());
   }
 }

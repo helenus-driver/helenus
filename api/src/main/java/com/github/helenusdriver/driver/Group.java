@@ -21,9 +21,9 @@ import com.github.helenusdriver.util.function.ERunnable;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
- * The <code>ObjectStatement</code> interface extends the functionality of
+ * The <code>Group</code> interface extends the functionality of
  * the {@link GenericStatement} interface for statements that are capable of
- * recording other statements such as the {@link Batch} or the {@link Sequence}.
+ * grouping other statements together such as a {@link Batch} or a {@link Sequence}.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -34,17 +34,17 @@ import com.google.common.util.concurrent.ListenableFuture;
  *
  * @since 1.0
  */
-public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture> {
+public interface Group<S> extends GenericStatement<Void, VoidFuture> {
   /**
-   * Gets the recorder registered with this recording statement or with a parent
+   * Gets the recorder registered with this group or with a parent
    * if any.
    * <p>
-   * <i>Note:</i> A parent is another recording statement to which this one was
+   * <i>Note:</i> A parent is another group to which this one was
    * added.
    *
    * @author paouelle
    *
-   * @return the recorder registered with this recording statement (or a parent)
+   * @return the recorder registered with this group (or a parent)
    *         or empty if none was registered at the time of creation
    */
   public Optional<Recorder> getRecorder();
@@ -76,7 +76,7 @@ public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture
   public void clear();
 
   /**
-   * Adds a new statement to this recording statement.
+   * Adds a new statement to this group.
    *
    * @author paouelle
    *
@@ -85,7 +85,7 @@ public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture
    *            to record
    *
    * @param  statement the new statement to add
-   * @return the recording statement
+   * @return the group
    * @throws NullPointerException if <code>statement</code> is <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
    *         are mixed or if the statement is not of a supported class
@@ -93,12 +93,12 @@ public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture
   public <R, F extends ListenableFuture<R>> S add(BatchableStatement<R, F> statement);
 
   /**
-   * Adds a new raw Cassandra statement to this recording statement.
+   * Adds a new raw Cassandra statement to this group.
    *
    * @author paouelle
    *
    * @param  statement the new statement to add
-   * @return this recording statement
+   * @return this group
    * @throws NullPointerException if <code>statement</code> is <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
    *         are mixed or if the statement represents a "select" statement or a
@@ -107,17 +107,17 @@ public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture
   public S add(com.datastax.driver.core.RegularStatement statement);
 
   /**
-   * Registers an error handler with this recording statement. Error handlers
-   * are simply attached to the recording statement and must be specifically
+   * Registers an error handler with this group. Error handlers
+   * are simply attached to the group and must be specifically
    * executed via the {@link #runErrorHandlers} method by the user when an error
-   * occurs either from the execution of the recording statement of before executing
-   * the recording statement to make sure that allocated resources can be properly
+   * occurs either from the execution of the group of before executing
+   * the group to make sure that allocated resources can be properly
    * released if no longer required.
    *
    * @author paouelle
    *
    * @param  run the error handler to register
-   * @return this recording statement
+   * @return this group
    * @throws NullPointerException if <code>run</code> is <code>null</code>
    */
   public S addErrorHandler(ERunnable<?> run);
@@ -125,7 +125,7 @@ public interface RecordingStatement<S> extends GenericStatement<Void, VoidFuture
   /**
    * Runs all registered error handlers in sequence from the current thread. This
    * method will recursively runs all registered error handlers in sequences and
-   * batches that have been added to this recording statement.
+   * batches that have been added to this group.
    * <p>
    * <i>Note:</i> Errors thrown out of the error handlers will not be
    * propagated up.

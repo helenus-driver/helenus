@@ -31,7 +31,7 @@ import com.google.common.util.concurrent.AbstractFuture;
  * @since 1.0
  */
 public interface Batch
-  extends Statement<Void>, BatchableStatement<Void, VoidFuture>, RecordingStatement<Batch> {
+  extends Statement<Void>, BatchableStatement<Void, VoidFuture>, Group<Batch> {
   /**
    * Holds the max size of the batch after which we should be committing it to
    * Cassandra while processing the CSV file.

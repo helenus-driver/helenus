@@ -40,7 +40,7 @@ package com.github.helenusdriver.driver;
 public interface Recorder {
   /**
    * Called when an object statement is being recorded with a
-   * {@link RecordingStatement}.
+   * {@link Group}.
    *
    * @author paouelle
    *
