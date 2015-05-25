@@ -288,6 +288,42 @@ public final class StatementBuilder {
   }
 
   /**
+   * Start building a new DELETE statement that deletes the provided columns from
+   * the specified POJO class.
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @param  clazz the class of POJO to delete columns for
+   * @param  columns the columns names that should be deleted by the statement
+   * @return an in-construction DELETE statement (At least a FROM and a WHERE
+   *         clause needs to be provided to complete the statement).
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
+   *         valid POJO class or any of the specified columns are not defined
+   *         by the POJO
+   */
+  public static <T> Delete.Builder<T> delete(Class<T> clazz, String... columns) {
+    return StatementManager.getManager().delete(clazz, columns);
+  }
+
+  /**
+   * Start building a new DELETE statement for the specified POJO class.
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @param  clazz the class of POJO to delete columns for
+   * @return an in-construction SELECT statement (you will need to provide a
+   *         column selection and at least a FROM and a WHERE clause to complete
+   *         the statement).
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent a
+   *         valid POJO class
+   */
+  public static <T> Delete.Selection<T> delete(Class<T> clazz) {
+    return StatementManager.getManager().delete(clazz);
+  }
+
+  /**
    * Starts building a new BATCH statement on the provided statements.
    * <p>
    * This method will build a logged batch (this is the default in CQL3). To

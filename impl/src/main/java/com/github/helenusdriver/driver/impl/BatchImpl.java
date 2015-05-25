@@ -27,9 +27,9 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.RegularStatement;
 import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.BatchableStatement;
+import com.github.helenusdriver.driver.Group;
 import com.github.helenusdriver.driver.ObjectStatement;
 import com.github.helenusdriver.driver.Recorder;
-import com.github.helenusdriver.driver.Group;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.Using;
 import com.github.helenusdriver.driver.VoidFuture;
@@ -306,6 +306,9 @@ public class BatchImpl
    */
   @Override
   public void recorded(ObjectStatement<?> statement) {
+    if (statement.getObject() == null) { // not associated with a single POJO so skip it
+      return;
+    }
     // start by notifying the registered recorder
     recorder.ifPresent(
       r -> Inhibit.throwables(

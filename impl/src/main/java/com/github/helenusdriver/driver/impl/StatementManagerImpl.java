@@ -55,6 +55,7 @@ import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.CreateTable;
 import com.github.helenusdriver.driver.CreateType;
+import com.github.helenusdriver.driver.Delete;
 import com.github.helenusdriver.driver.Delete.Builder;
 import com.github.helenusdriver.driver.Insert;
 import com.github.helenusdriver.driver.KeyspaceWith;
@@ -505,6 +506,55 @@ public class StatementManagerImpl extends StatementManager {
       bridge
     );
   }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.StatementManager#delete(java.lang.Class, java.lang.String[])
+   */
+  @Override
+  protected <T> Delete.Builder<T> delete(Class<T> clazz, String... columns) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a delete statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
+    return new DeleteImpl.BuilderImpl<>(
+      cinfo.newContext(),
+      Arrays.asList((Object[])columns),
+      this,
+      bridge
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.StatementManager#delete(java.lang.Class)
+   */
+  @Override
+  protected <T> Delete.Selection<T> delete(Class<T> clazz) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a delete statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
+    );
+    return new DeleteImpl.SelectionImpl<>(
+      cinfo.newContext(),
+      this,
+      bridge
+    );
+  };
 
   /**
    * {@inheritDoc}
