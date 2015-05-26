@@ -293,7 +293,7 @@ public class DeleteImpl<T>
       for (final ClauseImpl c: whereClauses) {
         andClause(table, cs, c);
       }
-      if (cs.isEmpty()) { // nothing to select for this update so skip
+      if (cs.isEmpty()) { // nothing to select for this delete so skip
         return;
       }
       builder.append(" WHERE ");

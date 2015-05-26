@@ -207,7 +207,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    */
-  private boolean hasCollectionColumns = false;
+  private volatile boolean hasCollectionColumns = false;
 
   /**
    * Instantiates a new <code>TableInfo</code> object.
@@ -558,6 +558,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     final FieldInfoImpl<T> rcol
       = new FieldInfoImpl<>((RootClassInfoImpl<T>)cinfo, this, col);
 
+    if (rcol.getDataType().isCollection()) {
+      this.hasCollectionColumns = true;
+    }
     fields.put(Pair.of(rcol.getName(), rcol.getDeclaringClass()), rcol);
     columns.put(rcol.getColumnName(), rcol);
     if (rcol.isIndex()) {
