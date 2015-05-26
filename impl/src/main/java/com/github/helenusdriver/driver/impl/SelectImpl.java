@@ -290,8 +290,12 @@ public class SelectImpl<T>
       }
     }
     builder.append(" FROM ");
-    if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+    try {
+      if (getKeyspace() != null) {
+        Utils.appendName(getKeyspace(), builder).append(".");
+      }
+    } catch (ExcludedSuffixKeyException e) { // just skip this one since we were asked to skip the current keyspace suffix
+      return null;
     }
     Utils.appendName(table.getName(), builder);
     if (!where.clauses.isEmpty()) {
