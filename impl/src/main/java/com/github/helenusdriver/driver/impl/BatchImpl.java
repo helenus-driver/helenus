@@ -137,11 +137,11 @@ public class BatchImpl
     this.statements = new ArrayList<>(Math.max(statements.length, 8));
     this.logged = logged;
     this.usings = new OptionsImpl(this);
+    this.recorder = recorder;
+    this.errorHandlers = new LinkedList<>();
     for (final BatchableStatement<?, ?> statement: statements) {
       add(statement);
     }
-    this.recorder = recorder;
-    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -171,11 +171,11 @@ public class BatchImpl
     this.statements = new ArrayList<>(32);
     this.logged = logged;
     this.usings = new OptionsImpl(this);
+    this.recorder = recorder;
+    this.errorHandlers = new LinkedList<>();
     for (final BatchableStatement<?, ?> statement: statements) {
       add(statement);
     }
-    this.recorder = recorder;
-    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -190,9 +190,9 @@ public class BatchImpl
     super(Void.class, (String)null, b.mgr, b.bridge);
     this.statements = new ArrayList<>(b.statements);
     this.logged = b.logged;
-    this.usings = new OptionsImpl(this, b.usings);
     this.recorder = recorder;
     this.errorHandlers = new LinkedList<>(b.errorHandlers);
+    this.usings = new OptionsImpl(this, b.usings);
   }
 
   /**

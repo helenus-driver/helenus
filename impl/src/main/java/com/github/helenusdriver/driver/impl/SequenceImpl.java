@@ -109,11 +109,11 @@ public class SequenceImpl
   ) {
     super(Void.class, (String)null, mgr, bridge);
     this.statements = new ArrayList<>(Math.max(statements.length, 8));
+    this.recorder = recorder;
+    this.errorHandlers = new LinkedList<>();
     for (final SequenceableStatement<?, ?> statement: statements) {
       add(statement);
     }
-    this.recorder = recorder;
-    this.errorHandlers = new LinkedList<>();
   }
 
   /**
@@ -136,11 +136,11 @@ public class SequenceImpl
   ) {
     super(Void.class, (String)null, mgr, bridge);
     this.statements = new ArrayList<>(32);
+    this.recorder = recorder;
+    this.errorHandlers = new LinkedList<>();
     for (final SequenceableStatement<?, ?> statement: statements) {
       add(statement);
     }
-    this.recorder = recorder;
-    this.errorHandlers = new LinkedList<>();
   }
 
   /**
