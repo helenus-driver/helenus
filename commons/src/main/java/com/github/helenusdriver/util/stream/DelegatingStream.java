@@ -55,7 +55,7 @@ public class DelegatingStream<T> implements Stream<T> {
    *
    * @author paouelle
    */
-  private final Stream<T> delegate;
+  protected final Stream<T> delegate;
 
   /**
    * Instantiates a new <code>DelegatingStream</code> object.
