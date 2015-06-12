@@ -33,8 +33,10 @@ import java.util.stream.StreamSupport;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.ExecutionInfo;
+import com.github.helenusdriver.driver.ObjectNotFoundException;
 import com.github.helenusdriver.driver.ObjectSet;
 import com.github.helenusdriver.driver.ObjectSetFuture;
+import com.github.helenusdriver.driver.StatementManager;
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ExecutionList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -78,6 +80,13 @@ public class CompoundObjectSetFuture<T>
   private final ExecutionList executionList = new ExecutionList();
 
   /**
+   * Holds the statement context associated with this object set future.
+   *
+   * @author paouelle
+   */
+  private final StatementManager.Context<T> context;
+
+  /**
    * Holds the future object sets.
    *
    * @author paouelle
@@ -96,12 +105,17 @@ public class CompoundObjectSetFuture<T>
    *
    * @author paouelle
    *
+   * @param  context the statement context associated with this object set future
    * @param  futures the list of object set futures to compound together
-   * @throws NullPointerException if <code>statements</code> or any of the
-   *         object set futures are <code>null</code>
+   * @throws NullPointerException if <code>context</code>, <code>statements</code>
+   *         or any of the object set futures are <code>null</code>
    */
-  public CompoundObjectSetFuture(List<ObjectSetFuture<T>> futures) {
+  public CompoundObjectSetFuture(
+    StatementManager.Context<T> context, List<ObjectSetFuture<T>> futures
+  ) {
+    org.apache.commons.lang3.Validate.notNull(context, "invalid null context");
     org.apache.commons.lang3.Validate.notNull(futures, "invalid null result set futures");
+    this.context = context;
     final List<ObjectSetFuture<T>> osets = new ArrayList<>(futures.size());
 
     this.called = new BitSet(futures.size());
@@ -219,7 +233,7 @@ public class CompoundObjectSetFuture<T>
         results.add(result);
       }
     }
-    return new CompoundObjectSet<>(results);
+    return new CompoundObjectSet<>(context, results);
   }
 
   /**
@@ -238,7 +252,7 @@ public class CompoundObjectSetFuture<T>
         results.add(future.get());
       }
     }
-    return new CompoundObjectSet<>(results);
+    return new CompoundObjectSet<>(context, results);
   }
 
   /**
@@ -257,7 +271,7 @@ public class CompoundObjectSetFuture<T>
         results.add(future.getUninterruptibly());
       }
     }
-    return new CompoundObjectSet<>(results);
+    return new CompoundObjectSet<>(context, results);
   }
 
   /**
@@ -282,7 +296,7 @@ public class CompoundObjectSetFuture<T>
         results.add(result);
       }
     }
-    return new CompoundObjectSet<>(results);
+    return new CompoundObjectSet<>(context, results);
   }
 
   /**
@@ -312,6 +326,13 @@ public class CompoundObjectSetFuture<T>
    */
   private static class CompoundObjectSet<T> implements ObjectSet<T> {
     /**
+     * Holds the statement context associated with this object set.
+     *
+     * @author paouelle
+     */
+    private final StatementManager.Context<T> context;
+
+    /**
      * Holds the object sets being compounded.
      *
      * @author paouelle
@@ -330,10 +351,15 @@ public class CompoundObjectSetFuture<T>
      *
      * @author paouelle
      *
+     * @param context the non-<code>null</code> statement context associated with
+     *        this object set
      * @param objects the non-<code>null</code> and non-empty list of object
      *        sets to compound together
      */
-    CompoundObjectSet(List<ObjectSet<T>> objects) {
+    CompoundObjectSet(
+      StatementManager.Context<T> context, List<ObjectSet<T>> objects
+    ) {
+      this.context = context;
       this.objects = objects;
     }
 
@@ -397,7 +423,7 @@ public class CompoundObjectSetFuture<T>
     @Override
     public T oneRequired() {
       if (isExhausted()) {
-        return null;
+        throw new ObjectNotFoundException(context.getObjectClass());
       }
       return objects.get(i).oneRequired();
     }

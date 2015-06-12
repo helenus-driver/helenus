@@ -398,6 +398,7 @@ public class SelectImpl<T>
       return super.executeAsync();
     }
     return new CompoundObjectSetFuture<>(
+      getContext(),
       statements()
         .map(s -> s.executeAsync())
         .collect(Collectors.toList())
