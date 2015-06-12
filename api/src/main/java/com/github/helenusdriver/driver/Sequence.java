@@ -60,6 +60,8 @@ public interface Sequence
    * @param  statement the new statement to add
    * @return this sequence
    * @throws NullPointerException if <code>statement</code> is <code>null</code>
+   * @throws ObjectValidationException if the statement's POJO is validated via
+   *         an associated recorder and that validation fails
    */
   public <R, F extends ListenableFuture<R>> Sequence add(SequenceableStatement<R, F> statement);
 

@@ -89,6 +89,8 @@ public interface Group<S> extends GenericStatement<Void, VoidFuture> {
    * @throws NullPointerException if <code>statement</code> is <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
    *         are mixed or if the statement is not of a supported class
+   * @throws ObjectValidationException if the statement's POJO is validated via
+   *         an associated recorder and that validation fails
    */
   public <R, F extends ListenableFuture<R>> S add(BatchableStatement<R, F> statement);
 
