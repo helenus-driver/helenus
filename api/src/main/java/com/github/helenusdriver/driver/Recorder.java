@@ -17,18 +17,18 @@ package com.github.helenusdriver.driver;
 
 /**
  * The <code>Recorder</code> interface can be used along with a {@link Batch}
- * or a {@link Sequence} in order to record inserted, updated, or removed pojos
- * as statements are added to a batch or a sequence using one of the following
- * methods.
+ * or a {@link Sequence} in order to record inserted, updated, or removed POJO
+ * objects as statements are added to a batch or a sequence using one of the
+ * following methods:
  * <p>
  * <ul>
- *   <li>{@link StatementBuilder#insert(Object)}</li>
- *   <li>{@link StatementBuilder#update(Object)}</li>
- *   <li>{@link StatementBuilder#update(Object, java.util.stream.Stream)}</li>
- *   <li>{@link StatementBuilder#update(Object, String...)}</li>
- *   <li>{@link StatementBuilder#delete(Object)}</li>
- *   <li>{@link StatementBuilder#delete(Object, String...)}</li>
+ *   <li>{@link Batch#add(BatchableStatement)}</li>
+ *   <li>{@link Sequence#add(BatchableStatement)}</li>
+ *   <li>{@link Sequence#add(SequenceableStatement)}</li>
  * </ul>
+ * <p>
+ * It can also be used to validate the statement before it is allowed to be
+ * added to the batch.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -41,10 +41,15 @@ public interface Recorder {
   /**
    * Called when an object statement is being recorded with a
    * {@link Group}.
+   * <p>
+   * <i>Note:</i> All runtime exceptions thrown out of this method will bubble
+   * out of any of the <code>add()</code> methods listed above.
    *
    * @author paouelle
    *
-   * @param statement the non-<code>null</code> object statement recorded
+   * @param  statement the non-<code>null</code> object statement recorded
+   * @throws ObjectValidationException if the statement's POJO is validated and
+   *         that validation fails
    */
   public void recorded(ObjectStatement<?> statement);
 }

@@ -24,9 +24,6 @@ import com.github.helenusdriver.persistence.Persisted;
 import com.github.helenusdriver.persistence.SuffixKey;
 import com.github.helenusdriver.persistence.TypeKey;
 
-
-
-
 /**
  * The <code>FieldInfo</code> interface provides information about a specific
  * field in a given table for a particular POJO class.
