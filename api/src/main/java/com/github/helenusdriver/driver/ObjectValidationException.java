@@ -61,6 +61,18 @@ public class ObjectValidationException extends RuntimeException {
    *
    * @author paouelle
    *
+   * @param e the validation exception to copy (it will become the cause of the
+   *        newly created exception)
+   */
+  public ObjectValidationException(ObjectValidationException e) {
+    this(e.obj, e.name, e.val, e.getMessage(), e);
+  }
+
+  /**
+   * Instantiates a new <code>ObjectValidationException</code> object.
+   *
+   * @author paouelle
+   *
    * @param obj the POJO that failed validation
    * @param name the name of the column that failed validation
    * @param val the value of the column that failed validation
