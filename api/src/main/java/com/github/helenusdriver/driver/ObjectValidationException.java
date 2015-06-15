@@ -27,7 +27,7 @@ package com.github.helenusdriver.driver;
  *
  * @since 1.0
  */
-public class ObjectValidationException extends RuntimeException {
+public class ObjectValidationException extends IllegalArgumentException {
   /**
    * Holds the serial version UID for this class.
    *
