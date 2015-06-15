@@ -128,7 +128,7 @@ public interface Insert<T>
    *
    * @since 1.0
    */
-  public interface Builder<T> extends Insert<T> {
+  public interface Builder<T> {
     /**
      * Adds tables to insert into using the keyspace defined in the POJO.
      *

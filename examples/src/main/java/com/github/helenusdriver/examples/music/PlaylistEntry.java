@@ -230,7 +230,7 @@ public class PlaylistEntry {
    *         unauthorized or any other validation problem).
    */
   public void save() {
-    StatementBuilder.insert(this).execute();
+    StatementBuilder.insert(this).intoAll().execute();
   }
 
   /**

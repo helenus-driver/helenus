@@ -73,8 +73,8 @@ import com.github.helenusdriver.driver.Batch;
 import com.github.helenusdriver.driver.CreateSchema;
 import com.github.helenusdriver.driver.CreateSchemas;
 import com.github.helenusdriver.driver.GenericStatement;
-import com.github.helenusdriver.driver.ObjectSet;
 import com.github.helenusdriver.driver.ObjectClassStatement;
+import com.github.helenusdriver.driver.ObjectSet;
 import com.github.helenusdriver.driver.Sequence;
 import com.github.helenusdriver.driver.StatementBuilder;
 import com.github.helenusdriver.driver.impl.StatementManagerImpl;
@@ -1270,7 +1270,7 @@ public class Tool {
       final Batch b = StatementBuilder.batch();
 
       for (final Object io: ios) {
-        b.add(StatementBuilder.insert(io));
+        b.add(StatementBuilder.insert(io).intoAll());
       }
       if (b.isEmpty() || (b.getQueryString() == null)) {
         System.out.println(Tool.class.getSimpleName() + ": no objects to insert");
