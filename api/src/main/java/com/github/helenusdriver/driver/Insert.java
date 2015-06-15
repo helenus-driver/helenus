@@ -34,6 +34,20 @@ import java.util.stream.Stream;
 public interface Insert<T>
   extends ObjectStatement<T>, BatchableStatement<Void, VoidFuture> {
   /**
+   * Checks if there are no column/value pairs registered with this INSERT
+   * statement; indicating that all column/value pairs would be inserted.
+   * <p>
+   * <i>Note:</i> Call {@link #valuesFromObject} would force this method to
+   * return <code>true</code>.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if there are no column/value pairs registered;
+   *         <code>false</code> otherwise
+   */
+  public boolean isEmpty();
+
+  /**
    * Adds all column/value pairs from the POJO object to the values inserted by
    * this INSERT statement.
    *

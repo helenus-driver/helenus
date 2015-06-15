@@ -284,6 +284,22 @@ public class InsertImpl<T>
    *
    * @author paouelle
    *
+   * @see com.github.helenusdriver.driver.Insert#isEmpty()
+   */
+  @Override
+  public boolean isEmpty() {
+    if (allValuesAdded || columns.isEmpty()) {
+      // either is considered as if all columns were added
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see com.github.helenusdriver.driver.Insert#valuesFromObject()
    */
   @Override
@@ -508,6 +524,20 @@ public class InsertImpl<T>
     @Override
     public Insert<T> intoAll() {
       return init(new InsertImpl<>(getPOJOContext(), null, mgr, bridge));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.github.helenusdriver.driver.Insert#isEmpty()
+     */
+    @Override
+    public boolean isEmpty() {
+      // while we are still in the builder's instance, we still haven't
+      // added any column/value pairs
+      return true;
     }
 
     /**
