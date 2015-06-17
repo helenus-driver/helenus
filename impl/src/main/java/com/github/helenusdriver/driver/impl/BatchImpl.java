@@ -310,21 +310,13 @@ public class BatchImpl
       return;
     }
     // start by notifying the registered recorder
-    recorder.ifPresent(
-      r -> Inhibit.throwables(
-        () -> r.recorded(statement), t -> logger.catching(t)
-      )
-    );
+    recorder.ifPresent(r ->  r.recorded(statement));
     // now notify our parent if any
     final ParentStatementImpl p = parent;
 
-    Inhibit.throwables(
-      () -> {
-        if (p != null) {
-          p.recorded(statement);
-        }
-      }, t -> logger.catching(t)
-    );
+    if (p != null) {
+      p.recorded(statement);
+    }
   }
 
   /**
