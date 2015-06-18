@@ -34,6 +34,7 @@ import com.github.helenusdriver.driver.Delete;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.Using;
 import com.github.helenusdriver.driver.VoidFuture;
+import com.github.helenusdriver.driver.info.TableInfo;
 
 /**
  * The <code>DeleteImpl</code> class extends the functionality of Cassandra's
@@ -435,6 +436,18 @@ public class DeleteImpl<T>
   @Override
   protected void appendGroupType(StringBuilder builder) {
     builder.append("BATCH");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Update#tables()
+   */
+  @Override
+  public Stream<TableInfo<T>> tables() {
+    return tables.stream().map(t -> t);
   }
 
   /**

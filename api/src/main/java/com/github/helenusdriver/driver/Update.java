@@ -15,6 +15,10 @@
  */
 package com.github.helenusdriver.driver;
 
+import java.util.stream.Stream;
+
+import com.github.helenusdriver.driver.info.TableInfo;
+
 /**
  * The <code>Update</code> interface extends the functionality of Cassandra's
  * {@link com.datastax.driver.core.querybuilder.Update} class to provide support
@@ -31,6 +35,16 @@ package com.github.helenusdriver.driver;
  */
 public interface Update<T>
   extends ObjectStatement<T>, BatchableStatement<Void, VoidFuture> {
+  /**
+   * Gets all the tables included in this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> stream of all tables included in this
+   *         statement
+   */
+  public Stream<TableInfo<T>> tables();
+
   /**
    * Sets the 'IF EXISTS' option for this UPDATE statement.
    * <p>

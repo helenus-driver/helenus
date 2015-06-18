@@ -35,6 +35,7 @@ import com.github.helenusdriver.driver.ObjectExistException;
 import com.github.helenusdriver.driver.StatementBridge;
 import com.github.helenusdriver.driver.Using;
 import com.github.helenusdriver.driver.VoidFuture;
+import com.github.helenusdriver.driver.info.TableInfo;
 
 /**
  * The <code>InsertImpl</code> class extends the functionality of Cassandra's
@@ -293,6 +294,18 @@ public class InsertImpl<T>
       return true;
     }
     return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Insert#tables()
+   */
+  @Override
+  public Stream<TableInfo<T>> tables() {
+    return tables.stream().map(t -> t);
   }
 
   /**

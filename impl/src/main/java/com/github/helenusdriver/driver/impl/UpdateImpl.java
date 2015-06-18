@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
@@ -35,6 +36,7 @@ import com.github.helenusdriver.driver.UpdateNotAppliedException;
 import com.github.helenusdriver.driver.Using;
 import com.github.helenusdriver.driver.VoidFuture;
 import com.github.helenusdriver.driver.impl.AssignmentImpl.CounterAssignmentImpl;
+import com.github.helenusdriver.driver.info.TableInfo;
 
 /**
  * The <code>UpdateImpl</code> class extends the functionality of Cassandra's
@@ -560,6 +562,18 @@ public class UpdateImpl<T>
     if (isCounterOp()) {
       builder.append(" COUNTER");
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.github.helenusdriver.driver.Update#tables()
+   */
+  @Override
+  public Stream<TableInfo<T>> tables() {
+    return tables.stream().map(t -> t);
   }
 
   /**

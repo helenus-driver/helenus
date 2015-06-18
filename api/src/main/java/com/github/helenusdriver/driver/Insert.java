@@ -17,6 +17,8 @@ package com.github.helenusdriver.driver;
 
 import java.util.stream.Stream;
 
+import com.github.helenusdriver.driver.info.TableInfo;
+
 /**
  * The <code>Insert</code> interface extends the functionality of Cassandra's
  * {@link com.datastax.driver.core.querybuilder.Insert} class to provide support
@@ -46,6 +48,16 @@ public interface Insert<T>
    *         <code>false</code> otherwise
    */
   public boolean isEmpty();
+
+  /**
+   * Gets all the tables included in this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> stream of all tables included in this
+   *         statement
+   */
+  public Stream<TableInfo<T>> tables();
 
   /**
    * Adds all column/value pairs from the POJO object to the values inserted by
