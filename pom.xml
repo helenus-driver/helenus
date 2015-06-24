@@ -24,14 +24,14 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.github.helenusdriver</groupId>
+  <groupId>org.helenus</groupId>
   <artifactId>helenus</artifactId>
   <packaging>pom</packaging>
   <version>1.0.10-SNAPSHOT</version>
 
   <name>Helenus</name>
   <description>JPA-like syntax for annotating POJO classes for persistence via Cassandra's Java driver</description>
-  <url>https://github.com/helenusdriver/helenus</url>
+  <url>http://www.helenus.org</url>
   
   <licenses>
     <license>
@@ -262,17 +262,17 @@
     <dependencies>
       <!-- Helenus Libraries -->
       <dependency>
-	<groupId>com.github.helenusdriver</groupId>
+	<groupId>org.helenus</groupId>
 	<artifactId>helenus-commons</artifactId>
 	<version>${helenus-version}</version>
       </dependency>
       <dependency>
-	<groupId>com.github.helenusdriver</groupId>
+	<groupId>org.helenus</groupId>
 	<artifactId>helenus-api</artifactId>
 	<version>${helenus-version}</version>
       </dependency>
       <dependency>
-	<groupId>com.github.helenusdriver</groupId>
+	<groupId>org.helenus</groupId>
 	<artifactId>helenus-impl</artifactId>
 	<version>${helenus-version}</version>
       </dependency>

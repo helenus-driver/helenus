@@ -23,8 +23,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.github.helenusdriver.driver.StatementManager;
 import com.google.common.util.concurrent.ExecutionList;
+
+import org.helenus.driver.StatementManager;
 
 /**
  * The <code>LastResultSetFuture</code> class defines a result set which is

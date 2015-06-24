@@ -17,9 +17,9 @@ package com.datastax.driver.core;
 
 import java.util.stream.Collectors;
 
-import com.github.helenusdriver.driver.impl.DataTypeImpl.Definition;
-import com.github.helenusdriver.persistence.CQLDataType;
-import com.github.helenusdriver.persistence.Ordering;
+import org.helenus.driver.impl.DataTypeImpl.Definition;
+import org.helenus.driver.persistence.CQLDataType;
+import org.helenus.driver.persistence.Ordering;
 
 /**
  * The <code>DataTypeParser</code> provides access to the
@@ -97,7 +97,7 @@ public class DataTypeParser extends CassandraTypeParser {
       };
     }
     return new Definition(
-      com.github.helenusdriver.persistence.DataType.valueOf(t.getName().name()),
+      org.helenus.driver.persistence.DataType.valueOf(t.getName().name()),
       t.getTypeArguments().stream()
         .map(ta -> DataTypeParser.toCQL(ta))
         .collect(Collectors.toList())

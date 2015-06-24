@@ -45,7 +45,7 @@
 	</appenders>
 
 	<loggers>
-        <logger name="com.github.helenusdriver" level="TRACE"/>
+        <logger name="org.helenus" level="TRACE"/>
 		<root level="TRACE">
 			<appender-ref ref="STDOUT_LOCATION">
 				<filters>

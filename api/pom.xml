@@ -25,7 +25,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.github.helenusdriver</groupId>
+    <groupId>org.helenus</groupId>
     <artifactId>helenus</artifactId>
     <version>1.0.10-SNAPSHOT</version>
   </parent>
@@ -55,7 +55,7 @@
     </dependency>
 
     <dependency>
-      <groupId>com.github.helenusdriver</groupId>
+      <groupId>org.helenus</groupId>
       <artifactId>helenus-commons</artifactId>
     </dependency>
     

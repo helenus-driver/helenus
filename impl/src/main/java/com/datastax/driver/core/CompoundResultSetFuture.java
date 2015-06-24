@@ -27,9 +27,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import com.github.helenusdriver.driver.StatementManager;
 import com.google.common.util.concurrent.ExecutionList;
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.helenus.driver.StatementManager;
 
 /**
  * The <code>CompoundResultSetFuture</code> class defines a result set which is
