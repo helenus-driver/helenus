@@ -16,6 +16,7 @@
 package org.helenus.driver;
 
 import com.google.common.util.concurrent.AbstractFuture;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.util.function.ERunnable;
 
@@ -32,7 +33,7 @@ import org.helenus.util.function.ERunnable;
  * @since 1.0
  */
 public interface Batch
-  extends Statement<Void>, BatchableStatement<Void, VoidFuture>, Group<Batch> {
+  extends Statement<Void>, BatchableStatement<Void, VoidFuture>, Group {
   /**
    * Holds the max size of the batch after which we should be committing it to
    * Cassandra while processing the CSV file.
@@ -66,6 +67,36 @@ public interface Batch
    */
   @Override
   public String getKeyspace();
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#add(org.helenus.driver.BatchableStatement)
+   */
+  @Override
+  public <R, F extends ListenableFuture<R>> Batch add(BatchableStatement<R, F> statement);
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#add(com.datastax.driver.core.RegularStatement)
+   */
+  @Override
+  public Batch add(com.datastax.driver.core.RegularStatement statement);
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#addErrorHandler(org.helenus.util.function.ERunnable)
+   */
+  @Override
+  public Batch addErrorHandler(ERunnable<?> run);
 
   /**
    * Checks the this batch has reached the recommended size for a batch in

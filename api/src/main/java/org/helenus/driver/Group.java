@@ -31,11 +31,9 @@ import org.helenus.util.function.ERunnable;
  * @author  The Helenus Driver Project Authors
  * @version 1 - May 21, 2015 - paouelle - Creation
  *
- * @param <S> the type of statement that is
- *
  * @since 1.0
  */
-public interface Group<S> extends GenericStatement<Void, VoidFuture> {
+public interface Group extends GenericStatement<Void, VoidFuture> {
   /**
    * Gets the recorder registered with this group or with a parent
    * if any.
@@ -93,7 +91,7 @@ public interface Group<S> extends GenericStatement<Void, VoidFuture> {
    * @throws ObjectValidationException if the statement's POJO is validated via
    *         an associated recorder and that validation fails
    */
-  public <R, F extends ListenableFuture<R>> S add(BatchableStatement<R, F> statement);
+  public <R, F extends ListenableFuture<R>> Group add(BatchableStatement<R, F> statement);
 
   /**
    * Adds a new raw Cassandra statement to this group.
@@ -107,7 +105,7 @@ public interface Group<S> extends GenericStatement<Void, VoidFuture> {
    *         are mixed or if the statement represents a "select" statement or a
    *         "batch" statement or if the statement is not of a supported class
    */
-  public S add(com.datastax.driver.core.RegularStatement statement);
+  public Group add(com.datastax.driver.core.RegularStatement statement);
 
   /**
    * Registers an error handler with this group. Error handlers
@@ -123,7 +121,7 @@ public interface Group<S> extends GenericStatement<Void, VoidFuture> {
    * @return this group
    * @throws NullPointerException if <code>run</code> is <code>null</code>
    */
-  public S addErrorHandler(ERunnable<?> run);
+  public Group addErrorHandler(ERunnable<?> run);
 
   /**
    * Runs all registered error handlers in sequence from the current thread. This

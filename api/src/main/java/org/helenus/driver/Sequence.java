@@ -19,6 +19,8 @@ import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.helenus.util.function.ERunnable;
+
 /**
  * The <code>Sequence</code> interface defines support for a statement that
  * can execute a set of statements in sequence returning the result set from
@@ -32,7 +34,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * @since 1.0
  */
 public interface Sequence
-  extends Group<Sequence>, SequenceableStatement<Void, VoidFuture> {
+  extends Group, SequenceableStatement<Void, VoidFuture> {
   /**
    * {@inheritDoc}
    * <p>
@@ -47,23 +49,6 @@ public interface Sequence
    */
   @Override
   public String getKeyspace();
-
-  /**
-   * Adds a new statement to this sequence.
-   *
-   * @author paouelle
-   *
-   * @param <R> The type of result returned when executing the statement to sequence
-   * @param <F> The type of future result returned when executing the statement
-   *            to sequence
-   *
-   * @param  statement the new statement to add
-   * @return this sequence
-   * @throws NullPointerException if <code>statement</code> is <code>null</code>
-   * @throws ObjectValidationException if the statement's POJO is validated via
-   *         an associated recorder and that validation fails
-   */
-  public <R, F extends ListenableFuture<R>> Sequence add(SequenceableStatement<R, F> statement);
 
   /**
    * {@inheritDoc}
@@ -134,4 +119,51 @@ public interface Sequence
    */
   @Override
   public ResultSetFuture executeAsyncRaw();
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#add(org.helenus.driver.BatchableStatement)
+   */
+  @Override
+  public <R, F extends ListenableFuture<R>> Sequence add(BatchableStatement<R, F> statement);
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#add(com.datastax.driver.core.RegularStatement)
+   */
+  @Override
+  public Sequence add(com.datastax.driver.core.RegularStatement statement);
+
+  /**
+   * Adds a new statement to this sequence.
+   *
+   * @author paouelle
+   *
+   * @param <R> The type of result returned when executing the statement to sequence
+   * @param <F> The type of future result returned when executing the statement
+   *            to sequence
+   *
+   * @param  statement the new statement to add
+   * @return this sequence
+   * @throws NullPointerException if <code>statement</code> is <code>null</code>
+   * @throws ObjectValidationException if the statement's POJO is validated via
+   *         an associated recorder and that validation fails
+   */
+  public <R, F extends ListenableFuture<R>> Sequence add(SequenceableStatement<R, F> statement);
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#addErrorHandler(org.helenus.util.function.ERunnable)
+   */
+  @Override
+  public Sequence addErrorHandler(ERunnable<?> run);
 }

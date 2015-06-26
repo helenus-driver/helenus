@@ -543,9 +543,11 @@ public class BatchImpl
       Inhibit.throwables((ERunnable<Throwable>)run, t -> logger.catching(t));
     }
     // now recurse in contained batches that have been added
-    statements.stream()
-      .filter(s -> s instanceof Group)
-      .forEach(s -> ((Group)s).runErrorHandlers());
+    for (final StatementImpl s: statements) {
+      if (s instanceof Group) {
+        ((Group)s).runErrorHandlers();
+      }
+    }
   }
 
   /**
