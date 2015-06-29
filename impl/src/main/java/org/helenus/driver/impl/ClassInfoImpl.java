@@ -1407,6 +1407,18 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.info.ClassInfo#getNumSuffixKeys()
+   */
+  @Override
+  public int getNumSuffixKeys() {
+    return suffixesByType.size();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.info.ClassInfo#getSuffixKey(java.lang.String)
    */
   @Override

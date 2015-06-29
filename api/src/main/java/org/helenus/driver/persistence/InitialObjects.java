@@ -52,7 +52,7 @@ public @interface InitialObjects {
   /**
    * Specifies the factory static method to be invoked to get an array of
    * pojo objects to insert in the database at the time a table for the
-   * associate entity is created.
+   * associated entity is created.
    * <p>
    * <i>Note:</i> If the POJO class requires suffix keys, the specified method
    * must be defined with a <code>Map&lt;String, String&gt;</code> parameter in order

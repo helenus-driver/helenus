@@ -21,11 +21,11 @@
 <!-- @copyright 2015-2015 The Helenus Driver Project Authors                   -->
 <!--                                                                           -->
 <!-- @author The Helenus Driver Project Authors                                -->
-<!-- @version 1 - Jan 15, 2015 - paouelle - Creation                           -->
+<!-- @version 1 - Jun 28, 2015 - paouelle - Creation                           -->
 <!--                                                                           -->
 <!-- @since 1.0                                                                -->
 <!--                                                                           -->
-<configuration strict="true">
+<configuration strict="true"  packages="org.helenus.driver.junit.log4j">
 <!-- include this to enable log4j internal debug messages: status="debug" -->
 	<appenders>
 		<appender type="Console" name="STDOUT_LOCATION">
@@ -36,25 +36,51 @@
 			<layout type="PatternLayout"
 				pattern="%sequenceNumber: %date: %%%class-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %msg%map%n%throwable" />
 		</appender>
+		<appender type="File" name="CASSANDRA_FILE" fileName="target/helenus-junit/logs/system.log">
+            <layout type="PatternLayout"
+                pattern="%-5level [%thread] %date{ISO8601} %F:%L - %msg%n" />
+        </appender>
+		<!--  appender class="ch.qos.logback.core.rolling.RollingFileAppender" name="CASSANDRA_FILE">
+		    <file>target/helenus-junit/logs/system.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+                <fileNamePattern>target/helenus-junit/logs/system.log.%i.zip</fileNamePattern>
+                <minIndex>1</minIndex>
+                <maxIndex>20</maxIndex>
+            </rollingPolicy>
+            <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+                <maxFileSize>20MB</maxFileSize>
+            </triggeringPolicy>
+            <encoder>
+                <pattern>%-5level [%thread] %date{ISO8601} %F:%L - %msg%n</pattern>
+            </encoder>
+		</appender -->
 	</appenders>
 
 	<loggers>
         <logger name="org.helenus" level="TRACE"/>
+        <logger name="com.datastax" level="INFO"/>
+        <logger name="org.apache.cassandra" level="INFO"/>
         
 		<root level="TRACE">
-			<appender-ref ref="STDOUT_LOCATION">
-				<filters>
+            <appender-ref ref="CASSANDRA_FILE">
+                <filters>
+                    <CassandraDaemonThreadFilter onMatch="ACCEPT" onMismatch="DENY"/>
+                </filters>
+            </appender-ref>
+            <appender-ref ref="STDOUT_LOCATION">
+                <filters>
+                    <CassandraDaemonThreadFilter onMatch="DENY" onMismatch="NEUTRAL"/>
                     <MarkerFilter marker="FLOW" onMatch="ACCEPT" onMismatch="DENY"/>
                     <MarkerFilter marker="EXCEPTION" onMatch="ACCEPT" onMismatch="DENY"/>
-				</filters>
-			</appender-ref>
-			<appender-ref ref="STDOUT">
-				<filters>
+                </filters>
+            </appender-ref>
+            <appender-ref ref="STDOUT">
+                <filters>
+                    <CassandraDaemonThreadFilter onMatch="DENY" onMismatch="NEUTRAL"/>
                     <MarkerFilter marker="FLOW" onMatch="DENY" onMismatch="NEUTRAL"/>
                     <MarkerFilter marker="EXCEPTION" onMatch="DENY" onMismatch="ACCEPT"/>
-				</filters>
-			</appender-ref>
-		</root>
+                </filters>
+            </appender-ref>                
+      	</root>
 	</loggers>
-
 </configuration>

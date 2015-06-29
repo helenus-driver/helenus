@@ -87,11 +87,11 @@
     <commons-collections-version>4.0</commons-collections-version>
     <commons-cli-version>1.2</commons-cli-version>
     <commons-codec-version>1.10</commons-codec-version>
+    <commons-io-version>2.4</commons-io-version>
     <reflections-version>0.9.9</reflections-version>
     <lombok-version>1.16.2</lombok-version>
     <fasterxml-jackson-version>2.5.1</fasterxml-jackson-version>
     <cassandra-version>2.1.4</cassandra-version>
-    <cassandra-driver-version>2.1.4</cassandra-driver-version>
     <glassfish-version>1.0.4</glassfish-version>
     <tomcat-version>8.0.21</tomcat-version>
     <servlet-api-version>3.1.0</servlet-api-version>
@@ -299,6 +299,11 @@
 	<version>${commons-codec-version}</version>
       </dependency>
       <dependency>
+	<groupId>commons-io</groupId>
+	<artifactId>commons-io</artifactId>
+	<version>${commons-io-version}</version>
+      </dependency>
+      <dependency>
 	<groupId>org.apache.logging.log4j</groupId>
 	<artifactId>log4j-slf4j-impl</artifactId>
 	<version>${log4j2-version}</version>
@@ -329,6 +334,16 @@
 	<scope>provided</scope> <!-- because we want to run with the log4j2 api wrapper for log4j above -->
       </dependency>
       <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-core</artifactId>
+	<version>1.1.2</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+	<version>1.1.2</version>
+      </dependency>
+      <dependency>
 	<groupId>org.projectlombok</groupId>
 	<artifactId>lombok</artifactId>
 	<version>${lombok-version}</version>
@@ -351,7 +366,12 @@
       <dependency>
 	<groupId>com.datastax.cassandra</groupId>
 	<artifactId>cassandra-driver-core</artifactId>
-	<version>${cassandra-driver-version}</version>
+	<version>${cassandra-version}</version>
+      </dependency>
+      <dependency>
+	<groupId>org.apache.cassandra</groupId>
+	<artifactId>cassandra-all</artifactId>
+	<version>${cassandra-version}</version>
       </dependency>
       <dependency>
 	<groupId>com.fasterxml.jackson.datatype</groupId>
@@ -421,5 +441,6 @@
     <module>impl</module>
     <module>tomcat</module>
     <module>examples</module>
+    <module>junit</module>
   </modules>
 </project>

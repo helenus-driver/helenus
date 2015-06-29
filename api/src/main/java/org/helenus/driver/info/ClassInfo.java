@@ -67,6 +67,15 @@ public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
   public boolean supportsTablesAndIndexes();
 
   /**
+   * Gets the number of suffix keys defined by this class of pojo.
+   *
+   * @author paouelle
+   *
+   * @return the number of suffix keys defined by this class of pojo
+   */
+  public int getNumSuffixKeys();
+
+  /**
    * Gets the field info corresponding to the given suffix key.
    *
    * @author paouelle

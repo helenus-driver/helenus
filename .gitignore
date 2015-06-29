@@ -12,3 +12,4 @@ target/
 /install
 \~*.xlsx
 /logs
+/test
