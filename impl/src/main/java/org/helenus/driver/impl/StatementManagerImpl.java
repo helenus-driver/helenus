@@ -57,12 +57,14 @@ import org.helenus.driver.CreateSchemas;
 import org.helenus.driver.CreateTable;
 import org.helenus.driver.CreateType;
 import org.helenus.driver.Delete;
+import org.helenus.driver.Delete.Builder;
 import org.helenus.driver.Insert;
 import org.helenus.driver.KeyspaceWith;
 import org.helenus.driver.Ordering;
 import org.helenus.driver.Recorder;
 import org.helenus.driver.RegularStatement;
 import org.helenus.driver.Select;
+import org.helenus.driver.Select.Selection;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
@@ -70,8 +72,6 @@ import org.helenus.driver.StatementManager;
 import org.helenus.driver.Truncate;
 import org.helenus.driver.Update;
 import org.helenus.driver.Using;
-import org.helenus.driver.Delete.Builder;
-import org.helenus.driver.Select.Selection;
 import org.helenus.driver.impl.Utils.CNameSequence;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.EntityFilter;
@@ -320,6 +320,15 @@ public class StatementManagerImpl extends StatementManager {
         this.filters.add(EntityFilter.class.cast(clazz.newInstance()));
       }
     }
+  }
+
+  /**
+   * Clears the cache of pojo class info.
+   *
+   * @author paouelle
+   */
+  protected void clearCache() {
+    classInfoCache.clear();
   }
 
   /**

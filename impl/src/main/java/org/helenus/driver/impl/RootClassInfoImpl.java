@@ -15,10 +15,9 @@
  */
 package org.helenus.driver.impl;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -142,18 +141,10 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.Context#getInitialObjects()
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public T[] getInitialObjects() {
+    public Collection<T> getInitialObjects() {
       return contexts.values().stream()
-      .flatMap(
-        tc -> {
-          final T[] ts = tc.getInitialObjects();
-
-          return (ts != null) ? Arrays.stream(ts) : Stream.empty();
-        }
-      ).toArray(
-        sz -> (T[])Array.newInstance(clazz, sz)
-      );
+      .flatMap(tc -> tc.getInitialObjects().stream())
+      .collect(Collectors.toList());
     }
 
     /**
@@ -395,9 +386,12 @@ public class RootClassInfoImpl<T>
      *
      * @see org.helenus.driver.impl.ClassInfoImpl.Context#getInitialObjects()
      */
+    @SuppressWarnings("cast")
     @Override
-    public T[] getInitialObjects() {
-      return tcontext.getInitialObjects();
+    public Collection<T> getInitialObjects() {
+      return tcontext.getInitialObjects().stream()
+        .map(o -> (T)o) // type cast require to compile on cmdline
+        .collect(Collectors.toList());
     }
   }
 

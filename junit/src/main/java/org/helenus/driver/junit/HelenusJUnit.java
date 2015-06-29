@@ -15,6 +15,12 @@
  */
 package org.helenus.driver.junit;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -24,6 +30,9 @@ import java.io.InputStream;
 import java.net.ServerSocket;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -33,10 +42,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -54,6 +63,8 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.service.CassandraDaemon;
 import org.helenus.commons.collections.iterators.CombinationIterator;
+import org.helenus.commons.lang3.reflect.ReflectionUtils;
+import org.helenus.driver.Batch;
 import org.helenus.driver.CreateSchema;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
@@ -61,9 +72,10 @@ import org.helenus.driver.impl.ClassInfoImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
+import org.helenus.driver.junit.util.ReflectionJUnitUtils;
 import org.helenus.driver.junit.util.Strings;
-import org.junit.rules.TestRule;
-import org.junit.runner.Description;
+import org.junit.rules.MethodRule;
+import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
 import org.yaml.snakeyaml.reader.UnicodeReader;
 
@@ -81,7 +93,7 @@ import org.yaml.snakeyaml.reader.UnicodeReader;
  *
  * @since 1.0
  */
-public class HelenusJUnit implements TestRule {
+public class HelenusJUnit implements MethodRule {
   /**
    * Holds the logger.
    *
@@ -95,7 +107,7 @@ public class HelenusJUnit implements TestRule {
    *
    * @author paouelle
    */
-  public final static long DEFAULT_STARTUP_TIMEOUT = 10000L;
+  public final static long DEFAULT_STARTUP_TIMEOUT = 15000L;
 
   /**
    * Constant for the default Cassandra configuration file which starts the
@@ -143,7 +155,7 @@ public class HelenusJUnit implements TestRule {
    *
    * @author paouelle
    */
-  private static StatementManagerImpl manager = null;
+  private static StatementManagerUnitImpl manager = null;
 
   /**
    * Hold a set of pojo class for which we have loaded the schema definition
@@ -154,11 +166,26 @@ public class HelenusJUnit implements TestRule {
   private static final Set<Class<?>> schemas = new HashSet<>();
 
   /**
-   * Holds the description for the current test method.
+   * Holds the test method currently running.
    *
    * @author paouelle
    */
-  private static volatile Description description = null;
+  private static volatile FrameworkMethod method = null;
+
+  /**
+   * Holds the test object on which the test method is currently running
+   *
+   * @author paouelle
+   */
+  private static volatile Object target = null;
+
+  /**
+   * Holds the suffix key values for the current test method keyed by suffix
+   * types.
+   *
+   * @author paouelle
+   */
+  private static volatile Map<String, Set<String>> suffixKeyValues = null;
 
   /**
    * Holds the Cassandra config file name used to start the Cassandra daemon.
@@ -257,45 +284,11 @@ public class HelenusJUnit implements TestRule {
   }
 
   /**
-   * Checks if the specified suffix key value is a match for the specified pojo
-   * class.
-   *
-   * @author paouelle
-   *
-   * @param  skv the non-<code>null</code> suffix key value annotation to check
-   * @param  clazz the non-<code>null</code> pojo class to check
-   * @return <code>true</code> if the suffix key value annotation is a match for
-   *         the specified pojo class; <code>false</code> otherwise
-   */
-  private static boolean matches(SuffixKeyValues skv, Class<?> clazz) {
-    // first check for class matches
-    for (final Class<?> skvc: skv.classes()) {
-      if (clazz.equals(skvc)) {
-        return true;
-      }
-    }
-    // next check for package match
-    final String pkg = clazz.getPackage().getName();
-
-    for (final String skvp: skv.packages()) {
-      if (pkg.equals(skvp)) {
-        return true;
-      }
-    }
-    // finally check for the default (no classes & no pkgs defined)
-    if ((skv.classes().length == 0) && (skv.packages().length == 0)) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
    * Find the suffix key values from the specified test definition that matches
    * the specified pojo class.
    *
    * @author paouelle
    *
-   * @param  description the non-<code>null</code> test description
    * @param  cinfo the non-<code>null</code> pojo class information
    * @return a non-<code>null</code> collection of all suffix values keyed by
    *         their names based on the specified class info (each entry in the main
@@ -303,58 +296,192 @@ public class HelenusJUnit implements TestRule {
    *         given suffix)
    */
   private static Collection<Collection<Strings>> getSuffixKeyValues(
-    Description description, ClassInfo<?> cinfo
+    ClassInfo<?> cinfo
   ) {
-    final Class<?> clazz = cinfo.getObjectClass();
-    final Map<String, Set<String>> suffixes = new LinkedHashMap<>(12);
-    final Consumer<SuffixKeyValues> insert = skv -> {
-      final FieldInfo<?> finfo = cinfo.getSuffixKeyByType(skv.type());
+    final Map<String, Set<String>> skvss = HelenusJUnit.suffixKeyValues;
 
-      if (finfo == null) { // pojo doesn't define this suffix type
+    if (skvss == null) {
+      return Collections.emptyList();
+    }
+    return skvss.entrySet().stream()
+      .map(e -> {
+        final FieldInfo<?> finfo = cinfo.getSuffixKeyByType(e.getKey());
+
+        if (finfo != null) { // pojo defines this suffix type
+          return e.getValue().stream()
+            .map(v -> new Strings(finfo.getSuffixKeyName(), v))
+            .collect(Collectors.toList());
+        }
+        return null;
+      })
+      .filter(p -> p != null)
+      .collect(Collectors.toList());
+  }
+
+  /**
+   * Processes the @BeforeObjects method by calling it and inserting all
+   * returned pojo objects into the database.
+   *
+   * @author paouelle
+   *
+   * @param batch the non-<code>null</code> batch to insert the objects to create in
+   * @param m the non-<code>null</code> method to invoke to get the initial objects
+   * @param target the test object for which we are calling the method
+   * @param suffixes the map of suffixes to pass to the method
+   * @param onlyIfRequiresSuffixes <code>true</code> if the method should
+   *        not be called if it doesn't require suffixes
+   */
+  private static void processBeforeObjects(
+    Batch batch,
+    Method m,
+    Object target, Map<String, String> suffixes,
+    boolean onlyIfRequiresSuffixes
+  ) {
+    try {
+      final Class<?>[] cparms = m.getParameterTypes();
+      final Object ret;
+
+      // check if the method expects a map of suffixes
+      if (cparms.length == 0) { // doesn't care about suffixes
+        if (!onlyIfRequiresSuffixes) {
+          ret = m.invoke(target);
+        } else {
+          ret = null;
+        }
+      } else {
+        final Type[] tparms = m.getGenericParameterTypes();
+
+        if ((cparms.length != 1)
+            || !Map.class.isAssignableFrom(cparms[0])
+            || (tparms.length != 1)
+            || !(tparms[0] instanceof ParameterizedType)) {
+          throw new AssertionError(
+            "expecting one Map<String, String> parameter for @BeforeObjects method "
+            + m.getName()
+            + "("
+            + m.getDeclaringClass().getName()
+            + ")"
+          );
+        }
+        final ParameterizedType ptype = (ParameterizedType)tparms[0];
+
+        // maps will always have 2 arguments
+        for (final Type atype: ptype.getActualTypeArguments()) {
+          final Class<?> aclazz = ReflectionUtils.getRawClass(atype);
+
+          if (String.class != aclazz) {
+            throw new AssertionError(
+              "expecting one Map<String, String> parameter for @BeforeObjects method "
+              + m.getName()
+              + "("
+              + m.getDeclaringClass().getName()
+              + ")"
+            );
+          }
+        }
+        ret = m.invoke(target, suffixes);
+      }
+      if (ret == null) { // nothing to do
         return;
       }
-      suffixes.compute(
-        finfo.getSuffixKeyName(), (t, s) -> {
-          if (s == null) {
-            s = new LinkedHashSet<>(Math.max(1, skv.values().length) * 3 / 2);
-          }
-          for (final String v: skv.values()) {
-            s.add(v);
-          }
-          return s;
-        }
-      );
-    };
-    // start by looking at the annotations of the test method
-    // no choices to check for the @Repeatable first as the Description class
-    // doesn't support those yet
-    final SuffixKeyValuess askvss = description.getAnnotation(SuffixKeyValuess.class);
+      // validate the return type is either an array, a collection, or a stream
+      final Class<?> type = m.getReturnType();
 
-    if (askvss != null) {
-      for (final SuffixKeyValues askvs: askvss.value()) {
-        if (HelenusJUnit.matches(askvs, clazz)) {
-          insert.accept(askvs);
+      if (type.isArray()) {
+        final int l = Array.getLength(ret);
+
+        for (int i = 0; i < l; i++) {
+          batch.add(StatementBuilder.insert(Array.get(ret, i)).intoAll());
         }
+      } else if (ret instanceof Collection) {
+        ((Collection<?>)ret).forEach(o -> StatementBuilder.insert(0).intoAll());
+      } else if (ret instanceof Stream) {
+        ((Stream<?>)ret).forEach(o -> StatementBuilder.insert(0).intoAll());
+      } else if (ret instanceof Iterator) {
+        for (final Iterator<?> i = (Iterator<?>)ret; i.hasNext(); ) {
+          batch.add(StatementBuilder.insert(i.next()).intoAll());
+        }
+      } else if (ret instanceof Enumeration<?>) {
+        for (final Enumeration<?> e = (Enumeration<?>)ret; e.hasMoreElements(); ) {
+          batch.add(StatementBuilder.insert(e.nextElement()).intoAll());
+        }
+      } else if (ret instanceof Iterable) {
+        for (final Iterator<?> i = ((Iterable<?>)ret).iterator(); i.hasNext(); ) {
+          batch.add(StatementBuilder.insert(i.next()).intoAll());
+        }
+      } else {
+        batch.add(StatementBuilder.insert(ret).intoAll());
+      }
+    } catch (IllegalAccessException e) { // should not happen
+      throw new IllegalStateException(e);
+    } catch (InvocationTargetException e) {
+      final Throwable t = e.getTargetException();
+
+      if (t instanceof Error) {
+        throw (Error)t;
+      } else if (t instanceof RuntimeException) {
+        throw (RuntimeException)t;
+      } else { // we don't expect any of those
+        throw new IllegalStateException(t);
       }
     }
-    // and now check for a single SuffixKeyValues annotation
-    final SuffixKeyValues askvs = description.getAnnotation(SuffixKeyValues.class);
+  }
 
-    if ((askvs != null) && HelenusJUnit.matches(askvs, clazz)) {
-      insert.accept(askvs);
+  /**
+   * Processes all methods annotated with @BeforeObjects for the current test
+   * target object.
+   *
+   * @author paouelle
+   */
+  private static void processBeforeObjects() {
+    final Object target = HelenusJUnit.target;
+
+    if (target == null) {
+      return;
     }
-    // now check the class annotations for a match
-    for (final SuffixKeyValues acskvs: description.getTestClass().getAnnotationsByType(SuffixKeyValues.class)) {
-      if (HelenusJUnit.matches(acskvs, clazz)) {
-        insert.accept(acskvs);
-      }
-    }
-    return suffixes.entrySet().stream()
+    final Map<String, Set<String>> suffixeValues = HelenusJUnit.suffixKeyValues;
+    final Collection<Collection<Strings>> suffixesByTypes;
+
+    if (suffixeValues != null) {
+      suffixesByTypes = suffixeValues.entrySet().stream()
       .map(e -> e.getValue().stream()
         .map(v -> new Strings(e.getKey(), v))
         .collect(Collectors.toList())
       )
       .collect(Collectors.toList());
+    } else {
+      suffixesByTypes = Collections.emptyList();
+    }
+    final Set<Method> methods = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+      target.getClass(), BeforeObjects.class, true
+    ).keySet(); // don't care about the @BeforeObjects annotations
+    final Batch batch = StatementBuilder.batch();
+
+    if (CollectionUtils.isEmpty(suffixesByTypes)) {
+      // no suffixes so call with empty map of suffixes
+      methods.forEach(
+        m -> HelenusJUnit.processBeforeObjects(
+          batch, m, target, Collections.emptyMap(), false
+        )
+      );
+    } else {
+      boolean onlyIfRequiresSuffixes = false; // only the first time we call them
+
+      for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixesByTypes); i.hasNext(); ) {
+        final List<Strings> isuffixes = i.next();
+        final Map<String, String> suffixes = new HashMap<>(isuffixes.size() * 3 / 2);
+        final boolean oirs = onlyIfRequiresSuffixes;
+
+        isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
+        methods.forEach(
+          m -> HelenusJUnit.processBeforeObjects(
+            batch, m, target, suffixes, oirs
+          )
+        );
+        onlyIfRequiresSuffixes = true; // from now on, only call those that requires suffixes
+      }
+    }
+    batch.execute();
   }
 
   /**
@@ -365,10 +492,9 @@ public class HelenusJUnit implements TestRule {
    * @param  cfgname the non-<code>null</code> cassandra config resource name
    * @param  timeout the timeout to wait for the Cassandra daemon to start
    *         before failing
-   * @throws IOException if an I/O error occurs while starting everything
+   * @throws AssertionError if an I/O error occurs while starting everything
    */
-  private static synchronized void start(String cfgname, long timeout)
-    throws IOException {
+  private static synchronized void start(String cfgname, long timeout) {
     if (HelenusJUnit.daemon != null) {
       // check if we are starting it with the same config
       if (config.equals(cfgname)) {
@@ -379,84 +505,90 @@ public class HelenusJUnit implements TestRule {
         "Helenus cannot be started again with a different configuration"
       );
     }
-    HelenusJUnit.config = cfgname;
-    logger.info("Starting Helenus...");
-    // make sure the config resource is absolute
-    cfgname = StringUtils.prependIfMissing(cfgname, "/");
-    final File dir = new File(HelenusJUnit.RUNTIME_DIR);
-    final File cfgfile = new File(
-      dir, cfgname.substring(cfgname.lastIndexOf('/'))
-    );
-
-    // cleanup the runtime directory
-    FileUtils.deleteDirectory(dir);
-    // create the runtime directory
-    FileUtils.forceMkdir(dir);
-    // copy the resource config to the runtime directory
-    final InputStream cfgis = HelenusJUnit.class.getResourceAsStream(cfgname);
-
-    if (cfgis == null) {
-      throw new AssertionError("failed to locate config resource: " + cfgname);
-    }
-    FileUtils.copyInputStreamToFile(cfgis, cfgfile);
-    // now update the config with appropriate port numbers if random ports are requested
-    HelenusJUnit.update(cfgfile);
-    // update system properties for cassandra
-    System.setProperty("cassandra.config", "file:" + cfgfile.getAbsolutePath());
-    System.setProperty("cassandra-foreground", "true");
-    System.setProperty("cassandra.native.epoll.enabled", "false"); // JNA doesn't cope with relocated netty
-    // create a thread group for all Cassandra threads to be able to detect them
-    HelenusJUnit.group = new ThreadGroup("Cassandra Daemon Group");
-    // startup the cassandra daemon
-    final CountDownLatch latch = new CountDownLatch(1);
-    final Thread thread = new Thread(
-      HelenusJUnit.group,
-      new Runnable() {
-        @SuppressWarnings("synthetic-access")
-        @Override
-        public void run() {
-          // make sure the Cassandra runtime directories exists and are cleaned up
-          HelenusJUnit.cleanupAndCreateCassandraDirectories();
-          HelenusJUnit.daemon = new CassandraDaemon();
-          daemon.activate();
-          latch.countDown();
-        }
-      }
-    );
-
-    thread.start();
-    // wait for the Cassandra daemon to start properly
     try {
-      if (!latch.await(timeout, TimeUnit.MILLISECONDS)) {
-        logger.error(
-          "Cassandra daemon failed to start within "
-          + timeout
-          + "ms; increase the timeout"
-        );
-        throw new AssertionError(
-          "cassandra daemon failed to start within timeout"
-        );
-      }
-    } catch (InterruptedException e) {
-      logger.error("interrupted waiting for cassandra daemon to start", e);
-      throw new AssertionError(e);
-    } finally {
-      thread.interrupt();;
-    }
-    final String host = DatabaseDescriptor.getRpcAddress().getHostName();
-    final int port = DatabaseDescriptor.getNativeTransportPort();
+      HelenusJUnit.config = cfgname;
+      logger.info("Starting Helenus...");
+      // make sure the config resource is absolute
+      cfgname = StringUtils.prependIfMissing(cfgname, "/");
+      final File dir = new File(HelenusJUnit.RUNTIME_DIR);
+      final File cfgfile = new File(
+        dir, cfgname.substring(cfgname.lastIndexOf('/'))
+      );
 
-    logger.info("Cassandra started on '%s:%d'", host, port);
-    // finally initializes helenus
-    HelenusJUnit.manager = new StatementManagerUnitImpl(
-      Cluster
-        .builder()
-        .withPort(port)
-        .addContactPoint(host)
-        .withQueryOptions(null)
-    );
-    // force default replication factor to 1
-    HelenusJUnit.manager.setDefaultReplicationFactor(1);
+      // cleanup the runtime directory
+      FileUtils.deleteDirectory(dir);
+      // create the runtime directory
+      FileUtils.forceMkdir(dir);
+      // copy the resource config to the runtime directory
+      final InputStream cfgis = HelenusJUnit.class.getResourceAsStream(cfgname);
+
+      if (cfgis == null) {
+        throw new AssertionError("failed to locate config resource: " + cfgname);
+      }
+      FileUtils.copyInputStreamToFile(cfgis, cfgfile);
+      // now update the config with appropriate port numbers if random ports are requested
+      HelenusJUnit.update(cfgfile);
+      // update system properties for cassandra
+      System.setProperty("cassandra.config", "file:" + cfgfile.getAbsolutePath());
+      System.setProperty("cassandra-foreground", "true");
+      System.setProperty("cassandra.native.epoll.enabled", "false"); // JNA doesn't cope with relocated netty
+      // create a thread group for all Cassandra threads to be able to detect them
+      HelenusJUnit.group = new ThreadGroup("Cassandra Daemon Group");
+      // startup the cassandra daemon
+      final CountDownLatch latch = new CountDownLatch(1);
+      final Thread thread = new Thread(
+        HelenusJUnit.group,
+        new Runnable() {
+          @SuppressWarnings("synthetic-access")
+          @Override
+          public void run() {
+            // make sure the Cassandra runtime directories exists and are cleaned up
+            HelenusJUnit.cleanupAndCreateCassandraDirectories();
+            HelenusJUnit.daemon = new CassandraDaemon();
+            daemon.activate();
+            latch.countDown();
+          }
+        }
+      );
+
+      thread.start();
+      // wait for the Cassandra daemon to start properly
+      try {
+        if (!latch.await(timeout, TimeUnit.MILLISECONDS)) {
+          logger.error(
+            "Cassandra daemon failed to start within "
+            + timeout
+            + "ms; increase the timeout"
+          );
+          throw new AssertionError(
+            "cassandra daemon failed to start within timeout"
+          );
+        }
+      } catch (InterruptedException e) {
+        logger.error("interrupted waiting for cassandra daemon to start", e);
+        throw new AssertionError(e);
+      } finally {
+        thread.interrupt();;
+      }
+      final String host = DatabaseDescriptor.getRpcAddress().getHostName();
+      final int port = DatabaseDescriptor.getNativeTransportPort();
+
+      logger.info("Cassandra started on '%s:%d'", host, port);
+      // finally initializes helenus
+      HelenusJUnit.manager = new StatementManagerUnitImpl(
+        Cluster
+          .builder()
+          .withPort(port)
+          .addContactPoint(host)
+          .withQueryOptions(null)
+      );
+      // force default replication factor to 1
+      HelenusJUnit.manager.setDefaultReplicationFactor(1);
+    } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+      throw e;
+    } catch (IOException|Error|RuntimeException e) {
+      throw new AssertionError("failed to start Cassandra daemon", e);
+    }
   }
 
   /**
@@ -489,18 +621,25 @@ public class HelenusJUnit implements TestRule {
    * @author paouelle
    */
   public static synchronized void clear() {
-    // first drop all non-system keyspaces
-    for (final KeyspaceMetadata keyspace: HelenusJUnit.manager.getCluster().getMetadata().getKeyspaces()) {
-      final String kname = keyspace.getName();
+    final StatementManagerUnitImpl mgr = HelenusJUnit.manager;
 
-      if (!"system".equals(kname) && !"system_auth".equals(kname) && !"system_traces".equals(kname)) {
-        HelenusJUnit.manager.getSession().execute("DROP KEYSPACE " + kname);
+    if (mgr != null) {
+      // first drop all non-system keyspaces
+      for (final KeyspaceMetadata keyspace: HelenusJUnit.manager.getCluster().getMetadata().getKeyspaces()) {
+        final String kname = keyspace.getName();
+
+        if (!"system".equals(kname)
+            && !"system_auth".equals(kname)
+            && !"system_traces".equals(kname)) {
+          mgr.getSession().execute("DROP KEYSPACE " + kname);
+        }
       }
+      // make sure to also clear the pojo class info in order to force the dependencies
+      // to other pojos to be re-created when they are referenced
+      mgr.clear();
     }
-    // next clear the cache of schemas
+    // finally clear the cache of schemas
     HelenusJUnit.schemas.clear();
-    // we can leave the pojo class infos loaded in Helenus'statement manager as
-    // our hook will properly re-create the schemas if required
   }
 
   /**
@@ -511,6 +650,7 @@ public class HelenusJUnit implements TestRule {
    *
    * @param  clazz the pojo class for which to create the schema
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws AssertionError if a failure occurs while creating the schema
    */
   public static void createSchema(Class<?> clazz) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
@@ -519,47 +659,58 @@ public class HelenusJUnit implements TestRule {
       if (!HelenusJUnit.schemas.add(clazz)) {
         return; // nothing to do more
       }
-      logger.debug("Creating schema for %s", clazz.getSimpleName());
-      final ClassInfo<?> cinfo = manager.getClassInfoImpl(clazz);
-      final Description description = HelenusJUnit.description;
-      // find all suffixes that are defined for this classes
-      final Collection<Collection<Strings>> suffixes = ((description != null)
-        ? HelenusJUnit.getSuffixKeyValues(description, cinfo)
-        : null
-      );
-
-      // now check if we have the right number of suffixes as if we don't, we
-      // cannot create this schema
-      if (cinfo.getNumSuffixKeys() != CollectionUtils.size(suffixes)) {
-        throw new AssertionError(
-          "unable to create schema for '"
-          + clazz.getSimpleName()
-          + "'; missing required suffix keys"
+      try {
+        logger.debug("Creating schema for %s", clazz.getSimpleName());
+        final ClassInfo<?> cinfo = manager.getClassInfoImpl(clazz);
+        // find all suffixes that are defined for this classes
+        final Collection<Collection<Strings>> suffixes = ((target != null)
+          ? HelenusJUnit.getSuffixKeyValues(cinfo)
+          : null
         );
-      }
-      // now generate as many create schemas statement as required by the combination
-      // of all suffix values
-      if (CollectionUtils.isEmpty(suffixes)) {
-        // no suffixes so just the one create schema required
-        final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
-        cs.ifNotExists();
-        cs.execute();
-      } else {
-        final Sequence s = StatementBuilder.sequence();
-
-        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+        // now check if we have the right number of suffixes as if we don't, we
+        // cannot create this schema
+        if (cinfo.getNumSuffixKeys() != CollectionUtils.size(suffixes)) {
+          throw new AssertionError(
+            "unable to create schema for '"
+            + clazz.getSimpleName()
+            + "'; missing required suffix keys"
+          );
+        }
+        // now generate as many create schemas statement as required by the combination
+        // of all suffix values
+        if (CollectionUtils.isEmpty(suffixes)) {
+          // no suffixes so just the one create schema required
           final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
           cs.ifNotExists();
-          // pass all required suffixes
-          for (final Strings ss: i.next()) {
-            // register the suffix value with the corresponding suffix name
-            cs.where(StatementBuilder.eq(ss.key, ss.value));
+          cs.execute();
+        } else {
+          final Sequence s = StatementBuilder.sequence();
+
+          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+            final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
+
+            cs.ifNotExists();
+            // pass all required suffixes
+            for (final Strings ss: i.next()) {
+              // register the suffix value with the corresponding suffix name
+              cs.where(StatementBuilder.eq(ss.key, ss.value));
+            }
+            s.add(cs);
           }
-          s.add(cs);
+          s.execute();
         }
-        s.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        // make sure to remove cached schema indicator
+        HelenusJUnit.schemas.remove(clazz);
+        throw e;
+      } catch (RuntimeException|Error e) {
+        // make sure to remove cached schema indicator
+        HelenusJUnit.schemas.remove(clazz);
+        throw new AssertionError(
+          "failed to create schema for " + clazz.getSimpleName(), e
+        );
       }
     }
   }
@@ -582,7 +733,7 @@ public class HelenusJUnit implements TestRule {
   /**
    * Instantiates a new <code>HelenusJUnit</code> object.
    * <p>
-   * <i>Note:</i> Defaults to 10 seconds timeout to wait for the Cassandra
+   * <i>Note:</i> Defaults to 15 seconds timeout to wait for the Cassandra
    * daemon to start on a free port before failing.
    *
    * @author paouelle
@@ -627,23 +778,73 @@ public class HelenusJUnit implements TestRule {
    *
    * @author paouelle
    *
-   * @param  description the description for the test method
-   * @throws IOException if an I/O error occurs while initializing the cassandra
+   * @param  method the test method to be run
+   * @param  target the test object on which the method will be run
+   * @throws AssertionError if an I/O error occurs while initializing the cassandra
    *         daemon or the helenus statement manager
    */
-  protected void before(Description description) throws IOException {
-    // start embedded cassandra daemon
+  protected void before(FrameworkMethod method, Object target) {
+    final Map<String, Set<String>> suffixes = new LinkedHashMap<>(12);
+
     synchronized (HelenusJUnit.class) {
-      HelenusJUnit.start(cfgname, timeout);
       // make sure we are not running another test case
-      if (HelenusJUnit.description != null) {
+      if (HelenusJUnit.method != null) {
         throw logger.throwing(new AssertionError(
-          "already running test case: " + HelenusJUnit.description
+          "already running test case "
+          + method.getName()
+          + "("
+          + method.getDeclaringClass().getName()
+          + ")"
         ));
       }
-      HelenusJUnit.description = description;
-      // finally cleanup the database for this new test
-      HelenusJUnit.clear();
+      try {
+        // start embedded cassandra daemon
+        HelenusJUnit.start(cfgname, timeout);
+        HelenusJUnit.method = method;
+        HelenusJUnit.target = target;
+        for (final SuffixKeyValues skvs: ReflectionJUnitUtils.getAnnotationsByType(
+              method.getMethod(), SuffixKeyValues.class
+            )) {
+          suffixes.compute(
+            skvs.type(), (t, s) -> {
+              if (s == null) {
+                s = new LinkedHashSet<>(Math.max(1, skvs.values().length) * 3 / 2);
+              }
+              for (final String v: skvs.values()) {
+                s.add(v);
+              }
+              return s;
+            }
+          );
+        }
+        HelenusJUnit.suffixKeyValues = suffixes;
+        // finally cleanup the database for this new test
+        HelenusJUnit.clear();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        // make sure to cleanup
+        HelenusJUnit.method = null;
+        HelenusJUnit.target = null;
+        throw e;
+      } catch (RuntimeException|Error e) {
+        // make sure to cleanup
+        HelenusJUnit.method = null;
+        HelenusJUnit.target = null;
+        throw new AssertionError("failed to start Cassandra daemon", e);
+      }
+      try {
+        // Process all @BeforeObjects methods found
+        HelenusJUnit.processBeforeObjects();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        // make sure to cleanup
+        HelenusJUnit.method = null;
+        HelenusJUnit.target = null;
+        throw e;
+      } catch (RuntimeException|Error e) {
+        // make sure to cleanup
+        HelenusJUnit.method = null;
+        HelenusJUnit.target = null;
+        throw new AssertionError("failed to install @BeforeObjects objects into Cassandra", e);
+      }
     }
   }
 
@@ -652,13 +853,16 @@ public class HelenusJUnit implements TestRule {
    *
    * @author paouelle
    *
-   * @param description the description for the test method
+   * @param method the test method to be run
+   * @param target the test object on which the method will be run
    */
-  protected void after(Description description) {
+  protected void after(FrameworkMethod method, Object target) {
     // clear the current test description
     synchronized (HelenusJUnit.class) {
-      if (HelenusJUnit.description == description) { // should always be true
-        HelenusJUnit.description = null;
+      if ((HelenusJUnit.method == method)
+          && (HelenusJUnit.target == target)) { // should always be true
+        HelenusJUnit.method = null;
+        HelenusJUnit.target = null;
       }
     }
   }
@@ -668,18 +872,18 @@ public class HelenusJUnit implements TestRule {
    *
    * @author paouelle
    *
-   * @see org.junit.rules.TestRule#apply(org.junit.runners.model.Statement, org.junit.runner.Description)
+   * @see org.junit.rules.MethodRule#apply(org.junit.runners.model.Statement, org.junit.runners.model.FrameworkMethod, java.lang.Object)
    */
   @Override
-  public Statement apply(Statement base, Description description) {
+  public Statement apply(Statement base, FrameworkMethod method, Object target) {
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
-        before(description);
+        before(method, target);
         try {
           base.evaluate();
         } finally {
-          after(description);
+          after(method, target);
         }
       }
     };
@@ -715,6 +919,15 @@ public class HelenusJUnit implements TestRule {
      */
     StatementManagerUnitImpl(Cluster.Initializer initializer) {
       super(initializer, true);
+    }
+
+    /**
+     * Clears the cache of all pojo class infos.
+     *
+     * @author paouelle
+     */
+    void clear() {
+      super.clearCache();
     }
 
     /**

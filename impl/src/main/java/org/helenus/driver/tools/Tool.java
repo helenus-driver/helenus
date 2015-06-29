@@ -31,9 +31,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -43,7 +47,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.lang3.tuple.Pair;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -1025,7 +1028,7 @@ public class Tool {
   }
 
   /**
-   * Finds an initial objects factory method and its dependent classes from the
+   * Finds initial objects factory methods and their dependent classes from the
    * specified object creator class.
    *
    * @author paouelle
@@ -1036,109 +1039,98 @@ public class Tool {
    * @throws IllegalArgumentException if the initial objects method is not
    *         properly defined
    */
-  private static Pair<Method, Class<?>[]> findInitial(Class<?> clazz) {
-    final InitialObjects io = clazz.getAnnotation(InitialObjects.class);
+  private static Map<Method, Class<?>[]> findInitials(Class<?> clazz) {
+    return ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+      clazz, InitialObjects.class, true
+    ).entrySet().stream()
+      .peek(e -> {
+        final Method m = e.getKey();
 
-    if (io != null) {
-      final String mname = io.staticMethod();
-
-      try {
-        Method m;
-
-        try { // first look for one with a map for suffixes
-          m = clazz.getMethod(mname, Map.class);
-          // validate that if suffixes are defined, the method expects a Map<String, String>
-          // to provide the values for the suffixes when initializing objects
-          final Class<?>[] cparms = m.getParameterTypes();
-
-          // should always be 1 as we used only 1 class in getMethod()
-          if (cparms.length != 1) {
-            throw new IllegalArgumentException(
-              "expecting one Map<String, String> parameter for initial objects method '"
-              + mname
-              + "' in class: "
-              + clazz.getSimpleName()
-            );
-          }
-          // should always be a map as we used a Map to find the method
-          if (!Map.class.isAssignableFrom(cparms[0])) {
-            throw new IllegalArgumentException(
-              "expecting parameter for initial objects method '"
-              + mname
-              + "' to be of type Map<String, String> in class: "
-              + clazz.getSimpleName()
-            );
-          }
-          final Type[] tparms = m.getGenericParameterTypes();
-
-          // should always be 1 as we used only 1 class in getMethod()
-          if (tparms.length != 1) { // should always be 1 as it was already tested above
-            throw new IllegalArgumentException(
-              "expecting one Map<String, String> parameter for initial objects method '"
-              + mname
-              + "' in class: "
-              + clazz.getSimpleName()
-            );
-          }
-          if (tparms[0] instanceof ParameterizedType) {
-            final ParameterizedType ptype = (ParameterizedType)tparms[0];
-
-            // maps will always have 2 arguments
-            for (final Type atype: ptype.getActualTypeArguments()) {
-              final Class<?> aclazz = ReflectionUtils.getRawClass(atype);
-
-              if (String.class != aclazz) {
-                throw new IllegalArgumentException(
-                  "expecting a Map<String, String> parameter for initial objects method '"
-                  + mname
-                  + "' in class: "
-                  + clazz.getSimpleName()
-                );
-              }
-            }
-          } else {
-            throw new IllegalArgumentException(
-              "expecting a Map<String, String> parameter for initial objects method '"
-              + mname
-              + "' in class: "
-              + clazz.getSimpleName()
-            );
-          }
-        } catch (NoSuchMethodException e) { // fallback to one with no map
-          m = clazz.getMethod(mname);
-        }
         // validate the method is static
         if (!Modifier.isStatic(m.getModifiers())) {
           throw new IllegalArgumentException(
             "initial objects method '"
-            + mname
+            + m.getName()
             + "' is not static in class: "
             + clazz.getSimpleName()
           );
         }
-        // validate the return type is an array
+        // validate the return type is compatible with this class
         final Class<?> type = m.getReturnType();
 
-        if (!type.isArray()) {
-          throw new IllegalArgumentException(
-            "initial objects method '"
-            + mname
-            + "' doesn't return an array in class: "
-            + clazz.getSimpleName()
-          );
+        if (type.isArray()) {
+          final Class<?> ctype = type.getComponentType();
+
+          if (!ctype.isAssignableFrom(clazz)) {
+            throw new IllegalArgumentException(
+              "incompatible returned array of class '"
+              + ctype.getName()
+              + "' for initial objects method '"
+              + m.getName()
+              + "' in class: "
+              + clazz.getSimpleName()
+            );
+          }
+        } else if (!clazz.isAssignableFrom(type)) {
+          // must be a collection, stream, iterator, enumeration, iterable
+          if (!Collection.class.isAssignableFrom(type)
+              && !Stream.class.isAssignableFrom(type)
+              && !Iterator.class.isAssignableFrom(type)
+              && !Enumeration.class.isAssignableFrom(type)
+              && !Iterable.class.isAssignableFrom(type)) {
+            throw new IllegalArgumentException(
+              "incompatible returned class '"
+              + type.getName()
+              + "' for initial objects method '"
+              + m.getName()
+              + "' in class: "
+              + clazz.getSimpleName()
+            );
+          }
+          // now check its argument type
+          final Type rtype = m.getGenericReturnType();
+
+          if (rtype instanceof ParameterizedType) {
+            final ParameterizedType ptype = (ParameterizedType)rtype;
+
+            // the expected types will always have only 1 argument
+            if (ptype.getActualTypeArguments().length != 1) {
+              throw new IllegalArgumentException(
+                "incompatible returned type '"
+                + ptype.getTypeName()
+                + "' for initial objects method '"
+                + m.getName()
+                + "' in class: "
+                + clazz.getSimpleName()
+              );
+            }
+            final Class<?> aclazz = ReflectionUtils.getRawClass(ptype.getActualTypeArguments()[0]);
+
+            if (!aclazz.isAssignableFrom(clazz)) {
+              throw new IllegalArgumentException(
+                "incompatible returned type argument '"
+                + aclazz.getName()
+                + "' for initial objects method '"
+                + m.getName()
+                + "' in class: "
+                + clazz.getSimpleName()
+              );
+            }
+          } else {
+            throw new IllegalArgumentException(
+              "incompatible returned type '"
+              + rtype.getTypeName()
+              + "' for initial objects method '"
+              + m.getName()
+              + "' in class: "
+              + clazz.getSimpleName()
+            );
+          }
         }
-        return Pair.of(m, io.dependsOn());
-      } catch (NoSuchMethodException e) {
-        throw new IllegalArgumentException(
-          "missing initial objects method '"
-          + mname
-          + "' in class: "
-          + clazz.getSimpleName(),
-          e
-        );
-      }
-    }
-    return null;
+      })
+      .collect(Collectors.toMap(Map.Entry::getKey, e -> (e.getValue()[0]).dependsOn()));
+    // the array of InitialObjects annotation will always have only 1 entry as
+    // it is not repeatable
   }
 
   /**
@@ -1163,9 +1155,9 @@ public class Tool {
         final Class<?> clazz = Class.forName(cnames[i]);
 
         cnames[i] = null; // clear since we found a class
-        final Pair<Method, Class<?>[]> initial = Tool.findInitial(clazz);
+        final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
 
-        if (initial == null) {
+        if (initials.isEmpty()) {
           System.out.println(
             Tool.class.getSimpleName()
             + ": no objects found using "
@@ -1173,14 +1165,16 @@ public class Tool {
           );
           continue;
         }
-        classes.add(clazz);
-        final DirectedGraph.Node<Class<?>> node = classes.get(clazz);
+        initials.forEach((m, ios) -> {
+          classes.add(ios.getClass());
+          if (!no_dependents) {
+            final DirectedGraph.Node<Class<?>> node = classes.get(clazz);
 
-        if (!no_dependents) {
-          for (final Class<?> c: initial.getRight()) {
-            node.add(c);
+            for (final Class<?> c: ios) {
+              node.add(c);
+            }
           }
-        }
+        });
       } catch (ClassNotFoundException e) { // ignore and continue
       }
     }
@@ -1210,9 +1204,9 @@ public class Tool {
       for (final Class<?> clazz: new Reflections(pkg).getTypesAnnotatedWith(
         org.helenus.driver.persistence.InitialObjects.class, true
       )) {
-        final Pair<Method, Class<?>[]> initial = Tool.findInitial(clazz);
+        final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
 
-        if (initial == null) {
+        if (initials.isEmpty()) {
           System.out.println(
             Tool.class.getSimpleName()
             + ": no objects found using "
@@ -1221,12 +1215,14 @@ public class Tool {
           continue;
         }
         classes.add(clazz);
-        final DirectedGraph.Node<Class<?>> node = classes.get(clazz);
-
         if (!no_dependents) {
-          for (final Class<?> c: initial.getRight()) {
-            node.add(c);
-          }
+          final DirectedGraph.Node<Class<?>> node = classes.get(clazz);
+
+          initials.forEach((m, cs) -> {
+            for (final Class<?> c: cs) {
+              node.add(c);
+            }
+          });
         }
       }
     }
@@ -1245,9 +1241,9 @@ public class Tool {
     Collection<Class<?>> classes, Map<String, String> suffixes
   ) {
     for (final Class<?> clazz: classes) {
-      final Pair<Method, Class<?>[]> initial = Tool.findInitial(clazz);
+      final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
 
-      if (initial == null) { // should not happen!
+      if (initials.isEmpty()) { // should not happen!
         System.out.println(
           Tool.class.getSimpleName()
           + ": no objects found using "
@@ -1255,27 +1251,32 @@ public class Tool {
         );
         continue;
       }
-      final List<Object> ios
-        = Tool.getInitialObjects(initial.getLeft(), suffixes);
+      final Batch batch = StatementBuilder.batch();
 
-      System.out.println(
-        Tool.class.getSimpleName()
-        + ": inserting "
-        + ios.size()
-        + " object"
-        + (ios.size() == 1 ? "" : "s")
-        + " using "
-        + clazz.getName()
-      );
-      final Batch b = StatementBuilder.batch();
+      initials.forEach((m, cs) -> {
+        final List<Object> ios = Tool.getInitialObjects(m, suffixes);
 
-      for (final Object io: ios) {
-        b.add(StatementBuilder.insert(io).intoAll());
-      }
-      if (b.isEmpty() || (b.getQueryString() == null)) {
+        System.out.println(
+          Tool.class.getSimpleName()
+          + ": inserting "
+          + ios.size()
+          + " object"
+          + (ios.size() == 1 ? "" : "s")
+          + " using "
+          + clazz.getName()
+          + "."
+          + m.getName()
+          + "()"
+        );
+
+        for (final Object io: ios) {
+          batch.add(StatementBuilder.insert(io).intoAll());
+        }
+      });
+      if (batch.isEmpty() || (batch.getQueryString() == null)) {
         System.out.println(Tool.class.getSimpleName() + ": no objects to insert");
       } else {
-        executeCQL(b);
+        executeCQL(batch);
       }
     }
   }
@@ -1351,7 +1352,8 @@ public class Tool {
 
     for (final String name: new String[] {
            LogManager.ROOT_LOGGER_NAME,
-           pkg.subSequence(0, pkg.lastIndexOf('.', pkg.lastIndexOf('.') - 1)).toString()
+           pkg.subSequence(0, pkg.lastIndexOf('.', pkg.lastIndexOf('.') - 1)).toString(),
+           "com.datastax"
          }) {
       final LoggerConfig loggerConfig = config.getLoggerConfig(name);
 

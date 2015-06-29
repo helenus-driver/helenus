@@ -18,50 +18,41 @@ package org.helenus.driver.junit;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
-import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.stream.Stream;
+
 /**
- * The <code>SuffixKeyValues</code> annotation allows a test method or class to
- * define specific suffix key values to be used when creating schemas for pojos.
+ * The <code>BeforeObjects</code> annotation can be used to identify a method
+ * that will be invoked before the test method in order to pre-populate the
+ * database with the pojos returned by the method.
  * <p>
- * When defining suffix key values, one can set them on either the test class or
- * the test method. Suffix key values defined on the test methods will override
- * any the values defined for the same suffix type on the class. The order of
- * the annotations provided also indicates a priority. That is that the first
- * annotation that matches will override all others found on the same method or
- * class.
+ * The referenced method must be public. It can return an array, a {@link Collection},
+ * an {@link Iterable}, an {@link Iterator}, an {@link Enumeration}, or a
+ * {@link Stream} of pojo objects or a single object to insert in the database.
+ * Finally, if it is declared with a single parameter of type
+ * <code>Map&lt;String, String&gt;</code> the Helenus JUnit framework will provide
+ * access to each suffix key values based on the corresponding suffix types. It
+ * is therefore possible that the method be called multiple times; once per set
+ * of suffix key values. The suffix key values are computed from the
+ * {@link SuffixKeyValues} annotation provided for the test method and class.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
+ *
  * @version 1 - Jun 28, 2015 - paouelle - Creation
  *
  * @since 1.0
  */
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-@Repeatable(SuffixKeyValuess.class)
 @Inherited
 @Documented
-public @interface SuffixKeyValues {
-  /**
-   * The type for the suffix key.
-   *
-   * @author paouelle
-   *
-   * @return the type for the suffix key
-   */
-  String type();
-
-  /**
-   * The values for the suffix key.
-   *
-   * @author paouelle
-   *
-   * @return the values for the suffix key
-   */
-  String[] values();
+public @interface BeforeObjects {
 }

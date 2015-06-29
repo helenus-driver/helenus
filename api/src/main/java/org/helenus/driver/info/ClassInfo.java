@@ -155,8 +155,8 @@ public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
    *
    * @param  suffixes the map of all suffixes values (if any) keyed by the suffix
    *         type
-   * @return the initial objects to insert in the table or <code>null</code>
-   *         if none needs to be inserted
+   * @return a non-<code>null</code> collection of the initial objects to insert
+   *         in the table
    */
-  public T[] getInitialObjects(Map<String, String> suffixes);
+  public Collection<T> getInitialObjects(Map<String, String> suffixes);
 }

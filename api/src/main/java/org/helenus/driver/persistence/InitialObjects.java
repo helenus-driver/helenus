@@ -22,19 +22,26 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.stream.Stream;
+
 /**
- * The <code>InitialObjects</code> annotation can be used to identify a factory
- * static methods to invoke at the time the table for an associate entity class
+ * The <code>InitialObjects</code> annotation can be used to identify a static
+ * method to invoke at the time the table for an associate entity class
  * is created in order to pre-populate the table with the pojos returned by the
  * method. It can also be used with an object created class which can be used
  * alongside with the Helenus tool to insert objects in the database.
  * <p>
- * The referenced method must be public and static. It must returned an array
- * of pojo objects to insert in the database. Finally, it must not take any
- * parameters unless the entity is defined with suffixes in which case it must
- * expect a single parameter of type <code>Map&lt;String, String&gt;</code> which
- * will be used to provide access to each suffix values based on the
- * corresponding suffix types.
+ * The referenced method must be public and static. It can return an array, a
+ * {@link Collection}, an {@link Iterable}, an {@link Iterator}, an
+ * {@link Enumeration}, or a {@link Stream} of pojo objects or a single object
+ * to insert in the database. Finally, it must not take any parameters unless
+ * the pojo class entity is defined with suffixes in which case it must expect
+ * a single parameter of type <code>Map&lt;String, String&gt;</code> which will
+ * be used to provide access to each suffix values based on the corresponding
+ * suffix types.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -44,26 +51,11 @@ import java.lang.annotation.Target;
  *
  * @since 1.0
  */
-@Target(ElementType.TYPE)
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
 @Documented
 public @interface InitialObjects {
-  /**
-   * Specifies the factory static method to be invoked to get an array of
-   * pojo objects to insert in the database at the time a table for the
-   * associated entity is created.
-   * <p>
-   * <i>Note:</i> If the POJO class requires suffix keys, the specified method
-   * must be defined with a <code>Map&lt;String, String&gt;</code> parameter in order
-   * to receive a map of all available suffixes keyed by their defined type.
-   *
-   * @author paouelle
-   *
-   * @return the factory static method to be invoked to get an array of pojo objects
-   */
-  String staticMethod();
-
   /**
    * Specifies dependent creator classes which must be explored and their provided
    * objects inserted into the database first before invoking this creator's

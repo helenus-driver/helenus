@@ -21,8 +21,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.ArrayUtils;
-
 import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
@@ -180,28 +178,24 @@ public class CreateSchemaImpl<T>
       }
     }
     // finish with initial objects
-    final T[] ios = getContext().getInitialObjects();
+    final BatchImpl batch = new BatchImpl(
+      Optional.empty(), new BatchableStatement[0], true, mgr, bridge
+    );
 
-    if (!ArrayUtils.isEmpty(ios)) {
-      final BatchImpl batch = new BatchImpl(
-        Optional.empty(), new BatchableStatement[0], true, mgr, bridge
+    for (final T io: getContext().getInitialObjects()) {
+      batch.add(
+        new InsertImpl<>(
+          getContext().getClassInfo().newContext(io),
+          null,
+          mgr,
+          bridge
+        )
       );
+    }
+    final StringBuilder builder = batch.buildQueryString();
 
-      for (final T io: ios) {
-        batch.add(
-          new InsertImpl<>(
-            getContext().getClassInfo().newContext(io),
-            null,
-            mgr,
-            bridge
-          )
-        );
-      }
-      final StringBuilder builder = batch.buildQueryString();
-
-      if (builder != null) {
-        builders.add(builder);
-      }
+    if (builder != null) {
+      builders.add(builder);
     }
     if (builders.isEmpty()) {
       return null;

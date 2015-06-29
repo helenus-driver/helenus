@@ -16,6 +16,7 @@
 package org.helenus.driver.impl;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -24,13 +25,16 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -229,11 +233,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *
      * @author paouelle
      *
-     * @return the initial objects to insert in the table or <code>null</code>
-     *         if none needs to be inserted
+     * @return a non-<code>null</code> collection of the initial objects to insert
+     *         in the table
      */
     @SuppressWarnings("synthetic-access")
-    public T[] getInitialObjects() {
+    public Collection<T> getInitialObjects() {
       if (getSuffixKeys().isEmpty()) {
         return ClassInfoImpl.this.getInitialObjects(null);
       }
@@ -656,11 +660,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   protected final Map<Field, Object> finalFields;
 
   /**
-   * Holds the optional initial objects factory method.
+   * Holds the optional initial objects factory methods.
    *
    * @author paouelle
    */
-  private final Method initial;
+  private final Set<Method> initials;
 
   /**
    * Holds the keyspace annotation.
@@ -726,7 +730,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     findTables(mgr);
     findColumns();
     findSuffixKeys();
-    this.initial = findInitial();
+    this.initials = findInitials();
   }
 
   /**
@@ -851,141 +855,172 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
-   * Finds an initial objects factory method for the POJO if configured.
+   * Finds initial objects factory methods for the POJO if configured.
    *
    * @author paouelle
    *
-   * @return the initial objects factory method or <code>null</code> if none
-   *         configured
-   * @throws IllegalArgumentException if the initial objects method is not
+   * @return the non-<code>null</code> initial objects factory methods
+   * @throws IllegalArgumentException if the initial objects methods are not
    *         properly defined
    */
-  private Method findInitial() {
-    final InitialObjects io = clazz.getAnnotation(InitialObjects.class);
+  private Set<Method> findInitials() {
+    final Set<Method> initials = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+      clazz, InitialObjects.class, true
+    ).keySet();
 
-    if (io != null) {
-      final String mname = io.staticMethod();
+    initials.forEach(m -> {
+      // validate the method is static
+      if (!Modifier.isStatic(m.getModifiers())) {
+        throw new IllegalArgumentException(
+          "initial objects method '"
+          + m.getName()
+          + "' is not static in class: "
+          + clazz.getSimpleName()
+        );
+      }
+      // validate the return type is compatible with this class
+      final Class<?> type = m.getReturnType();
 
-      try {
-        final Method m = (
-          suffixesByType.isEmpty()
-            ? clazz.getMethod(mname)
-            : clazz.getMethod(mname, Map.class)
-          );
-
-        // validate the method is static
-        if (!Modifier.isStatic(m.getModifiers())) {
-          throw new IllegalArgumentException(
-            "initial objects method '"
-            + mname
-            + "' is not static in class: "
-            + clazz.getSimpleName()
-          );
-        }
-        // validate the return type is compatible with this class and is an array
-        final Class<?> type = m.getReturnType();
-
-        if (!type.isArray()) {
-          throw new IllegalArgumentException(
-            "initial objects method '"
-            + mname
-            + "' doesn't return an array in class: "
-            + clazz.getSimpleName()
-          );
-        }
+      if (type.isArray()) {
         final Class<?> ctype = type.getComponentType();
 
         if (!ctype.isAssignableFrom(clazz)) {
           throw new IllegalArgumentException(
-            "incompatible returned class '"
+            "incompatible returned array of class '"
             + ctype.getName()
             + "' for initial objects method '"
-            + mname
+            + m.getName()
             + "' in class: "
             + clazz.getSimpleName()
           );
         }
-        // validate that if suffixes are defined, the method expects a Map<String, String>
-        // to provide the values for the suffixes when initializing objects
-        final Class<?>[] cparms = m.getParameterTypes();
+      } else if (!clazz.isAssignableFrom(type)) {
+        // must be a collection, stream, iterator, enumeration, iterable
+        if (!Collection.class.isAssignableFrom(type)
+            && !Stream.class.isAssignableFrom(type)
+            && !Iterator.class.isAssignableFrom(type)
+            && !Enumeration.class.isAssignableFrom(type)
+            && !Iterable.class.isAssignableFrom(type)) {
+          throw new IllegalArgumentException(
+            "incompatible returned class '"
+            + type.getName()
+            + "' for initial objects method '"
+            + m.getName()
+            + "' in class: "
+            + clazz.getSimpleName()
+          );
+        }
+        // now check its argument type
+        final Type rtype = m.getGenericReturnType();
 
-        if (suffixesByType.isEmpty()) {
-          // should always be 0 as we used no classes in getMethod()
-          if (cparms.length != 0) {
+        if (rtype instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)rtype;
+
+          // the expected types will always have only 1 argument
+          if (ptype.getActualTypeArguments().length != 1) {
             throw new IllegalArgumentException(
-              "expecting no parameters for initial objects method '"
-              + mname
+              "incompatible returned type '"
+              + ptype.getTypeName()
+              + "' for initial objects method '"
+              + m.getName()
+              + "' in class: "
+              + clazz.getSimpleName()
+            );
+          }
+          final Class<?> aclazz = ReflectionUtils.getRawClass(ptype.getActualTypeArguments()[0]);
+
+          if (!clazz.isAssignableFrom(aclazz)) {
+            throw new IllegalArgumentException(
+              "incompatible returned type argument '"
+              + aclazz.getName()
+              + "' for initial objects method '"
+              + m.getName()
               + "' in class: "
               + clazz.getSimpleName()
             );
           }
         } else {
-          // should always be 1 as we used only 1 class in getMethod()
-          if (cparms.length != 1) {
-            throw new IllegalArgumentException(
-              "expecting one Map<String, String> parameter for initial objects method '"
-              + mname
-              + "' in class: "
-              + clazz.getSimpleName()
-            );
-          }
-          // should always be a map as we used a Map to find the method
-          if (!Map.class.isAssignableFrom(cparms[0])) {
-            throw new IllegalArgumentException(
-              "expecting parameter for initial objects method '"
-              + mname
-              + "' to be of type Map<String, String> in class: "
-              + clazz.getSimpleName()
-            );
-          }
-          final Type[] tparms = m.getGenericParameterTypes();
-
-          // should always be 1 as we used only 1 class in getMethod()
-          if (tparms.length != 1) { // should always be 1 as it was already tested above
-            throw new IllegalArgumentException(
-              "expecting one Map<String, String> parameter for initial objects method '"
-              + mname
-              + "' in class: "
-              + clazz.getSimpleName()
-            );
-          }
-          if (tparms[0] instanceof ParameterizedType) {
-            final ParameterizedType ptype = (ParameterizedType)tparms[0];
-
-            // maps will always have 2 arguments
-            for (final Type atype: ptype.getActualTypeArguments()) {
-              final Class<?> aclazz = ReflectionUtils.getRawClass(atype);
-
-              if (String.class != aclazz) {
-                throw new IllegalArgumentException(
-                  "expecting a Map<String, String> parameter for initial objects method '"
-                  + mname
-                  + "' in class: "
-                  + clazz.getSimpleName()
-                );
-              }
-            }
-          } else {
-            throw new IllegalArgumentException(
-              "expecting a Map<String, String> parameter for initial objects method '"
-              + mname
-              + "' in class: "
-              + clazz.getSimpleName()
-            );
-          }
+          throw new IllegalArgumentException(
+            "incompatible returned type '"
+            + rtype.getTypeName()
+            + "' for initial objects method '"
+            + m.getName()
+            + "' in class: "
+            + clazz.getSimpleName()
+          );
         }
-        return m;
-      } catch (NoSuchMethodException e) {
-        throw new IllegalArgumentException(
-          "missing initial objects method '"
-          + mname
-          + "' in class: "
-          + clazz.getSimpleName(),
-          e
-        );
       }
-    }
-    return null;
+      // validate that if suffixes are defined, the method expects a Map<String, String>
+      // to provide the values for the suffixes when initializing objects
+      final Class<?>[] cparms = m.getParameterTypes();
+
+      if (suffixesByType.isEmpty()) {
+        // should always be 0 as we used no classes in getMethod()
+        if (cparms.length != 0) {
+          throw new IllegalArgumentException(
+            "expecting no parameters for initial objects method '"
+            + m.getName()
+            + "' in class: "
+            + clazz.getSimpleName()
+          );
+        }
+      } else {
+        // should always be 1 as we used only 1 class in getMethod()
+        if (cparms.length != 1) {
+          throw new IllegalArgumentException(
+            "expecting one Map<String, String> parameter for initial objects method '"
+            + m.getName()
+            + "' in class: "
+            + clazz.getSimpleName()
+          );
+        }
+        // should always be a map as we used a Map to find the method
+        if (!Map.class.isAssignableFrom(cparms[0])) {
+          throw new IllegalArgumentException(
+            "expecting parameter for initial objects method '"
+            + m.getName()
+            + "' to be of type Map<String, String> in class: "
+            + clazz.getSimpleName()
+          );
+        }
+        final Type[] tparms = m.getGenericParameterTypes();
+
+        // should always be 1 as we used only 1 class in getMethod()
+        if (tparms.length != 1) { // should always be 1 as it was already tested above
+          throw new IllegalArgumentException(
+            "expecting one Map<String, String> parameter for initial objects method '"
+            + m.getName()
+            + "' in class: "
+            + clazz.getSimpleName()
+          );
+        }
+        if (tparms[0] instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)tparms[0];
+
+          // maps will always have 2 arguments
+          for (final Type atype: ptype.getActualTypeArguments()) {
+            final Class<?> aclazz = ReflectionUtils.getRawClass(atype);
+
+            if (String.class != aclazz) {
+              throw new IllegalArgumentException(
+                "expecting a Map<String, String> parameter for initial objects method '"
+                + m.getName()
+                + "' in class: "
+                + clazz.getSimpleName()
+              );
+            }
+          }
+        } else {
+          throw new IllegalArgumentException(
+            "expecting a Map<String, String> parameter for initial objects method '"
+            + m.getName()
+            + "' in class: "
+            + clazz.getSimpleName()
+          );
+        }
+      }
+    });
+    return initials;
   }
 
   /**
@@ -1785,15 +1820,53 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    */
   @Override
   @SuppressWarnings("unchecked")
-  public T[] getInitialObjects(Map<String, String> suffixes) {
-    if (initial == null) {
-      return null;
+  public Collection<T> getInitialObjects(Map<String, String> suffixes) {
+    if (initials.isEmpty()) {
+      return Collections.emptyList();
     }
     try {
-      if (suffixesByType.isEmpty()) {
-        return (T[])initial.invoke(null);
+      final List<T> objs = new ArrayList<>(16);
+
+      for (final Method initial: initials) {
+        final Object ret;
+
+        if (suffixesByType.isEmpty()) {
+          ret = initial.invoke(null);
+        } else {
+          ret = initial.invoke(null, suffixes);
+        }
+        if (ret == null) {
+          return Collections.emptyList();
+        }
+        final Class<?> type = initial.getReturnType();
+
+        if (type.isArray()) {
+          final int l = Array.getLength(ret);
+
+          for (int i = 0; i < l; i++) {
+            objs.add(clazz.cast(Array.get(ret, i)));
+          }
+        } else if (ret instanceof Collection) {
+          ((Collection<?>)ret).forEach(o -> objs.add(clazz.cast(o)));
+        } else if (ret instanceof Stream) {
+          ((Stream<?>)ret).forEach(o -> objs.add(clazz.cast(o)));
+        } else if (ret instanceof Iterator) {
+          for (final Iterator<?> i = (Iterator<?>)ret; i.hasNext(); ) {
+            objs.add(clazz.cast(i.next()));
+          }
+        } else if (ret instanceof Enumeration<?>) {
+          for (final Enumeration<?> e = (Enumeration<?>)ret; e.hasMoreElements(); ) {
+            objs.add(clazz.cast(e.nextElement()));
+          }
+        } else if (ret instanceof Iterable) {
+          for (final Iterator<?> i = ((Iterable<?>)ret).iterator(); i.hasNext(); ) {
+            objs.add(clazz.cast(i.next()));
+          }
+        } else {
+          objs.add(clazz.cast(ret));
+        }
       }
-      return (T[])initial.invoke(null, suffixes);
+      return objs;
     } catch (IllegalAccessException e) { // should not happen
       throw new IllegalStateException(e);
     } catch (InvocationTargetException e) {
