@@ -286,6 +286,41 @@ public class InsertImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#executeAsync0()
+   */
+  @Override
+  protected VoidFuture executeAsync0() {
+    // if we have no conditions then no need for special treatment of the response
+    if (!ifNotExists) {
+      return super.executeAsync0();
+    }
+    return bridge.newVoidFuture(executeAsyncRaw0(), new VoidFuture.PostProcessor() {
+      @Override
+      public void postProcess(ResultSet result) {
+        // update result set when using conditions have only one row
+        // where the entry "[applied]" is a boolean indicating if the insert was
+        // successful and the rest are all the conditional values specified in
+        // the INSERT request
+
+        // check if the condition was successful
+        final Row row = result.one();
+
+        if (row == null) {
+          throw new ObjectExistException("no result row returned");
+        }
+        if (!row.getBool("[applied]")) {
+          throw new ObjectExistException(row, "insert not applied");
+        }
+        // else all good
+      }
+    });
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.Insert#isEmpty()
    */
   @Override
@@ -393,41 +428,6 @@ public class InsertImpl<T>
     this.ifNotExists = true;
     setDirty();
     return this;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see org.helenus.driver.impl.StatementImpl#executeAsync()
-   */
-  @Override
-  public VoidFuture executeAsync() {
-    // if we have no conditions then no need for special treatment of the response
-    if (!ifNotExists) {
-      return super.executeAsync();
-    }
-    return bridge.newVoidFuture(executeAsyncRaw(), new VoidFuture.PostProcessor() {
-      @Override
-      public void postProcess(ResultSet result) {
-        // update result set when using conditions have only one row
-        // where the entry "[applied]" is a boolean indicating if the insert was
-        // successful and the rest are all the conditional values specified in
-        // the INSERT request
-
-        // check if the condition was successful
-        final Row row = result.one();
-
-        if (row == null) {
-          throw new ObjectExistException("no result row returned");
-        }
-        if (!row.getBool("[applied]")) {
-          throw new ObjectExistException(row, "insert not applied");
-        }
-        // else all good
-      }
-    });
   }
 
   /**

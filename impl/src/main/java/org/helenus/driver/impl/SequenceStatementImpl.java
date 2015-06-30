@@ -183,10 +183,10 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#executeAsyncRaw()
+   * @see org.helenus.driver.impl.StatementImpl#executeAsyncRaw0()
    */
   @Override
-  public ResultSetFuture executeAsyncRaw() {
+  protected ResultSetFuture executeAsyncRaw0() {
     try {
       final StringBuilder[] queries = getQueryStrings();
 

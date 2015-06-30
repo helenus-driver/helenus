@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -66,9 +67,13 @@ import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.Batch;
 import org.helenus.driver.CreateSchema;
+import org.helenus.driver.Group;
+import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.impl.ClassInfoImpl;
+import org.helenus.driver.impl.ParentStatementImpl;
+import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
@@ -80,7 +85,7 @@ import org.junit.runners.model.Statement;
 import org.yaml.snakeyaml.reader.UnicodeReader;
 
 /**
- * The <code>HelenusJUnit</code> class provides the JUnit 4 definition for an
+ * The <code>HelenusJUnit</code> class provides the JUnit 4 definition for a
  * <code>@Rule</code> service that will take care of initializing an embedded
  * Cassandra server and the Helenus driver.
  * <p>
@@ -123,7 +128,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  private final static String RUNTIME_DIR = "target/helenus-unit";
+  private final static String RUNTIME_DIR = "target/helenus-junit";
 
   /**
    * Holds the regex pattern used to parse the Cassandra yaml configuration
@@ -142,6 +147,13 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    */
   private static volatile ThreadGroup group = null;
+
+  /**
+   * Holds the Cassandra config file name used to start the Cassandra daemon.
+   *
+   * @author paouelle
+   */
+  private static String config = null;
 
   /**
    * Holds the Cassandra daemon when started.
@@ -188,11 +200,12 @@ public class HelenusJUnit implements MethodRule {
   private static volatile Map<String, Set<String>> suffixKeyValues = null;
 
   /**
-   * Holds the Cassandra config file name used to start the Cassandra daemon.
+   * Holds the capture lists.
    *
    * @author paouelle
    */
-  private static String config = null;
+  static final Map<List<? extends ObjectStatement<?>>, Class<? extends ObjectStatement<?>>> captures
+    = new IdentityHashMap<>(8);
 
   /**
    * Reads the specified file fully based on the appropriate encoding.
@@ -492,13 +505,13 @@ public class HelenusJUnit implements MethodRule {
    * @param  cfgname the non-<code>null</code> cassandra config resource name
    * @param  timeout the timeout to wait for the Cassandra daemon to start
    *         before failing
-   * @throws AssertionError if an I/O error occurs while starting everything
+   * @throws AssertionError if an error occurs while starting everything
    */
-  private static synchronized void start(String cfgname, long timeout) {
+    private static synchronized void start0(String cfgname, long timeout) {
     if (HelenusJUnit.daemon != null) {
       // check if we are starting it with the same config
       if (config.equals(cfgname)) {
-        logger.debug("Helenus already started using configuration '%s'", cfgname);
+        // logger.debug("Helenus already started using configuration '%s'", cfgname);
         return;
       }
       throw new AssertionError(
@@ -592,53 +605,38 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Checks if the specified thread is a Cassandra daemon thread.
-   *
-   * @author paouelle
-   *
-   * @param  thread the thread to check if it is a Cassandra daemon thread
-   * @return <code>true</code> if the specified is a Cassandra daemon thread;
-   *         <code>false</code> if it is not
-   */
-  public static boolean isCassandraDaemonThread(Thread thread) {
-    if (thread != null) {
-      ThreadGroup group = thread.getThreadGroup();
-
-      while (group != null) {
-        if (group == HelenusJUnit.group) {
-          return true;
-        }
-        group = group.getParent();
-      }
-    }
-    return false;
-  }
-
-  /**
    * Clears the database by resetting it to the same state it was before the
    * previous test case.
    *
    * @author paouelle
+   *
+   * @throws AssertionError if a failure occurs while cleanup
    */
-  public static synchronized void clear() {
+  private static synchronized void clear0() {
     final StatementManagerUnitImpl mgr = HelenusJUnit.manager;
 
     if (mgr != null) {
-      // first drop all non-system keyspaces
-      for (final KeyspaceMetadata keyspace: HelenusJUnit.manager.getCluster().getMetadata().getKeyspaces()) {
-        final String kname = keyspace.getName();
+      try {
+        // first drop all non-system keyspaces
+        for (final KeyspaceMetadata keyspace: HelenusJUnit.manager.getCluster().getMetadata().getKeyspaces()) {
+          final String kname = keyspace.getName();
 
-        if (!"system".equals(kname)
-            && !"system_auth".equals(kname)
-            && !"system_traces".equals(kname)) {
-          mgr.getSession().execute("DROP KEYSPACE " + kname);
+          if (!"system".equals(kname)
+              && !"system_auth".equals(kname)
+              && !"system_traces".equals(kname)) {
+            mgr.getSession().execute("DROP KEYSPACE " + kname);
+          }
         }
+        // make sure to also clear the pojo class info in order to force the dependencies
+        // to other pojos to be re-created when they are referenced
+        mgr.clearCache();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (Error|RuntimeException e) {
+        throw new AssertionError("failed to clean Cassandra database", e);
       }
-      // make sure to also clear the pojo class info in order to force the dependencies
-      // to other pojos to be re-created when they are referenced
-      mgr.clear();
     }
-    // finally clear the cache of schemas
+    // clear the cache of schemas
     HelenusJUnit.schemas.clear();
   }
 
@@ -652,7 +650,7 @@ public class HelenusJUnit implements MethodRule {
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
    * @throws AssertionError if a failure occurs while creating the schema
    */
-  public static void createSchema(Class<?> clazz) {
+  static void createSchema0(Class<?> clazz) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
     // check whether the schema for this pojo has already been loaded
     synchronized (HelenusJUnit.schemas) {
@@ -713,6 +711,29 @@ public class HelenusJUnit implements MethodRule {
         );
       }
     }
+  }
+
+  /**
+   * Checks if the specified thread is a Cassandra daemon thread.
+   *
+   * @author paouelle
+   *
+   * @param  thread the thread to check if it is a Cassandra daemon thread
+   * @return <code>true</code> if the specified is a Cassandra daemon thread;
+   *         <code>false</code> if it is not
+   */
+  public static boolean isCassandraDaemonThread(Thread thread) {
+    if (thread != null) {
+      ThreadGroup group = thread.getThreadGroup();
+
+      while (group != null) {
+        if (group == HelenusJUnit.group) {
+          return true;
+        }
+        group = group.getParent();
+      }
+    }
+    return false;
   }
 
   /**
@@ -780,7 +801,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @param  method the test method to be run
    * @param  target the test object on which the method will be run
-   * @throws AssertionError if an I/O error occurs while initializing the cassandra
+   * @throws AssertionError if an error occurs while initializing the cassandra
    *         daemon or the helenus statement manager
    */
   protected void before(FrameworkMethod method, Object target) {
@@ -799,7 +820,7 @@ public class HelenusJUnit implements MethodRule {
       }
       try {
         // start embedded cassandra daemon
-        HelenusJUnit.start(cfgname, timeout);
+        HelenusJUnit.start0(cfgname, timeout);
         HelenusJUnit.method = method;
         HelenusJUnit.target = target;
         for (final SuffixKeyValues skvs: ReflectionJUnitUtils.getAnnotationsByType(
@@ -819,7 +840,7 @@ public class HelenusJUnit implements MethodRule {
         }
         HelenusJUnit.suffixKeyValues = suffixes;
         // finally cleanup the database for this new test
-        HelenusJUnit.clear();
+        HelenusJUnit.clear0();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         // make sure to cleanup
         HelenusJUnit.method = null;
@@ -830,6 +851,8 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         throw new AssertionError("failed to start Cassandra daemon", e);
+      } finally {
+        HelenusJUnit.captures.clear();
       }
       try {
         // Process all @BeforeObjects methods found
@@ -844,6 +867,8 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         throw new AssertionError("failed to install @BeforeObjects objects into Cassandra", e);
+      } finally {
+        HelenusJUnit.captures.clear();
       }
     }
   }
@@ -863,6 +888,7 @@ public class HelenusJUnit implements MethodRule {
           && (HelenusJUnit.target == target)) { // should always be true
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
+        HelenusJUnit.captures.clear();
       }
     }
   }
@@ -887,6 +913,98 @@ public class HelenusJUnit implements MethodRule {
         }
       }
     };
+  }
+
+  /**
+   * Clears the database by resetting it to the same state it was before the
+   * previous test case.
+   *
+   * @author paouelle
+   *
+   * @return this for chaining
+   * @throws AssertionError if a failure occurs while cleanup
+   */
+  public HelenusJUnit clear() {
+    HelenusJUnit.clear0();
+    return this;
+  }
+
+  /**
+   * Creates the schema for the specified pojo class onto the embedded Cassandra
+   * database.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the pojo class for which to create the schema
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @return this for chaining
+   * @throws AssertionError if a failure occurs while creating the schema
+   */
+  public HelenusJUnit createSchema(Class<?> clazz) {
+    HelenusJUnit.createSchema0(clazz);
+    return this;
+  }
+
+  /**
+   * Starts capturing all object statements that have had their executions
+   * requested with the Helenus statement manager in the order they are occurring
+   * to the provided list. Registered capture lists are automatically removed
+   * at the end of and right before a test execution.
+   * <p>
+   * <i>Note:</i> In the case of {@link Group}-based statements, all grouped
+   * statements will be captured individually.
+   *
+   * @author paouelle
+   *
+   * @param  list the list which will capture all executing object statements
+   * @return this for chaining
+   * @throws NullPointerException if <code>list</code> is <code>null</code>
+   */
+  public HelenusJUnit withStatementsCapture(List<ObjectStatement<?>> list) {
+    return withStatementsCapture(ObjectStatement.class, list);
+  }
+
+  /**
+   * Starts capturing all object statements of the specified class that have had
+   * their executions requested with the Helenus statement manager in the order
+   * they are occurring to the provided list. Registered capture lists are
+   * automatically removed at the end of and right before a test execution.
+   * <p>
+   * <i>Note:</i> In the case of {@link Group}-based statements, all grouped
+   * statements will be captured individually.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class of object statements to capture
+   * @param  list the list which will capture all executing object statements
+   * @return this for chaining
+   * @throws NullPointerException if <code>clazz</code> or <code>list</code> is
+   *         <code>null</code>
+   */
+  public <T extends ObjectStatement<?>> HelenusJUnit withStatementsCapture(
+    Class<T> clazz, List<? extends T> list
+  ) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.notNull(list, "invalid null list");
+    synchronized (HelenusJUnit.class) {
+      HelenusJUnit.captures.put(list, clazz);
+    }
+    return this;
+  }
+
+  /**
+   * Stops capturing object statements with the specified capture list.
+   *
+   * @author paouelle
+   *
+   * @param  list the list to stop capturing with
+   * @return this for chaining
+   */
+  public HelenusJUnit withoutStatementsCapture(List<? extends ObjectStatement<?>> list) {
+    synchronized (HelenusJUnit.class) {
+      HelenusJUnit.captures.remove(list);
+    }
+    return this;
   }
 
   /**
@@ -922,12 +1040,51 @@ public class HelenusJUnit implements MethodRule {
     }
 
     /**
-     * Clears the cache of all pojo class infos.
+     * {@inheritDoc}
      *
      * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#clearCache()
      */
-    void clear() {
+    @Override
+    protected void clearCache() {
       super.clearCache();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#executing(org.helenus.driver.impl.StatementImpl)
+     */
+    @SuppressWarnings({
+      "rawtypes", "unchecked"
+    })
+    @Override
+    protected void executing(StatementImpl<?, ?, ?> statement) {
+      synchronized (HelenusJUnit.class) {
+        if (HelenusJUnit.captures.isEmpty()) { // nothing to capture to
+          return;
+        }
+        final Stream<ObjectStatement<?>> s;
+
+        // handle batch and sequences by capturing all internal statements
+        if (statement instanceof ParentStatementImpl) {
+          s = ((ParentStatementImpl)statement).objectStatements();
+        } else if (statement instanceof ObjectStatement) {
+          s = Stream.of((ObjectStatement<?>)(ObjectStatement)statement); // typecast is required for cmd line compilation
+        } else { // nothing to capture
+          return;
+        }
+        s.forEachOrdered(os -> HelenusJUnit.captures.forEach(
+          (l, c) -> {
+            if (c.isInstance(os)) {
+              ((List<ObjectStatement<?>>)l).add(os);
+            }
+          }
+        ));
+      }
     }
 
     /**
@@ -944,9 +1101,8 @@ public class HelenusJUnit implements MethodRule {
       final ClassInfoImpl<T> classInfo = super.getClassInfoImpl(clazz);
 
       // load the schemas for the pojo if required
-      HelenusJUnit.createSchema(clazz);
+      HelenusJUnit.createSchema0(clazz);
       return classInfo;
     }
   }
 }
-

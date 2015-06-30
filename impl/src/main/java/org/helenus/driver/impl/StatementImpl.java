@@ -40,6 +40,7 @@ import org.helenus.driver.ObjectSet;
 import org.helenus.driver.ObjectSetFuture;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBridge;
+import org.helenus.driver.StatementPreprocessingException;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
 
@@ -478,6 +479,116 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
+   * Executes this statement asynchronously.
+   *
+   * This method does not block. It returns as soon as the statement has been
+   * passed to the underlying network stack. In particular, returning from
+   * this method does not guarantee that the statement is valid or has even been
+   * submitted to a live node. Any exception pertaining to the failure of the
+   * statement will be thrown when accessing the {@link ResultSetFuture}.
+   *
+   * Note that for queries that doesn't return a result (INSERT, UPDATE and
+   * DELETE), you will need to access the result future (that is call one of
+   * its get method to make sure the statement's execution was successful.
+   *
+   * @author paouelle
+   *
+   * @return a future on the result of the statement's execution
+   * @throws IllegalArgumentException if the statement is associated with a POJO
+   *         and the keyspace has not yet been computed and cannot be
+   *         computed with the provided suffixes yet
+   * @throws StatementPreprocessingException if the statement cannot be preprocessed
+   *         for execution
+   */
+  @SuppressWarnings("unchecked")
+  protected F executeAsync0() {
+    final ResultSetFuture rawFuture = executeAsyncRaw0();
+
+    if (ObjectSet.class == resultClass) {
+      return (F)new ObjectSetFutureImpl<>(context, rawFuture);
+    }
+    if (Void.class == resultClass) {
+      return (F)bridge.newVoidFuture(rawFuture);
+    }
+    if (ResultSet.class == resultClass) {
+      return (F)rawFuture;
+    }
+    throw new IllegalStateException(
+      "unsupported result class: " + resultClass.getName()
+    );
+  }
+
+  /**
+   * Executes the provided statement asynchronously and returned a raw result set.
+   * A raw result set is in the raw form as returned by Cassandra's driver. This
+   * can be useful when doing SELECT statement that queries for COUNT().
+   *
+   * This method does not block. It returns as soon as the statement has been
+   * passed to the underlying network stack. In particular, returning from
+   * this method does not guarantee that the statement is valid or has even been
+   * submitted to a live node. Any exception pertaining to the failure of the
+   * statement will be thrown when accessing the {@link ResultSetFuture}.
+   *
+   * Note that for queries that doesn't return a result (INSERT, UPDATE and
+   * DELETE), you will need to access the ResultSetFuture (that is call one of
+   * its get method) to make sure the statement was successful.
+   *
+   * @author paouelle
+   *
+   * @return a future on the raw result of the statement.
+   * @throws IllegalArgumentException if the statement is associated with a POJO
+   *         and the keyspace has not yet been computed and cannot be
+   *         computed with the provided suffixes yet
+   * @throws StatementPreprocessingException if the statement cannot be preprocessed
+   *         for execution
+   */
+  protected ResultSetFuture executeAsyncRaw0() {
+    final String query = getQueryString();
+
+    try {
+      if (StringUtils.isEmpty(query)) { // nothing to query
+        return new EmptyResultSetFuture(mgr);
+      }
+      if (logger.isDebugEnabled()) {
+        if (isTracing()) {
+          if ((query.length() < 2048)
+              || !((this instanceof Batch) || (this instanceof Sequence))) {
+            logger.log(Level.DEBUG, "CQL -> %s", query);
+          } else {
+            if (this instanceof Batch) {
+              logger.log(Level.DEBUG, "CQL -> %s ... APPLY BATCH", query.substring(0, 2024));
+            } else {
+              logger.log(Level.DEBUG, "CQL -> %s ... APPLY SEQUENCE", query.substring(0, 2024));
+            }
+          }
+        }
+      }
+      final SimpleStatement raw = new SimpleStatement(query);
+
+      // propagate statement properties
+      if (getConsistencyLevel() != null) {
+        raw.setConsistencyLevel(getConsistencyLevel());
+      }
+      if (getSerialConsistencyLevel() != null) {
+        raw.setSerialConsistencyLevel(getSerialConsistencyLevel());
+      }
+      if (isTracing()) {
+        raw.enableTracing();
+      } else {
+        raw.disableTracing();
+      }
+      raw.setRetryPolicy(getRetryPolicy());
+      raw.setFetchSize(getFetchSize());
+      return mgr.getSession().executeAsync(raw);
+    } finally {
+      // let's recursively clear the query string that gets cache to reduce
+      // the memory impact chance are now that it got executed, it won't be
+      // needed anymore
+      setDirty(true);
+    }
+  }
+
+  /**
    * Gets the class of POJO for this statement or <code>null</code> if this
    * statement is not associated with a POJO class.
    *
@@ -777,22 +888,9 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @see org.helenus.driver.GenericStatement#executeAsync()
    */
   @Override
-  @SuppressWarnings("unchecked")
   public F executeAsync() {
-    final ResultSetFuture rawFuture = executeAsyncRaw();
-
-    if (ObjectSet.class == resultClass) {
-      return (F)new ObjectSetFutureImpl<>(context, rawFuture);
-    }
-    if (Void.class == resultClass) {
-      return (F)bridge.newVoidFuture(rawFuture);
-    }
-    if (ResultSet.class == resultClass) {
-      return (F)rawFuture;
-    }
-    throw new IllegalStateException(
-      "unsupported result class: " + resultClass.getName()
-    );
+    mgr.executing(this);
+    return executeAsync0();
   }
 
   /**
@@ -816,49 +914,8 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public ResultSetFuture executeAsyncRaw() {
-    final String query = getQueryString();
-
-    try {
-      if (StringUtils.isEmpty(query)) { // nothing to query
-        return new EmptyResultSetFuture(mgr);
-      }
-      if (logger.isDebugEnabled()) {
-        if (isTracing()) {
-          if ((query.length() < 2048)
-              || !((this instanceof Batch) || (this instanceof Sequence))) {
-            logger.log(Level.DEBUG, "CQL -> %s", query);
-          } else {
-            if (this instanceof Batch) {
-              logger.log(Level.DEBUG, "CQL -> %s ... APPLY BATCH", query.substring(0, 2024));
-            } else {
-              logger.log(Level.DEBUG, "CQL -> %s ... APPLY SEQUENCE", query.substring(0, 2024));
-            }
-          }
-        }
-      }
-      final SimpleStatement raw = new SimpleStatement(query);
-
-      // propagate statement properties
-      if (getConsistencyLevel() != null) {
-        raw.setConsistencyLevel(getConsistencyLevel());
-      }
-      if (getSerialConsistencyLevel() != null) {
-        raw.setSerialConsistencyLevel(getSerialConsistencyLevel());
-      }
-      if (isTracing()) {
-        raw.enableTracing();
-      } else {
-        raw.disableTracing();
-      }
-      raw.setRetryPolicy(getRetryPolicy());
-      raw.setFetchSize(getFetchSize());
-      return mgr.getSession().executeAsync(raw);
-    } finally {
-      // let's recursively clear the query string that gets cache to reduce
-      // the memory impact chance are now that it got executed, it won't be
-      // needed anymore
-      setDirty(true);
-    }
+    mgr.executing(this);
+    return executeAsyncRaw0();
   }
 
   /**

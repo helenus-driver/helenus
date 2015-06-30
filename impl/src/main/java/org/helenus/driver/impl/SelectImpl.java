@@ -344,6 +344,47 @@ public class SelectImpl<T>
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#executeAsyncRaw0()
+   */
+  @Override
+  protected ResultSetFuture executeAsyncRaw0() {
+    if (suffixes == null) {
+      return super.executeAsyncRaw0();
+    }
+    return new CompoundResultSetFuture(
+      statements()
+        .map(s -> s.executeAsyncRaw0())
+        .filter(s -> !(s instanceof EmptyResultSetFuture))
+        .collect(Collectors.toList()),
+      mgr
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#executeAsync0()
+   */
+  @Override
+  public ObjectSetFuture<T> executeAsync0() {
+    if (suffixes == null) {
+      return super.executeAsync0();
+    }
+    return new CompoundObjectSetFuture<>(
+      getContext(),
+      statements()
+        .map(s -> s.executeAsync0())
+        .collect(Collectors.toList())
+    );
+  }
+
+  /**
    * Gets the keyspace name associated with this context.
    *
    * @author paouelle
@@ -383,48 +424,6 @@ public class SelectImpl<T>
       this.keyspace = "(" + String.join("|", keyspaces) + ")";
     }
     return keyspace;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see org.helenus.driver.impl.StatementImpl#executeAsync()
-   */
-  @Override
-  @SuppressWarnings("unchecked")
-  public ObjectSetFuture<T> executeAsync() {
-    if (suffixes == null) {
-      return super.executeAsync();
-    }
-    return new CompoundObjectSetFuture<>(
-      getContext(),
-      statements()
-        .map(s -> s.executeAsync())
-        .collect(Collectors.toList())
-    );
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see org.helenus.driver.impl.StatementImpl#executeAsyncRaw()
-   */
-  @Override
-  public ResultSetFuture executeAsyncRaw() {
-    if (suffixes == null) {
-      return super.executeAsyncRaw();
-    }
-    return new CompoundResultSetFuture(
-      statements()
-        .map(s -> s.executeAsyncRaw())
-        .filter(s -> !(s instanceof EmptyResultSetFuture))
-        .collect(Collectors.toList()),
-      mgr
-    );
   }
 
   /**

@@ -684,16 +684,16 @@ public class UpdateImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#executeAsync()
+   * @see org.helenus.driver.impl.StatementImpl#executeAsync0()
    */
   @SuppressWarnings("synthetic-access")
   @Override
-  public VoidFuture executeAsync() {
+  public VoidFuture executeAsync0() {
     // if we have no conditions then no need for special treatment of the response
     if (conditions.conditions.isEmpty()) {
-      return super.executeAsync();
+      return super.executeAsync0();
     }
-    return bridge.newVoidFuture(executeAsyncRaw(), new VoidFuture.PostProcessor() {
+    return bridge.newVoidFuture(executeAsyncRaw0(), new VoidFuture.PostProcessor() {
       @Override
       public void postProcess(ResultSet result) {
         // update result set when using conditions have only one row

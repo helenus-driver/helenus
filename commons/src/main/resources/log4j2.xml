@@ -25,8 +25,7 @@
 <!--                                                                           -->
 <!-- @since 1.0                                                                -->
 <!--                                                                           -->
-<configuration strict="true">
-<!-- include this to enable log4j internal debug messages: status="debug" -->
+<configuration strict="true" status="off">
 	<appenders>
 		<appender type="Console" name="STDOUT_LOCATION">
 			<layout type="PatternLayout"

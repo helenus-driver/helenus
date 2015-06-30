@@ -1615,6 +1615,15 @@ public class StatementManagerImpl extends StatementManager {
   }
 
   /**
+   * Called after a statement's execution has been requested.
+   *
+   * @author paouelle
+   *
+   * @param statement the non-<code>null</code> statement executing
+   */
+  protected void executing(StatementImpl<?, ?, ?> statement) {}
+
+  /**
    * Connects to Cassandra if not already connected.
    *
    * @author paouelle
