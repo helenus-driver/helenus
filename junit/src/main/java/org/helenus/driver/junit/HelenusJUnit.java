@@ -112,7 +112,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  public final static long DEFAULT_STARTUP_TIMEOUT = 15000L;
+  public final static long DEFAULT_STARTUP_TIMEOUT = 60000L;
 
   /**
    * Constant for the default Cassandra configuration file which starts the
@@ -754,7 +754,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Instantiates a new <code>HelenusJUnit</code> object.
    * <p>
-   * <i>Note:</i> Defaults to 15 seconds timeout to wait for the Cassandra
+   * <i>Note:</i> Defaults to 60 seconds timeout to wait for the Cassandra
    * daemon to start on a free port before failing.
    *
    * @author paouelle
