@@ -991,27 +991,64 @@ public class Tool {
    *
    * @author paouelle
    *
-   * @param  initial a non-<code>null</code> initial method to retreive objects with
+   * @param  initial a non-<code>null</code> initial method to retrieve objects with
    * @param  suffixes the non-<code>null</code> map of suffixes configured
-   * @return the initial objects to insert in the table or <code>null</code>
-   *         if none needs to be inserted
+   * @return a non-<code>null</code> collection of the initial objects to insert in the table
    */
-  private static List<Object> getInitialObjects(
+  @SuppressWarnings("unchecked")
+  private static Collection<?> getInitialObjects(
     Method initial, Map<String, String> suffixes
   ) {
     try {
-      final Object array = initial.invoke(null, suffixes);
+      final Object ret;
 
-      if (array == null) {
+      if (initial.getParameterCount() == 0) {
+        ret = initial.invoke(null);
+      } else {
+        ret = initial.invoke(null, suffixes);
+      }
+      if (ret == null) {
         return Collections.emptyList();
       }
-      final int length = Array.getLength(array);
-      final List<Object> objects = new ArrayList<>(length);
+      // validate the return type is either an array, a collection, or a stream
+      final Class<?> type = initial.getReturnType();
 
-      for (int i = 0; i < length; i++) {
-        objects.add(Array.get(array, i));
+      if (type.isArray()) {
+        final int length = Array.getLength(ret);
+        final List<Object> objects = new ArrayList<>(length);
+
+        for (int i = 0; i < length; i++) {
+          objects.add(Array.get(ret, i));
+        }
+        return objects;
+      } else if (ret instanceof Collection) {
+        return (Collection<?>)ret;
+      } else if (ret instanceof Stream) {
+        return ((Stream<Object>)ret).collect(Collectors.toList());
+      } else if (ret instanceof Iterator) {
+        final List<Object> objects = new ArrayList<>(32);
+
+        for (final Iterator<?> i = (Iterator<?>)ret; i.hasNext(); ) {
+         objects.add(i.next());
+        }
+        return objects;
+      } else if (ret instanceof Enumeration<?>) {
+        final List<Object> objects = new ArrayList<>(32);
+
+        for (final Enumeration<?> e = (Enumeration<?>)ret; e.hasMoreElements(); ) {
+          objects.add(e.nextElement());
+        }
+        return objects;
+      } else if (ret instanceof Iterable) {
+        final List<Object> objects = new ArrayList<>(32);
+
+        for (final Iterator<?> i = ((Iterable<?>)ret).iterator(); i.hasNext(); ) {
+          objects.add(i.next());
+        }
+        return objects;
+      } else {
+        return Collections.singleton(ret);
       }
-      return objects;
     } catch (IllegalAccessException e) { // should not happen
       throw new IllegalStateException(e);
     } catch (InvocationTargetException e) {
@@ -1055,74 +1092,57 @@ public class Tool {
             + clazz.getSimpleName()
           );
         }
-        // validate the return type is compatible with this class
-        final Class<?> type = m.getReturnType();
+        // validate that if it has parameters than it must be a Map<String, String>
+        // to provide the values for the suffixes when initializing objects
+        final Class<?>[] cparms = m.getParameterTypes();
 
-        if (type.isArray()) {
-          final Class<?> ctype = type.getComponentType();
-
-          if (!ctype.isAssignableFrom(clazz)) {
+        if (cparms.length > 1) {
+          throw new IllegalArgumentException(
+            "expecting only one parameter for initial objects method '"
+            + m.getName()
+            + "' to be of type Map<String, String> in class: "
+            + clazz.getSimpleName()
+          );
+        } else if (cparms.length == 1) {
+          if (!Map.class.isAssignableFrom(cparms[0])) {
             throw new IllegalArgumentException(
-              "incompatible returned array of class '"
-              + ctype.getName()
-              + "' for initial objects method '"
+              "expecting parameter for initial objects method '"
               + m.getName()
-              + "' in class: "
+              + "' to be of type Map<String, String> in class: "
               + clazz.getSimpleName()
             );
           }
-        } else if (!clazz.isAssignableFrom(type)) {
-          // must be a collection, stream, iterator, enumeration, iterable
-          if (!Collection.class.isAssignableFrom(type)
-              && !Stream.class.isAssignableFrom(type)
-              && !Iterator.class.isAssignableFrom(type)
-              && !Enumeration.class.isAssignableFrom(type)
-              && !Iterable.class.isAssignableFrom(type)) {
+          final Type[] tparms = m.getGenericParameterTypes();
+
+          if (tparms.length != 1) { // should always be 1 as it was already tested above
             throw new IllegalArgumentException(
-              "incompatible returned class '"
-              + type.getName()
-              + "' for initial objects method '"
+              "expecting parameter for initial objects method '"
               + m.getName()
-              + "' in class: "
+              + "' to be of type Map<String, String> in class: "
               + clazz.getSimpleName()
             );
           }
-          // now check its argument type
-          final Type rtype = m.getGenericReturnType();
+          if (tparms[0] instanceof ParameterizedType) {
+            final ParameterizedType ptype = (ParameterizedType)tparms[0];
 
-          if (rtype instanceof ParameterizedType) {
-            final ParameterizedType ptype = (ParameterizedType)rtype;
+            // maps will always have 2 arguments
+            for (final Type atype: ptype.getActualTypeArguments()) {
+              final Class<?> aclazz = ReflectionUtils.getRawClass(atype);
 
-            // the expected types will always have only 1 argument
-            if (ptype.getActualTypeArguments().length != 1) {
-              throw new IllegalArgumentException(
-                "incompatible returned type '"
-                + ptype.getTypeName()
-                + "' for initial objects method '"
-                + m.getName()
-                + "' in class: "
-                + clazz.getSimpleName()
-              );
-            }
-            final Class<?> aclazz = ReflectionUtils.getRawClass(ptype.getActualTypeArguments()[0]);
-
-            if (!aclazz.isAssignableFrom(clazz)) {
-              throw new IllegalArgumentException(
-                "incompatible returned type argument '"
-                + aclazz.getName()
-                + "' for initial objects method '"
-                + m.getName()
-                + "' in class: "
-                + clazz.getSimpleName()
-              );
+              if (String.class != aclazz) {
+                throw new IllegalArgumentException(
+                  "expecting parameter for initial objects method '"
+                  + m.getName()
+                  + "' to be of type Map<String, String> in class: "
+                  + clazz.getSimpleName()
+                );
+              }
             }
           } else {
             throw new IllegalArgumentException(
-              "incompatible returned type '"
-              + rtype.getTypeName()
-              + "' for initial objects method '"
+              "expecting parameter for initial objects method '"
               + m.getName()
-              + "' in class: "
+              + "' to be of type Map<String, String> in class: "
               + clazz.getSimpleName()
             );
           }
@@ -1157,6 +1177,7 @@ public class Tool {
         cnames[i] = null; // clear since we found a class
         final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
 
+        System.out.println("*** INITIALS FOUND: " + initials);
         if (initials.isEmpty()) {
           System.out.println(
             Tool.class.getSimpleName()
@@ -1202,7 +1223,7 @@ public class Tool {
       }
       // search for all object creator classes
       for (final Class<?> clazz: new Reflections(pkg).getTypesAnnotatedWith(
-        org.helenus.driver.persistence.InitialObjects.class, true
+        org.helenus.driver.persistence.ObjectCreator.class, true
       )) {
         final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
 
@@ -1254,7 +1275,7 @@ public class Tool {
       final Batch batch = StatementBuilder.batch();
 
       initials.forEach((m, cs) -> {
-        final List<Object> ios = Tool.getInitialObjects(m, suffixes);
+        final Collection<?> ios = Tool.getInitialObjects(m, suffixes);
 
         System.out.println(
           Tool.class.getSimpleName()

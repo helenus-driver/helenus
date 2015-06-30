@@ -975,6 +975,8 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    *
+   * @param <T> the type of statements to capture
+   *
    * @param  clazz the class of object statements to capture
    * @param  list the list which will capture all executing object statements
    * @return this for chaining
