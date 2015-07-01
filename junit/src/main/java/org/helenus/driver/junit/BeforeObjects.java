@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 
 /**
  * The <code>BeforeObjects</code> annotation can be used to identify a method
- * that will be invoked before the test method in order to pre-populate the
+ * that will be invoked before the test methods in order to pre-populate the
  * database with the pojos returned by the method.
  * <p>
  * The referenced method must be public. It can return an array, a {@link Collection},
@@ -55,4 +55,15 @@ import java.util.stream.Stream;
 @Inherited
 @Documented
 public @interface BeforeObjects {
+  /**
+   * Specifies the names of the only test methods for which to invoke the
+   * annotated method. If left blank then the annotated method is called for
+   * all test methods.
+   *
+   * @author paouelle
+   *
+   * @return the names of optianal test methods for which to call the annotated
+   *         method
+   */
+  String[] value() default {};
 }

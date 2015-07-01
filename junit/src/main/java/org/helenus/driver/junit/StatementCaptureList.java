@@ -159,11 +159,11 @@ public class StatementCaptureList<T extends GenericStatement> {
    * Registers a consumer to intercept all executing statement. An interceptor
    * gets called just before the statement is submitted to Cassandra. Upon
    * returning control from the interceptor, the statement will be submitted to
-   * Cassandra unless an exception was thrown out
+   * Cassandra unless an exception was thrown out.
    *
    * @author paouelle
    *
-   * @param  consumer the consumer to call in order to intercept the next statement
+   * @param  consumer the consumer to call in order to intercept all statements
    * @return this for chaining
    * @throws NullPointerException if <code>consumer</code> is <code>null</code>
    */
@@ -178,12 +178,12 @@ public class StatementCaptureList<T extends GenericStatement> {
    * Registers a consumer to intercept the next <code>num</code> executing
    * statements. An interceptor gets called just before the statement is submitted
    * to Cassandra. Upon returning control from the interceptor, the statement
-   * will be submitted to Cassandra unless an exception was thrown out
+   * will be submitted to Cassandra unless an exception was thrown out.
    *
    * @author paouelle
    *
    * @param  num the number of times this interceptor should remain active
-   * @param  consumer the consumer to call in order to intercept the next statement
+   * @param  consumer the consumer to call in order to intercept the next statements
    * @return this for chaining
    * @throws NullPointerException if <code>consumer</code> is <code>null</code>
    */
@@ -196,6 +196,44 @@ public class StatementCaptureList<T extends GenericStatement> {
       ((List)interceptors).add(MutablePair.of(num, consumer));
     } // else - nothing to intercept
     return this;
+  }
+
+  /**
+   * Registers an interceptor to intercept all executing statement to throw back
+   * the specified error. An interceptor gets called just before the statement
+   * is submitted to Cassandra.
+   * <p>
+   * <i>Note:</i> The same exception is throw back each time a statement is
+   * intercepted and will have its stack trace re-filled every time.
+   *
+   * @author paouelle
+   *
+   * @param  e the error to throw back when intercepting all statements
+   * @return this for chaining
+   * @throws NullPointerException if <code>consumer</code> is <code>null</code>
+   */
+  public StatementCaptureList<T> fail(RuntimeException e) {
+    return fail(Integer.MAX_VALUE, e);
+  }
+
+  /**
+   * Registers an interceptor to intercept the next <code>num</code> executing
+   * statements to throw back the specified error. An interceptor gets called
+   * just before the statement is submitted to Cassandra.
+   * <p>
+   * <i>Note:</i> The same exception is throw back each time a statement is
+   * intercepted and will have its stack trace re-filled every time.
+   *
+   * @author paouelle
+   *
+   * @param  num the number of times this interceptor should remain active
+   * @param  e the error to throw back when intercepting the next statements
+   * @return this for chaining
+   * @throws NullPointerException if <code>consumer</code> is <code>null</code>
+   */
+  public StatementCaptureList<T> fail(int num, RuntimeException e) {
+    org.apache.commons.lang3.Validate.notNull(e, "invalid null error");
+    return intercept(num, s -> { e.fillInStackTrace(); throw e; });
   }
 
   /**

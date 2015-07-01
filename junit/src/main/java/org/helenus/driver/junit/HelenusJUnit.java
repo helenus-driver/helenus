@@ -43,6 +43,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -51,6 +53,7 @@ import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.logging.log4j.LogManager;
@@ -339,14 +342,16 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Processes the @BeforeObjects method by calling it and inserting all
-   * returned pojo objects into the database.
+   * Processes the {@link BeforeObjects} annotated methods by calling it and
+   * inserting all returned pojo objects into the database.
    *
    * @author paouelle
    *
    * @param batch the non-<code>null</code> batch to insert the objects to create in
    * @param m the non-<code>null</code> method to invoke to get the initial objects
+   * @param bo the non-<code>null</code> annotation for the method
    * @param target the test object for which we are calling the method
+   * @param method the test method
    * @param suffixes the map of suffixes to pass to the method
    * @param onlyIfRequiresSuffixes <code>true</code> if the method should
    *        not be called if it doesn't require suffixes
@@ -354,9 +359,16 @@ public class HelenusJUnit implements MethodRule {
   private static void processBeforeObjects(
     Batch batch,
     Method m,
-    Object target, Map<String, String> suffixes,
+    BeforeObjects bo,
+    Object target,
+    FrameworkMethod method,
+    Map<String, String> suffixes,
     boolean onlyIfRequiresSuffixes
   ) {
+    if (!ArrayUtils.isEmpty(bo.value())
+        && !ArrayUtils.contains(bo.value(), method.getName())) {
+      return;
+    }
     try {
       final Class<?>[] cparms = m.getParameterTypes();
       final Object ret;
@@ -401,37 +413,7 @@ public class HelenusJUnit implements MethodRule {
         }
         ret = m.invoke(target, suffixes);
       }
-      if (ret == null) { // nothing to do
-        return;
-      }
-      // validate the return type is either an array, a collection, or a stream
-      final Class<?> type = m.getReturnType();
-
-      if (type.isArray()) {
-        final int l = Array.getLength(ret);
-
-        for (int i = 0; i < l; i++) {
-          batch.add(StatementBuilder.insert(Array.get(ret, i)).intoAll());
-        }
-      } else if (ret instanceof Collection) {
-        ((Collection<?>)ret).forEach(o -> StatementBuilder.insert(0).intoAll());
-      } else if (ret instanceof Stream) {
-        ((Stream<?>)ret).forEach(o -> StatementBuilder.insert(0).intoAll());
-      } else if (ret instanceof Iterator) {
-        for (final Iterator<?> i = (Iterator<?>)ret; i.hasNext(); ) {
-          batch.add(StatementBuilder.insert(i.next()).intoAll());
-        }
-      } else if (ret instanceof Enumeration<?>) {
-        for (final Enumeration<?> e = (Enumeration<?>)ret; e.hasMoreElements(); ) {
-          batch.add(StatementBuilder.insert(e.nextElement()).intoAll());
-        }
-      } else if (ret instanceof Iterable) {
-        for (final Iterator<?> i = ((Iterable<?>)ret).iterator(); i.hasNext(); ) {
-          batch.add(StatementBuilder.insert(i.next()).intoAll());
-        }
-      } else {
-        batch.add(StatementBuilder.insert(ret).intoAll());
-      }
+      HelenusJUnit.processObjects(batch, ret);
     } catch (IllegalAccessException e) { // should not happen
       throw new IllegalStateException(e);
     } catch (InvocationTargetException e) {
@@ -448,6 +430,51 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
+   * Processes the returned object as a {@link Collection}, {@link Stream},
+   * {@link Iterator}, {@link Enumeration}, {@link Iterable}, or a single object
+   * and insert the object(s) in the specified batch.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param batch the non-<code>null</code> batch to insert the objects to create in
+   * @param ret the return object to process
+   */
+  @SuppressWarnings("unchecked")
+  private static void processObjects(Batch batch, Object ret) {
+    if (ret == null) { // nothing to do
+      return;
+    }
+    // validate the return type is either an array, a collection, or a stream
+    final Class<?> type = ret.getClass();
+
+    if (type.isArray()) {
+      final int l = Array.getLength(ret);
+
+      for (int i = 0; i < l; i++) {
+        batch.add(StatementBuilder.insert(Array.get(ret, i)).intoAll());
+      }
+    } else if (ret instanceof Collection) {
+      ((Collection<Object>)ret).forEach(o -> StatementBuilder.insert(o).intoAll());
+    } else if (ret instanceof Stream) {
+      ((Stream<Object>)ret).forEach(o -> StatementBuilder.insert(o).intoAll());
+    } else if (ret instanceof Iterator) {
+      for (final Iterator<?> i = (Iterator<?>)ret; i.hasNext(); ) {
+        batch.add(StatementBuilder.insert(i.next()).intoAll());
+      }
+    } else if (ret instanceof Enumeration<?>) {
+      for (final Enumeration<?> e = (Enumeration<?>)ret; e.hasMoreElements(); ) {
+        batch.add(StatementBuilder.insert(e.nextElement()).intoAll());
+      }
+    } else if (ret instanceof Iterable) {
+      for (final Iterator<?> i = ((Iterable<?>)ret).iterator(); i.hasNext(); ) {
+        batch.add(StatementBuilder.insert(i.next()).intoAll());
+      }
+    } else {
+      batch.add(StatementBuilder.insert(ret).intoAll());
+    }
+  }
+
+  /**
    * Processes all methods annotated with @BeforeObjects for the current test
    * target object.
    *
@@ -455,8 +482,9 @@ public class HelenusJUnit implements MethodRule {
    */
   private static void processBeforeObjects() {
     final Object target = HelenusJUnit.target;
+    final FrameworkMethod method = HelenusJUnit.method;
 
-    if (target == null) {
+    if ((target == null) || (method == null)) {
       return;
     }
     final Map<String, Set<String>> suffixeValues = HelenusJUnit.suffixKeyValues;
@@ -472,16 +500,16 @@ public class HelenusJUnit implements MethodRule {
     } else {
       suffixesByTypes = Collections.emptyList();
     }
-    final Set<Method> methods = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+    final Map<Method, BeforeObjects[]> methods = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
       target.getClass(), BeforeObjects.class, true
-    ).keySet(); // don't care about the @BeforeObjects annotations
+    );
     final Batch batch = StatementBuilder.batch();
 
     if (CollectionUtils.isEmpty(suffixesByTypes)) {
       // no suffixes so call with empty map of suffixes
       methods.forEach(
-        m -> HelenusJUnit.processBeforeObjects(
-          batch, m, target, Collections.emptyMap(), false
+        (m, bos) -> HelenusJUnit.processBeforeObjects(
+          batch, m, bos[0], target, method, Collections.emptyMap(), false // BeforeObjects is not repeatable so only 1 in array
         )
       );
     } else {
@@ -494,8 +522,8 @@ public class HelenusJUnit implements MethodRule {
 
         isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
         methods.forEach(
-          m -> HelenusJUnit.processBeforeObjects(
-            batch, m, target, suffixes, oirs
+          (m, bos) -> HelenusJUnit.processBeforeObjects(
+            batch, m, bos[0], target, method, suffixes, oirs // BeforeObjects is not repeatable so only 1 in array
           )
         );
         onlyIfRequiresSuffixes = true; // from now on, only call those that requires suffixes
@@ -514,7 +542,7 @@ public class HelenusJUnit implements MethodRule {
    *         before failing
    * @throws AssertionError if an error occurs while starting everything
    */
-    private static synchronized void start0(String cfgname, long timeout) {
+  private static synchronized void start0(String cfgname, long timeout) {
     if (HelenusJUnit.daemon != null) {
       // check if we are starting it with the same config
       if (config.equals(cfgname)) {
@@ -957,6 +985,209 @@ public class HelenusJUnit implements MethodRule {
    */
   public HelenusJUnit createSchema(Class<?> clazz) {
     HelenusJUnit.createSchema0(clazz);
+    return this;
+  }
+
+  /**
+   * Populates the database with objects returned by the specified supplier.
+   * <p>
+   * <i>Note:</i> The supplier can return an array, a {@link Collection},
+   * an {@link Iterable}, an {@link Iterator}, an {@link Enumeration}, or a
+   * {@link Stream} of pojo objects or a single object to insert in the database.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  objs the supplier of objects to populate the database with
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit populate(Supplier<? super Object> objs) {
+    if (objs == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Batch batch = StatementBuilder.batch();
+
+        HelenusJUnit.processObjects(batch, objs.get());
+        batch.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (RuntimeException|Error e) {
+        throw new AssertionError("failed to populate objects", e);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Populates the database with objects returned by the specified function. This
+   * version of the <code>populate()</code> allows one to receive a map of all
+   * suffix key values defined in the test environment using the
+   * {@link SuffixKeyValues} annotations. As such, the function might be called
+   * multiple times with each combination of suffix key values.
+   * <p>
+   * <i>Note:</i> The function can return an array, a {@link Collection},
+   * an {@link Iterable}, an {@link Iterator}, an {@link Enumeration}, or a
+   * {@link Stream} of pojo objects or a single object to insert in the database.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  objs the function to receive a map of suffix key values and return
+   *         objects to populate the database with
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit populate(Function<Map<String, String>, ? super Object> objs) {
+    if (objs == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Map<String, Set<String>> suffixeValues = HelenusJUnit.suffixKeyValues;
+        final Collection<Collection<Strings>> suffixesByTypes;
+
+        if (suffixeValues != null) {
+          suffixesByTypes = suffixeValues.entrySet().stream()
+          .map(e -> e.getValue().stream()
+            .map(v -> new Strings(e.getKey(), v))
+            .collect(Collectors.toList())
+          )
+          .collect(Collectors.toList());
+        } else {
+          suffixesByTypes = Collections.emptyList();
+        }
+        final Batch batch = StatementBuilder.batch();
+
+        if (CollectionUtils.isEmpty(suffixesByTypes)) {
+          // no suffixes so call with empty map of suffixes
+          HelenusJUnit.processObjects(batch, objs.apply(Collections.emptyMap()));
+        } else {
+          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixesByTypes); i.hasNext(); ) {
+            final List<Strings> isuffixes = i.next();
+            final Map<String, String> suffixes = new HashMap<>(isuffixes.size() * 3 / 2);
+
+            isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
+            HelenusJUnit.processObjects(batch, objs.apply(suffixes));
+          }
+        }
+        batch.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (RuntimeException|Error e) {
+        throw new AssertionError("failed to populate objects", e);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Populates the database with the specified objects.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  objs the objects to populate the database with
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit populate(Object... objs) {
+    if (objs == null) {
+      return this;
+    }
+    return populate(Stream.of(objs));
+  }
+
+  /**
+   * Populates the database with the specified objects.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  objs the objects to populate the database with
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit populate(Iterable<? super Object> objs) {
+    if (objs == null) {
+      return this;
+    }
+    return populate(objs.iterator());
+  }
+
+  /**
+   * Populates the database with the specified objects.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  objs the objects to populate the database with
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit populate(Iterator<? super Object> objs) {
+    if (objs == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Batch batch = StatementBuilder.batch();
+
+        while (objs.hasNext()) {
+          batch.add(StatementBuilder.insert(objs.next()).intoAll());
+        }
+        batch.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (RuntimeException|Error e) {
+        throw new AssertionError("failed to populate objects", e);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Populates the database with the specified objects.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  objs the objects to populate the database with
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit populate(Stream<? super Object> objs) {
+    if (objs == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Batch batch = StatementBuilder.batch();
+
+        objs.forEachOrdered(o -> batch.add(StatementBuilder.insert(o).intoAll()));
+        batch.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (RuntimeException|Error e) {
+        throw new AssertionError("failed to populate objects", e);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
     return this;
   }
 
