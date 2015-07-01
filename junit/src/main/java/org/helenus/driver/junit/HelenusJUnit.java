@@ -29,12 +29,12 @@ import java.io.InputStream;
 
 import java.net.ServerSocket;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -72,7 +72,6 @@ import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.impl.ClassInfoImpl;
-import org.helenus.driver.impl.ParentStatementImpl;
 import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.info.ClassInfo;
@@ -204,8 +203,8 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  static final Map<List<? extends ObjectStatement<?>>, Class<? extends ObjectStatement<?>>> captures
-    = new IdentityHashMap<>(8);
+  static final List<StatementCaptureList<? extends ObjectStatement<?>>> captures
+    = new ArrayList<>(4);
 
   /**
    * Reads the specified file fully based on the appropriate encoding.
@@ -948,27 +947,26 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Starts capturing all object statements that have had their executions
    * requested with the Helenus statement manager in the order they are occurring
-   * to the provided list. Registered capture lists are automatically removed
-   * at the end of and right before a test execution.
+   * to the returned list. Capture lists are automatically removed at the end
+   * of and right before a test execution.
    * <p>
    * <i>Note:</i> In the case of {@link Group}-based statements, all grouped
    * statements will be captured individually.
    *
    * @author paouelle
    *
-   * @param  list the list which will capture all executing object statements
-   * @return this for chaining
-   * @throws NullPointerException if <code>list</code> is <code>null</code>
+   * @return a non-<code>null</code> statements capture list where the statements
+   *         will be recorded
    */
-  public HelenusJUnit withStatementsCapture(List<ObjectStatement<?>> list) {
-    return withStatementsCapture(ObjectStatement.class, list);
+  public StatementCaptureList<?> withStatementsCapture() {
+    return withStatementsCapture(ObjectStatement.class);
   }
 
   /**
    * Starts capturing all object statements of the specified class that have had
    * their executions requested with the Helenus statement manager in the order
-   * they are occurring to the provided list. Registered capture lists are
-   * automatically removed at the end of and right before a test execution.
+   * they are occurring to the returned list. Capture lists are automatically
+   * removed at the end of and right before a test execution.
    * <p>
    * <i>Note:</i> In the case of {@link Group}-based statements, all grouped
    * statements will be captured individually.
@@ -978,20 +976,20 @@ public class HelenusJUnit implements MethodRule {
    * @param <T> the type of statements to capture
    *
    * @param  clazz the class of object statements to capture
-   * @param  list the list which will capture all executing object statements
-   * @return this for chaining
-   * @throws NullPointerException if <code>clazz</code> or <code>list</code> is
-   *         <code>null</code>
+   * @return a non-<code>null</code> statements capture list where the statements
+   *         will be recorded
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
    */
-  public <T extends ObjectStatement<?>> HelenusJUnit withStatementsCapture(
-    Class<T> clazz, List<? extends T> list
+  public <T extends ObjectStatement<?>> StatementCaptureList<? extends T> withStatementsCapture(
+    Class<T> clazz
   ) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
-    org.apache.commons.lang3.Validate.notNull(list, "invalid null list");
     synchronized (HelenusJUnit.class) {
-      HelenusJUnit.captures.put(list, clazz);
+      final StatementCaptureList<T> cl = new StatementCaptureList<>(clazz);
+
+      HelenusJUnit.captures.add(cl);
+      return cl;
     }
-    return this;
   }
 
   /**
@@ -1004,7 +1002,11 @@ public class HelenusJUnit implements MethodRule {
    */
   public HelenusJUnit withoutStatementsCapture(List<? extends ObjectStatement<?>> list) {
     synchronized (HelenusJUnit.class) {
-      HelenusJUnit.captures.remove(list);
+      for (final Iterator<StatementCaptureList<? extends ObjectStatement<?>>> i = HelenusJUnit.captures.iterator(); i.hasNext(); ) {
+        if (i.next() == list) {
+          i.remove();
+        }
+      }
     }
     return this;
   }
@@ -1060,32 +1062,13 @@ public class HelenusJUnit implements MethodRule {
      *
      * @see org.helenus.driver.impl.StatementManagerImpl#executing(org.helenus.driver.impl.StatementImpl)
      */
-    @SuppressWarnings({
-      "rawtypes", "unchecked"
-    })
     @Override
     protected void executing(StatementImpl<?, ?, ?> statement) {
       synchronized (HelenusJUnit.class) {
         if (HelenusJUnit.captures.isEmpty()) { // nothing to capture to
           return;
         }
-        final Stream<ObjectStatement<?>> s;
-
-        // handle batch and sequences by capturing all internal statements
-        if (statement instanceof ParentStatementImpl) {
-          s = ((ParentStatementImpl)statement).objectStatements();
-        } else if (statement instanceof ObjectStatement) {
-          s = Stream.of((ObjectStatement<?>)(ObjectStatement)statement); // typecast is required for cmd line compilation
-        } else { // nothing to capture
-          return;
-        }
-        s.forEachOrdered(os -> HelenusJUnit.captures.forEach(
-          (l, c) -> {
-            if (c.isInstance(os)) {
-              ((List<ObjectStatement<?>>)l).add(os);
-            }
-          }
-        ));
+        HelenusJUnit.captures.forEach(l -> l.executing(statement));
       }
     }
 
