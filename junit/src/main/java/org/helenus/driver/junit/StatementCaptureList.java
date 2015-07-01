@@ -24,13 +24,13 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.MutablePair;
 
 import org.hamcrest.Matcher;
-import org.helenus.driver.ObjectStatement;
+import org.helenus.driver.GenericStatement;
 import org.helenus.driver.impl.ParentStatementImpl;
 import org.helenus.driver.impl.StatementImpl;
 
 /**
- * The <code>EnumCaptureList</code> class defines a class capable of
- * capturing processed enums.
+ * The <code>StatementCaptureList</code> class defines a class capable of
+ * capturing executing statements.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -41,35 +41,38 @@ import org.helenus.driver.impl.StatementImpl;
  *
  * @since 1.0
  */
-public class StatementCaptureList<T extends ObjectStatement<?>> {
+@SuppressWarnings("rawtypes")
+public class StatementCaptureList<T extends GenericStatement> {
   /**
    * Holds the list of captured statements.
    *
    * @author paouelle
    */
-  private final List<? extends ObjectStatement<T>> list = new ArrayList<>(8);
+  @SuppressWarnings("rawtypes")
+  private final List<? extends GenericStatement> list = new ArrayList<>(8);
 
   /**
    * Holds the list of interceptors with their intercepting counter.
    *
    * @author paouelle
    */
-  private final List<MutablePair<Consumer<? extends ObjectStatement<T>>, Integer>> interceptors
+  @SuppressWarnings("rawtypes")
+  private final List<MutablePair<Consumer<? extends GenericStatement>, Integer>> interceptors
     = new ArrayList<>(4);
 
   /**
-   * Holds the class of object statements to capture
+   * Holds the class of statements to capture
    *
    * @author paouelle
    */
   private final Class<T> clazz;
 
   /**
-   * Instantiates a new <code>EnumCaptureList</code> object.
+   * Instantiates a new <code>StatementCaptureList</code> object.
    *
    * @author paouelle
    *
-   * @param  clazz the class of object statements to capture
+   * @param  clazz the class of statements to capture
    */
   StatementCaptureList(Class<T> clazz) {
     this.clazz = clazz;
@@ -84,36 +87,34 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   synchronized void executing(StatementImpl<?, ?, ?> statement) {
-    final Stream<ObjectStatement<?>> s;
+    final Stream<? extends GenericStatement> s;
 
     // handle batch and sequences by capturing all internal statements
     if (statement instanceof ParentStatementImpl) {
       s = ((ParentStatementImpl)statement).objectStatements();
-    } else if (statement instanceof ObjectStatement) {
-      s = Stream.of((ObjectStatement<?>)(ObjectStatement)statement); // cast is required for cmdline compilation
-    } else { // nothing to capture or intercept
-      return;
+    } else {
+      s = Stream.of(statement);
     }
     s.forEachOrdered(os -> {
       if (clazz.isInstance(os)) {
         // first intercept
-        for (final Iterator<MutablePair<Consumer<? extends ObjectStatement<T>>, Integer>> i = interceptors.iterator(); i.hasNext(); ) {
-          final MutablePair<Consumer<? extends ObjectStatement<T>>, Integer> m = i.next();
+        for (final Iterator<MutablePair<Consumer<? extends GenericStatement>, Integer>> i = interceptors.iterator(); i.hasNext(); ) {
+          final MutablePair<Consumer<? extends GenericStatement>, Integer> m = i.next();
           final int num = m.getRight().intValue() - 1;
 
           if (num <= 0) { // done with this interceptor; this was the last time
             i.remove();
           }
-          ((Consumer<ObjectStatement<?>>)(Consumer)m.getLeft()).accept(os);
+          ((Consumer)m.getLeft()).accept(os); // cast required to compile on cmdline
         }
         // then capture
-        ((List<ObjectStatement<?>>)(List)list).add(os); // cast required to compile on cmdline
+        ((List)list).add(os); // cast required to compile on cmdline
       }
     });
   }
 
   /**
-   * Stops capturing and intercepting object statements with this capture list.
+   * Stops capturing and intercepting statements with this capture list.
    *
    * @author paouelle
    *
@@ -121,9 +122,10 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    */
   public StatementCaptureList<T> stop() {
     synchronized (HelenusJUnit.class) {
-      for (final Iterator<StatementCaptureList<? extends ObjectStatement<?>>> i = HelenusJUnit.captures.iterator(); i.hasNext(); ) {
+      for (final Iterator<?> i = HelenusJUnit.captures.iterator(); i.hasNext(); ) {
         if (i.next() == this) {
           i.remove();
+          break;
         }
       }
     }
@@ -154,10 +156,10 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
   }
 
   /**
-   * Registers a consumer to intercept all executing object statement. An
-   * interceptor gets called just before the statement is submitted to Cassandra.
-   * Upon returning control from the interceptor, the object statement will be
-   * submitted to Cassandra unless an exception was thrown out
+   * Registers a consumer to intercept all executing statement. An interceptor
+   * gets called just before the statement is submitted to Cassandra. Upon
+   * returning control from the interceptor, the statement will be submitted to
+   * Cassandra unless an exception was thrown out
    *
    * @author paouelle
    *
@@ -165,17 +167,18 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    * @return this for chaining
    * @throws NullPointerException if <code>consumer</code> is <code>null</code>
    */
+  @SuppressWarnings("rawtypes")
   public StatementCaptureList<T> intercept(
-    Consumer<? extends ObjectStatement<? extends T>> consumer
+    Consumer<? extends GenericStatement> consumer
   ) {
     return intercept(Integer.MAX_VALUE, consumer);
   }
 
   /**
-   * Registers a consumer to intercept the next <code>num</code> executing object
-   * statement. An interceptor gets called just before the statement is submitted
-   * to Cassandra. Upon returning control from the interceptor, the object
-   * statement will be submitted to Cassandra unless an exception was thrown out
+   * Registers a consumer to intercept the next <code>num</code> executing
+   * statements. An interceptor gets called just before the statement is submitted
+   * to Cassandra. Upon returning control from the interceptor, the statement
+   * will be submitted to Cassandra unless an exception was thrown out
    *
    * @author paouelle
    *
@@ -186,7 +189,7 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   public StatementCaptureList<T> intercept(
-    int num, Consumer<? extends ObjectStatement<? extends T>> consumer
+    int num, Consumer<? extends GenericStatement> consumer
   ) {
     org.apache.commons.lang3.Validate.notNull(consumer, "invalid null consumer");
     if (num > 0) {
@@ -216,17 +219,18 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    * @return the corresponding non-<code>null</code> statement
    * @throws AssertionError if less statements were captured
    */
-  public ObjectStatement<T> on(int i) {
+  @SuppressWarnings("unchecked")
+  public T on(int i) {
     if (list.size() <= i) {
       throw new AssertionError(
-        "not enough captured object statements; only "
+        "not enough captured statements; only "
         + list.size()
         + " statements were captured and at least "
         + (i + 1)
         + " was expected"
       );
     }
-    return list.get(0);
+    return (T)list.get(0);
   }
 
   /**

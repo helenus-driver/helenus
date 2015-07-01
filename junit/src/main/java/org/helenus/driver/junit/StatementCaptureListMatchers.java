@@ -19,11 +19,11 @@ import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.StringDescription;
-import org.helenus.driver.ObjectStatement;
+import org.helenus.driver.GenericStatement;
 
 /**
- * The <code>EnumCaptureListMatchers</code> abstract class defines static
- * factory method for an enum capture list.
+ * The <code>StatementCaptureListMatchers</code> abstract class defines static
+ * factory method for a statement capture list.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -88,7 +88,8 @@ public abstract class StatementCaptureListMatchers {
    *         list
    * @return the corresponding statement matcher
    */
-  public static <T extends ObjectStatement<?>> StatementCaptureListMatcher<T> size(
+  @SuppressWarnings("rawtypes")
+  public static <T extends GenericStatement> StatementCaptureListMatcher<T> size(
     Matcher<Integer> matcher
   ) {
     return new StatementCaptureListMatcher<T>() {
@@ -108,7 +109,8 @@ public abstract class StatementCaptureListMatchers {
    *
    * @return a corresponding matcher
    */
-  public static <T extends ObjectStatement<?>> Matcher<StatementCaptureList<T>> isEmpty() {
+  @SuppressWarnings("rawtypes")
+  public static <T extends GenericStatement> Matcher<StatementCaptureList<T>> isEmpty() {
     return new BaseMatcher<StatementCaptureList<T>>() {
       @SuppressWarnings("unchecked")
       @Override
@@ -133,7 +135,8 @@ public abstract class StatementCaptureListMatchers {
    *
    * @return a corresponding matcher
    */
-  public static <T extends ObjectStatement<?>> Matcher<StatementCaptureList<T>> isNotEmpty() {
+  @SuppressWarnings("rawtypes")
+  public static <T extends GenericStatement> Matcher<StatementCaptureList<T>> isNotEmpty() {
     return new BaseMatcher<StatementCaptureList<T>>() {
       @SuppressWarnings("unchecked")
       @Override

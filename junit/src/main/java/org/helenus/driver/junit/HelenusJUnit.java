@@ -67,8 +67,8 @@ import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.Batch;
 import org.helenus.driver.CreateSchema;
+import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
-import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.impl.ClassInfoImpl;
@@ -203,7 +203,8 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  static final List<StatementCaptureList<? extends ObjectStatement<?>>> captures
+  @SuppressWarnings("rawtypes")
+  static final List<StatementCaptureList<? extends GenericStatement>> captures
     = new ArrayList<>(4);
 
   /**
@@ -973,15 +974,16 @@ public class HelenusJUnit implements MethodRule {
    * @return a non-<code>null</code> statements capture list where the statements
    *         will be recorded
    */
-  public StatementCaptureList<?> withStatementsCapture() {
-    return withStatementsCapture(ObjectStatement.class);
+  @SuppressWarnings("rawtypes")
+  public StatementCaptureList<GenericStatement> withCapture() {
+    return withCapture(GenericStatement.class);
   }
 
   /**
-   * Starts capturing all object statements of the specified class that have had
-   * their executions requested with the Helenus statement manager in the order
-   * they are occurring to the returned list. Capture lists are automatically
-   * removed at the end of and right before a test execution.
+   * Starts capturing all statements of the specified class that have had their
+   * executions requested with the Helenus statement manager in the order they
+   * are occurring to the returned list. Capture lists are automatically removed
+   * at the end of and right before a test execution.
    * <p>
    * <i>Note:</i> In the case of {@link Group}-based statements, all grouped
    * statements will be captured individually.
@@ -995,7 +997,8 @@ public class HelenusJUnit implements MethodRule {
    *         will be recorded
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
    */
-  public <T extends ObjectStatement<?>> StatementCaptureList<? extends T> withStatementsCapture(
+  @SuppressWarnings("rawtypes")
+  public <T extends GenericStatement> StatementCaptureList<T> withCapture(
     Class<T> clazz
   ) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
@@ -1014,7 +1017,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @return this for chaining
    */
-  public HelenusJUnit withoutStatementsCapture() {
+  public HelenusJUnit withoutCapture() {
     synchronized (HelenusJUnit.class) {
       HelenusJUnit.captures.clear();
     }
@@ -1072,8 +1075,9 @@ public class HelenusJUnit implements MethodRule {
      *
      * @see org.helenus.driver.impl.StatementManagerImpl#executing(org.helenus.driver.impl.StatementImpl)
      */
+    @SuppressWarnings("rawtypes")
     @Override
-    protected void executing(StatementImpl<?, ?, ?> statement) {
+    protected void executing(StatementImpl statement) {
       synchronized (HelenusJUnit.class) {
         if (!HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // not capturing
           return;

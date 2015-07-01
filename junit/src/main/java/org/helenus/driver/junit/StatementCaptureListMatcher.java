@@ -15,11 +15,11 @@
  */
 package org.helenus.driver.junit;
 
-import org.helenus.driver.ObjectStatement;
+import org.helenus.driver.GenericStatement;
 
 /**
- * The <code>EnumCaptureListMatcher</code> interface defines a class that can
- * match the enum capture list against some expectation.
+ * The <code>StatementCaptureListMatcher</code> interface defines a class that can
+ * match the statement capture list against some expectation.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -30,7 +30,8 @@ import org.helenus.driver.ObjectStatement;
  *
  * @since 1.0
  */
-public interface StatementCaptureListMatcher<T extends ObjectStatement<?>> {
+@SuppressWarnings("rawtypes")
+public interface StatementCaptureListMatcher<T extends GenericStatement> {
   /**
    * Called to process this matcher against the specified statement capture list.
    *
