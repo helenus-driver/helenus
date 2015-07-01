@@ -16,8 +16,12 @@
 package org.helenus.driver.junit;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
+
+import org.apache.commons.lang3.tuple.MutablePair;
 
 import org.hamcrest.Matcher;
 import org.helenus.driver.ObjectStatement;
@@ -46,6 +50,14 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
   private final List<? extends ObjectStatement<T>> list = new ArrayList<>(8);
 
   /**
+   * Holds the list of interceptors with their intercepting counter.
+   *
+   * @author paouelle
+   */
+  private final List<MutablePair<Consumer<? extends ObjectStatement<T>>, Integer>> interceptors
+    = new ArrayList<>(4);
+
+  /**
    * Holds the class of object statements to capture
    *
    * @author paouelle
@@ -71,7 +83,7 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    * @param statement being processed
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
-  void executing(StatementImpl<?, ?, ?> statement) {
+  synchronized void executing(StatementImpl<?, ?, ?> statement) {
     final Stream<ObjectStatement<?>> s;
 
     // handle batch and sequences by capturing all internal statements
@@ -79,14 +91,43 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
       s = ((ParentStatementImpl)statement).objectStatements();
     } else if (statement instanceof ObjectStatement) {
       s = Stream.of((ObjectStatement<?>)(ObjectStatement)statement); // cast is required for cmdline compilation
-    } else { // nothing to capture
+    } else { // nothing to capture or intercept
       return;
     }
     s.forEachOrdered(os -> {
-      if (!clazz.isInstance(os)) {
+      if (clazz.isInstance(os)) {
+        // first intercept
+        for (final Iterator<MutablePair<Consumer<? extends ObjectStatement<T>>, Integer>> i = interceptors.iterator(); i.hasNext(); ) {
+          final MutablePair<Consumer<? extends ObjectStatement<T>>, Integer> m = i.next();
+          final int num = m.getRight().intValue() - 1;
+
+          if (num <= 0) { // done with this interceptor; this was the last time
+            i.remove();
+          }
+          ((Consumer<ObjectStatement<?>>)(Consumer)m.getLeft()).accept(os);
+        }
+        // then capture
         ((List<ObjectStatement<?>>)(List)list).add(os); // cast required to compile on cmdline
       }
     });
+  }
+
+  /**
+   * Stops capturing and intercepting object statements with this capture list.
+   *
+   * @author paouelle
+   *
+   * @return this for chaining
+   */
+  public StatementCaptureList<T> stop() {
+    synchronized (HelenusJUnit.class) {
+      for (final Iterator<StatementCaptureList<? extends ObjectStatement<?>>> i = HelenusJUnit.captures.iterator(); i.hasNext(); ) {
+        if (i.next() == this) {
+          i.remove();
+        }
+      }
+    }
+    return this;
   }
 
   /**
@@ -110,6 +151,60 @@ public class StatementCaptureList<T extends ObjectStatement<?>> {
    */
   public boolean isEmpty() {
     return list.isEmpty();
+  }
+
+  /**
+   * Registers a consumer to intercept all executing object statement. An
+   * interceptor gets called just before the statement is submitted to Cassandra.
+   * Upon returning control from the interceptor, the object statement will be
+   * submitted to Cassandra unless an exception was thrown out
+   *
+   * @author paouelle
+   *
+   * @param  consumer the consumer to call in order to intercept the next statement
+   * @return this for chaining
+   * @throws NullPointerException if <code>consumer</code> is <code>null</code>
+   */
+  public StatementCaptureList<T> intercept(
+    Consumer<? extends ObjectStatement<? extends T>> consumer
+  ) {
+    return intercept(Integer.MAX_VALUE, consumer);
+  }
+
+  /**
+   * Registers a consumer to intercept the next <code>num</code> executing object
+   * statement. An interceptor gets called just before the statement is submitted
+   * to Cassandra. Upon returning control from the interceptor, the object
+   * statement will be submitted to Cassandra unless an exception was thrown out
+   *
+   * @author paouelle
+   *
+   * @param  num the number of times this interceptor should remain active
+   * @param  consumer the consumer to call in order to intercept the next statement
+   * @return this for chaining
+   * @throws NullPointerException if <code>consumer</code> is <code>null</code>
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public StatementCaptureList<T> intercept(
+    int num, Consumer<? extends ObjectStatement<? extends T>> consumer
+  ) {
+    org.apache.commons.lang3.Validate.notNull(consumer, "invalid null consumer");
+    if (num > 0) {
+      ((List)interceptors).add(MutablePair.of(num, consumer));
+    } // else - nothing to intercept
+    return this;
+  }
+
+  /**
+   * Stops all registered interceptors.
+   *
+   * @author paouelle
+   *
+   * @return this for chaining
+   */
+  public StatementCaptureList<T> stopIntercepting() {
+    interceptors.clear();
+    return this;
   }
 
   /**

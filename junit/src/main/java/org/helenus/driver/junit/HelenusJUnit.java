@@ -207,6 +207,13 @@ public class HelenusJUnit implements MethodRule {
     = new ArrayList<>(4);
 
   /**
+   * Holds a flag indicating if capturing is enabled or not.
+   *
+   * @author paouelle
+   */
+  static boolean capturing = false;
+
+  /**
    * Reads the specified file fully based on the appropriate encoding.
    *
    * @author paouelle
@@ -656,8 +663,11 @@ public class HelenusJUnit implements MethodRule {
       if (!HelenusJUnit.schemas.add(clazz)) {
         return; // nothing to do more
       }
+      final boolean old = HelenusJUnit.capturing;
+
       try {
         logger.debug("Creating schema for %s", clazz.getSimpleName());
+        HelenusJUnit.capturing = false; // disable temporarily capturing
         final ClassInfo<?> cinfo = manager.getClassInfoImpl(clazz);
         // find all suffixes that are defined for this classes
         final Collection<Collection<Strings>> suffixes = ((target != null)
@@ -708,6 +718,8 @@ public class HelenusJUnit implements MethodRule {
         throw new AssertionError(
           "failed to create schema for " + clazz.getSimpleName(), e
         );
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
       }
     }
   }
@@ -818,6 +830,7 @@ public class HelenusJUnit implements MethodRule {
         ));
       }
       try {
+        HelenusJUnit.capturing = false;
         // start embedded cassandra daemon
         HelenusJUnit.start0(cfgname, timeout);
         HelenusJUnit.method = method;
@@ -869,6 +882,7 @@ public class HelenusJUnit implements MethodRule {
       } finally {
         HelenusJUnit.captures.clear();
       }
+      HelenusJUnit.capturing = true;
     }
   }
 
@@ -888,6 +902,7 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         HelenusJUnit.captures.clear();
+        HelenusJUnit.capturing = false;
       }
     }
   }
@@ -993,20 +1008,15 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Stops capturing object statements with the specified capture list.
+   * Stops capturing object statements with all capture lists.
    *
    * @author paouelle
    *
-   * @param  list the list to stop capturing with
    * @return this for chaining
    */
-  public HelenusJUnit withoutStatementsCapture(List<? extends ObjectStatement<?>> list) {
+  public HelenusJUnit withoutStatementsCapture() {
     synchronized (HelenusJUnit.class) {
-      for (final Iterator<StatementCaptureList<? extends ObjectStatement<?>>> i = HelenusJUnit.captures.iterator(); i.hasNext(); ) {
-        if (i.next() == list) {
-          i.remove();
-        }
-      }
+      HelenusJUnit.captures.clear();
     }
     return this;
   }
@@ -1065,7 +1075,7 @@ public class HelenusJUnit implements MethodRule {
     @Override
     protected void executing(StatementImpl<?, ?, ?> statement) {
       synchronized (HelenusJUnit.class) {
-        if (HelenusJUnit.captures.isEmpty()) { // nothing to capture to
+        if (!HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // not capturing
           return;
         }
         HelenusJUnit.captures.forEach(l -> l.executing(statement));

@@ -1615,7 +1615,11 @@ public class StatementManagerImpl extends StatementManager {
   }
 
   /**
-   * Called after a statement's execution has been requested.
+   * Called after a statement's execution has been requested but
+   * before it actually gets requested with Cassandra.
+   * <p>
+   * <i>Note:</i> Any exceptions thrown back will bubble out of the statement's
+   * execution.
    *
    * @author paouelle
    *
