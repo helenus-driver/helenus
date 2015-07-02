@@ -90,6 +90,47 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   }
 
   /**
+   * Checks if the two specified objects have the specified column equal.
+   *
+   * @author paouelle
+   *
+   * @param  column the name of the column to compare
+   * @param  actual the actual object to compare
+   * @param  expected the expected object to compare against
+   * @return <code>true</code> if both objects have the specified columns equal;
+   *         <code>false</code> otherwise
+   */
+  private static boolean areEqual(
+    String column, Object actual, Object expected
+  ) {
+    if (actual == null) {
+      return (expected == null);
+    } else if (actual == expected) {
+      return true;
+    } else if (expected == null) {
+      return false;
+    }
+    final Class<?> clazz = actual.getClass();
+
+    if (clazz.isArray()) {
+      return (
+        expected.getClass().isArray()
+        && AreColumnsEqual.areArraysEqual(column, actual, expected)
+      );
+    }
+    // make sure they are of the same class
+    if (!expected.getClass().equals(clazz)) {
+      return false;
+    }
+    return ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
+      clazz, Column.class, true
+    ).entrySet().stream()
+     .filter(e -> AreColumnsEqual.acceptField(e.getValue(), column))
+     .map(Map.Entry::getKey)
+     .allMatch(f -> AreColumnsEqual.areFieldsEqual(f, actual, expected));
+  }
+
+  /**
    * Checks if a field associated with the specified columns should be ignored.
    *
    * @author paouelle
@@ -103,6 +144,25 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   private static boolean ignoreField(Column[] columns, String... ignore) {
     for (final Column c: columns) {
       if (ArrayUtils.contains(ignore, c.name())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Checks if a field associated with the specified columns should be accepted.
+   *
+   * @author paouelle
+   *
+   * @param  columns the set of columns defined for the field
+   * @param  column the name of the column to accept for comparison
+   * @return <code>true</code> if the field should be accepted; <code>false</code>
+   *         if it should be ignored
+   */
+  private static boolean acceptField(Column[] columns, String column) {
+    for (final Column c: columns) {
+      if (c.name().equals(c.name())) {
         return true;
       }
     }
@@ -173,9 +233,41 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   }
 
   /**
+   * Checks if the two specified array of objects have the specified column
+   * equal.
+   *
+   * @author paouelle
+   *
+   * @param  column the name of the column to compare
+   * @param  actual the actual array of objects to compare
+   * @param  expected the expected array of objects to compare against
+   * @return <code>true</code> if both array of objects have the specified column
+   *         equal; <code>false</code> otherwise
+   */
+  private static boolean areArraysEqual(
+    String column, Object actual, Object expected
+  ) {
+    final int l = Array.getLength(actual);
+
+    if (Array.getLength(expected) == l) {
+      for (int i = 0; i < l; i++) {
+        final Object aval = Array.get(actual, i);
+        final Object eval = Array.get(expected, i);
+
+        if (!AreColumnsEqual.areEqual(column, aval, eval)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Creates a matcher that matches when the examined object has all columns
-   * equal to the specified <code>operand</code>, as determined by calling the
-   * {@link java.lang.Object#equals} method on each associated fields' values.
+   * equal to the same columns of the specified <code>operand</code>, as
+   * determined by calling the {@link java.lang.Object#equals} method on each
+   * associated fields' values.
    * <p>
    * If the specified operand is <code>null</code> then the created matcher will
    * only match if the examined object's is also <code>null</code>.
@@ -186,6 +278,8 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
    * equal to each other (according to the above rules) <b>in the same
    * indexes</b>.
    *
+   * @author paouelle
+   *
    * @param  operand the object to compare against
    * @param  ignore column names to ignore during comparison (may be
    *         <code>null</code> or empty)
@@ -194,6 +288,32 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   @Factory
   public static <T> Matcher<T> columnsEqualTo(T operand, String... ignore) {
     return new AreColumnsEqual<>(operand, ignore);
+  }
+
+  /**
+   * Creates a matcher that matches when the examined object has a given column
+   * equal to the same column on the specified <code>operand</code>, as
+   * determined by calling the {@link java.lang.Object#equals} method on each
+   * associated fields' values.
+   * <p>
+   * If the specified operand is <code>null</code> then the created matcher will
+   * only match if the examined object's is also <code>null</code>.
+   * <p>
+   * The created matcher provides a special behavior when examining
+   * <code>Array</code>s, whereby it will match if both the operand and the
+   * examined object are arrays of the same length and contain items that are
+   * equal to each other (according to the above rules) <b>in the same
+   * indexes</b>.
+   *
+   * @author paouelle
+   *
+   * @param  column the name of the column to compare
+   * @param  operand the object to compare against
+   * @return a corresponding matcher
+   */
+  @Factory
+  public static <T> Matcher<T> columnsEqualTo(String column, T operand) {
+    return new AreColumnsEqual<>(column, operand);
   }
 
   /**
@@ -212,6 +332,14 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   private final String[] ignore;
 
   /**
+   * Holds the name of the column to compare (<code>null</code> to compare
+   * all columns).
+   *
+   * @author paouelle
+   */
+  private final String column;
+
+  /**
    * Instantiates a new <code>AreColumnsEqual</code> object.
    *
    * @author paouelle
@@ -223,6 +351,21 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   public AreColumnsEqual(T expected, String... ignore) {
     this.expected = expected;
     this.ignore = ignore;
+    this.column = null;
+  }
+
+  /**
+   * Instantiates a new <code>AreColumnsEqual</code> object.
+   *
+   * @author paouelle
+   *
+   * @param column the name of the column to compare
+   * @param expected the expected object to be equal to
+   */
+  public AreColumnsEqual(String column, T expected) {
+    this.expected = expected;
+    this.ignore = null;
+    this.column = column;
   }
 
   /**
@@ -234,6 +377,9 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
    */
   @Override
   public boolean matches(Object actual) {
+    if (column != null) {
+
+    }
     return AreColumnsEqual.areEqual(actual, expected, ignore);
   }
 
