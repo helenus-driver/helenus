@@ -434,7 +434,7 @@ public class HelenusJUnit implements MethodRule {
    * {@link Iterator}, {@link Enumeration}, {@link Iterable}, or a single object
    * and insert the object(s) in the specified batch.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param batch the non-<code>null</code> batch to insert the objects to create in
    * @param ret the return object to process
@@ -995,7 +995,7 @@ public class HelenusJUnit implements MethodRule {
    * an {@link Iterable}, an {@link Iterator}, an {@link Enumeration}, or a
    * {@link Stream} of pojo objects or a single object to insert in the database.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  objs the supplier of objects to populate the database with
    * @return this for chaining
@@ -1036,7 +1036,7 @@ public class HelenusJUnit implements MethodRule {
    * an {@link Iterable}, an {@link Iterator}, an {@link Enumeration}, or a
    * {@link Stream} of pojo objects or a single object to insert in the database.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  objs the function to receive a map of suffix key values and return
    *         objects to populate the database with
@@ -1094,7 +1094,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Populates the database with the specified objects.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  objs the objects to populate the database with
    * @return this for chaining
@@ -1110,7 +1110,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Populates the database with the specified objects.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  objs the objects to populate the database with
    * @return this for chaining
@@ -1126,7 +1126,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Populates the database with the specified objects.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  objs the objects to populate the database with
    * @return this for chaining
@@ -1161,7 +1161,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Populates the database with the specified objects.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  objs the objects to populate the database with
    * @return this for chaining
@@ -1184,6 +1184,110 @@ public class HelenusJUnit implements MethodRule {
         throw e;
       } catch (RuntimeException|Error e) {
         throw new AssertionError("failed to populate objects", e);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Truncates all tables for the specified pojo classes from the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to truncate all the tables
+   *         content
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit truncate(Class<?>... classes) {
+    if (classes == null) {
+      return this;
+    }
+    return truncate(Stream.of(classes));
+  }
+
+  /**
+   * Truncates all tables for the specified pojo classes from the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to truncate all the tables
+   *         content
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit truncate(Iterable<Class<?>> classes) {
+    if (classes == null) {
+      return this;
+    }
+    return populate(classes.iterator());
+  }
+
+  /**
+   * Truncates all tables for the specified pojo classes from the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to truncate all the tables
+   *         content
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit truncate(Iterator<Class<?>> classes) {
+    if (classes == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Sequence sequence = StatementBuilder.sequence();
+
+        while (classes.hasNext()) {
+          sequence.add(StatementBuilder.truncate(classes.next()));
+        }
+        sequence.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (RuntimeException|Error e) {
+        throw new AssertionError("failed to truncate classes", e);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Truncates all tables for the specified pojo classes from the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to truncate all the tables
+   *         content
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit truncate(Stream<Class<?>> classes) {
+    if (classes == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Sequence sequence = StatementBuilder.sequence();
+
+        classes.forEachOrdered(c -> sequence.add(StatementBuilder.truncate(c)));
+        sequence.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (RuntimeException|Error e) {
+        throw new AssertionError("failed to truncate classes", e);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
