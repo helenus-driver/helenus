@@ -52,7 +52,7 @@ public class ObjectValidationException extends IllegalArgumentException {
   /**
    * Holds the value of the column that failed validation.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private final Object val;
 
