@@ -21,8 +21,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -147,7 +147,7 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author vasu
    */
-  private final Map<Class<?>, ClassInfoImpl<?>> classInfoCache = new HashMap<>();
+  protected final Map<Class<?>, ClassInfoImpl<?>> classInfoCache = new LinkedHashMap<>(64);
 
   /**
    * Holds the registered filters to be used when introspecting entities.
@@ -320,15 +320,6 @@ public class StatementManagerImpl extends StatementManager {
         this.filters.add(EntityFilter.class.cast(clazz.newInstance()));
       }
     }
-  }
-
-  /**
-   * Clears the cache of pojo class info.
-   *
-   * @author paouelle
-   */
-  protected void clearCache() {
-    classInfoCache.clear();
   }
 
   /**
@@ -1658,6 +1649,19 @@ public class StatementManagerImpl extends StatementManager {
       } catch (Throwable t) { // ignore exception
         logger.log(Level.WARN, "entity filter error", t);
       }
+    }
+  }
+
+  /**
+   * Gets all cached class info structures.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all cached class info structures
+   */
+  public Stream<ClassInfoImpl<?>> classInfoImpls() {
+    synchronized (classInfoCache) {
+      return classInfoCache.values().stream();
     }
   }
 

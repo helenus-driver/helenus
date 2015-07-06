@@ -365,6 +365,11 @@ public class CreateSchemasImpl
       if (ifNotExists) {
         cs.ifNotExists();
       }
+      if (isTracing()) {
+        cs.enableTracing();
+      } else {
+        cs.disableTracing();
+      }
       final StringBuilder[] cbuilders = cs.buildQueryStrings(keyspaces);
 
       if (cbuilders != null) {

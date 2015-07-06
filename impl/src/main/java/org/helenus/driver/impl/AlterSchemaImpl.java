@@ -118,10 +118,22 @@ public class AlterSchemaImpl<T>
           });
       }
       ci = new CreateIndexImpl<>(getContext(), null, null, mgr, bridge);
+      if (isTracing()) {
+        at.enableTracing();
+        ci.enableTracing();
+      } else {
+        at.disableTracing();
+        ci.disableTracing();
+      }
     } else {
       cy = new AlterCreateTypeImpl<>(getContext(), mgr, bridge);
       at = null;
       ci = null;
+      if (isTracing()) {
+        cy.enableTracing();
+      } else {
+        cy.disableTracing();
+      }
     }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     StringBuilder[] cbuilders;
@@ -134,6 +146,11 @@ public class AlterSchemaImpl<T>
         getContext(), mgr, bridge
       );
 
+      if (isTracing()) {
+        ck.enableTracing();
+      } else {
+        ck.disableTracing();
+      }
       cbuilders = ck.buildQueryStrings();
       if (cbuilders != null) {
         for (final StringBuilder builder: cbuilders) {
@@ -181,6 +198,11 @@ public class AlterSchemaImpl<T>
       Optional.empty(), new BatchableStatement[0], true, mgr, bridge
     );
 
+    if (isTracing()) {
+      batch.enableTracing();
+    } else {
+      batch.disableTracing();
+    }
     for (final T io: getContext().getInitialObjects()) {
       batch.add(
         new InsertImpl<>(

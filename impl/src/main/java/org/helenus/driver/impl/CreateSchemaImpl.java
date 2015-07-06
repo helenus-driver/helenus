@@ -105,10 +105,22 @@ public class CreateSchemaImpl<T>
       cy = null;
       ct = new CreateTableImpl<>(getContext(), null, mgr, bridge);
       ci = new CreateIndexImpl<>(getContext(), null, null, mgr, bridge);
+      if (isTracing()) {
+        ct.enableTracing();
+        ci.enableTracing();
+      } else {
+        ct.disableTracing();
+        ci.disableTracing();
+      }
     } else {
       cy = new CreateTypeImpl<>(getContext(), mgr, bridge);
       ct = null;
       ci = null;
+      if (isTracing()) {
+        cy.enableTracing();
+      } else {
+        cy.disableTracing();
+      }
     }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     StringBuilder[] cbuilders;
@@ -134,6 +146,11 @@ public class CreateSchemaImpl<T>
 
       if (ifNotExists) {
         ck.ifNotExists();
+      }
+      if (isTracing()) {
+        ck.enableTracing();
+      } else {
+        ck.disableTracing();
       }
       cbuilders = ck.buildQueryStrings();
       if (cbuilders != null) {
@@ -182,15 +199,25 @@ public class CreateSchemaImpl<T>
       Optional.empty(), new BatchableStatement[0], true, mgr, bridge
     );
 
+    if (isTracing()) {
+      batch.enableTracing();
+    } else {
+      batch.disableTracing();
+    }
     for (final T io: getContext().getInitialObjects()) {
-      batch.add(
-        new InsertImpl<>(
-          getContext().getClassInfo().newContext(io),
-          null,
-          mgr,
-          bridge
-        )
+      final InsertImpl<T> insert = new InsertImpl<>(
+        getContext().getClassInfo().newContext(io),
+        null,
+        mgr,
+        bridge
       );
+
+      if (isTracing()) {
+        insert.enableTracing();
+      } else {
+        insert.disableTracing();
+      }
+      batch.add(insert);
     }
     final StringBuilder builder = batch.buildQueryString();
 

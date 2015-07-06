@@ -118,8 +118,12 @@ public class TruncateImpl<T>
     final StringBuilder builder = new StringBuilder();
 
     builder.append("TRUNCATE ");
-    if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+    try {
+      if (getKeyspace() != null) {
+        Utils.appendName(getKeyspace(), builder).append(".");
+      }
+    } catch (ExcludedSuffixKeyException e) { // just skip this one since we were asked to skip the current keyspace suffix
+      return null;
     }
     Utils.appendName(table.getName(), builder);
     builder.append(';');

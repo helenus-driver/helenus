@@ -72,13 +72,20 @@ import org.helenus.driver.Batch;
 import org.helenus.driver.CreateSchema;
 import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
+import org.helenus.driver.Insert;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
+import org.helenus.driver.Truncate;
 import org.helenus.driver.impl.ClassInfoImpl;
+import org.helenus.driver.impl.RootClassInfoImpl;
 import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
+import org.helenus.driver.impl.TypeClassInfoImpl;
+import org.helenus.driver.impl.UDTClassInfoImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
+import org.helenus.driver.info.RootClassInfo;
+import org.helenus.driver.info.TypeClassInfo;
 import org.helenus.driver.junit.util.ReflectionJUnitUtils;
 import org.helenus.driver.junit.util.Strings;
 import org.junit.rules.MethodRule;
@@ -177,7 +184,15 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  private static final Set<Class<?>> schemas = new HashSet<>();
+  static final Set<Class<?>> schemas = new HashSet<>();
+
+  /**
+   * Holds a cache of class info structures created by previous test cases.
+   *
+   * @author paouelle
+   */
+  static final Map<Class<?>, ClassInfoImpl<?>> fromPreviousTestsCacheInfoCache
+    = new LinkedHashMap<>(64);
 
   /**
    * Holds the test method currently running.
@@ -640,39 +655,142 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Clears the database by resetting it to the same state it was before the
-   * previous test case.
+   * Clears the schema for the specified class info.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of pojo being cleared
+   *
+   * @param  cinfo the class info to clear the schema
+   * @param  seq the sequence to record all statements
+   * @throws AssertionError if a failure occurs while clearing the schema
+   */
+  private static <T> void clearSchema0(ClassInfoImpl<T> cinfo, Sequence seq) {
+    if (cinfo instanceof UDTClassInfoImpl) { // nothing to reset but we want the above trace
+      return;
+    }
+    final boolean old = HelenusJUnit.capturing;
+
+    try {
+      HelenusJUnit.capturing = false; // disable temporarily capturing
+      // find all suffixes that are defined for this classes
+      final Collection<Collection<Strings>> suffixes = ((target != null)
+        ? HelenusJUnit.getSuffixKeyValues(cinfo)
+        : null
+      );
+      // since we already created the schema, we should have the right number of suffixes
+      // now generate as many insert statements for each initial object as
+      // required by the combination of all suffix values
+      if (CollectionUtils.isEmpty(suffixes)) {
+        // no suffixes so just the one truncate
+        final Truncate<T> truncate = StatementBuilder.truncate(cinfo.getObjectClass());
+
+        truncate.disableTracing();
+        seq.add(truncate);
+      } else {
+        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+          final Truncate<T> truncate = StatementBuilder.truncate(cinfo.getObjectClass());
+
+          truncate.disableTracing();
+          // pass all required suffixes
+          for (final Strings ss: i.next()) {
+            // register the suffix value with the corresponding suffix name
+            truncate.where(StatementBuilder.eq(ss.key, ss.value));
+          }
+          seq.add(truncate);
+        }
+      }
+    } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+      throw e;
+    } catch (RuntimeException|Error e) {
+      throw new AssertionError(
+        "failed to clear schema for "
+        + cinfo.getObjectClass().getSimpleName(),
+        e
+      );
+    } finally {
+      HelenusJUnit.capturing = old; // restore previous capturing setting
+    }
+  }
+
+  /**
+   * Clears the database and the Helenus driver by completely resetting them to
+   * the same state they was before the previous test case.
+   *
+   * @author paouelle
+   *
+   * @throws AssertionError if a failure occurs while cleanup
+   */
+  private static synchronized void fullClear0() {
+    synchronized (HelenusJUnit.schemas) {
+      final StatementManagerUnitImpl mgr = HelenusJUnit.manager;
+
+      if (mgr != null) {
+        try {
+          // first drop all non-system keyspaces
+          for (final KeyspaceMetadata keyspace: HelenusJUnit.manager.getCluster().getMetadata().getKeyspaces()) {
+            final String kname = keyspace.getName();
+
+            if (!"system".equals(kname)
+                && !"system_auth".equals(kname)
+                && !"system_traces".equals(kname)) {
+              mgr.getSession().execute("DROP KEYSPACE " + kname);
+            }
+          }
+          // make sure to also clear the pojo class info in order to force the dependencies
+          // to other pojos to be re-created when they are referenced
+          mgr.clearCache();
+        } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+          throw e;
+        } catch (Error|RuntimeException e) {
+          throw new AssertionError("failed to clean Cassandra database", e);
+        }
+      }
+      // clear the cache of schemas
+      HelenusJUnit.schemas.clear();
+      // clear anything we remembered from the previous test cases
+      HelenusJUnit.fromPreviousTestsCacheInfoCache.clear();
+    }
+  }
+
+  /**
+   * Clears the database an the Helenus driver by partially resetting them to a
+   * similar state they were before the previous test case.
    *
    * @author paouelle
    *
    * @throws AssertionError if a failure occurs while cleanup
    */
   private static synchronized void clear0() {
-    final StatementManagerUnitImpl mgr = HelenusJUnit.manager;
+    synchronized (HelenusJUnit.schemas) {
+      final StatementManagerUnitImpl mgr = HelenusJUnit.manager;
 
-    if (mgr != null) {
-      try {
-        // first drop all non-system keyspaces
-        for (final KeyspaceMetadata keyspace: HelenusJUnit.manager.getCluster().getMetadata().getKeyspaces()) {
-          final String kname = keyspace.getName();
+      if (mgr != null) {
+        try {
+          // start by truncating all loaded pojo tables
+          final Sequence seq = StatementBuilder.sequence();
 
-          if (!"system".equals(kname)
-              && !"system_auth".equals(kname)
-              && !"system_traces".equals(kname)) {
-            mgr.getSession().execute("DROP KEYSPACE " + kname);
-          }
+          seq.disableTracing();
+          mgr.classInfoImpls()
+            .filter(c -> !(c instanceof TypeClassInfo))
+            .collect(Collectors.toSet()) // force a snapshot
+            .forEach(c -> HelenusJUnit.clearSchema0(c, seq));
+          seq.execute();
+          // next preserve all class infos already cached
+          mgr.classInfoImpls()
+            .forEach(c -> HelenusJUnit.fromPreviousTestsCacheInfoCache.put(c.getObjectClass(), c));
+          // make sure to also clear the pojo class info in order to force the dependencies
+          // to other pojos to be re-created when they are referenced
+          mgr.clearCache();
+        } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+          throw e;
+        } catch (Error|RuntimeException e) {
+          throw new AssertionError("failed to clean Cassandra database", e);
         }
-        // make sure to also clear the pojo class info in order to force the dependencies
-        // to other pojos to be re-created when they are referenced
-        mgr.clearCache();
-      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
-        throw e;
-      } catch (Error|RuntimeException e) {
-        throw new AssertionError("failed to clean Cassandra database", e);
       }
+      // clear the cache of schemas
+      HelenusJUnit.schemas.clear();
     }
-    // clear the cache of schemas
-    HelenusJUnit.schemas.clear();
   }
 
   /**
@@ -695,9 +813,23 @@ public class HelenusJUnit implements MethodRule {
       final boolean old = HelenusJUnit.capturing;
 
       try {
-        logger.debug("Creating schema for %s", clazz.getSimpleName());
-        HelenusJUnit.capturing = false; // disable temporarily capturing
         final ClassInfo<?> cinfo = manager.getClassInfoImpl(clazz);
+
+        if (cinfo instanceof TypeClassInfo) {
+          // nothing to do for those since everything is done through the root
+          return;
+        } else if (cinfo instanceof RootClassInfo) {
+          logger.debug(
+            "Creating schema for %s, %s",
+            clazz.getSimpleName(),
+            ((RootClassInfo<?>)cinfo).types()
+              .map(t -> t.getObjectClass().getSimpleName())
+              .collect(Collectors.joining(", "))
+          );
+        } else {
+          logger.debug("Creating schema for %s", clazz.getSimpleName());
+        }
+        HelenusJUnit.capturing = false; // disable temporarily capturing
         // find all suffixes that are defined for this classes
         final Collection<Collection<Strings>> suffixes = ((target != null)
           ? HelenusJUnit.getSuffixKeyValues(cinfo)
@@ -719,14 +851,17 @@ public class HelenusJUnit implements MethodRule {
           // no suffixes so just the one create schema required
           final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
+          cs.disableTracing();
           cs.ifNotExists();
           cs.execute();
         } else {
           final Sequence s = StatementBuilder.sequence();
 
+          s.disableTracing();
           for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
             final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
+            cs.disableTracing();
             cs.ifNotExists();
             // pass all required suffixes
             for (final Strings ss: i.next()) {
@@ -746,6 +881,91 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.schemas.remove(clazz);
         throw new AssertionError(
           "failed to create schema for " + clazz.getSimpleName(), e
+        );
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+  }
+
+  /**
+   * Resets the schema for the specified class info.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of pojo being reset
+   *
+   * @param  cinfo the class info to reset the schema
+   * @throws AssertionError if a failure occurs while reseting the schema
+   */
+  static <T> void resetSchema0(ClassInfoImpl<T> cinfo) {
+    synchronized (HelenusJUnit.schemas) {
+      HelenusJUnit.schemas.add(cinfo.getObjectClass());
+      if (cinfo instanceof RootClassInfo) {
+        logger.debug(
+          "Resetting schema for %s, %s",
+          cinfo.getObjectClass().getSimpleName(),
+          ((RootClassInfoImpl<T>)cinfo).types()
+            .map(t -> t.getObjectClass().getSimpleName())
+            .collect(Collectors.joining(", "))
+        );
+      } else {
+        logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
+      }
+      if ((cinfo instanceof TypeClassInfoImpl) || (cinfo instanceof UDTClassInfoImpl)) {
+        // nothing to reset but we want the above trace
+        return;
+      }
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        // find all suffixes that are defined for this classes
+        final Collection<Collection<Strings>> suffixes = ((target != null)
+          ? HelenusJUnit.getSuffixKeyValues(cinfo)
+          : null
+        );
+        final Batch batch = StatementBuilder.batch();
+
+        batch.disableTracing();
+        // since we already created the schema, we should have the right number of suffixes
+        // now generate as many insert statements for each initial object as
+        // required by the combination of all suffix values
+        if (CollectionUtils.isEmpty(suffixes)) {
+          for (final T io: cinfo.newContext().getInitialObjects()) {
+            final Insert<T> insert = StatementBuilder.insert(io).intoAll();
+
+            insert.disableTracing();
+            batch.add(insert);
+          }
+        } else {
+          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+            final ClassInfoImpl<T>.Context context = cinfo.newContext();
+
+            // pass all required suffixes
+            for (final Strings ss: i.next()) {
+              context.addSuffix(ss.key, ss.value);
+            }
+            for (final T io: context.getInitialObjects()) {
+              final Insert<T> insert = StatementBuilder.insert(io).intoAll();
+
+              insert.disableTracing();
+              batch.add(insert);
+            }
+          }
+        }
+        batch.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        // make sure to remove cached schema indicator
+        HelenusJUnit.schemas.remove(cinfo.getObjectClass());
+        throw e;
+      } catch (RuntimeException|Error e) {
+        // make sure to remove cached schema indicator
+        HelenusJUnit.schemas.remove(cinfo.getObjectClass());
+        throw new AssertionError(
+          "failed to reset schema for "
+          + cinfo.getObjectClass().getSimpleName(),
+          e
         );
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
@@ -959,8 +1179,8 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Clears the database by resetting it to the same state it was before the
-   * previous test case.
+   * Clears the database and the Helenus layer by resetting them to the same
+   * state they were before the previous test case.
    *
    * @author paouelle
    *
@@ -968,7 +1188,8 @@ public class HelenusJUnit implements MethodRule {
    * @throws AssertionError if a failure occurs while cleanup
    */
   public HelenusJUnit clear() {
-    HelenusJUnit.clear0();
+    logger.debug("Clearing all schemas");
+    HelenusJUnit.fullClear0();
     return this;
   }
 
@@ -1392,15 +1613,14 @@ public class HelenusJUnit implements MethodRule {
     }
 
     /**
-     * {@inheritDoc}
+     * Clears the cache of pojo class info.
      *
      * @author paouelle
-     *
-     * @see org.helenus.driver.impl.StatementManagerImpl#clearCache()
      */
-    @Override
     protected void clearCache() {
-      super.clearCache();
+      synchronized (super.classInfoCache) {
+        super.classInfoCache.clear();
+      }
     }
 
     /**
@@ -1432,6 +1652,27 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     public <T> ClassInfoImpl<T> getClassInfoImpl(Class<T> clazz) {
+      synchronized (HelenusJUnit.schemas) {
+        // first check if we have already loaded it in previous test cases and if so, reset the schema for it
+        @SuppressWarnings("unchecked")
+        final ClassInfoImpl<T> cinfo
+          = (ClassInfoImpl<T>)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
+
+        if (cinfo != null) {
+          if (cinfo instanceof TypeClassInfoImpl) {
+            // force root to be re-cached first
+            getClassInfoImpl(((TypeClassInfoImpl<T>)cinfo).getRoot().getObjectClass());
+          }
+          synchronized (super.classInfoCache) {
+            super.classInfoCache.put(clazz,  cinfo);
+          }
+          // first truncate all loaded pojo tables and re-insert any schema defined
+          // initial objects
+          HelenusJUnit.resetSchema0(cinfo);
+          return cinfo;
+        }
+      }
+      // if we get here then the cinfo was not loaded in previous tests
       final ClassInfoImpl<T> classInfo = super.getClassInfoImpl(clazz);
 
       // load the schemas for the pojo if required

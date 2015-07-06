@@ -355,9 +355,13 @@ public class AlterSchemasImpl
 
     for (final ClassInfoImpl<?>.Context context: contexts) {
       final AlterSchemaImpl cs = new AlterSchemaImpl(context, mgr, bridge);
-
       final StringBuilder[] cbuilders = cs.buildQueryStrings(keyspaces);
 
+      if (isTracing()) {
+        cs.enableTracing();
+      } else {
+        cs.disableTracing();
+      }
       if (cbuilders != null) {
         for (final StringBuilder builder: cbuilders) {
           if (builder != null) {

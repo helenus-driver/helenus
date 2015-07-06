@@ -26,6 +26,7 @@ import java.util.concurrent.TimeoutException;
 import com.google.common.util.concurrent.ExecutionList;
 
 import org.helenus.driver.StatementManager;
+import org.helenus.driver.impl.StatementImpl;
 
 /**
  * The <code>LastResultSetFuture</code> class defines a result set which is
@@ -120,9 +121,10 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
           }
           // move on the the next if any
           if (LastResultSetFuture.this.statements.hasNext()) {
-            LastResultSetFuture.this.future = mgr.getSession().executeAsync(
-              LastResultSetFuture.this.statements.next()
-            );
+            final SimpleStatement s = LastResultSetFuture.this.statements.next();
+
+            StatementImpl.debugExecution(s);
+            LastResultSetFuture.this.future = mgr.getSession().executeAsync(s);
             LastResultSetFuture.this.future.addListener(
               LastResultSetFuture.this.listener,
               LastResultSetFuture.DIRECT
@@ -170,7 +172,10 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
     this.statements = ss.iterator();
     // execute the first one to get things going
     if (this.statements.hasNext()) {
-      this.future = mgr.getSession().executeAsync(this.statements.next());
+      final SimpleStatement s = this.statements.next();
+
+      StatementImpl.debugExecution(s);
+      this.future = mgr.getSession().executeAsync(s);
       this.future.addListener(listener, LastResultSetFuture.DIRECT);
     }
   }
