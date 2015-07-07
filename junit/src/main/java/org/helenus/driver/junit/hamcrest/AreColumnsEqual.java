@@ -378,7 +378,7 @@ public class AreColumnsEqual<T> extends BaseMatcher<T> {
   @Override
   public boolean matches(Object actual) {
     if (column != null) {
-
+      return AreColumnsEqual.areEqual(column, actual, expected);
     }
     return AreColumnsEqual.areEqual(actual, expected, ignore);
   }

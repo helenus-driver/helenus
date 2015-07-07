@@ -22,6 +22,7 @@ import org.helenus.junit.Tag;
 import org.helenus.junit.Tags;
 import org.helenus.util.function.EConsumer;
 import org.helenus.util.function.ERunnable;
+import org.junit.Test;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
 
@@ -45,11 +46,18 @@ public class MethodRule implements org.junit.rules.MethodRule {
   final EConsumer<MethodRule, Exception>[] shandlers;
 
   /**
-   * Holds a list of registered error handlers.
+   * Holds a list of registered error runnable handlers.
    *
    * @author paouelle
    */
-  final List<ERunnable<Exception>> ehandlers = new ArrayList<>(2);
+  final List<ERunnable<Exception>> erhandlers = new ArrayList<>(2);
+
+  /**
+   * Holds a list of registered error consumer handlers.
+   *
+   * @author paouelle
+   */
+  final List<EConsumer<Throwable, Exception>> echandlers = new ArrayList<>(2);
 
   /**
    * Holds the test method currently running.
@@ -94,12 +102,21 @@ public class MethodRule implements org.junit.rules.MethodRule {
         } catch (ThreadDeath|StackOverflowError|OutOfMemoryError e) {
           throw e;
         } catch (RuntimeException|Error e) {
-          for (final ERunnable<Exception> h: ehandlers) {
-            h.run();
+          // check if that error was expected because if it is ... that is not a failure
+          final Test test = method.getAnnotation(Test.class);
+
+          if (!test.expected().isAssignableFrom(e.getClass())) {
+            for (final ERunnable<Exception> h: erhandlers) {
+              h.run();
+            }
+            for (final EConsumer<Throwable, Exception> h: echandlers) {
+              h.accept(e);
+            }
           }
           throw e;
         } finally {
-          ehandlers.clear();
+          erhandlers.clear();
+          echandlers.clear();
         }
       }
     };
@@ -165,7 +182,23 @@ public class MethodRule implements org.junit.rules.MethodRule {
    */
   public MethodRule onFailure(ERunnable<Exception> handler) {
     if (handler != null) {
-      ehandlers.add(handler);
+      erhandlers.add(handler);
+    }
+    return this;
+  }
+
+  /**
+   * Register an error handler to be called on failure of the current test
+   * case.
+   *
+   * @author paouelle
+   *
+   * @param  handler the error handler to be called on failure of the test case
+   * @return this for chaining
+   */
+  public MethodRule onFailure(EConsumer<Throwable, Exception> handler) {
+    if (handler != null) {
+      echandlers.add(handler);
     }
     return this;
   }
