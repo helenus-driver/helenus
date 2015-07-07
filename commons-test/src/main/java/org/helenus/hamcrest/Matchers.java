@@ -41,22 +41,26 @@ public class Matchers {
    * @param  function the function to apply to the object currently being matched
    *         in order to retrieve another
    * @param  matcher the matcher to use for the retrieved object from the function
+   * @param  describer a describer string for the function
    * @return the corresponding matcher
    */
-  public static <T, S> Matcher<T> that(Function<T, S> function, Matcher<S> matcher) {
+  public static <T, S> Matcher<T> that(
+    Function<T, S> function, Matcher<S> matcher, String describer) {
     return new DiagnosingMatcher<T>() {
       @SuppressWarnings("unchecked")
       @Override
       public boolean matches(java.lang.Object obj, Description mismatch) {
-        if (!matcher.matches(function.apply((T)obj))) {
-          mismatch.appendDescriptionOf(matcher).appendText(" ");
-          matcher.describeMismatch(obj, mismatch);
+        final S s = function.apply((T)obj);
+
+        if (!matcher.matches(s)) {
+          matcher.describeMismatch(s, mismatch);
           return false;
         }
         return true;
       }
       @Override
       public void describeTo(Description description) {
+        description.appendText(describer).appendText(" ");
         matcher.describeTo(description);
       }
     };

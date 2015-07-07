@@ -99,6 +99,7 @@
     <findbugs-version>3.0.0</findbugs-version>
 
     <junit-version>4.12</junit-version>
+    <hamcrest-version>1.3</hamcrest-version>
     <jmockit-version>1.7</jmockit-version>
     <javassist-version>3.12.1.GA</javassist-version>
     
@@ -419,6 +420,12 @@
       </dependency>
       
       <!-- JUnit test and mock libraries -->
+      <dependency>
+	<groupId>org.hamcrest</groupId>
+	<artifactId>hamcrest-all</artifactId>
+	<version>${hamcrest-version}</version>
+	<scope>test</scope>
+      </dependency>
       <dependency>
 	<groupId>junit</groupId>
 	<artifactId>junit</artifactId>
