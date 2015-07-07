@@ -82,7 +82,7 @@ public abstract class ColumnMatchers {
   /**
    * Creates a matcher that matches when the examined object has all columns
    * equal to the same columns of the specified <code>operand</code>, as
-   * determined by calling the {@link java.lang.Object#equals} method on each
+   * determined by calling {@link java.util.Objects#deepEquals} method with each
    * associated fields' values.
    *
    * @author paouelle
@@ -110,7 +110,7 @@ public abstract class ColumnMatchers {
   /**
    * Creates a matcher that matches when the examined object has a given column
    * equal to the same column on the specified <code>operand</code>, as
-   * determined by calling the {@link java.lang.Object#equals} method on each
+   * determined by calling {@link java.util.Objects#deepEquals} method with each
    * associated fields' values.
    *
    * @author paouelle
@@ -293,7 +293,7 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
       final Object ival = field.get(item);
       final Object eval = field.get(expected);
 
-      if (!Objects.equals(ival, eval)) {
+      if (!Objects.deepEquals(ival, eval)) {
         mismatch.appendValue(ival);
         return false;
       }
