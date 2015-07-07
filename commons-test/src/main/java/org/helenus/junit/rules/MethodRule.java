@@ -105,7 +105,7 @@ public class MethodRule implements org.junit.rules.MethodRule {
           // check if that error was expected because if it is ... that is not a failure
           final Test test = method.getAnnotation(Test.class);
 
-          if (!test.expected().isAssignableFrom(e.getClass())) {
+          if ((test == null) || !test.expected().isAssignableFrom(e.getClass())) {
             for (final ERunnable<Exception> h: erhandlers) {
               h.run();
             }

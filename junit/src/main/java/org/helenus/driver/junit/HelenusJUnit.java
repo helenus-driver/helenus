@@ -1503,7 +1503,36 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.capturing = false; // disable temporarily capturing
         final Sequence sequence = StatementBuilder.sequence();
 
-        classes.forEachOrdered(c -> sequence.add(StatementBuilder.truncate(c)));
+        classes.forEach(c -> {
+          final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(c);
+          // find all suffixes that are defined for this classes
+          final Collection<Collection<Strings>> suffixes = ((target != null)
+            ? HelenusJUnit.getSuffixKeyValues(cinfo)
+            : null
+          );
+          // since we already created the schema, we should have the right number of suffixes
+          // now generate as many insert statements for each initial object as
+          // required by the combination of all suffix values
+          if (CollectionUtils.isEmpty(suffixes)) {
+            // no suffixes so just the one truncate
+            final Truncate<?> truncate = StatementBuilder.truncate(c);
+
+            truncate.disableTracing();
+            sequence.add(truncate);
+          } else {
+            for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+              final Truncate<?> truncate = StatementBuilder.truncate(c);
+
+              truncate.disableTracing();
+              // pass all required suffixes
+              for (final Strings ss: i.next()) {
+                // register the suffix value with the corresponding suffix name
+                truncate.where(StatementBuilder.eq(ss.key, ss.value));
+              }
+              sequence.add(truncate);
+            }
+          }
+        });
         sequence.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
