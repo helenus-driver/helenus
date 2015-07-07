@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -599,17 +600,29 @@ public class HelenusJUnit implements MethodRule {
       HelenusJUnit.group = new ThreadGroup("Cassandra Daemon Group");
       // startup the cassandra daemon
       final CountDownLatch latch = new CountDownLatch(1);
+      final AtomicReference<Throwable> failed = new AtomicReference<>(); // until proven otherwise
       final Thread thread = new Thread(
         HelenusJUnit.group,
         new Runnable() {
           @SuppressWarnings("synthetic-access")
           @Override
           public void run() {
-            // make sure the Cassandra runtime directories exists and are cleaned up
-            HelenusJUnit.cleanupAndCreateCassandraDirectories();
-            HelenusJUnit.daemon = new CassandraDaemon();
-            daemon.activate();
-            latch.countDown();
+            try {
+              // make sure the Cassandra runtime directories exists and are cleaned up
+              HelenusJUnit.cleanupAndCreateCassandraDirectories();
+              HelenusJUnit.daemon = new CassandraDaemon();
+              daemon.activate();
+            } catch (AssertionError|StackOverflowError|OutOfMemoryError|ThreadDeath e) {
+              throw e;
+            } catch (RuntimeException e) {
+              failed.set(e);
+              throw e;
+            } catch (Error e) {
+              failed.set(e);
+              throw e;
+            } finally {
+              latch.countDown();
+            }
           }
         }
       );
@@ -626,6 +639,11 @@ public class HelenusJUnit implements MethodRule {
           throw new AssertionError(
             "cassandra daemon failed to start within timeout"
           );
+        }
+        final Throwable t = failed.get();
+
+        if (t != null) {
+          logger.error("Cassandra daemon failed to start; %s", t);
         }
       } catch (InterruptedException e) {
         logger.error("interrupted waiting for cassandra daemon to start", e);
