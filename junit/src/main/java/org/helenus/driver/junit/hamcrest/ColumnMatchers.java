@@ -274,18 +274,23 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
     // first make sure they are the same class
     if (item == null) {
       if (expected != null) {
-        mismatch.appendText("null");
+        mismatch
+          .appendText(columns)
+          .appendText(" was null");
         return false;
       }
       return true;
     } else if (item == expected) {
       return true;
     } else if (expected == null) {
-      mismatch.appendText("not null");
+      mismatch
+        .appendText(columns)
+        .appendText(" was not null");
       return false;
     } else if (!expected.getClass().isInstance(item)) {
       mismatch
-        .appendText("not an instance of ")
+        .appendText(columns)
+        .appendText(" is not an instance of ")
         .appendText(expected.getClass().getName());
       return false;
     }
@@ -294,7 +299,12 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
       final Object eval = field.get(expected);
 
       if (!Objects.deepEquals(ival, eval)) {
-        mismatch.appendValue(ival);
+        mismatch
+          .appendText(columns)
+          .appendText(" was ")
+          .appendValue(ival)
+          .appendText(" instead of ")
+          .appendValue(eval);
         return false;
       }
       return true;
@@ -403,7 +413,8 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (!expected.isInstance(item)) {
       mismatch
-        .appendText("not an instance of ")
+      .appendText(column)
+        .appendText(" was not an instance of ")
         .appendText(expected.getName());
       return false;
     }
@@ -411,7 +422,9 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
       final Object ival = field.get(item);
 
       if (ival != null) {
-        mismatch.appendText("was not null");
+        mismatch
+          .appendText(column)
+          .appendText(" was not null");
         return false;
       }
       return true;
@@ -506,7 +519,8 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (!expected.isInstance(item)) {
       mismatch
-        .appendText("not an instance of ")
+        .appendText(column)
+        .appendText(" was not an instance of ")
         .appendText(expected.getName());
       return false;
     }
@@ -514,7 +528,9 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
       final Object ival = field.get(item);
 
       if (ival == null) {
-        mismatch.appendText("was null");
+        mismatch
+          .appendText(column)
+          .appendText(" was null");
         return false;
       }
       return true;
