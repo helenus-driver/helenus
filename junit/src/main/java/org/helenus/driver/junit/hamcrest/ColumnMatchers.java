@@ -17,14 +17,16 @@ package org.helenus.driver.junit.hamcrest;
 
 import java.lang.reflect.Field;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.ArrayUtils;
 
 import org.hamcrest.Description;
 import org.hamcrest.DiagnosingMatcher;
 import org.hamcrest.Matcher;
-import org.hamcrest.core.AllOf;
+import org.hamcrest.Matchers;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.persistence.Column;
 
@@ -93,18 +95,39 @@ public abstract class ColumnMatchers {
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnsEqualTo(T operand, String... ignore) {
-    final Matcher<T>[] matchers =
+    final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
        .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), ignore))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), e.getValue()))
-       .toArray(Matcher[]::new);
+       .collect(Collectors.toList());
 
-    if (matchers.length == 1) {
-      return matchers[0];
+    if (matchers.size() == 1) {
+      return Matchers.describedAs(
+        matchers.get(0).columns
+        + " is equal", matchers.get(0)
+      );
     }
-    return AllOf.allOf(matchers);
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText("[")
+          .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
+          .appendText("] are all equal");
+      }
+    };
   }
 
   /**
@@ -120,18 +143,38 @@ public abstract class ColumnMatchers {
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnsEqualTo(String column, T operand) {
-    final Matcher<T>[] matchers =
+    final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
        .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), column))
-       .toArray(Matcher[]::new);
+       .collect(Collectors.toList());
 
-    if (matchers.length == 1) {
-      return matchers[0];
+    if (matchers.size() == 1) {
+      return Matchers.describedAs(
+        matchers.get(0).columns
+        + " is equal", matchers.get(0)
+      );
     }
-    return AllOf.allOf(matchers);
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
+          .appendText(" is equal");
+      }
+    };
   }
 
   /**
@@ -145,18 +188,38 @@ public abstract class ColumnMatchers {
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnIsNull(String column, Class<T> operand) {
-    final Matcher<T>[] matchers =
+    final List<IsColumnNull<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand, Column.class, true
       ).entrySet().stream()
        .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
        .map(e -> new IsColumnNull<>(operand, e.getKey(), column))
-       .toArray(Matcher[]::new);
+       .collect(Collectors.toList());
 
-    if (matchers.length == 1) {
-      return matchers[0];
+    if (matchers.size() == 1) {
+      return Matchers.describedAs(
+        matchers.get(0).column
+        + " is null", matchers.get(0)
+      );
     }
-    return AllOf.allOf(matchers);
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
+          .appendText(" is null");
+      }
+    };
   }
 
   /**
@@ -170,18 +233,38 @@ public abstract class ColumnMatchers {
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnIsNotNull(String column, Class<T> operand) {
-    final Matcher<T>[] matchers =
+    final List<IsColumnNotNull<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand, Column.class, true
       ).entrySet().stream()
        .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
        .map(e -> new IsColumnNotNull<>(operand, e.getKey(), column))
-       .toArray(Matcher[]::new);
+       .collect(Collectors.toList());
 
-    if (matchers.length == 1) {
-      return matchers[0];
+    if (matchers.size() == 1) {
+      return Matchers.describedAs(
+        matchers.get(0).column
+        + " is not null", matchers.get(0)
+      );
     }
-    return AllOf.allOf(matchers);
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
+          .appendText(" is not null");
+      }
+    };
   }
 }
 
@@ -206,21 +289,21 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
    *
    * @author paouelle
    */
-  private final Object expected;
+  final Object expected;
 
   /**
    * Holds the field of the column to compare.
    *
    * @author paouelle
    */
-  private final Field field;
+  final Field field;
 
   /**
    * Holds the names of the columns to compare.
    *
    * @author paouelle
    */
-  private final String columns;
+  final String columns;
 
   /**
    * Instantiates a new <code>AreColumnsEqual</code> object.
@@ -275,6 +358,7 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
     if (item == null) {
       if (expected != null) {
         mismatch
+          .appendText("however ")
           .appendText(columns)
           .appendText(" was null");
         return false;
@@ -284,13 +368,15 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (expected == null) {
       mismatch
+        .appendText("however ")
         .appendText(columns)
         .appendText(" was not null");
       return false;
     } else if (!expected.getClass().isInstance(item)) {
       mismatch
+        .appendText("however ")
         .appendText(columns)
-        .appendText(" is not an instance of ")
+        .appendText(" was not an instance of ")
         .appendText(expected.getClass().getName());
       return false;
     }
@@ -300,6 +386,7 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
 
       if (!Objects.deepEquals(ival, eval)) {
         mismatch
+          .appendText("however ")
           .appendText(columns)
           .appendText(" was ")
           .appendValue(ival)
@@ -329,21 +416,7 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
    */
   @Override
   public void describeTo(Description description) {
-    try {
-      description
-        .appendText(columns)
-        .appendText(" equals to ")
-        .appendValue((expected != null) ? field.get(expected) : null);
-    } catch (IllegalAccessException e) {
-      throw new AssertionError(e);
-    } catch (ExceptionInInitializerError e) {
-      final Throwable t = e.getException();
-
-      if (t instanceof AssertionError) {
-        throw (AssertionError)t;
-      }
-      throw new AssertionError(t);
-    }
+    description.appendText(columns).appendText(" are equal");
   }
 }
 
@@ -367,21 +440,21 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
    *
    * @author paouelle
    */
-  private final Class<T> expected;
+  final Class<T> expected;
 
   /**
    * Holds the field of the column to compare.
    *
    * @author paouelle
    */
-  private final Field field;
+  final Field field;
 
   /**
    * Holds the names of the column to compare.
    *
    * @author paouelle
    */
-  private final String column;
+  final String column;
 
   /**
    * Instantiates a new <code>IsColumnNull</code> object.
@@ -413,7 +486,8 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (!expected.isInstance(item)) {
       mismatch
-      .appendText(column)
+        .appendText("however ")
+        .appendText(column)
         .appendText(" was not an instance of ")
         .appendText(expected.getName());
       return false;
@@ -423,6 +497,7 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
 
       if (ival != null) {
         mismatch
+          .appendText("however ")
           .appendText(column)
           .appendText(" was not null");
         return false;
@@ -473,21 +548,21 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
    *
    * @author paouelle
    */
-  private final Class<T> expected;
+  final Class<T> expected;
 
   /**
    * Holds the field of the column to compare.
    *
    * @author paouelle
    */
-  private final Field field;
+  final Field field;
 
   /**
    * Holds the names of the column to compare.
    *
    * @author paouelle
    */
-  private final String column;
+  final String column;
 
   /**
    * Instantiates a new <code>IsColumnNotNull</code> object.
@@ -519,6 +594,7 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (!expected.isInstance(item)) {
       mismatch
+        .appendText("however ")
         .appendText(column)
         .appendText(" was not an instance of ")
         .appendText(expected.getName());
@@ -529,6 +605,7 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
 
       if (ival == null) {
         mismatch
+          .appendText("however ")
           .appendText(column)
           .appendText(" was null");
         return false;
