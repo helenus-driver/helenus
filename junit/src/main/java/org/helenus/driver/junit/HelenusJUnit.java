@@ -146,8 +146,18 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  private static Pattern pattern = Pattern.compile(
+  private static Pattern portPattern = Pattern.compile(
     "^([a-z_]+_port:\\s*)([0-9]+)\\s*$", Pattern.MULTILINE
+  );
+
+  /**
+   * Holds the regex pattern used to parse the Cassandra yaml configuration
+   * file in search of target directories.
+   *
+   * @author paouelle
+   */
+  private static Pattern targetPattern = Pattern.compile(
+    "^([a-z_]+:[\\s-]*)(target/helenus-junit)(.*)$", Pattern.MULTILINE
   );
 
   /**
@@ -164,6 +174,19 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    */
   private static String config = null;
+
+  /**
+   * Holds the optional fork number which can be used to run multiple JVMs in
+   * parallel to test. When specified, the directory used to store Cassandra's
+   * files will have the forkNumber appended to it.
+   * <p>
+   * This can be used with the maven-surefire-plugin when using a fork count
+   * greater than 1 by setting the system property "fork" with
+   * "-${surefire.forkNumber}".
+   *
+   * @author paouelle
+   */
+  private static String fork = System.getProperty("fork", "");
 
   /**
    * Holds the Cassandra daemon when started.
@@ -264,26 +287,40 @@ public class HelenusJUnit implements MethodRule {
   private static void update(File cfgfile) throws IOException {
     final String yaml = HelenusJUnit.readFully(cfgfile);
     final StringBuffer sb = new StringBuffer(yaml.length() + 40);
-    final Matcher m = HelenusJUnit.pattern.matcher(yaml);
+    final Matcher pm = HelenusJUnit.portPattern.matcher(yaml);
     boolean updated = false; // until proven otherwise
 
-    while (m.find()) {
-      final String pname = m.group(1);
-      final int port = Integer.parseInt(m.group(2));
+    while (pm.find()) {
+      final String pname = pm.group(1);
+      final int port = Integer.parseInt(pm.group(2));
 
       if (port == 0) {
         try (
           final ServerSocket socket = new ServerSocket(0);
         ) {
-          m.appendReplacement(sb, pname + socket.getLocalPort());
+          pm.appendReplacement(sb, pname + socket.getLocalPort());
           updated = true;
         }
       } else {
-        m.appendReplacement(sb, m.group());
+        pm.appendReplacement(sb, pm.group());
       }
     }
-    m.appendTail(sb);
-    if (updated) { // update the config file with the updated ports
+    pm.appendTail(sb);
+    if (!StringUtils.isEmpty(HelenusJUnit.fork)) {
+      final Matcher tm = HelenusJUnit.targetPattern.matcher(sb.toString());
+
+      sb.setLength(0);
+      while (tm.find()) {
+        final String pname = tm.group(1);
+        final String tname = tm.group(2);
+        final String rest = tm.group(3);
+
+        tm.appendReplacement(sb, pname + tname + HelenusJUnit.fork + rest);
+        updated = true;
+      }
+      tm.appendTail(sb);
+    }
+    if (updated) { // update the config file with the updated ports and/or target dirs
       FileUtils.writeStringToFile(cfgfile, sb.toString(), "utf-8");
     }
   }
@@ -571,10 +608,17 @@ public class HelenusJUnit implements MethodRule {
     }
     try {
       HelenusJUnit.config = cfgname;
-      logger.info("Starting Helenus...");
+      final File dir;
+
+      if (StringUtils.isEmpty(HelenusJUnit.fork)) {
+        logger.info("Starting Helenus...");
+        dir = new File(HelenusJUnit.RUNTIME_DIR);
+      } else {
+        logger.info("Starting Helenus fork #%s...", StringUtils.removeStart(HelenusJUnit.fork, "-"));
+        dir = new File(HelenusJUnit.RUNTIME_DIR + HelenusJUnit.fork);
+      }
       // make sure the config resource is absolute
       cfgname = StringUtils.prependIfMissing(cfgname, "/");
-      final File dir = new File(HelenusJUnit.RUNTIME_DIR);
       final File cfgfile = new File(
         dir, cfgname.substring(cfgname.lastIndexOf('/'))
       );
@@ -591,6 +635,7 @@ public class HelenusJUnit implements MethodRule {
       }
       FileUtils.copyInputStreamToFile(cfgis, cfgfile);
       // now update the config with appropriate port numbers if random ports are requested
+      // and to update the runtime directory if forking
       HelenusJUnit.update(cfgfile);
       // update system properties for cassandra
       System.setProperty("cassandra.config", "file:" + cfgfile.getAbsolutePath());
