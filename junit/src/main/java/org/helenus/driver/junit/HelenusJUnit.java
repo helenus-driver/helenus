@@ -184,7 +184,7 @@ public class HelenusJUnit implements MethodRule {
    * <p>
    * This can be used with the maven-surefire-plugin when using a fork count
    * greater than 1 by setting the system property "fork" with
-   * "-${surefire.forkNumber}".
+   * "${surefire.forkNumber}".
    *
    * @author paouelle
    */
@@ -317,7 +317,7 @@ public class HelenusJUnit implements MethodRule {
         final String tname = tm.group(2);
         final String rest = tm.group(3);
 
-        tm.appendReplacement(sb, pname + tname + HelenusJUnit.fork + rest);
+        tm.appendReplacement(sb, pname + tname + File.separatorChar + HelenusJUnit.fork + rest);
         updated = true;
       }
       tm.appendTail(sb);
@@ -616,8 +616,8 @@ public class HelenusJUnit implements MethodRule {
         logger.info("Starting Helenus...");
         dir = new File(HelenusJUnit.RUNTIME_DIR);
       } else {
-        logger.info("Starting Helenus fork #%s...", StringUtils.removeStart(HelenusJUnit.fork, "-"));
-        dir = new File(HelenusJUnit.RUNTIME_DIR + HelenusJUnit.fork);
+        logger.info("Starting Helenus fork #%s...", HelenusJUnit.fork);
+        dir = new File(HelenusJUnit.RUNTIME_DIR + File.separatorChar + HelenusJUnit.fork);
       }
       // make sure the config resource is absolute
       cfgname = StringUtils.prependIfMissing(cfgname, "/");

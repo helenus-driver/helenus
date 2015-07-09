@@ -39,7 +39,7 @@
 			<layout type="PatternLayout"
 				pattern="%replace{${sys:fork}-%sequenceNumber}{^-}{}: %date: %%%logger-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %msg%map%throwable%n" />
 		</appender>
-		<appender type="File" name="CASSANDRA_FILE" fileName="target/helenus-junit${sys:fork}/logs/system.log">
+		<appender type="File" name="CASSANDRA_FILE" fileName="target/helenus-junit/${sys:fork}/logs/system.log">
             <layout type="PatternLayout"
                 pattern="%-5level [%thread] %date{ISO8601} %F:%L - %msg%n" />
         </appender>
