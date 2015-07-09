@@ -185,6 +185,9 @@ public class HelenusJUnit implements MethodRule {
    * This can be used with the maven-surefire-plugin when using a fork count
    * greater than 1 by setting the system property "fork" with
    * "${surefire.forkNumber}".
+   * <p>
+   * Maven Example:
+   *   &lt;argLine&gt;-Dfork=${surefire.forkNumber}&lt;/argLine&gt;
    *
    * @author paouelle
    */
