@@ -15,38 +15,43 @@
  */
 package org.helenus.util.function;
 
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
- * The <code>EBiConsumer</code> interface expands on the {@link BiConsumer}
- * interface to provide the ability to throw back exceptions.
+ * The <code>TriConsumer</code> interface represents an operation that accepts
+ * three input arguments and returns no result. This is the three-arity
+ * specialization of {@link Consumer}. Unlike most other functional interfaces,
+ * <code>TriConsumer</code> is expected to operate via side-effects.
+ * <p>
+ * This is a <a href="package-summary.html">functional interface</a>
+ * whose functional method is {@link #accept(Object, Object, Object)}.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - May 28, 2015 - paouelle - Creation
+ * @version 1 - Jul 9, 2015 - paouelle - Creation
  *
  * @param <T> the type of the first argument to the operation
  * @param <U> the type of the second argument to the operation
- * @param <E> the type of exceptions that can be thrown by the operation
+ * @param <V> the type of the third argument to the operation
  *
  * @since 2.0
  */
 @FunctionalInterface
-public interface EBiConsumer<T, U, E extends Throwable> {
+public interface TriConsumer<T, U, V> {
   /**
    * Performs this operation on the given arguments.
    *
    * @author paouelle
    *
-   * @param  t the first input argument
-   * @param  u the second input argument
-   * @throws E if an error occurs
+   * @param t the first input argument
+   * @param u the second input argument
+   * @param v the third input argument
    */
-  public void accept(T t, U u) throws E;
+  public void accept(T t, U u, V v);
 
   /**
-   * Returns a composed {@code EBiConsumer} that performs, in sequence, this
+   * Returns a composed {@code TriConsumer} that performs, in sequence, this
    * operation followed by the {@code after} operation. If performing either
    * operation throws an exception, it is relayed to the caller of the
    * composed operation.  If performing this operation throws an exception,
@@ -55,17 +60,17 @@ public interface EBiConsumer<T, U, E extends Throwable> {
    * @author paouelle
    *
    * @param  after the operation to perform after this operation
-   * @return a composed {@code EBiConsumer} that performs in sequence this
+   * @return a composed {@code TriConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
    */
-  public default EBiConsumer<T, U, E> andThen(
-    EBiConsumer<? super T, ? super U, E> after
-  ) throws E {
+  public default TriConsumer<T, U, V> andThen(
+    TriConsumer<? super T, ? super U, ? super V> after
+  ) {
     org.apache.commons.lang3.Validate.notNull(after, "invalid null after");
-    return (l, r) -> {
-      accept(l, r);
-      after.accept(l, r);
+    return (l, m, r) -> {
+      accept(l, m, r);
+      after.accept(l, m, r);
     };
   }
 }
