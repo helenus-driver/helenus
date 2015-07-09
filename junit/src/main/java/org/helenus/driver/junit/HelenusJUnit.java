@@ -317,7 +317,7 @@ public class HelenusJUnit implements MethodRule {
         final String tname = tm.group(2);
         final String rest = tm.group(3);
 
-        tm.appendReplacement(sb, pname + tname + File.separatorChar + HelenusJUnit.fork + rest);
+        tm.appendReplacement(sb, pname + tname + '/' + HelenusJUnit.fork + rest);
         updated = true;
       }
       tm.appendTail(sb);
