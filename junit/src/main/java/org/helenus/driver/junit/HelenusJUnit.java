@@ -16,6 +16,7 @@
 package org.helenus.driver.junit;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -76,6 +77,7 @@ import org.helenus.driver.Group;
 import org.helenus.driver.Insert;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
+import org.helenus.driver.StatementManager;
 import org.helenus.driver.Truncate;
 import org.helenus.driver.impl.ClassInfoImpl;
 import org.helenus.driver.impl.RootClassInfoImpl;
@@ -193,7 +195,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  private static CassandraDaemon daemon = null;
+  private static volatile CassandraDaemon daemon = null;
 
   /**
    * Holds the Helenus statement manager when started.
@@ -596,9 +598,9 @@ public class HelenusJUnit implements MethodRule {
    * @throws AssertionError if an error occurs while starting everything
    */
   private static synchronized void start0(String cfgname, long timeout) {
-    if (HelenusJUnit.daemon != null) {
+    if (HelenusJUnit.config != null) {
       // check if we are starting it with the same config
-      if (config.equals(cfgname)) {
+      if (HelenusJUnit.config.equals(cfgname)) {
         // logger.debug("Helenus already started using configuration '%s'", cfgname);
         return;
       }
@@ -656,13 +658,16 @@ public class HelenusJUnit implements MethodRule {
               // make sure the Cassandra runtime directories exists and are cleaned up
               HelenusJUnit.cleanupAndCreateCassandraDirectories();
               HelenusJUnit.daemon = new CassandraDaemon();
-              daemon.activate();
+              HelenusJUnit.daemon.activate();
             } catch (AssertionError|StackOverflowError|OutOfMemoryError|ThreadDeath e) {
+              HelenusJUnit.daemon = null;
               throw e;
             } catch (RuntimeException e) {
+              HelenusJUnit.daemon = null;
               failed.set(e);
               throw e;
             } catch (Error e) {
+              HelenusJUnit.daemon = null;
               failed.set(e);
               throw e;
             } finally {
@@ -694,26 +699,85 @@ public class HelenusJUnit implements MethodRule {
         logger.error("interrupted waiting for cassandra daemon to start", e);
         throw new AssertionError(e);
       } finally {
-        thread.interrupt();;
+        thread.interrupt();
       }
       final String host = DatabaseDescriptor.getRpcAddress().getHostName();
       final int port = DatabaseDescriptor.getNativeTransportPort();
 
       logger.info("Cassandra started on '%s:%d'", host, port);
       // finally initializes helenus
-      HelenusJUnit.manager = new StatementManagerUnitImpl(
-        Cluster
-          .builder()
-          .withPort(port)
-          .addContactPoint(host)
-          .withQueryOptions(null)
-      );
-      // force default replication factor to 1
-      HelenusJUnit.manager.setDefaultReplicationFactor(1);
-    } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+      try {
+        HelenusJUnit.manager = new StatementManagerUnitImpl(
+          Cluster
+            .builder()
+            .withPort(port)
+            .addContactPoint(host)
+            .withQueryOptions(null)
+        );
+      } catch (SecurityException e) {
+        // this shouldn't happen unless someone mocked the StatementManager class
+        // or registered a manager of their own
+        logger.error("Failed to install Helenus statement manager as one is already registered (maybe through mocking)");
+        // use reflection to dump info about it
+        try {
+          final Field f = StatementManager.class.getDeclaredField("manager");
+
+          f.setAccessible(true);
+          final Object mgr = f.get(null);
+
+          logger.error("*** manager: %s", mgr);
+          Class<?> c = mgr.getClass();
+
+          while (c != null) {
+            logger.debug("*** class: %s", c);
+            c = c.getSuperclass();
+          }
+          for (final Class<?> ci: mgr.getClass().getInterfaces()) {
+            logger.debug("*** interface: %s", ci);
+          }
+          for (final Field cf: mgr.getClass().getDeclaredFields()) {
+            cf.setAccessible(true);
+            logger.debug("*** field(%s): %s", cf.getName(), cf.get(mgr));
+          }
+        } catch (Throwable t) {} // ignore
+        throw new AssertionError("failed to install Helenus statement manager", e);
+      }
+    } catch(ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+      HelenusJUnit.config = null;
+      HelenusJUnit.group = null;
+      HelenusJUnit.daemon = null;
+      HelenusJUnit.manager = null;
       throw e;
-    } catch (IOException|Error|RuntimeException e) {
-      throw new AssertionError("failed to start Cassandra daemon", e);
+    } catch (AssertionError e) {
+      HelenusJUnit.config = null;
+      HelenusJUnit.group = null;
+      HelenusJUnit.manager = null;
+      if (HelenusJUnit.daemon != null) {
+        try {
+          HelenusJUnit.daemon.deactivate();
+        } catch (ThreadDeath|StackOverflowError|OutOfMemoryError ee) {
+          throw ee;
+        } catch (Throwable tt) { // ignore
+        } finally {
+          HelenusJUnit.daemon = null;
+        }
+      }
+      throw e;
+    } catch (Throwable t) {
+      HelenusJUnit.config = null;
+      HelenusJUnit.group = null;
+      HelenusJUnit.manager = null;
+      if (HelenusJUnit.daemon != null) {
+        try {
+          HelenusJUnit.daemon.deactivate();
+        } catch (ThreadDeath|StackOverflowError|OutOfMemoryError ee) {
+          throw ee;
+        } catch (Throwable tt) { // ignore
+        } finally {
+          HelenusJUnit.daemon = null;
+        }
+      }
+      throw new AssertionError("failed to start Cassandra daemon", t);
     }
   }
 
@@ -1701,7 +1765,8 @@ public class HelenusJUnit implements MethodRule {
      *         been set
      */
     StatementManagerUnitImpl(Cluster.Initializer initializer) {
-      super(initializer, true);
+      // force default replication factor to 1
+      super(initializer, 1, true);
     }
 
     /**
