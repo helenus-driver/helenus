@@ -33,11 +33,11 @@
 	<appenders>
 		<appender type="Console" name="STDOUT_LOCATION">
 			<layout type="PatternLayout"
-				pattern="${sys:fork}-%sequenceNumber: %date: %%%class-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %location %msg%map%n%throwable" />
+				pattern="%replace{${sys:fork}-%sequenceNumber}{^-}{}: %date: %%%logger-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %location %msg%map%throwable%n" />
 		</appender>
 		<appender type="Console" name="STDOUT">
 			<layout type="PatternLayout"
-				pattern="${sys:fork}-%sequenceNumber: %date: %%%class-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %msg%map%n%throwable" />
+				pattern="%replace{${sys:fork}-%sequenceNumber}{^-}{}: %date: %%%logger-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %msg%map%throwable%n" />
 		</appender>
 		<appender type="File" name="CASSANDRA_FILE" fileName="target/helenus-junit${sys:fork}/logs/system.log">
             <layout type="PatternLayout"

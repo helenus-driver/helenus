@@ -29,16 +29,18 @@
 	<appenders>
 		<appender type="Console" name="STDOUT_LOCATION">
 			<layout type="PatternLayout"
-				pattern="%sequenceNumber: %date: %%%class-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %location %msg%map%n%throwable" />
+				pattern="%sequenceNumber: %date: %%%logger-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %location %msg%map%throwable%n" />
 		</appender>
 		<appender type="Console" name="STDOUT">
 			<layout type="PatternLayout"
-				pattern="%sequenceNumber: %date: %%%class-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %msg%map%n%throwable" />
+				pattern="%sequenceNumber: %date: %%%logger-%level{TRACE=T,DEBUG=D,INFO=I,WARN=W,ERROR=E,FATAL=F}%replace{-%marker}{-$}{}: {Thrd=%thread} %msg%map%throwable%n" />
 		</appender>
 	</appenders>
 
 	<loggers>
         <logger name="org.helenus" level="TRACE"/>
+        <logger name="com.datastax" level="INFO"/>
+        <logger name="org.apache.cassandra" level="INFO"/>
         
 		<root level="TRACE">
 			<appender-ref ref="STDOUT_LOCATION">
