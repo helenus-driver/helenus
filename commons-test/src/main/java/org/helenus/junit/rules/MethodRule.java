@@ -101,19 +101,19 @@ public class MethodRule implements org.junit.rules.MethodRule {
           base.evaluate();
         } catch (ThreadDeath|StackOverflowError|OutOfMemoryError e) {
           throw e;
-        } catch (RuntimeException|Error e) {
+        } catch (Throwable t) {
           // check if that error was expected because if it is ... that is not a failure
           final Test test = method.getAnnotation(Test.class);
 
-          if ((test == null) || !test.expected().isAssignableFrom(e.getClass())) {
+          if ((test == null) || !test.expected().isAssignableFrom(t.getClass())) {
             for (final ERunnable<Exception> h: erhandlers) {
               h.run();
             }
             for (final EConsumer<Throwable, Exception> h: echandlers) {
-              h.accept(e);
+              h.accept(t);
             }
           }
-          throw e;
+          throw t;
         } finally {
           erhandlers.clear();
           echandlers.clear();

@@ -832,11 +832,11 @@ public class HelenusJUnit implements MethodRule {
       }
     } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
       throw e;
-    } catch (RuntimeException|Error e) {
+    } catch (Throwable t) {
       throw new AssertionError(
         "failed to clear schema for "
         + cinfo.getObjectClass().getSimpleName(),
-        e
+        t
       );
     } finally {
       HelenusJUnit.capturing = old; // restore previous capturing setting
@@ -872,8 +872,8 @@ public class HelenusJUnit implements MethodRule {
           mgr.clearCache();
         } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
           throw e;
-        } catch (Error|RuntimeException e) {
-          throw new AssertionError("failed to clean Cassandra database", e);
+        } catch (Throwable t) {
+          throw new AssertionError("failed to clean Cassandra database", t);
         }
       }
       // clear the cache of schemas
@@ -914,8 +914,8 @@ public class HelenusJUnit implements MethodRule {
           mgr.clearCache();
         } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
           throw e;
-        } catch (Error|RuntimeException e) {
-          throw new AssertionError("failed to clean Cassandra database", e);
+        } catch (Throwable t) {
+          throw new AssertionError("failed to clean Cassandra database", t);
         }
       }
       // clear the cache of schemas
@@ -1006,11 +1006,11 @@ public class HelenusJUnit implements MethodRule {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(clazz);
         throw e;
-      } catch (RuntimeException|Error e) {
+      } catch (Throwable t) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(clazz);
         throw new AssertionError(
-          "failed to create schema for " + clazz.getSimpleName(), e
+          "failed to create schema for " + clazz.getSimpleName(), t
         );
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
@@ -1089,13 +1089,13 @@ public class HelenusJUnit implements MethodRule {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(cinfo.getObjectClass());
         throw e;
-      } catch (RuntimeException|Error e) {
+      } catch (Throwable t) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(cinfo.getObjectClass());
         throw new AssertionError(
           "failed to reset schema for "
           + cinfo.getObjectClass().getSimpleName(),
-          e
+          t
         );
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
@@ -1237,11 +1237,11 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         throw e;
-      } catch (RuntimeException|Error e) {
+      } catch (Throwable t) {
         // make sure to cleanup
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
-        throw new AssertionError("failed to start Cassandra daemon", e);
+        throw new AssertionError("failed to start Cassandra daemon", t);
       } finally {
         HelenusJUnit.captures.clear();
       }
@@ -1253,11 +1253,11 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         throw e;
-      } catch (RuntimeException|Error e) {
+      } catch (Throwable t) {
         // make sure to cleanup
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
-        throw new AssertionError("failed to install @BeforeObjects objects into Cassandra", e);
+        throw new AssertionError("failed to install @BeforeObjects objects into Cassandra", t);
       } finally {
         HelenusJUnit.captures.clear();
       }
@@ -1367,8 +1367,8 @@ public class HelenusJUnit implements MethodRule {
         batch.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
-      } catch (RuntimeException|Error e) {
-        throw new AssertionError("failed to populate objects", e);
+      } catch (Throwable t) {
+        throw new AssertionError("failed to populate objects", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
@@ -1433,8 +1433,8 @@ public class HelenusJUnit implements MethodRule {
         batch.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
-      } catch (RuntimeException|Error e) {
-        throw new AssertionError("failed to populate objects", e);
+      } catch (Throwable t) {
+        throw new AssertionError("failed to populate objects", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
@@ -1500,8 +1500,8 @@ public class HelenusJUnit implements MethodRule {
         batch.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
-      } catch (RuntimeException|Error e) {
-        throw new AssertionError("failed to populate objects", e);
+      } catch (Throwable t) {
+        throw new AssertionError("failed to populate objects", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
@@ -1533,8 +1533,8 @@ public class HelenusJUnit implements MethodRule {
         batch.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
-      } catch (RuntimeException|Error e) {
-        throw new AssertionError("failed to populate objects", e);
+      } catch (Throwable t) {
+        throw new AssertionError("failed to populate objects", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
@@ -1603,8 +1603,8 @@ public class HelenusJUnit implements MethodRule {
         sequence.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
-      } catch (RuntimeException|Error e) {
-        throw new AssertionError("failed to truncate classes", e);
+      } catch (Throwable t) {
+        throw new AssertionError("failed to truncate classes", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
@@ -1666,8 +1666,8 @@ public class HelenusJUnit implements MethodRule {
         sequence.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
-      } catch (RuntimeException|Error e) {
-        throw new AssertionError("failed to truncate classes", e);
+      } catch (Throwable t) {
+        throw new AssertionError("failed to truncate classes", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
