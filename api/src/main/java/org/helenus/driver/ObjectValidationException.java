@@ -15,7 +15,6 @@
  */
 package org.helenus.driver;
 
-
 /**
  * The <code>ObjectConversionException</code> exception can be thrown as a
  * result of validating a POJO object before inserting or updating it.
