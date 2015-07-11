@@ -193,7 +193,7 @@ public class StatementCaptureList<T extends GenericStatement> {
   ) {
     org.apache.commons.lang3.Validate.notNull(consumer, "invalid null consumer");
     if (num > 0) {
-      ((List)interceptors).add(MutablePair.of(num, consumer));
+      ((List)interceptors).add(MutablePair.of(consumer, num));
     } // else - nothing to intercept
     return this;
   }
