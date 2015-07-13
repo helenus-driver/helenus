@@ -125,7 +125,10 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
     final T t = one();
 
     if (t == null) {
-      throw new ObjectNotFoundException(context.getObjectClass());
+      throw new ObjectNotFoundException(
+        context.getObjectClass(),
+        "one object was required; none found"
+      );
     }
     return t;
   }

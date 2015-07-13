@@ -15,6 +15,11 @@
  */
 package org.helenus.driver;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import lombok.NonNull;
+
 /**
  * The <code>ObjectConversionException</code> exception can be thrown as a
  * result of validating a POJO object before inserting or updating it.
@@ -56,6 +61,13 @@ public class ObjectValidationException extends IllegalArgumentException {
   private final Object val;
 
   /**
+   * Holds additional details about the error.
+   *
+   * @author paouelle
+   */
+  private volatile Map<String, Object> details = null;
+
+  /**
    * Instantiates a new <code>ObjectValidationException</code> object.
    *
    * @author paouelle
@@ -65,6 +77,9 @@ public class ObjectValidationException extends IllegalArgumentException {
    */
   public ObjectValidationException(ObjectValidationException e) {
     this(e.obj, e.name, e.val, e.getMessage(), e);
+    if (e.details != null) {
+      this.details = new LinkedHashMap<>(e.details);
+    }
   }
 
   /**
@@ -134,5 +149,37 @@ public class ObjectValidationException extends IllegalArgumentException {
    */
   public Object getColumnValue() {
     return val;
+  }
+
+  /**
+   * Gets the additional details about the error.
+   *
+   * @author paouelle
+   *
+   * @return map of additional details about the error or <code>null</code> if
+   *         none added
+   */
+  public Map<String, Object> getDetails() {
+    return details;
+  }
+
+  /**
+   * Adds the specified detail about this error.
+   *
+   * @author paouelle
+   *
+   * @param  key the key for the detail
+   * @param  value the value for the detail
+   * @return this for chaining
+   * @throws NullPointerException if <code>key</code> is <code>null</code>
+   */
+  public synchronized ObjectValidationException addDetail(
+    @NonNull String key, Object value
+  ) {
+    if (details == null) {
+      this.details = new LinkedHashMap<>(16);
+    }
+    details.put(key, value);
+    return this;
   }
 }

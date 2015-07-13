@@ -424,7 +424,10 @@ public class CompoundObjectSetFuture<T>
     @Override
     public T oneRequired() {
       if (isExhausted()) {
-        throw new ObjectNotFoundException(context.getObjectClass());
+        throw new ObjectNotFoundException(
+          context.getObjectClass(),
+          "one object was required; none found"
+        );
       }
       return objects.get(i).oneRequired();
     }

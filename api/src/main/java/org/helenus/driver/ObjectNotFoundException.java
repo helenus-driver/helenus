@@ -15,6 +15,11 @@
  */
 package org.helenus.driver;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import lombok.NonNull;
+
 import org.apache.commons.lang3.StringUtils;
 
 import com.datastax.driver.core.exceptions.InvalidQueryException;
@@ -38,6 +43,13 @@ public class ObjectNotFoundException extends RuntimeException {
    * @author paouelle
    */
   private static final long serialVersionUID = -4416855253723036106L;
+
+  /**
+   * Holds additional details about the error.
+   *
+   * @author paouelle
+   */
+  private volatile Map<String, Object> details = null;
 
   /**
    * Handles special case where a keyspace is not defined by throwing a
@@ -74,17 +86,6 @@ public class ObjectNotFoundException extends RuntimeException {
    * @author paouelle
    *
    * @param clazz the pojo class we queried
-   */
-  public ObjectNotFoundException(Class<?> clazz) {
-    this(clazz, null, null);
-  }
-
-  /**
-   * Instantiates a new <code>ObjectNotFoundException</code> object.
-   *
-   * @author paouelle
-   *
-   * @param clazz the pojo class we queried
    * @param msg the error message
    */
   public ObjectNotFoundException(Class<?> clazz, String msg) {
@@ -114,5 +115,37 @@ public class ObjectNotFoundException extends RuntimeException {
    */
   public Class<?> getObjectClass() {
     return clazz;
+  }
+
+  /**
+   * Gets the additional details about the error.
+   *
+   * @author paouelle
+   *
+   * @return map of additional details about the error or <code>null</code> if
+   *         none added
+   */
+  public Map<String, Object> getDetails() {
+    return details;
+  }
+
+  /**
+   * Adds the specified detail about this error.
+   *
+   * @author paouelle
+   *
+   * @param  key the key for the detail
+   * @param  value the value for the detail
+   * @return this for chaining
+   * @throws NullPointerException if <code>key</code> is <code>null</code>
+   */
+  public synchronized ObjectNotFoundException addDetail(
+    @NonNull String key, Object value
+  ) {
+    if (details == null) {
+      this.details = new LinkedHashMap<>(16);
+    }
+    details.put(key, value);
+    return this;
   }
 }

@@ -15,6 +15,11 @@
  */
 package org.helenus.driver;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import lombok.NonNull;
+
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 
@@ -44,6 +49,13 @@ public class ObjectExistException extends QueryExecutionException {
    * @author paouelle
    */
   private final Row row;
+
+  /**
+   * Holds additional details about the error.
+   *
+   * @author paouelle
+   */
+  private volatile Map<String, Object> details = null;
 
   /**
    * Instantiates a new <code>ObjectExistException</code> object.
@@ -105,5 +117,37 @@ public class ObjectExistException extends QueryExecutionException {
    */
   public Row getRow() {
     return row;
+  }
+
+  /**
+   * Gets the additional details about the error.
+   *
+   * @author paouelle
+   *
+   * @return map of additional details about the error or <code>null</code> if
+   *         none added
+   */
+  public Map<String, Object> getDetails() {
+    return details;
+  }
+
+  /**
+   * Adds the specified detail about this error.
+   *
+   * @author paouelle
+   *
+   * @param  key the key for the detail
+   * @param  value the value for the detail
+   * @return this for chaining
+   * @throws NullPointerException if <code>key</code> is <code>null</code>
+   */
+  public synchronized ObjectExistException addDetail(
+    @NonNull String key, Object value
+  ) {
+    if (details == null) {
+      this.details = new LinkedHashMap<>(16);
+    }
+    details.put(key, value);
+    return this;
   }
 }

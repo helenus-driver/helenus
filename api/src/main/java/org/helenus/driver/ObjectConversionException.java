@@ -15,6 +15,11 @@
  */
 package org.helenus.driver;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import lombok.NonNull;
+
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
 
@@ -57,6 +62,13 @@ public class ObjectConversionException extends RuntimeException {
    * @author paouelle
    */
   private final UDTValue uval;
+
+  /**
+   * Holds additional details about the error.
+   *
+   * @author paouelle
+   */
+  private volatile Map<String, Object> details = null;
 
   /**
    * Instantiates a new <code>ObjectConversionException</code> object.
@@ -157,5 +169,37 @@ public class ObjectConversionException extends RuntimeException {
    */
   public UDTValue getUDTValue() {
     return uval;
+  }
+
+  /**
+   * Gets the additional details about the error.
+   *
+   * @author paouelle
+   *
+   * @return map of additional details about the error or <code>null</code> if
+   *         none added
+   */
+  public Map<String, Object> getDetails() {
+    return details;
+  }
+
+  /**
+   * Adds the specified detail about this error.
+   *
+   * @author paouelle
+   *
+   * @param  key the key for the detail
+   * @param  value the value for the detail
+   * @return this for chaining
+   * @throws NullPointerException if <code>key</code> is <code>null</code>
+   */
+  public synchronized ObjectConversionException addDetail(
+    @NonNull String key, Object value
+  ) {
+    if (details == null) {
+      this.details = new LinkedHashMap<>(16);
+    }
+    details.put(key, value);
+    return this;
   }
 }
