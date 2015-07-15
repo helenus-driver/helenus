@@ -269,18 +269,18 @@ public class TypeClassInfoImpl<T>
     if (row == null) {
       return null;
     }
+    final ColumnDefinitions cdefs = row.getColumnDefinitions();
+
     // extract the type so we know which object we are creating
-    for (final ColumnDefinitions.Definition coldef: row.getColumnDefinitions()) {
-      // find the table for this column
-      final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(coldef.getTable());
+    for (final TableInfoImpl<T> table: getTablesImpl()) {
+      final FieldInfoImpl<T> type = table.getTypeKey().orElse(null);
 
-      if (table != null) {
-        // find the field in the table for this column
-        final FieldInfoImpl<T> field = table.getColumn(coldef.getName());
+      if (type != null) {
+        final int i = cdefs.getIndexOf(type.getColumnName());
 
-        if ((field != null) && field.isTypeKey()) { // get the POJO type
+        if ((i != -1) && table.getName().equals(cdefs.getTable(i))) {
           return getObject(
-            row, Objects.toString(field.decodeValue(row), null), suffixes
+            row, Objects.toString(type.decodeValue(row), null), suffixes
           );
         }
       }

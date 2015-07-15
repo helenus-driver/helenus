@@ -64,6 +64,13 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
   private final com.datastax.driver.core.ResultSet result;
 
   /**
+   * Holds the next object to be returned.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   */
+  private volatile T next = null;
+
+  /**
    * Instantiates a new <code>ObjectSetImpl</code> object.
    *
    * @author paouelle
@@ -98,7 +105,13 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    */
   @Override
   public boolean isExhausted() {
-    return result.isExhausted();
+    // we cannot rely only on the result set as it possible that the next result
+    // get's further filtered by the context (e.g. it is an object of a different
+    // type than requested)
+    while ((next == null) && !result.isExhausted()) {
+      this.next = context.getObject(result.one());
+    }
+    return next == null;
   }
 
   /**
@@ -110,7 +123,13 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    */
   @Override
   public T one() {
-    return context.getObject(result.one());
+    if (isExhausted()) {
+      return null;
+    }
+    final T next = this.next;
+
+    this.next = null;
+    return next;
   }
 
   /**
@@ -122,15 +141,15 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    */
   @Override
   public T oneRequired() {
-    final T t = one();
+    final T next = one();
 
-    if (t == null) {
+    if (next == null) {
       throw new ObjectNotFoundException(
         context.getObjectClass(),
         "one object was required; none found"
       );
     }
-    return t;
+    return next;
   }
 
   /**
@@ -158,8 +177,13 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
   @Override
   public List<T> all() {
     final List<Row> rows = result.all();
-    final List<T> ts = new ArrayList<>(rows.size());
+    final List<T> ts = new ArrayList<>(rows.size() + 1);
+    final T next = this.next;
 
+    if (next != null) { // don't leave this one behind
+      this.next = null;
+      ts.add(next);
+    }
     for (final Row row: rows) {
       final T obj = context.getObject(row);
 
@@ -187,20 +211,27 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
       @Override
       @SuppressWarnings("synthetic-access")
       public boolean hasNext() {
-        while ((next == null) && i.hasNext()) { // skip over all invalid type result
-          this.next = context.getObject(i.next());
+        final T next = ObjectSetImpl.this.next;
+
+        if (next != null) { // don't leave this one behind
+          ObjectSetImpl.this.next = null;
+          this.next = next;
+        } else {
+          while ((this.next == null) && i.hasNext()) { // skip over all invalid type result
+            this.next = context.getObject(i.next());
+          }
         }
-        return next != null;
+        return this.next != null;
       }
       @Override
       public T next() {
         if (!hasNext()) {
           throw new NoSuchElementException("ObjectSet Iterator");
         }
-        final T obj = next;
+        final T next = this.next;
 
         this.next = null;
-        return obj;
+        return next;
       }
     };
   }
@@ -214,7 +245,7 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    */
   @Override
   public int getAvailableWithoutFetching() {
-    return result.getAvailableWithoutFetching();
+    return result.getAvailableWithoutFetching() + ((next != null) ? 1 : 0);
   }
 
   /**
@@ -226,7 +257,7 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    */
   @Override
   public boolean isFullyFetched() {
-    return result.isFullyFetched();
+    return (next == null) && result.isFullyFetched();
   }
 
   /**
