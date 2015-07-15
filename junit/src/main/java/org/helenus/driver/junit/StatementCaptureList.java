@@ -167,7 +167,6 @@ public class StatementCaptureList<T extends GenericStatement> {
    * @return this for chaining
    * @throws NullPointerException if <code>consumer</code> is <code>null</code>
    */
-  @SuppressWarnings("rawtypes")
   public StatementCaptureList<T> intercept(
     Consumer<? extends GenericStatement> consumer
   ) {
@@ -210,7 +209,7 @@ public class StatementCaptureList<T extends GenericStatement> {
    *
    * @param  e the error to throw back when intercepting all statements
    * @return this for chaining
-   * @throws NullPointerException if <code>consumer</code> is <code>null</code>
+   * @throws NullPointerException if <code>e</code> is <code>null</code>
    */
   public StatementCaptureList<T> fail(RuntimeException e) {
     return fail(Integer.MAX_VALUE, e);
@@ -229,7 +228,7 @@ public class StatementCaptureList<T extends GenericStatement> {
    * @param  num the number of times this interceptor should remain active
    * @param  e the error to throw back when intercepting the next statements
    * @return this for chaining
-   * @throws NullPointerException if <code>consumer</code> is <code>null</code>
+   * @throws NullPointerException if <code>e</code> is <code>null</code>
    */
   public StatementCaptureList<T> fail(int num, RuntimeException e) {
     org.apache.commons.lang3.Validate.notNull(e, "invalid null error");
