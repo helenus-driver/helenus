@@ -44,21 +44,21 @@ public class ObjectValidationException extends IllegalArgumentException {
    *
    * @author paouelle
    */
-  private final Object obj;
+  private Object obj;
 
   /**
    * Holds the name of the column that failed validation.
    *
    * @author paouelle
    */
-  private final String name;
+  private String name;
 
   /**
    * Holds the value of the column that failed validation.
    *
    * @author paouelle
    */
-  private final Object val;
+  private Object val;
 
   /**
    * Holds additional details about the error.
@@ -119,6 +119,17 @@ public class ObjectValidationException extends IllegalArgumentException {
   }
 
   /**
+   * Sets the POJO object that failed validation.
+   *
+   * @author paouelle
+   *
+   * @param obj the POJO object that failed validation
+   */
+  public void setObject(Object obj) {
+    this.obj = obj;
+  }
+
+  /**
    * Gets the POJO object that failed validation.
    *
    * @author paouelle
@@ -130,6 +141,17 @@ public class ObjectValidationException extends IllegalArgumentException {
   }
 
   /**
+   * Sets the name of the column that failed validation.
+   *
+   * @author paouelle
+   *
+   * @param name the name of the column that failed validation
+   */
+  public void setColumnName(String name) {
+    this.name = name;
+  }
+
+  /**
    * Gets the name of the column that failed validation.
    *
    * @author paouelle
@@ -138,6 +160,17 @@ public class ObjectValidationException extends IllegalArgumentException {
    */
   public String getColumnName() {
     return name;
+  }
+
+  /**
+   * Sets the value of the column that failed validation.
+   *
+   * @author paouelle
+   *
+   * @param val the value of the column that failed validation
+   */
+  public void setColumnValue(Object val) {
+    this.val = val;
   }
 
   /**
