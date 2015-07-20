@@ -21,10 +21,18 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.Logger;
+
 import org.hamcrest.Matcher;
+import org.helenus.driver.Delete;
 import org.helenus.driver.GenericStatement;
+import org.helenus.driver.Insert;
+import org.helenus.driver.Select;
+import org.helenus.driver.Update;
 import org.helenus.driver.impl.ParentStatementImpl;
 import org.helenus.driver.impl.StatementImpl;
 
@@ -43,6 +51,37 @@ import org.helenus.driver.impl.StatementImpl;
  */
 @SuppressWarnings("rawtypes")
 public class StatementCaptureList<T extends GenericStatement> {
+  /**
+   * Gets a type string that corresponds to a given statement.
+   *
+   * @author paouelle
+   *
+   * @param  statement the statement to get a type string for
+   * @return the correspond non-<code>null</code> type string
+   */
+  private static String getType(GenericStatement statement) {
+    if (statement instanceof Update) {
+      return "Update";
+    } else if (statement instanceof Insert) {
+      return "Insert";
+    } else if (statement instanceof Delete) {
+      return "Delete";
+    } else if (statement instanceof Select) {
+      return "Select";
+    }
+    return StringUtils.removeEnd(
+      StringUtils.removeEnd(statement.getClass().getSimpleName(), "Impl"),
+      "Statement"
+    );
+  }
+
+  /**
+   * Holds the information where this capture list was created.
+   *
+   * @author paouelle
+   */
+  private final StackTraceElement created;
+
   /**
    * Holds the list of captured statements.
    *
@@ -68,13 +107,22 @@ public class StatementCaptureList<T extends GenericStatement> {
   private final Class<T> clazz;
 
   /**
+   * Holds a flag indicating if we are capturing or not with this list.
+   *
+   * @author paouelle
+   */
+  private volatile boolean capturing = true;
+
+  /**
    * Instantiates a new <code>StatementCaptureList</code> object.
    *
    * @author paouelle
    *
-   * @param  clazz the class of statements to capture
+   * @param created the information about where this capture list was created
+   * @param clazz the class of statements to capture
    */
-  StatementCaptureList(Class<T> clazz) {
+  StatementCaptureList(StackTraceElement created, Class<T> clazz) {
+    this.created = created;
     this.clazz = clazz;
   }
 
@@ -87,30 +135,32 @@ public class StatementCaptureList<T extends GenericStatement> {
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   synchronized void executing(StatementImpl<?, ?, ?> statement) {
-    final Stream<? extends GenericStatement> s;
+    if (capturing) {
+      final Stream<? extends GenericStatement> s;
 
-    // handle batch and sequences by capturing all internal statements
-    if (statement instanceof ParentStatementImpl) {
-      s = ((ParentStatementImpl)statement).objectStatements();
-    } else {
-      s = Stream.of(statement);
-    }
-    s.forEachOrdered(os -> {
-      if (clazz.isInstance(os)) {
-        // first intercept
-        for (final Iterator<MutablePair<Consumer<? extends GenericStatement>, Integer>> i = interceptors.iterator(); i.hasNext(); ) {
-          final MutablePair<Consumer<? extends GenericStatement>, Integer> m = i.next();
-          final int num = m.getRight().intValue() - 1;
-
-          if (num <= 0) { // done with this interceptor; this was the last time
-            i.remove();
-          }
-          ((Consumer)m.getLeft()).accept(os); // cast required to compile on cmdline
-        }
-        // then capture
-        ((List)list).add(os); // cast required to compile on cmdline
+      // handle batch and sequences by capturing all internal statements
+      if (statement instanceof ParentStatementImpl) {
+        s = ((ParentStatementImpl)statement).objectStatements();
+      } else {
+        s = Stream.of(statement);
       }
-    });
+      s.forEachOrdered(os -> {
+        if (clazz.isInstance(os)) {
+          // first intercept
+          for (final Iterator<MutablePair<Consumer<? extends GenericStatement>, Integer>> i = interceptors.iterator(); i.hasNext(); ) {
+            final MutablePair<Consumer<? extends GenericStatement>, Integer> m = i.next();
+            final int num = m.getRight().intValue() - 1;
+
+            if (num <= 0) { // done with this interceptor; this was the last time
+              i.remove();
+            }
+            ((Consumer)m.getLeft()).accept(os); // cast required to compile on cmdline
+          }
+          // then capture
+          ((List)list).add(os); // cast required to compile on cmdline
+        }
+      });
+    }
   }
 
   /**
@@ -121,13 +171,29 @@ public class StatementCaptureList<T extends GenericStatement> {
    * @return this for chaining
    */
   public StatementCaptureList<T> stop() {
-    synchronized (HelenusJUnit.class) {
-      for (final Iterator<?> i = HelenusJUnit.captures.iterator(); i.hasNext(); ) {
-        if (i.next() == this) {
-          i.remove();
-          break;
-        }
-      }
+    this.capturing = false;
+    return this;
+  }
+
+  /**
+   * Dumps the content of the capture list.
+   *
+   * @author paouelle
+   *
+   * @param  logger the logger where to dump the content of this capture list
+   * @param  level the log level to use when dumping
+   * @return this for chaining
+   */
+  public StatementCaptureList<T> dump(Logger logger, Level level) {
+    if (logger.isEnabled(level)) {
+      logger.log(level, "");
+      logger.log(level, "%20s = %s", "Created at", created);
+      logger.log(level, "%20s = %s", "Statement class", clazz.getSimpleName());
+      logger.log(level, "%20s = %d", "Size", list.size());
+      logger.log(level, "%20s:", "Content");
+      list.forEach(
+        s -> logger.log(level, "%20s = %s", StatementCaptureList.getType(s), s)
+      );
     }
     return this;
   }

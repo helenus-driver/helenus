@@ -58,6 +58,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -260,6 +261,26 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    */
   static boolean capturing = false;
+
+  /**
+   * Gets the caller's information. This would be the information about the
+   * method that called this class first.
+   *
+   * @author paouelle
+   *
+   * @return the corresponding non-<code>null</code> stack trace element
+   * @throws IllegalStateException if no outside method called this class
+   */
+  private static StackTraceElement getCallerInfo() {
+    final Exception e = new Exception();
+
+    for (final StackTraceElement ste: e.getStackTrace()) {
+      if (!HelenusJUnit.class.getName().equals(ste.getClassName())) {
+        return ste;
+      }
+    }
+    throw new IllegalStateException("missing caller's information");
+  }
 
   /**
    * Reads the specified file fully based on the appropriate encoding.
@@ -1718,7 +1739,8 @@ public class HelenusJUnit implements MethodRule {
   ) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
     synchronized (HelenusJUnit.class) {
-      final StatementCaptureList<T> cl = new StatementCaptureList<>(clazz);
+      final StatementCaptureList<T> cl
+        = new StatementCaptureList<>(HelenusJUnit.getCallerInfo(), clazz);
 
       HelenusJUnit.captures.add(cl);
       return cl;
@@ -1737,6 +1759,24 @@ public class HelenusJUnit implements MethodRule {
       HelenusJUnit.captures.clear();
     }
     return this;
+  }
+
+  /**
+   * Dumps the content of all the capture lists.
+   *
+   * @author paouelle
+   *
+   * @param  logger the logger where to dump the content of the capture lists
+   * @param  level the log level to use when dumping
+   * @return <code>true</code> if anything was dumped; <code>false</code> otherwise
+   */
+  public boolean dumpCaptures(Logger logger, Level level) {
+    if (!HelenusJUnit.captures.isEmpty() && logger.isEnabled(level)) {
+      logger.log(level, "StatementCaptureLists:");
+      HelenusJUnit.captures.forEach(cl -> cl.dump(logger, level));
+      return true;
+    }
+    return false;
   }
 
   /**

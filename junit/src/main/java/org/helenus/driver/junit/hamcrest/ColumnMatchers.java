@@ -27,6 +27,7 @@ import org.hamcrest.Description;
 import org.hamcrest.DiagnosingMatcher;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
+import org.hamcrest.StringDescription;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.persistence.Column;
 
@@ -89,6 +90,8 @@ public abstract class ColumnMatchers {
    *
    * @author paouelle
    *
+   * @param <T> the type of object to match
+   *
    * @param  operand the object to compare against
    * @param  ignore column names to ignore during comparison (may be
    *         <code>null</code> or empty)
@@ -138,6 +141,8 @@ public abstract class ColumnMatchers {
    *
    * @author paouelle
    *
+   * @param <T> the type of object to match
+   *
    * @param  column the name of the column to compare
    * @param  operand the object to compare against
    * @return a corresponding matcher
@@ -182,6 +187,8 @@ public abstract class ColumnMatchers {
    * <code>null</code>, as determined by the associated fields' values.
    *
    * @author paouelle
+   *
+   * @param <T> the type of object to match
    *
    * @param  column the name of the column to compare
    * @param  operand the class of object to compare against
@@ -228,6 +235,8 @@ public abstract class ColumnMatchers {
    *
    * @author paouelle
    *
+   * @param <T> the type of object to match
+   *
    * @param  column the name of the column to compare
    * @param  operand the class of object to compare against
    * @return a corresponding matcher
@@ -266,6 +275,59 @@ public abstract class ColumnMatchers {
       }
     };
   }
+
+  /**
+   * Creates a matcher that matches when the examined object has a given column
+   * value that matches the specified matcher, as determined by the associated
+   * fields' value.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of object to match
+   * @param <V> the type of value for the column to match
+   *
+   * @param  column the name of the column to compare
+   * @param  operand the class of object to compare against
+   * @param  matcher the matcher for the value of the column to match with
+   * @return a corresponding matcher
+   */
+  public static <T, V> Matcher<T> columnMatches(
+    String column, Class<T> operand, Matcher<V> matcher
+  ) {
+    final List<ColumnMatches<T, V>> matchers =
+      ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
+        operand.getClass(), Column.class, true
+      ).entrySet().stream()
+       .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
+       .map(e -> new ColumnMatches<>(operand, e.getKey(), column, matcher))
+       .collect(Collectors.toList());
+
+    if (matchers.size() == 1) {
+      final Description d = new StringDescription();
+
+      d.appendText(matchers.get(0).column).appendText(" ").appendDescriptionOf(matcher);
+      return Matchers.describedAs(d.toString(), matchers.get(0));
+    }
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
+          .appendText(" ")
+          .appendDescriptionOf(matcher);
+      }
+    };
+  }
 }
 
 /**
@@ -289,7 +351,7 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
    *
    * @author paouelle
    */
-  final Object expected;
+  final T expected;
 
   /**
    * Holds the field of the column to compare.
@@ -486,9 +548,7 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (!expected.isInstance(item)) {
       mismatch
-        .appendText("however ")
-        .appendText(column)
-        .appendText(" was not an instance of ")
+        .appendText("however the object was not an instance of ")
         .appendText(expected.getName());
       return false;
     }
@@ -591,7 +651,8 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
   protected boolean matches(Object item, Description mismatch) {
     // first make sure they are the same class
     if (item == null) {
-      return true;
+      mismatch.appendText("however the object was null");
+      return false;
     } else if (!expected.isInstance(item)) {
       mismatch
         .appendText("however ")
@@ -633,5 +694,125 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
   @Override
   public void describeTo(Description description) {
     description.appendText(column).appendText(" is not null");
+  }
+}
+
+/**
+ * The <code>ColumnMatches</code> class defines an Hamcrest matcher capable of
+ * comparing a pojo objects to see if a specified column matches a given matcher.
+ * This matcher uses reflection to find the field's value to match.
+ *
+ * @copyright 2015-2015 The Helenus Driver Project Authors
+ *
+ * @author  The Helenus Driver Project Authors
+ * @version 1 - Jul 20, 2015 - paouelle - Creation
+ *
+ * @param <T> the type of objects being compared
+ * @param <V> the type of column values being compared
+ *
+ * @since 1.0
+ */
+class ColumnMatches<T, V> extends DiagnosingMatcher<T> {
+  /**
+   * Holds the expected class.
+   *
+   * @author paouelle
+   */
+  final Class<T> expected;
+
+  /**
+   * Holds the field of the column to compare.
+   *
+   * @author paouelle
+   */
+  final Field field;
+
+  /**
+   * Holds the names of the column to compare.
+   *
+   * @author paouelle
+   */
+  final String column;
+
+  /**
+   * Holds the matcher to use for the column value.
+   *
+   * @author paouelle
+   */
+  final Matcher<V> matcher;
+
+  /**
+   * Instantiates a new <code>ColumnMatches</code> object.
+   *
+   * @author paouelle
+   *
+   * @param expected the expected class to compare
+   * @param field the field of the column to compare
+   * @param column the name of the column to compare
+   * @param matcher the matcher to use for matching the column's value
+   */
+  ColumnMatches(Class<T> expected, Field field, String column, Matcher<V> matcher) {
+    this.expected = expected;
+    this.field = field;
+    this.column = column;
+    this.matcher = matcher;
+    field.setAccessible(true); // make sure we can access any private fields
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.hamcrest.DiagnosingMatcher#matches(java.lang.Object, org.hamcrest.Description)
+   */
+  @Override
+  protected boolean matches(Object item, Description mismatch) {
+    // first make sure they are the same class
+    if (item == null) {
+      mismatch.appendText("however the object was null");
+      return false;
+    } else if (!expected.isInstance(item)) {
+      mismatch
+        .appendText("however ")
+        .appendText(column)
+        .appendText(" was not an instance of ")
+        .appendText(expected.getName());
+      return false;
+    }
+    try {
+      final Object ival = field.get(item);
+
+      if (!matcher.matches(ival)) {
+        mismatch
+          .appendText("however ")
+          .appendText(column)
+          .appendText(" ");
+        matcher.describeMismatch(ival, mismatch);
+        return false;
+      }
+      return true;
+    } catch (IllegalAccessException e) {
+      throw new AssertionError(e);
+    } catch (ExceptionInInitializerError e) {
+      final Throwable t = e.getException();
+
+      if (t instanceof AssertionError) {
+        throw (AssertionError)t;
+      }
+      throw new AssertionError(t);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.hamcrest.SelfDescribing#describeTo(org.hamcrest.Description)
+   */
+  @Override
+  public void describeTo(Description description) {
+    description.appendText(column).appendText(" ").appendDescriptionOf(matcher);
   }
 }
