@@ -183,6 +183,114 @@ public abstract class ColumnMatchers {
   }
 
   /**
+   * Creates a matcher that matches when the examined object has all columns
+   * equal with a tolerable error to the same columns of the specified
+   * <code>operand</code>, as determined by calling
+   * {@link org.helenus.util.Objects#deepEquals} method with each associated fields'
+   * values.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of object to match
+   *
+   * @param  operand the object to compare against
+   * @param  epsilon the tolerable error
+   * @param  ignore column names to ignore during comparison (may be
+   *         <code>null</code> or empty)
+   * @return a corresponding matcher
+   */
+  public static <T> Matcher<T> columnsEqualTo(
+    T operand, double epsilon, String... ignore
+  ) {
+    final List<AreColumnsEqual<T>> matchers =
+      ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
+        operand.getClass(), Column.class, true
+      ).entrySet().stream()
+       .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), ignore))
+       .map(e -> new AreColumnsEqual<>(operand, e.getKey(), e.getValue(), epsilon))
+       .collect(Collectors.toList());
+
+    if (matchers.size() == 1) {
+      return Matchers.describedAs(
+        matchers.get(0).columns
+        + " is equal within " + epsilon, matchers.get(0)
+      );
+    }
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText("[")
+          .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
+          .appendText("] are all equal within " + epsilon);
+      }
+    };
+  }
+
+  /**
+   * Creates a matcher that matches when the examined object has a given column
+   * equal with a tolerable error to the same column on the specified
+   * <code>operand</code>, as determined by calling
+   * {@link org.helenus.util.Objects#deepEquals} method with each associated fields'
+   * values.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of object to match
+   *
+   * @param  column the name of the column to compare
+   * @param  operand the object to compare against
+   * @param  epsilon the tolerable error
+   * @return a corresponding matcher
+   */
+  public static <T> Matcher<T> columnsEqualTo(
+    String column, T operand, double epsilon
+  ) {
+    final List<AreColumnsEqual<T>> matchers =
+      ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
+        operand.getClass(), Column.class, true
+      ).entrySet().stream()
+       .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
+       .map(e -> new AreColumnsEqual<>(operand, e.getKey(), column, epsilon))
+       .collect(Collectors.toList());
+
+    if (matchers.size() == 1) {
+      return Matchers.describedAs(
+        matchers.get(0).columns
+        + " is equal within " + epsilon, matchers.get(0)
+      );
+    }
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
+          .appendText(" is equal within " + epsilon);
+      }
+    };
+  }
+
+  /**
    * Creates a matcher that matches when the examined object has a given column
    * <code>null</code>, as determined by the associated fields' values.
    *
@@ -368,6 +476,14 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
   final String columns;
 
   /**
+   * Holds the tolerable error when comparing or <code>null</code> if no tolerable
+   * error is acceptable.
+   *
+   * @author paouelle
+   */
+  final Double epsilon;
+
+  /**
    * Instantiates a new <code>AreColumnsEqual</code> object.
    *
    * @author paouelle
@@ -377,6 +493,20 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
    * @param columns the names of the columns to compare
    */
   AreColumnsEqual(T expected, Field field, Column[] columns) {
+    this(expected, field, columns, null);
+  }
+
+  /**
+   * Instantiates a new <code>AreColumnsEqual</code> object.
+   *
+   * @author paouelle
+   *
+   * @param expected the expected object to be equal to
+   * @param field the field of the column to compare
+   * @param columns the names of the columns to compare
+   * @param epsilon the tolerable error
+   */
+  AreColumnsEqual(T expected, Field field, Column[] columns, Double epsilon) {
     this.expected = expected;
     this.field = field;
     final StringBuilder sb = new StringBuilder();
@@ -388,6 +518,7 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
       sb.append(c.name());
     }
     this.columns = sb.toString();
+    this.epsilon = epsilon;
     field.setAccessible(true); // make sure we can access any private fields
   }
 
@@ -401,9 +532,24 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
    * @param column the name of the column to compare
    */
   AreColumnsEqual(T expected, Field field, String column) {
+    this(expected, field, column, null);
+  }
+
+  /**
+   * Instantiates a new <code>AreColumnsEqual</code> object.
+   *
+   * @author paouelle
+   *
+   * @param expected the expected object to be equal to
+   * @param field the field of the column to compare
+   * @param column the name of the column to compare
+   * @param epsilon the tolerable error
+   */
+  AreColumnsEqual(T expected, Field field, String column, Double epsilon) {
     this.expected = expected;
     this.field = field;
     this.columns = column;
+    this.epsilon = epsilon;
     field.setAccessible(true); // make sure we can access any private fields
   }
 
@@ -445,8 +591,14 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
     try {
       final Object ival = field.get(item);
       final Object eval = field.get(expected);
+      final boolean matched;
 
-      if (!Objects.deepEquals(ival, eval)) {
+      if (epsilon != null) {
+        matched = org.helenus.util.Objects.deepEquals(ival, eval, epsilon);
+      } else {
+        matched = Objects.deepEquals(ival, eval);
+      }
+      if (!matched) {
         mismatch
           .appendText("however ")
           .appendText(columns)

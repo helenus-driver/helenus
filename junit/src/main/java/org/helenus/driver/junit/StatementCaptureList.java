@@ -191,9 +191,11 @@ public class StatementCaptureList<T extends GenericStatement> {
       logger.log(level, "%20s = %s", "Statement class", clazz.getSimpleName());
       logger.log(level, "%20s = %d", "Size", list.size());
       logger.log(level, "%20s:", "Content");
-      list.forEach(
-        s -> logger.log(level, "%20s = %s", StatementCaptureList.getType(s), s)
-      );
+      for (int i = 0; i < list.size();i++) {
+        final GenericStatement s = list.get(i);
+
+        logger.log(level, "%20s = %10s -> %s", "[" + i + "]", StatementCaptureList.getType(s), s);
+      }
     }
     return this;
   }
