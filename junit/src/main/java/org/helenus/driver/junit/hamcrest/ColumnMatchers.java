@@ -17,8 +17,10 @@ package org.helenus.driver.junit.hamcrest;
 
 import java.lang.reflect.Field;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -26,8 +28,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.hamcrest.Description;
 import org.hamcrest.DiagnosingMatcher;
 import org.hamcrest.Matcher;
-import org.hamcrest.Matchers;
-import org.hamcrest.StringDescription;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.persistence.Column;
 
@@ -49,14 +49,18 @@ public abstract class ColumnMatchers {
    * @author paouelle
    *
    * @param  columns the set of columns defined for the field
+   * @param  found a set where to record found columns from the ignore list
    * @param  ignore column names to ignore during comparison (may be
    *         <code>null</code> or empty)
    * @return <code>true</code> if the field should be ignored; <code>false</code>
    *         if it should be compared
    */
-  private static boolean ignoreField(Column[] columns, String... ignore) {
+  private static boolean ignoreField(
+    Column[] columns, Set<String> found, String... ignore
+  ) {
     for (final Column c: columns) {
       if (ArrayUtils.contains(ignore, c.name())) {
+        found.add(c.name());
         return true;
       }
     }
@@ -92,30 +96,36 @@ public abstract class ColumnMatchers {
    *
    * @param <T> the type of object to match
    *
-   * @param  operand the object to compare against
+   * @param  operand the pojo to compare against
    * @param  ignore column names to ignore during comparison (may be
    *         <code>null</code> or empty)
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnsEqualTo(T operand, String... ignore) {
+    final Set<String> found = new HashSet<>(ignore.length * 3 / 2);
+
     final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
-       .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), ignore))
+       .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), found, ignore))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), e.getValue()))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      return Matchers.describedAs(
-        matchers.get(0).columns
-        + " is equal", matchers.get(0)
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "no matching columns left defined in pojo class '%s'", operand.getClass().getSimpleName()
+    );
+    for (final String i: ignore) {
+      org.apache.commons.lang3.Validate.isTrue(
+        found.contains(i),
+        "column '%s' not defined in pojo class '%s'", i, operand.getClass().getSimpleName()
       );
     }
     return new DiagnosingMatcher<T>() {
       @Override
       public boolean matches(Object o, Description mismatch) {
-        for (final Matcher<T> matcher : matchers) {
+        for (final Matcher<T> matcher: matchers) {
           if (!matcher.matches(o)) {
             matcher.describeMismatch(o, mismatch);
             return false;
@@ -126,6 +136,7 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getClass().getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
           .appendText("] are all equal");
@@ -144,7 +155,7 @@ public abstract class ColumnMatchers {
    * @param <T> the type of object to match
    *
    * @param  column the name of the column to compare
-   * @param  operand the object to compare against
+   * @param  operand the pojo to compare against
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnsEqualTo(String column, T operand) {
@@ -156,12 +167,10 @@ public abstract class ColumnMatchers {
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), column))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      return Matchers.describedAs(
-        matchers.get(0).columns
-        + " is equal", matchers.get(0)
-      );
-    }
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "column '%s' not defined in pojo class '%s'", column, operand.getClass().getSimpleName()
+    );
     return new DiagnosingMatcher<T>() {
       @Override
       public boolean matches(Object o, Description mismatch) {
@@ -176,8 +185,10 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getClass().getSimpleName())
+          .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText(" is equal");
+          .appendText("] is equal");
       }
     };
   }
@@ -193,7 +204,7 @@ public abstract class ColumnMatchers {
    *
    * @param <T> the type of object to match
    *
-   * @param  operand the object to compare against
+   * @param  operand the pojo to compare against
    * @param  epsilon the tolerable error
    * @param  ignore column names to ignore during comparison (may be
    *         <code>null</code> or empty)
@@ -202,18 +213,24 @@ public abstract class ColumnMatchers {
   public static <T> Matcher<T> columnsCloseTo(
     T operand, double epsilon, String... ignore
   ) {
+    final Set<String> found = new HashSet<>(ignore.length * 3 / 2);
+
     final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
-       .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), ignore))
+       .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), found, ignore))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), e.getValue(), epsilon))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      return Matchers.describedAs(
-        matchers.get(0).columns
-        + " is close within " + epsilon, matchers.get(0)
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "no matching columns left defined in pojo class '%s'", operand.getClass().getSimpleName()
+    );
+    for (final String i: ignore) {
+      org.apache.commons.lang3.Validate.isTrue(
+        found.contains(i),
+        "column '%s' not defined in pojo class '%s'", i, operand.getClass().getSimpleName()
       );
     }
     return new DiagnosingMatcher<T>() {
@@ -230,6 +247,7 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getClass().getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
           .appendText("] are all close within " + epsilon);
@@ -249,7 +267,7 @@ public abstract class ColumnMatchers {
    * @param <T> the type of object to match
    *
    * @param  column the name of the column to compare
-   * @param  operand the object to compare against
+   * @param  operand the pojo to compare against
    * @param  epsilon the tolerable error
    * @return a corresponding matcher
    */
@@ -264,12 +282,10 @@ public abstract class ColumnMatchers {
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), column, epsilon))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      return Matchers.describedAs(
-        matchers.get(0).columns
-        + " is close within " + epsilon, matchers.get(0)
-      );
-    }
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "column '%s' not defined in pojo class '%s'", column, operand.getClass().getSimpleName()
+    );
     return new DiagnosingMatcher<T>() {
       @Override
       public boolean matches(Object o, Description mismatch) {
@@ -284,8 +300,10 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getClass().getSimpleName())
+          .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText(" is close within " + epsilon);
+          .appendText("] is close within " + epsilon);
       }
     };
   }
@@ -311,12 +329,10 @@ public abstract class ColumnMatchers {
        .map(e -> new IsColumnNull<>(operand, e.getKey(), column))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      return Matchers.describedAs(
-        matchers.get(0).column
-        + " is null", matchers.get(0)
-      );
-    }
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "column '%s' not defined in pojo class '%s'", column, operand.getSimpleName()
+    );
     return new DiagnosingMatcher<T>() {
       @Override
       public boolean matches(Object o, Description mismatch) {
@@ -331,8 +347,10 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getSimpleName())
+          .appendText("[")
           .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
-          .appendText(" is null");
+          .appendText("] is null");
       }
     };
   }
@@ -358,12 +376,10 @@ public abstract class ColumnMatchers {
        .map(e -> new IsColumnNotNull<>(operand, e.getKey(), column))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      return Matchers.describedAs(
-        matchers.get(0).column
-        + " is not null", matchers.get(0)
-      );
-    }
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "column '%s' not defined in pojo class '%s'", column, operand.getSimpleName()
+    );
     return new DiagnosingMatcher<T>() {
       @Override
       public boolean matches(Object o, Description mismatch) {
@@ -378,8 +394,10 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getSimpleName())
+          .appendText("[")
           .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
-          .appendText(" is not null");
+          .appendText("] is not null");
       }
     };
   }
@@ -404,22 +422,20 @@ public abstract class ColumnMatchers {
   ) {
     final List<ColumnMatches<T, V>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
-        operand.getClass(), Column.class, true
+        operand, Column.class, true
       ).entrySet().stream()
        .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
        .map(e -> new ColumnMatches<>(operand, e.getKey(), column, matcher))
        .collect(Collectors.toList());
 
-    if (matchers.size() == 1) {
-      final Description d = new StringDescription();
-
-      d.appendText(matchers.get(0).column).appendText(" ").appendDescriptionOf(matcher);
-      return Matchers.describedAs(d.toString(), matchers.get(0));
-    }
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "column '%s' not defined in pojo class '%s'", column, operand.getSimpleName()
+    );
     return new DiagnosingMatcher<T>() {
       @Override
       public boolean matches(Object o, Description mismatch) {
-        for (final Matcher<T> matcher : matchers) {
+        for (final Matcher<T> matcher: matchers) {
           if (!matcher.matches(o)) {
             matcher.describeMismatch(o, mismatch);
             return false;
@@ -430,8 +446,10 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
+          .appendText(operand.getSimpleName())
+          .appendText("[")
           .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
-          .appendText(" ")
+          .appendText("] ")
           .appendDescriptionOf(matcher);
       }
     };
@@ -565,26 +583,18 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
     // first make sure they are the same class
     if (item == null) {
       if (expected != null) {
-        mismatch
-          .appendText("however ")
-          .appendText(columns)
-          .appendText(" was null");
+        mismatch.appendText("however the pojo was null");
         return false;
       }
       return true;
     } else if (item == expected) {
       return true;
     } else if (expected == null) {
-      mismatch
-        .appendText("however ")
-        .appendText(columns)
-        .appendText(" was not null");
+      mismatch.appendText("however the pojo was not null");
       return false;
     } else if (!expected.getClass().isInstance(item)) {
       mismatch
-        .appendText("however ")
-        .appendText(columns)
-        .appendText(" was not an instance of ")
+        .appendText("however the pojo was not an instance of ")
         .appendText(expected.getClass().getName());
       return false;
     }
@@ -600,9 +610,9 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
       }
       if (!matched) {
         mismatch
-          .appendText("however ")
+          .appendText("however the column '")
           .appendText(columns)
-          .appendText(" was ")
+          .appendText("' was ")
           .appendValue(ival)
           .appendText(" instead of ")
           .appendValue(eval);
@@ -630,7 +640,14 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
    */
   @Override
   public void describeTo(Description description) {
-    description.appendText(columns).appendText(" are equal");
+    description
+      .appendText("column '")
+      .appendText(columns);
+    if (epsilon == null) {
+      description.appendText("' are equal");
+    } else {
+      description.appendText("' are close to within ").appendText(epsilon.toString());
+    }
   }
 }
 
@@ -700,7 +717,7 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
       return true;
     } else if (!expected.isInstance(item)) {
       mismatch
-        .appendText("however the object was not an instance of ")
+        .appendText("however the pojo was not an instance of ")
         .appendText(expected.getName());
       return false;
     }
@@ -709,9 +726,9 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
 
       if (ival != null) {
         mismatch
-          .appendText("however ")
+          .appendText("however the column '")
           .appendText(column)
-          .appendText(" was not null");
+          .appendText("' was not null");
         return false;
       }
       return true;
@@ -736,7 +753,10 @@ class IsColumnNull<T> extends DiagnosingMatcher<T> {
    */
   @Override
   public void describeTo(Description description) {
-    description.appendText(column).appendText(" is null");
+    description
+      .appendText("column '")
+      .appendText(column)
+      .appendText("' is null");
   }
 }
 
@@ -803,13 +823,11 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
   protected boolean matches(Object item, Description mismatch) {
     // first make sure they are the same class
     if (item == null) {
-      mismatch.appendText("however the object was null");
+      mismatch.appendText("however the pojo was null");
       return false;
     } else if (!expected.isInstance(item)) {
       mismatch
-        .appendText("however ")
-        .appendText(column)
-        .appendText(" was not an instance of ")
+        .appendText("however the pojo was not an instance of ")
         .appendText(expected.getName());
       return false;
     }
@@ -818,9 +836,9 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
 
       if (ival == null) {
         mismatch
-          .appendText("however ")
+          .appendText("however the column '")
           .appendText(column)
-          .appendText(" was null");
+          .appendText("' was null");
         return false;
       }
       return true;
@@ -845,7 +863,10 @@ class IsColumnNotNull<T> extends DiagnosingMatcher<T> {
    */
   @Override
   public void describeTo(Description description) {
-    description.appendText(column).appendText(" is not null");
+    description
+      .appendText("column '")
+      .appendText(column)
+      .appendText("' is not null");
   }
 }
 
@@ -922,13 +943,11 @@ class ColumnMatches<T, V> extends DiagnosingMatcher<T> {
   protected boolean matches(Object item, Description mismatch) {
     // first make sure they are the same class
     if (item == null) {
-      mismatch.appendText("however the object was null");
+      mismatch.appendText("however the pojo was null");
       return false;
     } else if (!expected.isInstance(item)) {
       mismatch
-        .appendText("however ")
-        .appendText(column)
-        .appendText(" was not an instance of ")
+        .appendText("however the pojo was not an instance of ")
         .appendText(expected.getName());
       return false;
     }
@@ -937,9 +956,9 @@ class ColumnMatches<T, V> extends DiagnosingMatcher<T> {
 
       if (!matcher.matches(ival)) {
         mismatch
-          .appendText("however ")
+          .appendText("however the column '")
           .appendText(column)
-          .appendText(" ");
+          .appendText("' ");
         matcher.describeMismatch(ival, mismatch);
         return false;
       }
@@ -965,6 +984,10 @@ class ColumnMatches<T, V> extends DiagnosingMatcher<T> {
    */
   @Override
   public void describeTo(Description description) {
-    description.appendText(column).appendText(" ").appendDescriptionOf(matcher);
+    description
+      .appendText("column '")
+      .appendText(column)
+      .appendText("' ")
+      .appendDescriptionOf(matcher);
   }
 }
