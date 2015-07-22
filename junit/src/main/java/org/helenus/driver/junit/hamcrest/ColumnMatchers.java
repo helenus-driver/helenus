@@ -199,7 +199,7 @@ public abstract class ColumnMatchers {
    *         <code>null</code> or empty)
    * @return a corresponding matcher
    */
-  public static <T> Matcher<T> columnsEqualTo(
+  public static <T> Matcher<T> columnsCloseTo(
     T operand, double epsilon, String... ignore
   ) {
     final List<AreColumnsEqual<T>> matchers =
@@ -213,7 +213,7 @@ public abstract class ColumnMatchers {
     if (matchers.size() == 1) {
       return Matchers.describedAs(
         matchers.get(0).columns
-        + " is equal within " + epsilon, matchers.get(0)
+        + " is close within " + epsilon, matchers.get(0)
       );
     }
     return new DiagnosingMatcher<T>() {
@@ -232,7 +232,7 @@ public abstract class ColumnMatchers {
         description
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText("] are all equal within " + epsilon);
+          .appendText("] are all close within " + epsilon);
       }
     };
   }
@@ -253,7 +253,7 @@ public abstract class ColumnMatchers {
    * @param  epsilon the tolerable error
    * @return a corresponding matcher
    */
-  public static <T> Matcher<T> columnsEqualTo(
+  public static <T> Matcher<T> columnsCloseTo(
     String column, T operand, double epsilon
   ) {
     final List<AreColumnsEqual<T>> matchers =
@@ -267,7 +267,7 @@ public abstract class ColumnMatchers {
     if (matchers.size() == 1) {
       return Matchers.describedAs(
         matchers.get(0).columns
-        + " is equal within " + epsilon, matchers.get(0)
+        + " is close within " + epsilon, matchers.get(0)
       );
     }
     return new DiagnosingMatcher<T>() {
@@ -285,7 +285,7 @@ public abstract class ColumnMatchers {
       public void describeTo(Description description) {
         description
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText(" is equal within " + epsilon);
+          .appendText(" is close within " + epsilon);
       }
     };
   }
