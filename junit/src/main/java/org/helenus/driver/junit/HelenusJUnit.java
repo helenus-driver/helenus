@@ -326,6 +326,7 @@ public class HelenusJUnit implements MethodRule {
         ) {
           pm.appendReplacement(sb, pname + socket.getLocalPort());
           updated = true;
+          logger.info("Allocated free %s%d", pname, socket.getLocalPort());
         }
       } else {
         pm.appendReplacement(sb, pm.group());
