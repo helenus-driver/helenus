@@ -1302,7 +1302,6 @@ public class HelenusJUnit implements MethodRule {
           && (HelenusJUnit.target == target)) { // should always be true
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
-        HelenusJUnit.captures.clear();
         HelenusJUnit.capturing = false;
       }
     }
@@ -1757,7 +1756,7 @@ public class HelenusJUnit implements MethodRule {
    */
   public HelenusJUnit withoutCapture() {
     synchronized (HelenusJUnit.class) {
-      HelenusJUnit.captures.clear();
+      HelenusJUnit.captures.forEach(cl -> cl.stop());
     }
     return this;
   }
