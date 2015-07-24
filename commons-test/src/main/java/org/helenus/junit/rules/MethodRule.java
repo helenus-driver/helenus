@@ -18,6 +18,10 @@ package org.helenus.junit.rules;
 import java.util.ArrayList;
 import java.util.List;
 
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtMethod;
+
 import org.helenus.junit.Tag;
 import org.helenus.junit.Tags;
 import org.helenus.util.function.EConsumer;
@@ -67,6 +71,20 @@ public class MethodRule implements org.junit.rules.MethodRule {
   private volatile FrameworkMethod method = null;
 
   /**
+   * Holds the Javassist reference to the test class.
+   *
+   * @author paouelle
+   */
+  private volatile CtClass ctclass = null;
+
+  /**
+   * Holds the Javassist reference to the test method.
+   *
+   * @author paouelle
+   */
+  private volatile CtMethod ctmethod = null;
+
+  /**
    * Instantiates a new <code>MethodRule</code> object.
    *
    * @author paouelle
@@ -89,6 +107,13 @@ public class MethodRule implements org.junit.rules.MethodRule {
   @Override
   public Statement apply(Statement base, FrameworkMethod method, Object target) {
     this.method = method;
+    try {
+      final ClassPool pool = ClassPool.getDefault();
+
+      this.ctclass = pool.get(method.getDeclaringClass().getCanonicalName());
+      this.ctmethod = ctclass.getDeclaredMethod(method.getName());
+    } catch (Exception e) { // ignore and continue without javassist info
+    }
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
@@ -133,6 +158,40 @@ public class MethodRule implements org.junit.rules.MethodRule {
     final FrameworkMethod m = method;
 
     return (m != null) ? m.getName() : null;
+  }
+
+  /**
+   * Gets the source file for the test method if available.
+   *
+   * @author paouelle
+   *
+   * @return the source file where the test method is defined or <code>null</code>
+   *         if not available
+   */
+  public String getSourceFile() {
+    final CtClass c = ctclass;
+
+    if (c != null) {
+      return c.getClassFile2().getSourceFile();
+    }
+    return null;
+  }
+
+  /**
+   * Gets the line number for the test method if available.
+   *
+   * @author paouelle
+   *
+   * @return the line number of the source line corresponding to the test method
+   *         or <code>-1</code> if not available
+   */
+  public int getLineNumber() {
+    final CtMethod m = ctmethod;
+
+    if (m != null) {
+      return m.getMethodInfo2().getLineNumber(0);
+    }
+    return -1;
   }
 
   /**
