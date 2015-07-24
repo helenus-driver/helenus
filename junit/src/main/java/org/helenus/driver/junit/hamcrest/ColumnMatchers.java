@@ -309,6 +309,55 @@ public abstract class ColumnMatchers {
   }
 
   /**
+   * Creates a matcher that matches when the examined object has the specified
+   * column matching the specified matcher.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of object to match
+   *
+   * @param  column the name of the column to compare
+   * @param  operand the class of objects to compare against
+   * @param  matcher a matcher to use when comparing the column's value
+   * @return a corresponding matcher
+   */
+  public static <T> Matcher<T> column(String column, Class<T> operand, Matcher<?> matcher) {
+    final List<ColumnMatch<T>> matchers =
+      ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
+        operand, Column.class, true
+      ).entrySet().stream()
+       .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
+       .map(e -> new ColumnMatch<>(operand, e.getKey(), column, matcher))
+       .collect(Collectors.toList());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      !matchers.isEmpty(),
+      "column '%s' not defined in pojo class '%s'", column, operand.getClass().getSimpleName()
+    );
+    return new DiagnosingMatcher<T>() {
+      @Override
+      public boolean matches(Object o, Description mismatch) {
+        for (final Matcher<T> matcher : matchers) {
+          if (!matcher.matches(o)) {
+            matcher.describeMismatch(o, mismatch);
+            return false;
+          }
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText(operand.getClass().getSimpleName())
+          .appendText("[")
+          .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
+          .appendText("] ")
+          .appendDescriptionOf(matcher);
+      }
+    };
+  }
+
+  /**
    * Creates a matcher that matches when the examined object has a given column
    * <code>null</code>, as determined by the associated fields' values.
    *
@@ -648,6 +697,125 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
     } else {
       description.appendText("' are close to within ").appendText(epsilon.toString());
     }
+  }
+}
+
+/**
+ * The <code>ColumnMatch</code> class defines an Hamcrest matcher capable of
+ * comparing a pojo objects to see if a specified column matches a given matcher.
+ * This matcher uses reflection to find the field's value to match.
+ *
+ * @copyright 2015-2015 The Helenus Driver Project Authors
+ *
+ * @author  The Helenus Driver Project Authors
+ * @version 1 - Jul 24, 2015 - paouelle - Creation
+ *
+ * @param <T> the type of objects being compared
+ *
+ * @since 1.0
+ */
+class ColumnMatch<T> extends DiagnosingMatcher<T> {
+  /**
+   * Holds the expected class.
+   *
+   * @author paouelle
+   */
+  final Class<T> expected;
+
+  /**
+   * Holds the field of the column to compare.
+   *
+   * @author paouelle
+   */
+  final Field field;
+
+  /**
+   * Holds the names of the column to compare.
+   *
+   * @author paouelle
+   */
+  final String column;
+
+  /**
+   * Holds the matcher to use for matching the column's value.
+   *
+   * @author paouelle
+   */
+  final Matcher<?> matcher;
+
+  /**
+   * Instantiates a new <code>ColumnMatch</code> object.
+   *
+   * @author paouelle
+   *
+   * @param expected the expected class to compare
+   * @param field the field of the column to compare
+   * @param column the name of the column to compare
+   * @param matcher the matcher to use for matching the column's value
+   */
+  ColumnMatch(Class<T> expected, Field field, String column, Matcher<?> matcher) {
+    this.expected = expected;
+    this.field = field;
+    this.column = column;
+    this.matcher = matcher;
+    field.setAccessible(true); // make sure we can access any private fields
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.hamcrest.DiagnosingMatcher#matches(java.lang.Object, org.hamcrest.Description)
+   */
+  @Override
+  protected boolean matches(Object item, Description mismatch) {
+    // first make sure they are the same class
+    if (item == null) {
+      return true;
+    } else if (!expected.isInstance(item)) {
+      mismatch
+        .appendText("however the pojo was not an instance of ")
+        .appendText(expected.getName());
+      return false;
+    }
+    try {
+      final Object ival = field.get(item);
+
+      if (!matcher.matches(ival)) {
+        mismatch
+          .appendText("however the column '")
+          .appendText(column)
+          .appendText("' did not match");
+        return false;
+      }
+      return true;
+    } catch (IllegalAccessException e) {
+      throw new AssertionError(e);
+    } catch (ExceptionInInitializerError e) {
+      final Throwable t = e.getException();
+
+      if (t instanceof AssertionError) {
+        throw (AssertionError)t;
+      }
+      throw new AssertionError(t);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.hamcrest.SelfDescribing#describeTo(org.hamcrest.Description)
+   */
+  @Override
+  public void describeTo(Description description) {
+    description
+      .appendText("column '")
+      .appendText(column)
+      .appendText("' ")
+      .appendDescriptionOf(matcher);
   }
 }
 
