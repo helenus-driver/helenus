@@ -332,7 +332,7 @@ public abstract class ColumnMatchers {
 
     org.apache.commons.lang3.Validate.isTrue(
       !matchers.isEmpty(),
-      "column '%s' not defined in pojo class '%s'", column, operand.getClass().getSimpleName()
+      "column '%s' not defined in pojo class '%s'", column, operand.getSimpleName()
     );
     return new DiagnosingMatcher<T>() {
       @Override
@@ -348,7 +348,7 @@ public abstract class ColumnMatchers {
       @Override
       public void describeTo(Description description) {
         description
-          .appendText(operand.getClass().getSimpleName())
+          .appendText(operand.getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.column).collect(Collectors.joining(", ")))
           .appendText("] ")
