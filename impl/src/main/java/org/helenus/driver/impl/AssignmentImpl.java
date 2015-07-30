@@ -299,7 +299,7 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      */
-    private final Object object;
+    final Object object;
 
     /**
      * Instantiates a new <code>DelayedSetAssignmentImpl</code> object.
@@ -393,7 +393,7 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      */
-    private final Object object;
+    final Object object;
 
     /**
      * Instantiates a new <code>DelayedSetAllAssignmentImpl</code> object.

@@ -175,6 +175,18 @@ public interface Update<T>
     public boolean isEmpty();
 
     /**
+     * Checks if all columns from the pojo are being updated in this UPDATE
+     * statement either because no assignments have been added or because the
+     * {@link StatementBuilder#setAllFromObject} was added.
+     *
+     * @author paouelle
+     *
+     * @return <code>true</code> if all columns from the pojo are being updated;
+     *         <code>false</code> otherwise
+     */
+    public boolean hasAllFromObject();
+
+    /**
      * Adds a WHERE clause to the UPDATE statement those assignments are part
      * of.
      *

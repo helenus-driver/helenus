@@ -22,6 +22,7 @@ import java.net.InetAddress;
 
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -84,6 +85,34 @@ public abstract class Utils {
     }
     return sb;
   }
+
+  public static StringBuilder joinAndAppendWithNoDuplicates(
+    TableInfoImpl<?> tinfo,
+    StringBuilder sb,
+    String separator,
+    Collection<? extends Appendeable> values
+  ) {
+    final Set<String> done = new HashSet<>(values.size() * 3 / 2);
+    boolean first = true;
+
+    for (final Appendeable value: values) {
+      final StringBuilder vsb = new StringBuilder(10);
+
+      value.appendTo(tinfo, vsb);
+      final String vs = vsb.toString();
+
+      if (done.add(vs)) {
+        if (!first) {
+          sb.append(separator);
+        } else {
+          first = false;
+        }
+        sb.append(vs);
+      }
+    }
+    return sb;
+  }
+
   public static StringBuilder joinAndAppend(
     TableInfoImpl<?> tinfo,
     StringBuilder sb,

@@ -32,6 +32,7 @@ import org.helenus.driver.Assignment;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.StatementBridge;
+import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.Update;
 import org.helenus.driver.UpdateNotAppliedException;
 import org.helenus.driver.Using;
@@ -307,6 +308,14 @@ public class UpdateImpl<T>
       final List<AssignmentImpl> as = new ArrayList<>(assignments.assignments.size());
 
       for (final AssignmentImpl a: assignments.assignments) {
+        if (assignments.hasAllFromObject()) {
+          if (a instanceof AssignmentImpl.DelayedSetAssignmentImpl) {
+            if (((AssignmentImpl.DelayedSetAssignmentImpl)a).object == null) {
+              // skip it as we are already adding all from the object anyway
+              continue;
+            }
+          }
+        }
         andAssignment(table, as, a);
       }
       if (as.isEmpty()) { // nothing to set for this table so skip
@@ -369,7 +378,8 @@ public class UpdateImpl<T>
         return;
       }
       builder.append(" SET ");
-      Utils.joinAndAppend(table, builder, ",", as);
+      // make sure we do not add any duplicates
+      Utils.joinAndAppendWithNoDuplicates(table, builder, ",", as);
     } else { // nothing to set for this table
       return;
     }
@@ -739,6 +749,14 @@ public class UpdateImpl<T>
     private final List<AssignmentImpl> assignments = new ArrayList<>(25);
 
     /**
+     * Flag indicating if all columns from the objects are being added using the
+     * special {@link StatementBuilder#setAllFromObject} assignment.
+     *
+     * @author paouelle
+     */
+    private boolean hasAllFromObject = false;
+
+    /**
      * Instantiates a new <code>AssignmentsImpl</code> object.
      *
      * @author paouelle
@@ -773,6 +791,11 @@ public class UpdateImpl<T>
         final AssignmentImpl a = (AssignmentImpl)assignment;
 
         statement.setCounterOp(a instanceof CounterAssignmentImpl);
+        if (a instanceof AssignmentImpl.DelayedSetAllAssignmentImpl) {
+          if (((AssignmentImpl.DelayedSetAllAssignmentImpl)a).object == null) {
+            this.hasAllFromObject = true;
+          }
+        }
         if (!(a instanceof AssignmentImpl.DelayedWithObject)) {
           // pre-validate against any table
           getPOJOContext().getClassInfo().validateColumn(a.getColumnName().toString());
@@ -793,6 +816,18 @@ public class UpdateImpl<T>
     @Override
     public boolean isEmpty() {
       return assignments.isEmpty();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Update.Assignments#hasAllFromObject()
+     */
+    @Override
+    public boolean hasAllFromObject() {
+      return assignments.isEmpty() || hasAllFromObject;
     }
 
     /**
