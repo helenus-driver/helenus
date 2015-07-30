@@ -1264,15 +1264,15 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         logger.error("Failed to start Cassandra daemon", e);
-        System.exit(200); // force an exit!!!
-        // throw e;
+        // System.exit(200); // force an exit!!!
+        throw e;
       } catch (Throwable t) {
         // make sure to cleanup
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
         logger.error("Failed to start Cassandra daemon", t);
-        System.exit(200); // force an exit!!!
-        // throw new AssertionError("failed to start Cassandra daemon", t);
+        // System.exit(200); // force an exit!!!
+        throw new AssertionError("failed to start Cassandra daemon", t);
       } finally {
         HelenusJUnit.captures.clear();
       }
