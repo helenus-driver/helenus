@@ -684,14 +684,7 @@ public class HelenusJUnit implements MethodRule {
               HelenusJUnit.cleanupAndCreateCassandraDirectories();
               HelenusJUnit.daemon = new CassandraDaemon();
               HelenusJUnit.daemon.activate();
-            } catch (AssertionError|StackOverflowError|OutOfMemoryError|ThreadDeath e) {
-              HelenusJUnit.daemon = null;
-              throw e;
-            } catch (RuntimeException e) {
-              HelenusJUnit.daemon = null;
-              failed.set(e);
-              throw e;
-            } catch (Error e) {
+            } catch (RuntimeException|Error e) {
               HelenusJUnit.daemon = null;
               failed.set(e);
               throw e;
@@ -711,6 +704,15 @@ public class HelenusJUnit implements MethodRule {
             + timeout
             + "ms; increase the timeout"
           );
+          Thread.getAllStackTraces().forEach((t, se) -> {
+            if (HelenusJUnit.isCassandraDaemonThread(t)) {
+              logger.error(t);
+              for (final StackTraceElement te: se) {
+                logger.error("\tat %s", te);
+              }
+            }
+          });
+          logger.error("Cassandra daemon failed to start within timeout");
           throw new AssertionError(
             "cassandra daemon failed to start within timeout"
           );
@@ -719,6 +721,9 @@ public class HelenusJUnit implements MethodRule {
 
         if (t != null) {
           logger.error("Cassandra daemon failed to start; %s", t);
+          throw new AssertionError(
+            "cassandra daemon failed to start", t
+          );
         }
       } catch (InterruptedException e) {
         logger.error("interrupted waiting for cassandra daemon to start", e);
@@ -1258,12 +1263,16 @@ public class HelenusJUnit implements MethodRule {
         // make sure to cleanup
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
-        throw e;
+        logger.error("Failed to start Cassandra daemon", e);
+        System.exit(200); // force an exit!!!
+        // throw e;
       } catch (Throwable t) {
         // make sure to cleanup
         HelenusJUnit.method = null;
         HelenusJUnit.target = null;
-        throw new AssertionError("failed to start Cassandra daemon", t);
+        logger.error("Failed to start Cassandra daemon", t);
+        System.exit(200); // force an exit!!!
+        // throw new AssertionError("failed to start Cassandra daemon", t);
       } finally {
         HelenusJUnit.captures.clear();
       }
