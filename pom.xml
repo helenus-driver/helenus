@@ -91,9 +91,9 @@
     <reflections-version>0.9.9</reflections-version>
     <lombok-version>1.16.2</lombok-version>
     <fasterxml-jackson-version>2.5.1</fasterxml-jackson-version>
-    <cassandra-version>2.1.4</cassandra-version>
+    <cassandra-version>2.1.6</cassandra-version>
     <glassfish-version>1.0.4</glassfish-version>
-    <tomcat-version>8.0.21</tomcat-version>
+    <tomcat-version>8.0.24</tomcat-version>
     <servlet-api-version>3.1.0</servlet-api-version>
     
     <findbugs-version>3.0.0</findbugs-version>
