@@ -41,7 +41,7 @@
         <logger name="org.helenus" level="TRACE"/>
         <logger name="com.datastax" level="INFO"/>
         <logger name="org.apache.cassandra" level="INFO"/>
-        <logger name="io.netty.channel.nio" level="INFO"/>
+        <logger name="io.netty" level="INFO"/>
         
 		<root level="TRACE">
 			<appender-ref ref="STDOUT_LOCATION">
