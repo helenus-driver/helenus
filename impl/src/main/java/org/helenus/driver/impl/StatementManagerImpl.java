@@ -39,6 +39,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.CloseFuture;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 
@@ -1617,6 +1618,24 @@ public class StatementManagerImpl extends StatementManager {
    * @param statement the non-<code>null</code> statement executing
    */
   protected void executing(StatementImpl<?, ?, ?> statement) {}
+
+  /**
+   * Called after a statement's execution has been sent to Cassandra.
+   * <p>
+   * <i>Note:</i> This callback should not throw back any exceptions.
+   *
+   * @author paouelle
+   *
+   * @param  statement the non-<code>null</code> statement executing
+   * @param  future the non-<code>null</code> future for the set resulting from
+   *         the execution of the statement
+   * @return <code>future</code> for chaining
+   */
+  protected ResultSetFuture sent(
+    StatementImpl<?, ?, ?> statement, ResultSetFuture future
+  ) {
+    return future;
+  }
 
   /**
    * Connects to Cassandra if not already connected.

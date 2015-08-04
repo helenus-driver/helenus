@@ -222,7 +222,7 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
         raw.setFetchSize(getFetchSize());
         raws.add(raw);
       }
-      return new LastResultSetFuture(raws, mgr);
+      return mgr.sent(this, new LastResultSetFuture(raws, mgr));
     } finally {
       // let's recursively clear the query string that gets cache to reduce
       // the memory impact chance are now that it got executed, it won't be

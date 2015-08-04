@@ -29,6 +29,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.driver.Batch;
 import org.helenus.driver.BatchableStatement;
+import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
 import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.Recorder;
@@ -260,6 +261,24 @@ public class SequenceImpl
           return Stream.empty();
         }
       });
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.ParentStatementImpl#statements()
+   */
+  @Override
+  public Stream<GenericStatement<?, ?>> statements() {
+    return Stream.concat(Stream.of(this), statements.stream()
+      .flatMap(s -> {
+        if (s instanceof ParentStatementImpl) {
+          return ((ParentStatementImpl)s).statements();
+        }
+        return Stream.of(s);
+      }));
   }
 
   /**

@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -64,6 +65,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.KeyspaceMetadata;
+import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -254,6 +256,13 @@ public class HelenusJUnit implements MethodRule {
   @SuppressWarnings("rawtypes")
   static final List<StatementCaptureList<? extends GenericStatement>> captures
     = new ArrayList<>(4);
+
+  /**
+   * Holds the sent lists.
+   *
+   * @author paouelle
+   */
+  static final List<Consumer<GenericStatement<?, ?>>> sent = new ArrayList<>(4);
 
   /**
    * Holds a flag indicating if capturing is enabled or not.
@@ -1789,6 +1798,22 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
+   * Registers a callback to be notified when a statement is sent to Cassandra.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  consumer the consumer to register to be notified every time a
+   *         statement is sent to Cassandra
+   * @return this for chaining
+   */
+  public HelenusJUnit whenSent(Consumer<GenericStatement<?, ?>> consumer) {
+    synchronized (HelenusJUnit.class) {
+      HelenusJUnit.sent.add(consumer);
+    }
+    return this;
+  }
+
+  /**
    * The <code>StatementManagerUnitImpl</code> class extends the Helenus one
    * in order to hook the Helenus unit engine in it.
    *
@@ -1839,15 +1864,31 @@ public class HelenusJUnit implements MethodRule {
      *
      * @see org.helenus.driver.impl.StatementManagerImpl#executing(org.helenus.driver.impl.StatementImpl)
      */
-    @SuppressWarnings("rawtypes")
     @Override
-    protected void executing(StatementImpl statement) {
+    protected void executing(StatementImpl<?, ?, ?> statement) {
       synchronized (HelenusJUnit.class) {
         if (!HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // not capturing
           return;
         }
         HelenusJUnit.captures.forEach(l -> l.executing(statement));
       }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#sent(org.helenus.driver.impl.StatementImpl, com.datastax.driver.core.ResultSetFuture)
+     */
+    @Override
+    protected ResultSetFuture sent(
+      StatementImpl<?, ?, ?> statement, ResultSetFuture future
+    ) {
+      synchronized (HelenusJUnit.class) {
+        HelenusJUnit.sent.forEach(c -> c.accept(statement));
+      }
+      return future;
     }
 
     /**

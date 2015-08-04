@@ -18,6 +18,7 @@ package org.helenus.driver.impl;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import org.helenus.driver.GenericStatement;
 import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.Recorder;
 
@@ -73,4 +74,14 @@ public interface ParentStatementImpl {
    * @return a stream of all object statements contained recursively in this parent
    */
   public Stream<ObjectStatement<?>> objectStatements();
+
+  /**
+   * Gets all statements contained recursively in this parent statement including
+   * parent statements (and this one).
+   *
+   * @author paouelle
+   *
+   * @return a stream of all statements contained recursively in this parent
+   */
+  public Stream<GenericStatement<?, ?>> statements();
 }

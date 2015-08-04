@@ -600,7 +600,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
       }
       raw.setRetryPolicy(getRetryPolicy());
       raw.setFetchSize(getFetchSize());
-      return mgr.getSession().executeAsync(raw);
+      return mgr.sent(this, mgr.getSession().executeAsync(raw));
     } finally {
       // let's recursively clear the query string that gets cache to reduce
       // the memory impact chance are now that it got executed, it won't be
