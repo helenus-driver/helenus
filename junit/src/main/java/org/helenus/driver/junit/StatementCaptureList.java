@@ -364,7 +364,7 @@ public class StatementCaptureList<T extends GenericStatement> {
   public StatementCaptureList<T> andExpect(
     Matcher<StatementCaptureList<T>> matcher
   ) throws Exception {
-    matcher.matches(this);
+    StatementCaptureListMatchers.assertThat("Capture List", this, matcher);
     return this;
   }
 }
