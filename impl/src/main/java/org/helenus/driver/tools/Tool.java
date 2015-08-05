@@ -86,6 +86,7 @@ import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.persistence.InitialObjects;
 import org.reflections.Reflections;
+import org.reflections.scanners.SubTypesScanner;
 
 /**
  * The <code>Tool</code> class defines a command line tool that can be used
@@ -877,6 +878,7 @@ public class Tool {
    *         specified packages
    * @throws IOException if an I/O error occurs while generating the Json schemas
    */
+  @SuppressWarnings({"cast", "unchecked", "rawtypes"})
   private static void createJsonSchemasFromPackages(
     String[] pkgs,
     Map<String, String> suffixes,
@@ -887,19 +889,37 @@ public class Tool {
       if (pkg == null) {
         continue;
       }
-      final CreateSchemas cs
-        = (matching
-           ? StatementBuilder.createMatchingSchemas(pkg)
-           : StatementBuilder.createSchemas(pkg));
+      Collection<Class<?>> classes;
 
-      // pass all suffixes
-      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-        // register the suffix value with the corresponding suffix type
-        cs.where(
-          StatementBuilder.eq(e.getKey(), e.getValue())
-        );
+      try {
+        final CreateSchemas cs
+          = (matching
+             ? StatementBuilder.createMatchingSchemas(pkg)
+             : StatementBuilder.createSchemas(pkg));
+
+        // pass all suffixes
+        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+          // register the suffix value with the corresponding suffix type
+          cs.where(
+            StatementBuilder.eq(e.getKey(), e.getValue())
+          );
+        }
+        classes = cs.getObjectClasses();
+      } catch (IllegalArgumentException e) { // ignore and continue with package only
+        final Reflections reflections = new Reflections(pkg, new SubTypesScanner(false));
+
+        classes = (Collection<Class<?>>)(Collection)reflections.getAllTypes().stream()
+          .map(n -> {
+            try {
+              return Class.forName(n);
+            } catch (LinkageError|ClassNotFoundException ee) { // ignore
+              return null;
+            }
+          })
+          .filter(c -> c != null)
+          .collect(Collectors.toList());
       }
-      for (final Class<?> c: cs.getObjectClasses()) {
+      for (final Class<?> c: classes) {
         System.out.println(
           Tool.class.getSimpleName()
           + ": creating Json schema for "
