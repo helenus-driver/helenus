@@ -1732,6 +1732,10 @@ public class StatementManagerImpl extends StatementManager {
                 = (RootClassInfoImpl<? super T>)getClassInfoImpl(rclazz);
 
               classInfo = rcinfo.getType(clazz);
+              if (classInfo == null) { // was not listed in @RootEntity annotation
+                // so attempt to load it by itself
+                classInfo = (ClassInfoImpl<T>)rcinfo.addType(this, clazz);
+              }
             } else {
               throw new IllegalArgumentException(
                 "class '" + clazz.getSimpleName() + "' is not annotated with @TypeEntity"

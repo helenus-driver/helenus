@@ -83,7 +83,7 @@ public class RootClassInfoImpl<T>
       );
       @SuppressWarnings("unchecked") // tested above!
       final TypeClassInfoImpl<? extends T> tcinfo
-        = new TypeClassInfoImpl<>(mgr, clazz, (Class<? extends T>)type);
+        = new TypeClassInfoImpl<>(mgr, clazz, (Class<? extends T>)type, false);
 
       org.apache.commons.lang3.Validate.isTrue(
         types.put(tcinfo.getObjectClass(), tcinfo) == null,
@@ -436,12 +436,7 @@ public class RootClassInfoImpl<T>
     );
     this.ctypes = types;
     this.ntypes = types.values().stream()
-      .collect(
-        Collectors.toMap(
-          tcinfo -> tcinfo.getType(),
-          tcinfo -> tcinfo
-        )
-      );
+      .collect(Collectors.toMap(tcinfo -> tcinfo.getType(), tcinfo -> tcinfo));
     validateAndComplementSchema();
   }
 
@@ -491,6 +486,77 @@ public class RootClassInfoImpl<T>
   }
 
   /**
+   * Adds a new type POJO class to this root entity.
+   *
+   * @author paouelle
+   *
+   * @param  mgr the non-<code>null</code> statement manager
+   * @param  type the type POJO class
+   * @return the non-<code>null</code> class info for the specified type
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if the type class is invalid
+   */
+  TypeClassInfoImpl<? extends T> addType(StatementManagerImpl mgr, Class<?> type) {
+    org.apache.commons.lang3.Validate.isTrue(
+      clazz.isAssignableFrom(type),
+      "type class '%s' must extends root element class: %s",
+      type.getName(), clazz.getName()
+    );
+    @SuppressWarnings("unchecked") // tested above!
+    final TypeClassInfoImpl<? extends T> tcinfo
+      = new TypeClassInfoImpl<>(mgr, clazz, (Class<? extends T>)type, true);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      ctypes.put(tcinfo.getObjectClass(), tcinfo) == null,
+      "duplicate type element class '%s' defined for root element class '%s'",
+      type.getSimpleName(), clazz.getSimpleName()
+    );
+    org.apache.commons.lang3.Validate.isTrue(
+      ntypes.put(tcinfo.getType(), tcinfo) == null,
+      "duplicate type name '%s' defined by class '%s' for root element class '%s'",
+      tcinfo.getType(), type.getSimpleName(), clazz.getSimpleName()
+    );
+    // make sure this type doesn't define any new columns or different type of columns
+    tcinfo.getTablesImpl().forEach(t -> {
+      // make sure the table is defined in root
+      final TableInfoImpl<? extends T> rt = getTableImpl(t.getName());
+
+      // make sure there are no new non-primary columns and make sure that for
+      // those defined they are of the same type
+      t.getNonPrimaryKeys().stream().forEach(c -> {
+        final FieldInfoImpl<? extends T> rc = rt.getColumn(c.getColumnName());
+
+        org.apache.commons.lang3.Validate.isTrue(
+          rc != null,
+          "root element '%s' doesn't define column '%s' in pojo '%s'",
+          clazz.getSimpleName(),
+          c.getColumnName(),
+          type.getSimpleName()
+        );
+        // already defined so skip it but not before making sure it is compatible
+        if (rc.getDeclaringClass().equals(c.getDeclaringClass())) {
+          // same exact field so we are good
+          return;
+        }
+        // check data type
+        org.apache.commons.lang3.Validate.isTrue(
+          rc.getDataType().getType() == c.getDataType().getType(),
+          "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
+          c.getDeclaringClass().getSimpleName(),
+          c.getName(),
+          c.getDataType().getType(),
+          rc.getDeclaringClass().getSimpleName(),
+          rc.getName(),
+          rc.getDataType().getType(),
+          t.getName(),
+          type.getSimpleName()
+        );
+      });
+    });
+    return tcinfo;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -503,7 +569,6 @@ public class RootClassInfoImpl<T>
       Stream.of(clazz), ctypes.values().stream().map(t -> t.getObjectClass())
     );
   }
-
 
   /**
    * {@inheritDoc}

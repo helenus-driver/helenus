@@ -981,7 +981,7 @@ public class HelenusJUnit implements MethodRule {
       try {
         final ClassInfo<?> cinfo = manager.getClassInfoImpl(clazz);
 
-        if (cinfo instanceof TypeClassInfo) {
+        if ((cinfo instanceof TypeClassInfo) && !((TypeClassInfo<?>)cinfo).isDynamic()) {
           // nothing to do for those since everything is done through the root
           return;
         } else if (cinfo instanceof RootClassInfo) {
@@ -1078,7 +1078,8 @@ public class HelenusJUnit implements MethodRule {
       } else {
         logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
       }
-      if ((cinfo instanceof TypeClassInfoImpl) || (cinfo instanceof UDTClassInfoImpl)) {
+      if (((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic())
+          || (cinfo instanceof UDTClassInfoImpl)) {
         // nothing to reset but we want the above trace
         return;
       }

@@ -65,6 +65,14 @@ public class TypeClassInfoImpl<T>
   private final String type;
 
   /**
+   * Holds a flag indicating if this type was known to the root entity via the
+   * @RootEntity annotation or if it was dynamically added later.
+   *
+   * @author paouelle
+   */
+  private final boolean dynamic;
+
+  /**
    * Instantiates a new <code>TypeClassInfoImpl</code> object.
    *
    * @author paouelle
@@ -72,12 +80,15 @@ public class TypeClassInfoImpl<T>
    * @param  mgr the non-<code>null</code> statement manager
    * @param  rclazz the class of POJO for the root entity this POJO is a type
    * @param  clazz the class of POJO for which to get a class info object for
+   * @param  dynamic <code>true</code> if this type is dynamically being added
+   *         to the root; <code>false</code> if it was known to the root via
+   *         the @RootEnitty annotation
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
    *         a valid POJO class
    */
   TypeClassInfoImpl(
-    StatementManagerImpl mgr, Class<? super T> rclazz, Class<T> clazz
+    StatementManagerImpl mgr, Class<? super T> rclazz, Class<T> clazz, boolean dynamic
   ) {
     super(mgr, clazz, RootEntity.class); // search for ctor starting at root
     org.apache.commons.lang3.Validate.isTrue(
@@ -86,6 +97,7 @@ public class TypeClassInfoImpl<T>
     );
     this.type = findType();
     this.rclazz = rclazz;
+    this.dynamic = dynamic;
     // validate the type entity POJO class
     validate(rclazz);
   }
@@ -213,6 +225,18 @@ public class TypeClassInfoImpl<T>
   @Override
   public String getType() {
     return type;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.info.TypeClassInfo#isDynamic()
+   */
+  @Override
+  public boolean isDynamic() {
+    return dynamic;
   }
 
   /**
