@@ -58,7 +58,7 @@ public interface ETetraConsumer<T, U, V, X, E extends Throwable> {
    * @author paouelle
    *
    * @param  after the operation to perform after this operation
-   * @return a composed {@code ETriConsumer} that performs in sequence this
+   * @return a composed {@code ETetraConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
    */

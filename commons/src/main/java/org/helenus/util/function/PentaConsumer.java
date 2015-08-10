@@ -18,28 +18,29 @@ package org.helenus.util.function;
 import java.util.function.Consumer;
 
 /**
- * The <code>TetraConsumer</code> interface represents an operation that accepts
- * four input arguments and returns no result. This is the four-arity
+ * The <code>PentaConsumer</code> interface represents an operation that accepts
+ * five input arguments and returns no result. This is the five-arity
  * specialization of {@link Consumer}. Unlike most other functional interfaces,
- * <code>TetraConsumer</code> is expected to operate via side-effects.
+ * <code>PentaConsumer</code> is expected to operate via side-effects.
  * <p>
  * This is a <a href="package-summary.html">functional interface</a>
- * whose functional method is {@link #accept(Object, Object, Object, Object)}.
+ * whose functional method is {@link #accept(Object, Object, Object, Object, Object)}.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jul 9, 2015 - paouelle - Creation
+ * @version 1 - Aug 10, 2015 - paouelle - Creation
  *
  * @param <T> the type of the first argument to the operation
  * @param <U> the type of the second argument to the operation
  * @param <V> the type of the third argument to the operation
  * @param <X> the type of the fourth argument to the operation
+ * @param <Y> the type of the figth argument to the operation
  *
  * @since 2.0
  */
 @FunctionalInterface
-public interface TetraConsumer<T, U, V, X> {
+public interface PentaConsumer<T, U, V, X, Y> {
   /**
    * Performs this operation on the given arguments.
    *
@@ -49,11 +50,12 @@ public interface TetraConsumer<T, U, V, X> {
    * @param u the second input argument
    * @param v the third input argument
    * @param x the fourth input argument
+   * @param y the fifth input argument
    */
-  public void accept(T t, U u, V v, X x);
+  public void accept(T t, U u, V v, X x, Y y);
 
   /**
-   * Returns a composed {@code TetraConsumer} that performs, in sequence, this
+   * Returns a composed {@code PentaConsumer} that performs, in sequence, this
    * operation followed by the {@code after} operation. If performing either
    * operation throws an exception, it is relayed to the caller of the
    * composed operation.  If performing this operation throws an exception,
@@ -62,17 +64,17 @@ public interface TetraConsumer<T, U, V, X> {
    * @author paouelle
    *
    * @param  after the operation to perform after this operation
-   * @return a composed {@code TetraConsumer} that performs in sequence this
+   * @return a composed {@code PentaConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
    */
-  public default TetraConsumer<T, U, V, X> andThen(
-    TetraConsumer<? super T, ? super U, ? super V, ? super X> after
+  public default PentaConsumer<T, U, V, X, Y> andThen(
+    PentaConsumer<? super T, ? super U, ? super V, ? super X, ? super Y> after
   ) {
     org.apache.commons.lang3.Validate.notNull(after, "invalid null after");
-    return (l, m, r, f) -> {
-      accept(l, m, r, f);
-      after.accept(l, m, r, f);
+    return (l, m, r, f, g) -> {
+      accept(l, m, r, f, g);
+      after.accept(l, m, r, f, g);
     };
   }
 }
