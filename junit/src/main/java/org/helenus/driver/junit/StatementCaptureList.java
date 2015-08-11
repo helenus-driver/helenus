@@ -154,10 +154,10 @@ public class StatementCaptureList<T extends GenericStatement> {
             if (num <= 0) { // done with this interceptor; this was the last time
               i.remove();
             }
-            ((Consumer)m.getLeft()).accept(os); // cast required to compile on cmdline
+            ((Consumer)m.getLeft()).accept(os);
           }
           // then capture
-          ((List)list).add(os); // cast required to compile on cmdline
+          ((List)list).add(os);
         }
       });
     }

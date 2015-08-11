@@ -386,12 +386,9 @@ public class RootClassInfoImpl<T>
      *
      * @see org.helenus.driver.impl.ClassInfoImpl.Context#getInitialObjects()
      */
-    @SuppressWarnings("cast")
     @Override
     public Collection<T> getInitialObjects() {
-      return tcontext.getInitialObjects().stream()
-        .map(o -> (T)o) // type cast require to compile on cmdline
-        .collect(Collectors.toList());
+      return tcontext.getInitialObjects().stream().collect(Collectors.toList());
     }
   }
 
