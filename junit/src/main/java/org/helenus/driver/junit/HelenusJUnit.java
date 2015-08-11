@@ -66,6 +66,7 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.ResultSetFuture;
+import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -1613,7 +1614,7 @@ public class HelenusJUnit implements MethodRule {
     if (classes == null) {
       return this;
     }
-    return populate(classes.iterator());
+    return truncate(classes.iterator());
   }
 
   /**
@@ -1708,6 +1709,200 @@ public class HelenusJUnit implements MethodRule {
         throw e;
       } catch (Throwable t) {
         throw new AssertionError("failed to truncate classes", t);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Executes the specified simple statements.
+   *
+   * @author paouelle
+   *
+   * @param  statements the simple statements to execute
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit execute(String... statements) {
+    if (statements == null) {
+      return this;
+    }
+    return execute(Stream.of(statements));
+  }
+
+  /**
+   * Executes the specified simple statements.
+   *
+   * @author paouelle
+   *
+   * @param  statements the simple statements to execute
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit execute(Iterable<String> statements) {
+    if (statements == null) {
+      return this;
+    }
+    return execute(statements.iterator());
+  }
+
+  /**
+   * Execute the specified simple statements
+   *
+   * @author paouelle
+   *
+   * @param  statements the simple statements to execute
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit execute(Iterator<String> statements) {
+    if (statements == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Sequence sequence = StatementBuilder.sequence();
+
+        while (statements.hasNext()) {
+          sequence.add(new SimpleStatement(statements.next()));
+        }
+        sequence.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (Throwable t) {
+        throw new AssertionError("failed to execute statements", t);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Executes the specified simple statements.
+   *
+   * @author paouelle
+   *
+   * @param  statements the simple statements to execute
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit execute(Stream<String> statements) {
+    if (statements == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        final Sequence sequence = StatementBuilder.sequence();
+
+        statements.forEach(s -> sequence.add(new SimpleStatement(s)));
+        sequence.execute();
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (Throwable t) {
+        throw new AssertionError("failed to execute statements", t);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Initializes the schema for the specified pojo classes in the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to initialize the schema
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit schema(Class<?>... classes) {
+    if (classes == null) {
+      return this;
+    }
+    return schema(Stream.of(classes));
+  }
+
+  /**
+   * Initializes the schema for the specified pojo classes in the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to initialize the schema
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit schema(Iterable<Class<?>> classes) {
+    if (classes == null) {
+      return this;
+    }
+    return schema(classes.iterator());
+  }
+
+  /**
+   * Initializes the schema for the specified pojo classes in the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to initialize the schema
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit schema(Iterator<Class<?>> classes) {
+    if (classes == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        while (classes.hasNext()) {
+          StatementBuilder.getClassInfo(classes.next());
+        }
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (Throwable t) {
+        throw new AssertionError("failed to initialize schemas", t);
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Initializes the schema for the specified pojo classes in the database.
+   *
+   * @author paouelle
+   *
+   * @param  classes the pojo classes for which to initialize the schema
+   * @return this for chaining
+   * @throws AssertionError if any error occurs
+   */
+  public HelenusJUnit schema(Stream<Class<?>> classes) {
+    if (classes == null) {
+      return this;
+    }
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        classes.forEach(c -> StatementBuilder.getClassInfo(c));
+      } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
+        throw e;
+      } catch (Throwable t) {
+        throw new AssertionError("failed to initialize schemas", t);
       } finally {
         HelenusJUnit.capturing = old; // restore previous capturing setting
       }
