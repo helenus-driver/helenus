@@ -390,7 +390,9 @@ public class HelenusJUnit implements MethodRule {
         FileUtils.deleteDirectory(dir);
       }
       DatabaseDescriptor.createAllDirectories();
-      CommitLog.instance.resetUnsafe(); // cleanup screws w/ CommitLog, this brings it back to safe state
+      // cleanup screws with CommitLog, this brings it back to safe state
+      CommitLog.instance.getContext();
+      CommitLog.instance.resetUnsafe();
     } catch (IOException e) {
       throw new AssertionError(e);
     }
