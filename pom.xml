@@ -83,14 +83,14 @@
     <java-version>1.8</java-version>
     <log4j2-version>2.2</log4j2-version>
     <log4j-version>1.2.17</log4j-version>
-    <commons-lang3-version>3.3.2</commons-lang3-version>
-    <commons-collections-version>4.0</commons-collections-version>
+    <commons-lang3-version>3.4</commons-lang3-version>
+    <commons-collections4-version>4.0</commons-collections4-version>
     <commons-cli-version>1.2</commons-cli-version>
     <commons-codec-version>1.10</commons-codec-version>
     <commons-io-version>2.4</commons-io-version>
-    <reflections-version>0.9.9</reflections-version>
-    <lombok-version>1.16.2</lombok-version>
-    <fasterxml-jackson-version>2.5.1</fasterxml-jackson-version>
+    <reflections-version>0.9.10</reflections-version>
+    <lombok-version>1.16.4</lombok-version>
+    <fasterxml-jackson-version>2.6.1</fasterxml-jackson-version>
     <cassandra-version>2.1.6</cassandra-version>
     <glassfish-version>1.0.4</glassfish-version>
     <tomcat-version>8.0.24</tomcat-version>
@@ -293,7 +293,7 @@
       <dependency>
 	<groupId>org.apache.commons</groupId>
 	<artifactId>commons-collections4</artifactId>
-	<version>${commons-collections-version}</version>
+	<version>${commons-collections4-version}</version>
       </dependency>
       <dependency>
 	<groupId>commons-cli</groupId>
