@@ -89,7 +89,7 @@ public class SequenceImpl
    *
    * @author paouelle
    */
-  private final List<ERunnable<?>> errorHandlers;
+  private final LinkedList<ERunnable<?>> errorHandlers;
 
   /**
    * Instantiates a new <code>SequenceImpl</code> object.
@@ -420,7 +420,8 @@ public class SequenceImpl
   @Override
   public Sequence addErrorHandler(ERunnable<?> run) {
     org.apache.commons.lang3.Validate.notNull(run, "invalid null error handler");
-    errorHandlers.add(run);
+    // add at the beginning of the list to ensure reverse order when running them
+    errorHandlers.addFirst(run);
     return this;
   }
 

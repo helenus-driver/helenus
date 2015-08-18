@@ -89,7 +89,7 @@ public class BatchImpl
    *
    * @author paouelle
    */
-  private final List<ERunnable<?>> errorHandlers;
+  private final LinkedList<ERunnable<?>> errorHandlers;
 
   /**
    * Flag indicating if batches were added to this batch.
@@ -544,7 +544,8 @@ public class BatchImpl
   @Override
   public Batch addErrorHandler(ERunnable<?> run) {
     org.apache.commons.lang3.Validate.notNull(run, "invalid null error handler");
-    errorHandlers.add(run);
+    // add at the beginning of the list to ensure reverse order when running them
+    errorHandlers.addFirst(run);
     return this;
   }
 
