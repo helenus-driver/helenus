@@ -45,6 +45,7 @@ import com.datastax.driver.core.querybuilder.BindMarker;
 import com.datastax.driver.core.utils.Bytes;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
+import org.helenus.driver.Keywords;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.UDTEntity;
@@ -466,7 +467,7 @@ public abstract class Utils {
     name = name.trim();
     // FIXME: checking for token( specifically is uber ugly, we'll need some
     // better solution.
-    if (cnamePattern.matcher(name).matches()
+    if ((cnamePattern.matcher(name).matches() && !Keywords.isReserved(name))
         || name.startsWith("\"")
         || name.startsWith("token(")
         // | is used when a select statement requires searching multiple keyspaces
