@@ -50,6 +50,7 @@ import com.datastax.driver.core.UDTValue;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ObjectConversionException;
+import org.helenus.driver.ObjectNotFoundException;
 import org.helenus.driver.StatementManager;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
@@ -134,7 +135,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *
      * @return the non-<code>null</code> keyspace name associated with this
      *         context
-     * @throws IllegalArgumentException if unable to compute the keyspace name
+     * @throws ObjectNotFoundException if unable to compute the keyspace name
      *         based on provided suffixes
      * @throws ExcludedSuffixKeyException if the context defines a suffix value
      *         which is marked as excluded for a given suffix key
@@ -154,9 +155,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           final String key = skey.name();
           final Object value = suffixes.get(key);
 
-          org.apache.commons.lang3.Validate.isTrue(
-            value != null, "missing suffix key '%s'", key
-          );
+          if (value == null) {
+            throw new ObjectNotFoundException(
+              getObjectClass(), "missing suffix key '" + key + "'"
+            );
+          }
           if (ArrayUtils.contains(skey.exclude(), value)) {
             throw new ExcludedSuffixKeyException(
               "excluded suffix key '" + key + "' value '" + value + "' for object class: "
@@ -174,10 +177,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           name += '_' + svalue;
         }
       }
-      org.apache.commons.lang3.Validate.isTrue(
-        !name.isEmpty(),
-        "invalid empty keyspace name"
-      );
+      if (name.isEmpty()) {
+        throw new ObjectNotFoundException(
+          getObjectClass(), "invalid empty keyspace name"
+        );
+      }
       // replaces all non-alphanumeric and non underscores with underscores
       // to comply with Cassandra
       return name.replaceAll("[^a-zA-Z0-9_]", "_").toLowerCase();
