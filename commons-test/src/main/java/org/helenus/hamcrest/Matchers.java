@@ -18,6 +18,8 @@ package org.helenus.hamcrest;
 import java.util.Objects;
 import java.util.function.Function;
 
+import mockit.Deencapsulation;
+
 import org.hamcrest.Description;
 import org.hamcrest.DiagnosingMatcher;
 import org.hamcrest.Matcher;
@@ -166,6 +168,41 @@ public class Matchers {
           .appendText(String.valueOf(epsilon))
           .appendText(" to ")
           .appendValue(os);
+      }
+    };
+  }
+
+  /**
+   * Retrieves a field from the matched object and starts matching this new
+   * object with the specified matcher.
+   *
+   * @author paouelle
+   *
+   * @param  field the name of the field to retrieve from the object currently
+   *         being matched
+   * @param  matcher the matcher to use for the retrieved object from the field
+   * @return the corresponding matcher
+   */
+  public static <T, S> Matcher<T> fieldEqualTo(String field, Matcher<S> matcher) {
+    return new DiagnosingMatcher<T>() {
+      @SuppressWarnings("unchecked")
+      @Override
+      public boolean matches(java.lang.Object obj, Description mismatch) {
+        final S s = Deencapsulation.getField(obj,  field);
+
+        if (!matcher.matches(s)) {
+          matcher.describeMismatch(s, mismatch);
+          return false;
+        }
+        return true;
+      }
+      @Override
+      public void describeTo(Description description) {
+        description
+          .appendText("field '")
+          .appendText(field)
+          .appendText("' ")
+          .appendDescriptionOf(matcher);
       }
     };
   }
