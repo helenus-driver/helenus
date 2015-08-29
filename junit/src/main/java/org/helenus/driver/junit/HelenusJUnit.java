@@ -95,6 +95,7 @@ import org.helenus.driver.info.RootClassInfo;
 import org.helenus.driver.info.TypeClassInfo;
 import org.helenus.driver.junit.util.ReflectionJUnitUtils;
 import org.helenus.driver.junit.util.Strings;
+import org.helenus.util.function.ERunnable;
 import org.junit.rules.MethodRule;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
@@ -1972,6 +1973,32 @@ public class HelenusJUnit implements MethodRule {
   public HelenusJUnit withoutCapture() {
     synchronized (HelenusJUnit.class) {
       HelenusJUnit.captures.forEach(cl -> cl.stop());
+    }
+    return this;
+  }
+
+  /**
+   * Executes a command while disabling all capture lists.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param <E> the type of exceptions that can be thrown out
+   *
+   * @param  cmd the command to execute while capturing is inhibited
+   * @return this for chaining
+   * @throws E if thrown by the handle consumer
+   */
+  public <E extends Throwable> HelenusJUnit inhibitCapturing(ERunnable<E> cmd)
+    throws E {
+    synchronized (HelenusJUnit.class) {
+      final boolean old = HelenusJUnit.capturing;
+
+      try {
+        HelenusJUnit.capturing = false; // disable temporarily capturing
+        cmd.run();
+      } finally {
+        HelenusJUnit.capturing = old; // restore previous capturing setting
+      }
     }
     return this;
   }
