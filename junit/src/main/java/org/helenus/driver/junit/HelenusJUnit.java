@@ -1980,13 +1980,13 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Executes a command while disabling all capture lists.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param <E> the type of exceptions that can be thrown out
    *
    * @param  cmd the command to execute while capturing is inhibited
    * @return this for chaining
-   * @throws E if thrown by the handle consumer
+   * @throws E if thrown by the command
    */
   public <E extends Throwable> HelenusJUnit inhibitCapturing(ERunnable<E> cmd)
     throws E {
@@ -2091,10 +2091,9 @@ public class HelenusJUnit implements MethodRule {
     @Override
     protected void executing(StatementImpl<?, ?, ?> statement) {
       synchronized (HelenusJUnit.class) {
-        if (!HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // not capturing
-          return;
+        if (HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // capturing
+          HelenusJUnit.captures.forEach(l -> l.executing(statement));
         }
-        HelenusJUnit.captures.forEach(l -> l.executing(statement));
       }
     }
 
@@ -2110,7 +2109,9 @@ public class HelenusJUnit implements MethodRule {
       StatementImpl<?, ?, ?> statement, ResultSetFuture future
     ) {
       synchronized (HelenusJUnit.class) {
-        HelenusJUnit.sent.forEach(c -> c.accept(statement));
+        if (HelenusJUnit.capturing) { // capturing
+          HelenusJUnit.sent.forEach(c -> c.accept(statement));
+        }
       }
       return future;
     }
