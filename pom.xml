@@ -89,7 +89,7 @@
     <commons-codec-version>1.10</commons-codec-version>
     <commons-io-version>2.4</commons-io-version>
     <reflections-version>0.9.10</reflections-version>
-    <lombok-version>1.16.4</lombok-version>
+    <lombok-version>1.16.6</lombok-version>
     <fasterxml-jackson-version>2.6.1</fasterxml-jackson-version>
     <cassandra-version>2.1.6</cassandra-version>
     <glassfish-version>1.0.4</glassfish-version>
