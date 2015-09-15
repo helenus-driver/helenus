@@ -139,8 +139,9 @@ public class StatementCaptureList<T extends GenericStatement> {
       final Stream<? extends GenericStatement> s;
 
       // handle batch and sequences by capturing all internal statements
-      if (statement instanceof ParentStatementImpl) {
-        s = ((ParentStatementImpl)statement).objectStatements();
+      // cast to StatementImpl required to compile on cmdline
+      if (((StatementImpl)statement) instanceof ParentStatementImpl) {
+        s = ((ParentStatementImpl)((StatementImpl)statement)).objectStatements();
       } else {
         s = Stream.of(statement);
       }

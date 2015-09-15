@@ -256,8 +256,10 @@ public class SequenceImpl
   public Stream<ObjectStatement<?>> objectStatements() {
     return statements.stream()
       .flatMap(s -> {
-        if (s instanceof ParentStatementImpl) {
-          return ((ParentStatementImpl)s).objectStatements();
+        final StatementImpl si = s; // required to make sure it compiles on cmdline
+
+        if (si instanceof ParentStatementImpl) {
+          return ((ParentStatementImpl)si).objectStatements();
         } else if (s instanceof ObjectStatement) {
           return Stream.of((ObjectStatement<?>)(ObjectStatement)s); // typecast is required for cmd line compilation
         } else {
@@ -273,12 +275,15 @@ public class SequenceImpl
    *
    * @see org.helenus.driver.impl.ParentStatementImpl#statements()
    */
+  @SuppressWarnings("rawtypes")
   @Override
   public Stream<GenericStatement<?, ?>> statements() {
     return Stream.concat(Stream.of(this), statements.stream()
       .flatMap(s -> {
-        if (s instanceof ParentStatementImpl) {
-          return ((ParentStatementImpl)s).statements();
+        final StatementImpl si = s; // required to make sure it compiles on cmdline
+
+        if (si instanceof ParentStatementImpl) {
+          return ((ParentStatementImpl)si).statements();
         }
         return Stream.of(s);
       }));
