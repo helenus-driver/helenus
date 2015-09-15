@@ -89,6 +89,9 @@ public class CreateSchemaImpl<T>
    *         <code>null</code> if nothing to be done
    */
   StringBuilder[] buildQueryStrings(Set<Keyspace> keyspaces) {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders
       = new ArrayList<>(getContext().getClassInfo().getTables().size() + 2);
     final CreateTypeImpl<T> cy;

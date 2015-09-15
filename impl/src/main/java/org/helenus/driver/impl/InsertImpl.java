@@ -244,6 +244,9 @@ public class InsertImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
 
     for (final TableInfoImpl<T> table: tables) {
@@ -290,8 +293,8 @@ public class InsertImpl<T>
    */
   @Override
   protected VoidFuture executeAsync0() {
-    // if we have no conditions then no need for special treatment of the response
-    if (!ifNotExists) {
+    // if we are disabled or have no conditions then no need for special treatment of the response
+    if (!isEnabled() || !ifNotExists) {
       return super.executeAsync0();
     }
     return bridge.newVoidFuture(executeAsyncRaw0(), new VoidFuture.PostProcessor() {
@@ -472,6 +475,11 @@ public class InsertImpl<T>
      * @return <code>i</code>
      */
     private InsertImpl<T> init(InsertImpl<T> i) {
+      if (isEnabled()) {
+        i.enable();
+      } else {
+        i.disable();
+      }
       if (getConsistencyLevel() != null) {
         i.setConsistencyLevel(getConsistencyLevel());
       }

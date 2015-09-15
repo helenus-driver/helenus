@@ -69,6 +69,39 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
   public String getKeyspace();
 
   /**
+   * Enables this statement.
+   *
+   * @author paouelle
+   *
+   * @return this {@code GenericStatement} object
+   */
+  public GenericStatement<R, F> enable();
+
+  /**
+   * Disables this statement.
+   * <p>
+   * By default (that is unless you call this method), a statement is enabled.
+   * <p>
+   * A disabled statement's execution is bypassed resulting in a void or empty
+   * result set. If added to a {@link Group}, it is simply skipped.
+   *
+   * @author paouelle
+   *
+   * @return this for chaining
+   */
+  public GenericStatement<R, F> disable();
+
+  /**
+   * Checks whether this statement is enabled or not.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this statement is enabled, <code>false</code>
+   *         otherwise.
+   */
+  public boolean isEnabled();
+
+  /**
    * Sets the consistency level for the statement.
    *
    * @author paouelle

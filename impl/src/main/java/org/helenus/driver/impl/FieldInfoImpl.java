@@ -562,6 +562,13 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         field.getName()
       );
       org.apache.commons.lang3.Validate.isTrue(
+        !(isTypeKey() && !isMandatory()),
+        "field in table '%s' must be annotated with @Mandatory if it is annotated with @TypeKey: %s.%s",
+        tname,
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
         !(isTypeKey() && !String.class.equals(getType())),
         "field in table '%s' must be a String if it is annotated with @TypeKey: %s.%s",
         tname,

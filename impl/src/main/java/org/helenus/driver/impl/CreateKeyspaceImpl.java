@@ -89,6 +89,9 @@ public class CreateKeyspaceImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     return new StringBuilder[] { buildQueryString() };
   }
 
@@ -102,6 +105,9 @@ public class CreateKeyspaceImpl<T>
   @SuppressWarnings("synthetic-access")
   @Override
   protected StringBuilder buildQueryString() {
+    if (!isEnabled()) {
+      return null;
+    }
     final StringBuilder builder = new StringBuilder();
 
     builder.append("CREATE KEYSPACE ");

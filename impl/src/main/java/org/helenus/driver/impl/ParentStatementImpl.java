@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.helenus.driver.GenericStatement;
+import org.helenus.driver.Group;
 import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.Recorder;
 
@@ -33,7 +34,7 @@ import org.helenus.driver.Recorder;
  *
  * @since 1.0
  */
-public interface ParentStatementImpl {
+public interface ParentStatementImpl extends Group {
   /**
    * Sets the parent for this statement.
    *
@@ -44,17 +45,13 @@ public interface ParentStatementImpl {
   public void setParent(ParentStatementImpl parent);
 
   /**
-   * Gets the recorder registered with this parent statement or with a parent
-   * if any.
-   * <p>
-   * <i>Note:</i> A parent is another parent statement to which this one was
-   * added.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return the recorder registered with this parent statement (or one of its
-   *         parent) or empty if none was registered at the time of creation
+   * @see org.helenus.driver.Group#getRecorder()
    */
+  @Override
   public Optional<Recorder> getRecorder();
 
   /**
@@ -63,8 +60,9 @@ public interface ParentStatementImpl {
    * @author paouelle
    *
    * @param statement the non-<code>null</code> object statement that was recorded
+   * @param group the non-<code>null</code> group where the statement was defined
    */
-  public void recorded(ObjectStatement<?> statement);
+  public void recorded(ObjectStatement<?> statement, Group group);
 
   /**
    * Gets all object statements contained recursively in this parent statement.

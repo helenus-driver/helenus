@@ -237,6 +237,9 @@ public class CreateTableImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders = tables.stream()
       .map(t -> buildQueryStrings(t))
       .filter(bs -> bs != null)

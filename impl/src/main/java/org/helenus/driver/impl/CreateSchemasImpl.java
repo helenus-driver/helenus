@@ -354,6 +354,9 @@ public class CreateSchemasImpl
   @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     // we do not want to create the same keyspace so many times for nothing
     final List<ClassInfoImpl<?>.Context> contexts = getContexts();
     final List<StringBuilder> builders = new ArrayList<>(contexts.size() * 2);

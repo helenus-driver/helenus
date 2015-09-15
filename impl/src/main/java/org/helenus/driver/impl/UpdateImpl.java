@@ -538,6 +538,9 @@ public class UpdateImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
 
     for (final TableInfoImpl<T> table: tables) {

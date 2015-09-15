@@ -221,6 +221,42 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#enable()
+   */
+  @Override
+  public GenericStatement<R, F> enable() {
+    return statement.enable();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#disable()
+   */
+  @Override
+  public GenericStatement<R, F> disable() {
+    return statement.disable();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#isEnabled()
+   */
+  @Override
+  public boolean isEnabled() {
+    return statement.isEnabled();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#setConsistencyLevel(com.datastax.driver.core.ConsistencyLevel)
    */
   @Override

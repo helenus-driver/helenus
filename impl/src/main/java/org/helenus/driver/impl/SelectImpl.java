@@ -247,6 +247,9 @@ public class SelectImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     return new StringBuilder[] { buildQueryString() };
   }
 
@@ -260,6 +263,9 @@ public class SelectImpl<T>
   @Override
   @SuppressWarnings("synthetic-access")
   protected StringBuilder buildQueryString() {
+    if (!isEnabled()) {
+      return null;
+    }
     final StringBuilder builder = new StringBuilder();
 
     builder.append("SELECT ");
@@ -352,7 +358,8 @@ public class SelectImpl<T>
    */
   @Override
   protected ResultSetFuture executeAsyncRaw0() {
-    if (suffixes == null) {
+    // if we are disabled or have no suffixes then no need for special treatment of the response
+    if (!isEnabled() || (suffixes == null)) {
       return super.executeAsyncRaw0();
     }
     return new CompoundResultSetFuture(
@@ -373,7 +380,8 @@ public class SelectImpl<T>
    */
   @Override
   public ObjectSetFuture<T> executeAsync0() {
-    if (suffixes == null) {
+    // if we are disabled or have no suffixes then no need for special treatment of the response
+    if (!isEnabled() || (suffixes == null)) {
       return super.executeAsync0();
     }
     return new CompoundObjectSetFuture<>(

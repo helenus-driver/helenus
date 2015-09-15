@@ -186,15 +186,23 @@ public class StatementCaptureList<T extends GenericStatement> {
    */
   public StatementCaptureList<T> dump(Logger logger, Level level) {
     if (logger.isEnabled(level)) {
+      final int s = size();
+
       logger.log(level, "");
       logger.log(level, "%20s = %s", "Created at", created);
       logger.log(level, "%20s = %s", "Statement class", clazz.getSimpleName());
-      logger.log(level, "%20s = %d", "Size", list.size());
+      if (s == list.size()) {
+        logger.log(level, "%20s = %d", "Size", s);
+      } else {
+        logger.log(level, "%20s = %d (Collected: %d)", "Size", s, list.size());
+      }
       logger.log(level, "%20s:", "Content");
-      for (int i = 0; i < list.size();i++) {
-        final GenericStatement s = list.get(i);
+      int j = -1;
 
-        logger.log(level, "%20s = %10s -> %s", "[" + i + "]", StatementCaptureList.getType(s), s);
+      for (final GenericStatement gs: list) {
+        if (gs.isEnabled()) {
+          logger.log(level, "%20s = %10s -> %s", "[" + (++j) + "]", StatementCaptureList.getType(gs), gs);
+        }
       }
     }
     return this;
@@ -208,7 +216,7 @@ public class StatementCaptureList<T extends GenericStatement> {
    * @return the number of statements captured
    */
   public int size() {
-    return list.size();
+    return (int)list.stream().filter(GenericStatement::isEnabled).count();
   }
 
   /**
@@ -220,7 +228,7 @@ public class StatementCaptureList<T extends GenericStatement> {
    *         <code>false</code> otherwise
    */
   public boolean isEmpty() {
-    return list.isEmpty();
+    return size() == 0;
   }
 
   /**
@@ -326,16 +334,20 @@ public class StatementCaptureList<T extends GenericStatement> {
    */
   @SuppressWarnings("unchecked")
   public T on(int i) {
-    if (list.size() <= i) {
-      throw new AssertionError(
-        "not enough captured statements; only "
-        + list.size()
-        + " statements were captured and at least "
-        + (i + 1)
-        + " was expected"
-      );
+    int j = -1;
+
+    for (final GenericStatement<?, ?> s: list) {
+      if (s.isEnabled() && (++j == i)) {
+        return (T)s;
+      }
     }
-    return (T)list.get(0);
+    throw new AssertionError(
+      "not enough captured statements; only "
+      + (j + 1)
+      + " statements were captured and at least "
+      + (i + 1)
+      + " was expected"
+    );
   }
 
   /**

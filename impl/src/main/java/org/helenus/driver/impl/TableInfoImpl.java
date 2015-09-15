@@ -350,7 +350,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           multiKeyColumns.put(field.getColumnName(), field);
           multiKeyColumnsList.add(field);
         }
-      } else if (!field.isTypeKey()) {
+      } else {
         if (field.isIndex()) {
           indexColumns.put(field.getColumnName(), field);
         }

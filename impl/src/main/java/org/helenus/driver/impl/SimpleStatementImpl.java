@@ -103,6 +103,9 @@ public class SimpleStatementImpl
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     return new StringBuilder[] { new StringBuilder(query) };
   }
 
@@ -115,6 +118,9 @@ public class SimpleStatementImpl
    */
   @Override
   public String getQueryString() {
+    if (!isEnabled()) {
+      return null;
+    }
     return query;
   }
 

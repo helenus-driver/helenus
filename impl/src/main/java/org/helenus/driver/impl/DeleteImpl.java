@@ -82,6 +82,13 @@ public class DeleteImpl<T>
   private final OptionsImpl<T> usings;
 
   /**
+   * Holds a flag indicating if the "IF EXISTS" condition has been selected.
+   *
+   * @author paouelle
+   */
+  private boolean ifExists = false;
+
+  /**
    * Flag to keep track of whether or not the special * has been selected.
    *
    * @author paouelle
@@ -403,6 +410,9 @@ public class DeleteImpl<T>
         Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
       }
     }
+    if (ifExists) {
+      builder.append(" IF EXISTS");
+    }
     builders.add(builder);
   }
 
@@ -415,6 +425,9 @@ public class DeleteImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
 
     for (final TableInfoImpl<T> table: tables) {
@@ -484,6 +497,22 @@ public class DeleteImpl<T>
   @Override
   public Options<T> using(Using using) {
     return usings.and(using);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Delete#ifExists()
+   */
+  @Override
+  public Delete<T> ifExists() {
+    if (!ifExists) {
+      setDirty();
+      this.ifExists = true;
+    }
+    return this;
   }
 
   /**
@@ -597,6 +626,18 @@ public class DeleteImpl<T>
     @Override
     public Options<T> using(Using using) {
       return statement.using(using);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Delete.Where#ifExists()
+     */
+    @Override
+    public Delete<T> ifExists() {
+      return statement.ifExists();
     }
   }
 

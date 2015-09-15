@@ -2090,9 +2090,11 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected void executing(StatementImpl<?, ?, ?> statement) {
-      synchronized (HelenusJUnit.class) {
-        if (HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // capturing
-          HelenusJUnit.captures.forEach(l -> l.executing(statement));
+      if (statement.isEnabled()) {
+        synchronized (HelenusJUnit.class) {
+          if (HelenusJUnit.capturing || HelenusJUnit.captures.isEmpty()) { // capturing
+            HelenusJUnit.captures.forEach(l -> l.executing(statement));
+          }
         }
       }
     }

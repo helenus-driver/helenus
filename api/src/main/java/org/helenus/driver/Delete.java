@@ -79,6 +79,23 @@ public interface Delete<T>
   public Options<T> using(Using using);
 
   /**
+   * Sets the 'IF EXISTS' option for this DELETE statement.
+   * <p>
+   * A delete with that option will report whether the statement actually
+   * resulted in data being deleted. The existence check and deletion are
+   * done transactionally in the sense that if multiple clients attempt to
+   * delete a given row with this option, then at most one may succeed.
+   * <p>
+   * Please keep in mind that using this option has a non negligible
+   * performance impact and should be avoided when possible.
+   *
+   * @author paouelle
+   *
+   * @return this DELETE statement.
+   */
+  public Delete<T> ifExists();
+
+  /**
    * The <code>Where</code> interface defines WHERE clause for a DELETE statement.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
@@ -113,6 +130,24 @@ public interface Delete<T>
      * @return the options of the DELETE statement this WHERE clause is part of.
      */
     public Options<T> using(Using using);
+
+    /**
+     * Sets the 'IF EXISTS' option for the DELETE statement this WHERE clause
+     * is part of.
+     * <p>
+     * A delete with that option will report whether the statement actually
+     * resulted in data being deleted. The existence check and deletion are
+     * done transactionally in the sense that if multiple clients attempt to
+     * delete a given row with this option, then at most one may succeed.
+     * <p>
+     * Please keep in mind that using this option has a non negligible
+     * performance impact and should be avoided when possible.
+     *
+     * @author paouelle
+     *
+     * @return the DELETE statement this WHERE clause is part of.
+     */
+    public Delete<T> ifExists();
   }
 
   /**

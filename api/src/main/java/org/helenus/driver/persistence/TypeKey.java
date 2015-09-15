@@ -28,7 +28,7 @@ import org.helenus.annotation.Keyable;
  * a root element base class to hold the type of the pojo. It is used such that
  * it be persisted to Cassandra. Such a column can also be mark as a partition
  * or clustering key. However, the field annotated with {@link TypeKey} must be
- * of type {@link String}.
+ * of type {@link String} and annotated as {@link Mandatory}.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *

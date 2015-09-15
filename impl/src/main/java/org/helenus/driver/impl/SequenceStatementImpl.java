@@ -187,6 +187,9 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
    */
   @Override
   protected ResultSetFuture executeAsyncRaw0() {
+    if (!isEnabled()) {
+      return new EmptyResultSetFuture(mgr);
+    }
     try {
       final StringBuilder[] queries = getQueryStrings();
 

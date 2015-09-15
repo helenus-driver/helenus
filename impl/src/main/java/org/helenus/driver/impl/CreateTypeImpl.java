@@ -127,6 +127,9 @@ public class CreateTypeImpl<T>
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     // by design, there should only be one table!!!
     final List<StringBuilder> builders = ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
       .map(t -> buildQueryStrings(t))

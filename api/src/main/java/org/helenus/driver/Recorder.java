@@ -48,8 +48,9 @@ public interface Recorder {
    * @author paouelle
    *
    * @param  statement the non-<code>null</code> object statement recorded
+   * @param  group the non-<code>null</code> group where the statement was defined
    * @throws ObjectValidationException if the statement's POJO is validated and
    *         that validation fails
    */
-  public void recorded(ObjectStatement<?> statement);
+  public void recorded(ObjectStatement<?> statement, Group group);
 }

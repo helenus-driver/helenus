@@ -160,6 +160,13 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   private volatile ConsistencyLevel consistency;
 
   /**
+   * Holds a flag indicating if this statement is enabled or not.
+   *
+   * @author paouelle
+   */
+  private volatile boolean enabled = true;
+
+  /**
    * Holds the serial consistency level for this statement.
    *
    * @author paouelle
@@ -309,6 +316,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.context = statement.context;
     this.pojoContext = statement.pojoContext;
     this.keyspace = statement.keyspace;
+    this.enabled = statement.enabled;
     this.consistency = statement.consistency;
     this.serialConsistency = statement.serialConsistency;
     this.traceQuery = statement.traceQuery;
@@ -339,6 +347,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.context = context;
     this.pojoContext = null;
     this.keyspace = statement.keyspace;
+    this.enabled = statement.enabled;
     this.consistency = statement.consistency;
     this.serialConsistency = statement.serialConsistency;
     this.traceQuery = statement.traceQuery;
@@ -397,6 +406,9 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @SuppressWarnings("cast")
   protected StringBuilder buildQueryString() {
+    if (!enabled) {
+      return null;
+    }
     final StringBuilder[] builders = buildQueryStrings();
 
     if ((builders == null) || (builders.length == 0)) {
@@ -564,6 +576,9 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    *         for execution
    */
   protected ResultSetFuture executeAsyncRaw0() {
+    if (!enabled) {
+      return new EmptyResultSetFuture(mgr);
+    }
     final String query = getQueryString();
 
     try {
@@ -681,6 +696,46 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
       this.keyspace = context.getKeyspace();
     }
     return keyspace;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#enable()
+   */
+  @Override
+  public GenericStatement<R, F> enable() {
+    this.enabled = true;
+    setDirty();
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#disable()
+   */
+  @Override
+  public GenericStatement<R, F> disable() {
+    this.enabled = false;
+    setDirty();
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#isEnabled()
+   */
+  @Override
+  public boolean isEnabled() {
+    return enabled;
   }
 
   /**
@@ -836,6 +891,9 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public String getQueryString() {
+    if (!enabled) {
+      return null;
+    }
     if (dirty || (cache == null)) {
       final StringBuilder sb = buildQueryString();
 
@@ -947,7 +1005,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @see java.lang.Object#toString()
    */
   @Override
-  public String toString() {
+  public final String toString() {
     return StringUtils.defaultString(getQueryString());
   }
 }

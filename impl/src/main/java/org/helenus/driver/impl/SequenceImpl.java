@@ -155,6 +155,9 @@ public class SequenceImpl
   @SuppressWarnings("cast")
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders = new ArrayList<>(statements.size());
 
     for (final StatementImpl<?, ?, ?> s: statements) {
@@ -165,8 +168,8 @@ public class SequenceImpl
       //        [ERROR] required: com.github.helenusdriver.driver.Batch
       //        [ERROR] found:    com.github.helenusdriver.driver.impl.StatementImpl<capture#1 of ?,capture#2 of ?,capture#3 of ?>
       if (((Object)s) instanceof Batch) {
-        // do not do batch using the batched statements as we still want
-        // to deal with the batch statement as a single statement
+        // do not do sequence using the individual batched statements as we
+        // still want to deal with the batch statement as a single statement
         final StringBuilder sb = s.buildQueryString();
 
         if (sb != null) {
@@ -222,22 +225,22 @@ public class SequenceImpl
   /**
    * {@inheritDoc}
    *
-   * @author paouelle
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
    *
-   * @see org.helenus.driver.impl.ParentStatementImpl#recorded(org.helenus.driver.ObjectStatement)
+   * @see org.helenus.driver.impl.ParentStatementImpl#recorded(org.helenus.driver.ObjectStatement, org.helenus.driver.Group)
    */
   @Override
-  public void recorded(ObjectStatement<?> statement) {
+  public void recorded(ObjectStatement<?> statement, Group group) {
     if (statement.getObject() == null) { // not associated with a single POJO so skip it
       return;
     }
     // start by notifying the registered recorder
-    recorder.ifPresent(r -> r.recorded(statement));
+    recorder.ifPresent(r -> r.recorded(statement, group));
     // now notify our parent if any
     final ParentStatementImpl p = parent;
 
     if (p != null) {
-      p.recorded(statement);
+      p.recorded(statement, group);
     }
   }
 
@@ -375,9 +378,9 @@ public class SequenceImpl
 
       ps.setParent(this); // set us as their parent going forward
       // now recurse all contained object statements for the parent and report them as recorded
-      ps.objectStatements().forEach(cs -> recorded(cs));
+      ps.objectStatements().forEach(cs -> recorded(cs, ps));
     } else if (statement instanceof ObjectStatement) {
-      recorded((ObjectStatement<?>)statement);
+      recorded((ObjectStatement<?>)statement, this);
     }
     setDirty();
     return this;

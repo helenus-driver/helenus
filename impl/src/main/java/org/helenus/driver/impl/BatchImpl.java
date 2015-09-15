@@ -189,7 +189,7 @@ public class BatchImpl
    * @param b the non-<code>null</code> batch statement to duplicate
    */
   private BatchImpl(BatchImpl b, Optional<Recorder> recorder) {
-    super(Void.class, (String)null, b.mgr, b.bridge);
+    super(b);
     this.statements = new ArrayList<>(b.statements);
     this.logged = b.logged;
     this.recorder = recorder;
@@ -206,6 +206,9 @@ public class BatchImpl
    */
   @Override
   protected StringBuilder[] buildQueryStrings() {
+    if (!isEnabled()) {
+      return null;
+    }
     final List<StringBuilder> builders = new ArrayList<>(statements.size());
 
     for (final StatementImpl<?, ?, ?> statement: statements) {
@@ -302,22 +305,22 @@ public class BatchImpl
   /**
    * {@inheritDoc}
    *
-   * @author paouelle
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
    *
-   * @see org.helenus.driver.impl.ParentStatementImpl#recorded(org.helenus.driver.ObjectStatement)
+   * @see org.helenus.driver.impl.ParentStatementImpl#recorded(org.helenus.driver.ObjectStatement, org.helenus.driver.Group)
    */
   @Override
-  public void recorded(ObjectStatement<?> statement) {
+  public void recorded(ObjectStatement<?> statement, Group group) {
     if (statement.getObject() == null) { // not associated with a single POJO so skip it
       return;
     }
     // start by notifying the registered recorder
-    recorder.ifPresent(r ->  r.recorded(statement));
+    recorder.ifPresent(r ->  r.recorded(statement, group));
     // now notify our parent if any
     final ParentStatementImpl p = parent;
 
     if (p != null) {
-      p.recorded(statement);
+      p.recorded(statement, group);
     }
   }
 
@@ -503,9 +506,9 @@ public class BatchImpl
       bs.setParent(this); // set us as their parent going forward
       this.includesBatches = true;
       // now recurse all contained object statements for the batch and report them as recorded
-      bs.objectStatements().forEach(cs -> recorded(cs));
+      bs.objectStatements().forEach(cs -> recorded(cs, bs));
     } else if (s instanceof ObjectStatement) {
-      recorded((ObjectStatement<?>)s);
+      recorded((ObjectStatement<?>)s, this);
     }
     this.statements.add(s);
     setDirty();
