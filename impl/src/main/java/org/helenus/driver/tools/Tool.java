@@ -36,6 +36,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -878,7 +879,6 @@ public class Tool {
    *         specified packages
    * @throws IOException if an I/O error occurs while generating the Json schemas
    */
-  @SuppressWarnings({"cast", "unchecked", "rawtypes"})
   private static void createJsonSchemasFromPackages(
     String[] pkgs,
     Map<String, String> suffixes,
@@ -889,7 +889,7 @@ public class Tool {
       if (pkg == null) {
         continue;
       }
-      Collection<Class<?>> classes;
+      Set<Class<?>> classes;
 
       try {
         final CreateSchemas cs
@@ -908,7 +908,7 @@ public class Tool {
       } catch (IllegalArgumentException e) { // ignore and continue with package only
         final Reflections reflections = new Reflections(pkg, new SubTypesScanner(false));
 
-        classes = (Collection<Class<?>>)(Collection)reflections.getAllTypes().stream()
+        classes = reflections.getAllTypes().stream()
           .map(n -> {
             try {
               return Class.forName(n);
@@ -917,7 +917,9 @@ public class Tool {
             }
           })
           .filter(c -> c != null)
-          .collect(Collectors.toList());
+          .collect(Collectors.toSet());
+        // make sure to also cover enums
+        classes.addAll(reflections.getSubTypesOf(Enum.class));
       }
       for (final Class<?> c: classes) {
         System.out.println(
