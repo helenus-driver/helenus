@@ -1199,7 +1199,6 @@ public class Tool {
         cnames[i] = null; // clear since we found a class
         final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
 
-        System.out.println("*** INITIALS FOUND: " + initials);
         if (initials.isEmpty()) {
           System.out.println(
             Tool.class.getSimpleName()
@@ -1209,7 +1208,7 @@ public class Tool {
           continue;
         }
         initials.forEach((m, ios) -> {
-          classes.add(ios.getClass());
+          classes.add(clazz);
           if (!no_dependents) {
             final DirectedGraph.Node<Class<?>> node = classes.get(clazz);
 
