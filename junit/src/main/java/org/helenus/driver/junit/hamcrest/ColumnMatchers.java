@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -603,7 +604,22 @@ class AreColumnsEqual<T> extends DiagnosingMatcher<T> {
       final Object eval = field.get(expected);
       final boolean matched;
 
-      if (epsilon != null) {
+      if ((ival instanceof Optional) || (eval instanceof Optional)) {
+        // make sure that both are optional and then dereference them to properly
+        // handle the equality of their content
+        if (!(ival instanceof Optional) || !(eval instanceof Optional)) {
+          matched = false;
+        } else {
+          final Object ioval = ((Optional<?>)ival).orElse(null);
+          final Object eoval = ((Optional<?>)eval).orElse(null);
+
+          if (epsilon != null) {
+            matched = org.helenus.util.Objects.deepEquals(ioval, eoval, epsilon);
+          } else {
+            matched = Objects.deepEquals(ioval, eoval);
+          }
+        }
+      } else if (epsilon != null) {
         matched = org.helenus.util.Objects.deepEquals(ival, eval, epsilon);
       } else {
         matched = Objects.deepEquals(ival, eval);
