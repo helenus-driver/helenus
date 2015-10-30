@@ -61,7 +61,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
-import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 
 import org.helenus.commons.cli.RunnableFirstOption;
 import org.helenus.commons.cli.RunnableOption;
@@ -85,6 +84,7 @@ import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.persistence.InitialObjects;
+import org.helenus.jackson.jsonSchema.customProperties.JsonAnnotationSchemaFactoryWrapper;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 
@@ -172,7 +172,7 @@ public class Tool {
       };
 
   /**
-   * Holds the schemas creation action.
+   * Holds the json schemas creation action.
    *
    * @author paouelle
    */
@@ -195,6 +195,19 @@ public class Tool {
           Tool.createJsonSchemas(line);
         }
       };
+
+  /**
+   * Holds the json schemas view option.
+   *
+   * @author paouelle
+   */
+  @SuppressWarnings("static-access")
+  private final static Option jsonview = OptionBuilder
+    .withLongOpt("view")
+    .withDescription("to specify the Json view to use when generating the schemas (defaults to none)")
+    .hasArg()
+    .withArgName("class")
+    .create();
 
   /**
    * Holds the blob deserialization action.
@@ -477,6 +490,7 @@ public class Tool {
        .addOption(Tool.schemas)
        .addOption(Tool.objects)
        .addOption(Tool.jsons)
+       .addOption(Tool.jsonview)
        .addOption(Tool.suffixes)
        .addOption(Tool.server)
        .addOption(Tool.port)
@@ -493,6 +507,24 @@ public class Tool {
        .addOption(Tool.trace)
        .addOption(Tool.help)
       );
+
+  /**
+   * Gets the Json view name from the specified class.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class for which to get a Json view name
+   * @return the corresponding Json view name
+   */
+  private static String getViewName(Class<?> clazz) {
+    final String cname = clazz.getSimpleName();
+    final Class<?> pclazz = clazz.getDeclaringClass();
+
+     if (pclazz != null) {
+       return pclazz.getSimpleName() + "." + cname;
+     }
+     return cname;
+  }
 
   /**
    * Executes the specified CQL statement.
@@ -796,6 +828,7 @@ public class Tool {
    *         matches the specified set of suffixes
    * @param  schemas the map where to record the Json schema for the pojo classes
    *         found
+   * @param  view the json view to use when generating the schemas
    * @throws LinkageError if the linkage fails for one of the specified entity
    *         class
    * @throws ExceptionInInitializerError if the initialization provoked by one
@@ -807,7 +840,8 @@ public class Tool {
     String[] cnames,
     Map<String, String> suffixes,
     boolean matching,
-    Map<Class<?>, JsonSchema> schemas
+    Map<Class<?>, JsonSchema> schemas,
+    Class<?> view
   ) throws IOException {
     next_class:
     for (int i = 0; i < cnames.length; i++) {
@@ -845,14 +879,18 @@ public class Tool {
             Tool.class.getSimpleName()
             + ": creating Json schema for "
             + c.getName()
+            + ((view != null) ? " with view '" + Tool.getViewName(view) + "'" : "")
           );
           final ObjectMapper m = new ObjectMapper();
-          final SchemaFactoryWrapper visitor = new SchemaFactoryWrapper();
+          final JsonAnnotationSchemaFactoryWrapper visitor = new JsonAnnotationSchemaFactoryWrapper();
 
+          if (view != null) {
+            m.setConfig(m.getSerializationConfig().withView(view));
+          }
           m.registerModules(new Jdk8Module(), new com.fasterxml.jackson.datatype.jsr310.JSR310Module());
           m.enable(SerializationFeature.INDENT_OUTPUT);
           m.acceptJsonFormatVisitor(m.constructType(c), visitor);
-          schemas.put(c, visitor.finalSchema());
+          schemas.put(c, visitor.finalSchemaWithTitle());
         }
       } catch (ClassNotFoundException e) { // ignore and continue
       }
@@ -871,6 +909,7 @@ public class Tool {
    *         matches the specified set of suffixes
    * @param  schemas the map where to record the Json schema for the pojo classes
    *         found
+   * @param  view the json view to use when generating the schemas
    * @throws LinkageError if the linkage fails for one of the specified entity
    *         class
    * @throws ExceptionInInitializerError if the initialization provoked by one
@@ -879,11 +918,13 @@ public class Tool {
    *         specified packages
    * @throws IOException if an I/O error occurs while generating the Json schemas
    */
+  @SuppressWarnings("deprecation")
   private static void createJsonSchemasFromPackages(
     String[] pkgs,
     Map<String, String> suffixes,
     boolean matching,
-    Map<Class<?>, JsonSchema> schemas
+    Map<Class<?>, JsonSchema> schemas,
+    Class<?> view
   ) throws IOException {
     for (final String pkg: pkgs) {
       if (pkg == null) {
@@ -926,14 +967,18 @@ public class Tool {
           Tool.class.getSimpleName()
           + ": creating Json schema for "
           + c.getName()
+          + ((view != null) ? " with view '" + Tool.getViewName(view) + "'" : "")
         );
         final ObjectMapper m = new ObjectMapper();
-        final SchemaFactoryWrapper visitor = new SchemaFactoryWrapper();
+        final JsonAnnotationSchemaFactoryWrapper visitor = new JsonAnnotationSchemaFactoryWrapper();
 
-        m.registerModule(new Jdk8Module());
+        if (view != null) {
+          m.setConfig(m.getSerializationConfig().withView(view));
+        }
+        m.registerModules(new Jdk8Module(), new com.fasterxml.jackson.datatype.jsr310.JSR310Module());
         m.enable(SerializationFeature.INDENT_OUTPUT);
         m.acceptJsonFormatVisitor(m.constructType(c), visitor);
-        schemas.put(c, visitor.finalSchema());
+        schemas.put(c, visitor.finalSchemaWithTitle());
       }
     }
   }
@@ -960,7 +1005,15 @@ public class Tool {
       = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
     final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
     final Map<Class<?>, JsonSchema> schemas = new LinkedHashMap<>();
+    final Class<?> view;
 
+    if (line.hasOption(Tool.jsonview.getLongOpt())) {
+      view = Class.forName(
+        line.getOptionValue(Tool.jsonview.getLongOpt())
+      );
+    } else {
+      view = null;
+    }
     System.out.print(
       Tool.class.getSimpleName()
       + ": searching for Json schema definitions in "
@@ -976,9 +1029,9 @@ public class Tool {
     }
     System.out.println();
     // start by assuming we have classes; if we do they will be nulled from the array
-    Tool.createJsonSchemasFromClasses(opts, suffixes, matching, schemas);
+    Tool.createJsonSchemasFromClasses(opts, suffixes, matching, schemas, view);
     // now deal with the rest as if they were packages
-    Tool.createJsonSchemasFromPackages(opts, suffixes, matching, schemas);
+    Tool.createJsonSchemasFromPackages(opts, suffixes, matching, schemas, view);
     if (schemas.isEmpty()) {
       System.out.println(
         Tool.class.getSimpleName()

@@ -44,6 +44,8 @@ public class Objects {
    * the {@link Object#equals} method or the {@link Tolerable#equals} method of
    * the first argument.
    *
+   * @author paouelle
+   *
    * @param  a an object
    * @param  b an object to be compared with <code>a</code> for equality
    * @param  epsilon the tolerable error
@@ -117,6 +119,8 @@ public class Objects {
    * is used to determine equality. Otherwise, equality is determined by using
    * the {@link Object#equals} or {@link Tolerable#equals} method of the first
    * argument.
+   *
+   * @author paouelle
    *
    * @param  a an object
    * @param  b an object to be compared with <code>a</code> for deep equality
