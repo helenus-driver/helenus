@@ -33,6 +33,9 @@ import java.time.ZoneId;
 import org.apache.commons.lang3.ArrayUtils;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.JavaType;
@@ -50,6 +53,8 @@ import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonNumberFormatVisitor
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonStringFormatVisitor;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonValueFormat;
+import com.fasterxml.jackson.databind.ser.std.StdKeySerializers;
+import com.fasterxml.jackson.databind.ser.std.StringSerializer;
 import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
 import com.fasterxml.jackson.module.jsonSchema.factories.ArrayVisitor;
 import com.fasterxml.jackson.module.jsonSchema.factories.MapVisitor;
@@ -68,6 +73,8 @@ import com.fasterxml.jackson.module.jsonSchema.types.SimpleTypeSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.StringSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.ValueTypeSchema;
 
+import org.helenus.commons.lang3.reflect.ReflectionUtils;
+import org.helenus.jackson.annotation.JsonPropertyDefaultValue;
 import org.helenus.jackson.annotation.JsonPropertyDivisibleBy;
 import org.helenus.jackson.annotation.JsonPropertyEnumValues;
 import org.helenus.jackson.annotation.JsonPropertyKeyDescription;
@@ -133,6 +140,44 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
   }
 
   /**
+   * Gets the enum values based on the specified annotation.
+   *
+   * @author paouelle
+   *
+   * @param  ae the Json enum values annotation
+   * @param  keys <code>true</code> if we are updating the schema for keys;
+   *         <code>false</code> for values
+   * @return a set of all provided enum values
+   */
+  private Set<String> getEnumValues(JsonPropertyEnumValues ae, boolean keys) {
+    final Class<?>[] classes = keys ? ae.keySubTypesOf() : ae.valueSubTypesOf();
+    Stream<String> s = Stream.empty();
+
+    if (classes.length > 0) {
+      final JsonSubTypes jst = ReflectionUtils.findFirstAnnotation(classes[0], JsonSubTypes.class);
+
+      if (jst != null) {
+        s = Stream.of(jst.value())
+          .filter(t -> classes[0].isAssignableFrom(t.value()))
+          .map(t -> {
+            if (!t.name().isEmpty()) {
+              return t.name();
+            }
+            final JsonTypeName jtn = t.value().getAnnotation(JsonTypeName.class);
+
+            if (jtn != null) {
+              return jtn.value();
+            }
+            return t.value().getName();
+          });
+      }
+    }
+    return Stream.concat(
+      Stream.of(keys ? ae.key() : ae.value()), s
+    ).collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
    * Updates the specified schema for the specified property or its contained values.
    *
    * @author paouelle
@@ -159,10 +204,12 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         schema.setReadonly(true);
       }
     }
-    final JsonPropertyKeyDescription ak = prop.getAnnotation(JsonPropertyKeyDescription.class);
+    if (keys) {
+      final JsonPropertyKeyDescription ak = prop.getAnnotation(JsonPropertyKeyDescription.class);
 
-    if ((ak != null) && !ak.value().isEmpty()) {
-      schema.setDescription(ak.value());
+      if ((ak != null) && !ak.value().isEmpty()) {
+        schema.setDescription(ak.value());
+      }
     }
     if (schema instanceof SimpleTypeSchema) {
       final SimpleTypeSchema sschema = (SimpleTypeSchema)schema;
@@ -175,16 +222,18 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           sschema.setTitle(t);
         }
       }
+      final JsonPropertyDefaultValue adv = prop.getAnnotation(JsonPropertyDefaultValue.class);
+
+      if (adv != null) {
+        sschema.setDefault(adv.value());
+      }
     }
     if (schema instanceof ValueTypeSchema) {
       final ValueTypeSchema vtschema = (ValueTypeSchema)schema;
       final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
 
       if (ae != null) {
-        vtschema.setEnums(
-          Stream.of(keys ? ae.key() : ae.value())
-            .collect(Collectors.toCollection(LinkedHashSet::new))
-        );
+        vtschema.setEnums(getEnumValues(ae, keys));
       }
       final JsonPropertyValueFormat avf = prop.getAnnotation(JsonPropertyValueFormat.class);
 
@@ -201,10 +250,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
       final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
 
       if (ae != null) {
-        ctschema.setEnums(
-          Stream.of(keys ? ae.key() : ae.value())
-            .collect(Collectors.toCollection(LinkedHashSet::new))
-        );
+        ctschema.setEnums(getEnumValues(ae, keys));
       }
       final JsonPropertyOneOfIntegerValues ai = prop.getAnnotation(JsonPropertyOneOfIntegerValues.class);
       final JsonPropertyOneOfLongValues al = prop.getAnnotation(JsonPropertyOneOfLongValues.class);
@@ -425,7 +471,23 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     final ObjectVisitor visitor = (ObjectVisitor)super.expectObjectFormat(type);
     final SerializerProvider p = getProvider();
     final Class<?> view = (p != null) ? p.getActiveView() : null;
+    final JsonTypeInfo jti = ReflectionUtils.findFirstAnnotation(type.getRawClass(), JsonTypeInfo.class);
+    final String typeIdName;
+    final String typeName;
 
+    if ((jti != null) && (jti.use() == JsonTypeInfo.Id.NAME)) {
+      typeIdName = jti.property();
+      final JsonTypeName jtn = type.getRawClass().getAnnotation(JsonTypeName.class);
+
+      if (jtn != null) {
+        typeName = jtn.value();
+      } else {
+        typeName = null;
+      }
+    } else {
+      typeIdName = null;
+      typeName = null;
+    }
     return new ObjectVisitorDecorator(visitor) {
       private JsonSchema getPropertySchema(BeanProperty writer) {
         return ((ObjectSchema)getSchema()).getProperties().get(writer.getName());
@@ -446,18 +508,34 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         }
         return false;
       }
+      private void updateForTypeId(JsonSchema schema, BeanProperty writer) {
+        if ((schema instanceof SimpleTypeSchema)
+            && writer.getName().equals(typeIdName)) {
+          final SimpleTypeSchema sschema = (SimpleTypeSchema)schema;
+
+          if (sschema.getDefault() == null) {
+            sschema.setDefault(typeName);
+          }
+        }
+      }
       @Override
       public void optionalProperty(BeanProperty writer) throws JsonMappingException {
         if (isIncluded(writer)) {
           super.optionalProperty(writer);
-          updateSchema(null, getPropertySchema(writer), writer, false);
+          final JsonSchema schema = getPropertySchema(writer);
+
+          updateSchema(null, schema, writer, false);
+          updateForTypeId(schema, writer);
         }
       }
       @Override
       public void property(BeanProperty writer) throws JsonMappingException {
         if (isIncluded(writer)) {
           super.property(writer);
-          updateSchema(null, getPropertySchema(writer), writer, false);
+          final JsonSchema schema = getPropertySchema(writer);
+
+          updateSchema(null, schema, writer, false);
+          updateForTypeId(schema, writer);
         }
       }
     };
@@ -486,7 +564,14 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           aprops = new MapSchemaAdditionalProperties();
           schema.setAdditionalProperties(aprops);
         }
-        aprops.setKeysSchema(propertySchema(handler, keyType));
+        if (handler instanceof StdKeySerializers.StringKeySerializer) {
+          // special handling for keys such that they don't get their schema
+          // generated as an ANY schema
+          handler = new StringSerializer();
+        }
+        final JsonSchema schema = propertySchema(handler, keyType);
+
+        aprops.setKeysSchema(schema);
       }
       @Override
       public void valueFormat(JsonFormatVisitable handler, JavaType valueType)
@@ -497,7 +582,9 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           aprops = new MapSchemaAdditionalProperties();
           schema.setAdditionalProperties(aprops);
         }
-        aprops.setValuesSchema(propertySchema(handler, valueType));
+        final JsonSchema schema = propertySchema(handler, valueType);
+
+        aprops.setValuesSchema(schema);
       }
     };
   }

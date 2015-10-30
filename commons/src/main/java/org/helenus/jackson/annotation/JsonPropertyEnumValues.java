@@ -52,6 +52,19 @@ public @interface JsonPropertyEnumValues {
   String[] value() default {};
 
   /**
+   * Defines all possible values that are valid for the annotated property or
+   * its contained values from the Json sub types of the specified class.
+   * <p>
+   * <i>Note:</i> Only defined one class.
+   *
+   * @author paouelle
+   *
+   * @return the class from which to get all sub-types for all possible values
+   *         that are valid for the property or its contained values
+   */
+  Class<?>[] valueSubTypesOf() default {};
+
+  /**
    * Defines all possible values that are valid for the annotated property
    * contained keys.
    *
@@ -60,4 +73,17 @@ public @interface JsonPropertyEnumValues {
    * @return all possible values that are valid for the property contained keys
    */
   String[] key() default {};
+
+  /**
+   * Defines all possible values that are valid for the annotated property
+   * contained keys from the Json sub types of the specified class.
+   * <p>
+   * <i>Note:</i> Only defined one class.
+   *
+   * @author paouelle
+   *
+   * @return the class from which to get all sub-types for all possible values
+   *         that are valid for the property contained keys
+   */
+  Class<?>[] keySubTypesOf() default {};
 }

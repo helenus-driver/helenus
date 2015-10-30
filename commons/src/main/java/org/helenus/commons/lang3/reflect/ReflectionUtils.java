@@ -104,6 +104,48 @@ public class ReflectionUtils {
   }
 
   /**
+   * Finds the first annotation from a given class' and interface's hierarchy of
+   * the specified annotation.
+   *
+   * @author paouelle
+   *
+   * @param <A> the type of annotation to search for
+   *
+   * @param  clazz the class from which to search
+   * @param  annotationClass the annotation to search for
+   * @return the first annotation in <code>clazz</code>'s hierarchy or
+   *         <code>null</code> if none is found
+   * @throws NullPointerException if <code>clazz</code> or
+   *         <code>annotationClass</code> is <code>null</code>
+   */
+  public static <A extends Annotation> A findFirstAnnotation(
+    Class<?> clazz, Class<A> annotationClass
+  ) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.notNull(
+      annotationClass, "invalid null annotation class"
+    );
+    Class<?> c = clazz;
+
+    do {
+      final A[] as = c.getDeclaredAnnotationsByType(annotationClass);
+
+      if (as.length > 0) {
+        return as[0];
+      }
+      for (final Class<?> i: c.getInterfaces()) {
+        final A a = ReflectionUtils.findFirstAnnotation(i, annotationClass);
+
+        if (a != null) {
+          return a;
+        }
+      }
+      c = c.getSuperclass();
+    } while (c != null);
+    return null;
+  }
+
+  /**
    * Finds the first class from a given class' hierarchy that is not annotated
    * with the specified annotation.
    *
