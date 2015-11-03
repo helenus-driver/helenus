@@ -425,6 +425,8 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           );
         } else if (UUID.class.isAssignableFrom(clazz)) {
           sschema.setPattern("^(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$   # UUID");
+        } else if (Class.class.isAssignableFrom(clazz)) {
+          sschema.setPattern("\\p{ASCII}+   # ascii");
         }
       }
     }
