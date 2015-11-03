@@ -32,6 +32,7 @@ import java.time.ZoneId;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -69,6 +70,7 @@ import com.fasterxml.jackson.module.jsonSchema.types.ContainerTypeSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.IntegerSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.NumberSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
+import com.fasterxml.jackson.module.jsonSchema.types.ReferenceSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.SimpleTypeSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.StringSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.ValueTypeSchema;
@@ -78,6 +80,7 @@ import org.helenus.jackson.annotation.JsonPropertyDefaultValue;
 import org.helenus.jackson.annotation.JsonPropertyDivisibleBy;
 import org.helenus.jackson.annotation.JsonPropertyEnumValues;
 import org.helenus.jackson.annotation.JsonPropertyKeyDescription;
+import org.helenus.jackson.annotation.JsonPropertyKeyReference;
 import org.helenus.jackson.annotation.JsonPropertyLength;
 import org.helenus.jackson.annotation.JsonPropertyMaximumValue;
 import org.helenus.jackson.annotation.JsonPropertyMinimumValue;
@@ -87,6 +90,7 @@ import org.helenus.jackson.annotation.JsonPropertyOneOfIntegerValues;
 import org.helenus.jackson.annotation.JsonPropertyOneOfLongValues;
 import org.helenus.jackson.annotation.JsonPropertyPattern;
 import org.helenus.jackson.annotation.JsonPropertyReadOnly;
+import org.helenus.jackson.annotation.JsonPropertyReference;
 import org.helenus.jackson.annotation.JsonPropertyTitle;
 import org.helenus.jackson.annotation.JsonPropertyUniqueItems;
 import org.helenus.jackson.annotation.JsonPropertyValueFormat;
@@ -489,8 +493,75 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
       typeName = null;
     }
     return new ObjectVisitorDecorator(visitor) {
+      @SuppressWarnings("synthetic-access")
       private JsonSchema getPropertySchema(BeanProperty writer) {
-        return ((ObjectSchema)getSchema()).getProperties().get(writer.getName());
+        final Map<String, JsonSchema> properties = ((ObjectSchema)getSchema()).getProperties();
+        JsonSchema schema = properties.get(writer.getName());
+        final JsonPropertyReference apr = writer.getAnnotation(JsonPropertyReference.class);
+
+        if (apr != null) {
+          JavaType jtype = writer.getType();
+
+          if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
+            jtype = jtype.getReferencedType();
+          }
+          if (schema instanceof ArraySchema) {
+            final ArraySchema aschema = (ArraySchema)schema;
+            final ArraySchema.Items items = aschema.getItems();
+
+            jtype = jtype.getContentType();
+            if (items.isArrayItems()) {
+              final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
+              final JsonSchema[] aschemas = aitems.getJsonSchemas();
+
+              for (int i = 0; i < aitems.getJsonSchemas().length; i++) {
+                if (aschemas[i] instanceof ObjectSchema) {
+                  aschemas[i] = new ReferenceSchema(visitorContext.javaTypeToUrn(jtype));
+                }
+              }
+            } else if (items.isSingleItems()) {
+              final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
+              final JsonSchema ischema = sitems.getSchema();
+
+              if (ischema instanceof ObjectSchema) {
+                sitems.setSchema(new ReferenceSchema(visitorContext.javaTypeToUrn(jtype)));
+              }
+            }
+          } else if (schema instanceof ObjectSchema) {
+            final ObjectSchema oschema = (ObjectSchema)schema;
+            final ObjectSchema.AdditionalProperties aprops = oschema.getAdditionalProperties();
+
+            if (aprops instanceof MapSchemaAdditionalProperties) {
+              final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
+              final JsonSchema kschema = maprops.getKeysSchema();
+
+              if (kschema instanceof ObjectSchema) {
+                maprops.setKeysSchema(new ReferenceSchema(visitorContext.javaTypeToUrn(maprops.getKeysType())));
+              }
+            } else {
+              schema = new ReferenceSchema(visitorContext.javaTypeToUrn(jtype));
+            }
+          }
+          properties.put(writer.getName(), schema);
+        }
+        if (schema instanceof ObjectSchema) {
+          final JsonPropertyKeyReference apkr = writer.getAnnotation(JsonPropertyKeyReference.class);
+
+          if (apkr != null) {
+            final ObjectSchema oschema = (ObjectSchema)schema;
+            final ObjectSchema.AdditionalProperties aprops = oschema.getAdditionalProperties();
+
+            if (aprops instanceof MapSchemaAdditionalProperties) {
+              final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
+              final JsonSchema vschema = maprops.getValuesSchema();
+
+              if (vschema instanceof ObjectSchema) {
+                maprops.setValuesSchema(new ReferenceSchema(visitorContext.javaTypeToUrn(maprops.getValuesType())));
+              }
+            }
+          }
+        }
+        return schema;
       }
       private boolean isIncluded(BeanProperty writer) {
         if (view == null) {
@@ -572,6 +643,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final JsonSchema schema = propertySchema(handler, keyType);
 
         aprops.setKeysSchema(schema);
+        aprops.setKeysType(keyType);
       }
       @Override
       public void valueFormat(JsonFormatVisitable handler, JavaType valueType)
@@ -585,6 +657,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final JsonSchema schema = propertySchema(handler, valueType);
 
         aprops.setValuesSchema(schema);
+        aprops.setValuesType(valueType);
       }
     };
   }
@@ -723,12 +796,28 @@ class MapSchemaAdditionalProperties extends ObjectSchema.AdditionalProperties {
   private JsonSchema keysSchema;
 
   /**
+   * Holds the type for keys.
+   *
+   * @author paouelle
+   */
+  @JsonIgnore
+  private JavaType keysType;
+
+  /**
    * Holds the schema for the map values.
    *
    * @author paouelle
    */
   @JsonProperty("values")
   private JsonSchema valuesSchema;
+
+  /**
+   * Holds the type for values.
+   *
+   * @author paouelle
+   */
+  @JsonIgnore
+  private JavaType valuesType;
 
   /**
    * Gets the schema for the map keys.
@@ -753,6 +842,28 @@ class MapSchemaAdditionalProperties extends ObjectSchema.AdditionalProperties {
   }
 
   /**
+   * Gets the type for the map keys.
+   *
+   * @author paouelle
+   *
+   * @return the type for the map keys
+   */
+  public JavaType getKeysType() {
+    return keysType;
+  }
+
+  /**
+   * Sets the type for the map keys.
+   *
+   * @author paouelle
+   *
+   * @param keys the type for the map keys
+   */
+  public void setKeysType(JavaType keys) {
+    this.keysType = keys;
+  }
+
+  /**
    * Gets the schema for the map values.
    *
    * @author paouelle
@@ -772,6 +883,28 @@ class MapSchemaAdditionalProperties extends ObjectSchema.AdditionalProperties {
    */
   public void setValuesSchema(JsonSchema values) {
     this.valuesSchema = values;
+  }
+
+  /**
+   * Gets the type for the map values.
+   *
+   * @author paouelle
+   *
+   * @return the type for the map values
+   */
+  public JavaType getValuesType() {
+    return valuesType;
+  }
+
+  /**
+   * Sets the type for the map values.
+   *
+   * @author paouelle
+   *
+   * @param values the type for the map values
+   */
+  public void setValuesType(JavaType values) {
+    this.valuesType = values;
   }
 
   /**
