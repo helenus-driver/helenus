@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.text.WordUtils;
 
@@ -1218,6 +1219,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @param  value the value to be validated
    * @throws IllegalArgumentException if the specified value is not of the
    *         right type or is <code>null</code> when the field is mandatory
+   * @throws ExcludedSuffixKeyException if this field is a suffix and the
+   *         specified value is marked as excluded
    */
   public void validateValue(Object value) {
     if (value instanceof Optional) { // unwrapped optional if present
@@ -1289,6 +1292,16 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         type.getName(),
         (value != null) ? value.getClass().getName() : "null"
       );
+      if (ArrayUtils.contains(suffix.exclude(), value)) {
+        throw new ExcludedSuffixKeyException(
+          "excluded suffix key '"
+          + suffix.name()
+          + "' value '"
+          + value
+          + "' for object class: "
+          + clazz.getName()
+        );
+      }
     }
   }
 

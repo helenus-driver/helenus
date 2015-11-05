@@ -254,8 +254,11 @@ public class CreateTypeImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
-        setDirty();
+        try {
+          statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+          setDirty();
+        } catch (ExcludedSuffixKeyException e) { // ignore and continue without clause
+        }
       }
       return this;
     }

@@ -162,7 +162,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           }
           if (ArrayUtils.contains(skey.exclude(), value)) {
             throw new ExcludedSuffixKeyException(
-              "excluded suffix key '" + key + "' value '" + value + "' for object class: "
+              "excluded suffix key '"
+              + key
+              + "' value '"
+              + value
+              + "' for object class: "
               + clazz.getName()
             );
           }
@@ -199,6 +203,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if the POJO doesn't require the specified
      *         suffix or if the value doesn't match the POJO's definition for the
      *         specified suffix
+     * @throws ExcludedSuffixKeyException if the specified suffix value is
+     *         marked as excluded the specified suffix key
      */
     public void addSuffix(String suffix, Object value) {
       validateSuffix(suffix, value);
@@ -1723,6 +1729,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    * @throws IllegalArgumentException if the suffix is not defined by this POJO
    *         if the specified value is not of the right type or is
    *         <code>null</code> when the field is mandatory
+   * @throws ExcludedSuffixKeyException if the specified suffix value is
+   *         marked as excluded the specified suffix key
    */
   public void validateSuffix(String suffix, Object value) {
     org.apache.commons.lang3.Validate.notNull(suffix, "invalid null suffix");

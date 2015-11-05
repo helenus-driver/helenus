@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -222,6 +223,7 @@ public class SelectImpl<T>
       );
       final List<SelectImpl<T>> statements = new ArrayList<>(ci.size());
 
+      next_combination:
       while (ci.hasNext()) {
         final List<Object> svalues = ci.next();
         // create a new select statement as a dup of this one but with
@@ -229,7 +231,11 @@ public class SelectImpl<T>
         final SelectImpl<T> s = new SelectImpl<>(this);
 
         for (int j = 0; j < snames.size(); j++) {
-          s.getContext().addSuffix(snames.get(j), svalues.get(j));
+          try {
+            s.getContext().addSuffix(snames.get(j), svalues.get(j));
+          } catch (ExcludedSuffixKeyException e) { // ignore and continue without statement
+            continue next_combination;
+          }
         }
         statements.add(s);
       }
@@ -418,6 +424,7 @@ public class SelectImpl<T>
       );
       final List<String> keyspaces = new ArrayList<>(ci.size());
 
+      next_combination:
       while (ci.hasNext()) {
         final List<Object> svalues = ci.next();
         // create a new select statement as a dup of this one but with
@@ -425,7 +432,11 @@ public class SelectImpl<T>
         final SelectImpl s = new SelectImpl(this);
 
         for (int j = 0; j < snames.size(); j++) {
-          s.getContext().addSuffix(snames.get(j), svalues.get(j));
+          try {
+            s.getContext().addSuffix(snames.get(j), svalues.get(j));
+          } catch (ExcludedSuffixKeyException e) { // ignore and continue without the keyspace
+            continue next_combination;
+          }
         }
         keyspaces.add(s.getKeyspace());
       }
@@ -681,26 +692,38 @@ public class SelectImpl<T>
         if (c instanceof Clause.Equality) {
           statement.table.validateSuffixKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
           if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
-            statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
-            // only add if it is a column too
-            add = statement.table.hasColumn(c.getColumnName());
+            try {
+              statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+              // only add if it is a column too
+              add = statement.table.hasColumn(c.getColumnName());
+            } catch (ExcludedSuffixKeyException e) { // ignore and continue without clause
+              return this;
+            }
           }
           c.validate(statement.table);
         } else if (c instanceof Clause.In) {
           statement.table.validateSuffixKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
           if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
             // verify all suffix values one after the other to validate all of them
-            for (final Object v: c.values()) {
-              statement.getContext().getClassInfo().validateSuffix(
-                c.getColumnName().toString(), v
-              );
+            final List<Object> values = new ArrayList<>(c.values());
+
+            for (final Iterator<?> i = values.iterator(); i.hasNext(); ) {
+              final Object v = i.next();
+
+              try {
+                statement.getContext().getClassInfo().validateSuffix(
+                  c.getColumnName().toString(), v
+                );
+              } catch (ExcludedSuffixKeyException e) { // ignore this suffix and value from the list
+                i.remove();
+              }
             }
             // keep track of all suffixes so we can generate all the underlying
             // select statements later
             if (statement.suffixes == null) {
               statement.suffixes = new LinkedHashMap<>(6);
             }
-            statement.suffixes.put(c.getColumnName().toString(), c.values());
+            statement.suffixes.put(c.getColumnName().toString(), values);
             // only add if it is a column too
             add = statement.table.hasColumn(c.getColumnName());
             // don't validate the clause as we know it is not a valid one with

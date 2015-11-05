@@ -307,8 +307,13 @@ public class CreateSchemasImpl
             // associated POJO
             try {
               context.addSuffix(finfo.getSuffixKey().name(), where.suffixes.get(type));
-            } catch (IllegalArgumentException ee) {
+            } catch (ExcludedSuffixKeyException ee) { // ignore
               if (iae == null) { // keep only first one
+                iae = ee;
+              }
+            } catch (IllegalArgumentException ee) {
+              if ((iae == null) || (iae instanceof ExcludedSuffixKeyException)) {
+                // keep only first one not an excluded exception
                 iae = ee;
               }
             }
