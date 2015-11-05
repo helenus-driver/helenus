@@ -49,6 +49,7 @@ import com.datastax.driver.core.UDTValue;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.ObjectNotFoundException;
 import org.helenus.driver.StatementManager;

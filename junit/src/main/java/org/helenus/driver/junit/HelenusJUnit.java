@@ -76,6 +76,7 @@ import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.Batch;
 import org.helenus.driver.CreateSchema;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
 import org.helenus.driver.Insert;
@@ -857,6 +858,7 @@ public class HelenusJUnit implements MethodRule {
         truncate.disableTracing();
         seq.add(truncate);
       } else {
+        next_combination:
         for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
           final Truncate<T> truncate = StatementBuilder.truncate(cinfo.getObjectClass());
 
@@ -864,7 +866,11 @@ public class HelenusJUnit implements MethodRule {
           // pass all required suffixes
           for (final Strings ss: i.next()) {
             // register the suffix value with the corresponding suffix name
-            truncate.where(StatementBuilder.eq(ss.key, ss.value));
+            try {
+              truncate.where(StatementBuilder.eq(ss.key, ss.value));
+            } catch (ExcludedSuffixKeyException e) {// ignore this combination
+              continue next_combination;
+            }
           }
           seq.add(truncate);
         }
@@ -1027,6 +1033,7 @@ public class HelenusJUnit implements MethodRule {
           final Sequence s = StatementBuilder.sequence();
 
           s.disableTracing();
+          next_combination:
           for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
             final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
@@ -1035,7 +1042,11 @@ public class HelenusJUnit implements MethodRule {
             // pass all required suffixes
             for (final Strings ss: i.next()) {
               // register the suffix value with the corresponding suffix name
-              cs.where(StatementBuilder.eq(ss.key, ss.value));
+              try {
+                cs.where(StatementBuilder.eq(ss.key, ss.value));
+              } catch (ExcludedSuffixKeyException e) {// ignore this combination
+                continue next_combination;
+              }
             }
             s.add(cs);
           }
@@ -1109,12 +1120,17 @@ public class HelenusJUnit implements MethodRule {
             batch.add(insert);
           }
         } else {
+          next_combination:
           for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
             final ClassInfoImpl<T>.Context context = cinfo.newContext();
 
             // pass all required suffixes
             for (final Strings ss: i.next()) {
-              context.addSuffix(ss.key, ss.value);
+              try {
+                context.addSuffix(ss.key, ss.value);
+              } catch (ExcludedSuffixKeyException e) {// ignore this combination
+                continue next_combination;
+              }
             }
             for (final T io: context.getInitialObjects()) {
               final Insert<T> insert = StatementBuilder.insert(io).intoAll();
@@ -1693,14 +1709,19 @@ public class HelenusJUnit implements MethodRule {
             truncate.disableTracing();
             sequence.add(truncate);
           } else {
+            next_combination:
             for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
               final Truncate<?> truncate = StatementBuilder.truncate(c);
 
               truncate.disableTracing();
               // pass all required suffixes
               for (final Strings ss: i.next()) {
-                // register the suffix value with the corresponding suffix name
-                truncate.where(StatementBuilder.eq(ss.key, ss.value));
+                try {
+                  // register the suffix value with the corresponding suffix name
+                  truncate.where(StatementBuilder.eq(ss.key, ss.value));
+                } catch (ExcludedSuffixKeyException e) {// ignore this combination
+                  continue next_combination;
+                }
               }
               sequence.add(truncate);
             }

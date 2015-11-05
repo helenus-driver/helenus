@@ -56,6 +56,8 @@ public interface Delete<T>
    * @return the where clause of this query to which more clause can be added.
    * @throws IllegalArgumentException if the clause references a column
    *         not defined in the POJO
+   * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+   *         and the specified value is marked as excluded
    */
   public Where<T> where(Clause clause);
 
@@ -118,6 +120,8 @@ public interface Delete<T>
      * @return this WHERE clause.
      * @throws IllegalArgumentException if the clause references a column
      *         not defined in the POJO
+     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     *         and the specified value is marked as excluded
      */
     public Where<T> and(Clause clause);
 
@@ -183,6 +187,8 @@ public interface Delete<T>
      * @return the WHERE clause of the DELETE statement these options are part of.
      * @throws IllegalArgumentException if the clause references a column
      *         not defined in the POJO
+     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     *         and the specified value is marked as excluded
      */
     public Where<T> where(Clause clause);
   }

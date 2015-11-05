@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.helenus.driver.impl;
+package org.helenus.driver;
 
 /**
  * The <code>ExcludedSuffixKeyException</code> class extends on the

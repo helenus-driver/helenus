@@ -41,6 +41,7 @@ import com.datastax.driver.core.exceptions.InvalidTypeException;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;

@@ -38,6 +38,7 @@ import com.datastax.driver.core.ResultSetFuture;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.Clause;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.ObjectSetFuture;
 import org.helenus.driver.Ordering;

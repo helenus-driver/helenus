@@ -32,6 +32,7 @@ import org.helenus.commons.collections.graph.ConcurrentHashDirectedGraph;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchemas;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -537,7 +538,7 @@ public class CreateSchemasImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.CreateTable.Where#and(org.helenus.driver.Clause)
+     * @see org.helenus.driver.CreateSchemas.Where#and(org.helenus.driver.Clause)
      */
     @Override
     public Where and(Clause clause) {

@@ -74,6 +74,8 @@ public interface CreateIndex<T>
    * @return the where clause of this query to which more clause can be added.
    * @throws IllegalArgumentException if the clause doesn't reference a
    *         suffix key defined in the POJO
+   * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+   *         and the specified value is marked as excluded
    */
   public Where<T> where(Clause clause);
 
@@ -156,6 +158,8 @@ public interface CreateIndex<T>
      * @throws NullPointerException if <code>clause</code> is <code>null</code>
      * @throws IllegalArgumentException if the clause doesn't reference a
      *         suffix key defined in the POJO
+     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     *         and the specified value is marked as excluded
      */
     public Where<T> and(Clause clause);
   }

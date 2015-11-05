@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -366,7 +367,7 @@ public class CreateSchemaImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.CreateTable.Where#and(org.helenus.driver.Clause)
+     * @see org.helenus.driver.CreateSchema.Where#and(org.helenus.driver.Clause)
      */
     @Override
     public Where<T> and(Clause clause) {
@@ -393,11 +394,8 @@ public class CreateSchemaImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        try {
-          statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
-          setDirty();
-        } catch (ExcludedSuffixKeyException e) { // ignore and continue without clause
-        }
+        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+        setDirty();
       }
       return this;
     }

@@ -349,11 +349,8 @@ public class CreateKeyspaceImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        try {
-          statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
-          setDirty();
-        } catch (ExcludedSuffixKeyException e) { // ignore and continue without clause
-        }
+        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+        setDirty();
       }
       return this;
     }

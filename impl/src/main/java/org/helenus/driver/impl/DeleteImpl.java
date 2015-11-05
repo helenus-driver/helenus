@@ -604,11 +604,7 @@ public class DeleteImpl<T>
         if (c instanceof Clause.Equality) {
           getContext().getClassInfo().validateColumnOrSuffix(c.getColumnName().toString());
           if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
-            try {
-              statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
-            } catch (ExcludedSuffixKeyException e) { // ignore and continue without clause
-              return this;
-            }
+            statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
           }
         } else {
           getContext().getClassInfo().validateColumn(c.getColumnName().toString());
