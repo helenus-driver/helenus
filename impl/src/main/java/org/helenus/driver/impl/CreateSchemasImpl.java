@@ -286,6 +286,7 @@ public class CreateSchemasImpl
       next_keyspace:
       for (final List<ClassInfoImpl<?>> cinfos: keyspaces.values()) {
         // create contexts for all the classes associated with the keyspace
+        next_class:
         for (final ClassInfoImpl<?> cinfo: cinfos) {
           final ClassInfoImpl<?>.Context context = cinfo.newContext();
           IllegalArgumentException iae = null;
@@ -308,13 +309,10 @@ public class CreateSchemasImpl
             // associated POJO
             try {
               context.addSuffix(finfo.getSuffixKey().name(), where.suffixes.get(type));
-            } catch (ExcludedSuffixKeyException ee) { // ignore
-              if (iae == null) { // keep only first one
-                iae = ee;
-              }
+            } catch (ExcludedSuffixKeyException ee) { // ignore and skip this class
+              continue next_class;
             } catch (IllegalArgumentException ee) {
-              if ((iae == null) || (iae instanceof ExcludedSuffixKeyException)) {
-                // keep only first one not an excluded exception
+              if (iae == null) { // keep only first one
                 iae = ee;
               }
             }
