@@ -1803,9 +1803,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
     org.apache.commons.lang3.Validate.notNull(row, "invalid null row");
     // check if the column is defined in the row
-    if (getColumnName().equals("floors")) {
-      System.out.println("HERE");
-    }
     if (!row.getColumnDefinitions().contains(getColumnName())) {
       if (isPartitionKey()) {
         throw new ObjectConversionException(
