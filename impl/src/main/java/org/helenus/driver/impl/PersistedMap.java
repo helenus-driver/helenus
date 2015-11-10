@@ -91,7 +91,74 @@ public class PersistedMap<K, T, PT>
   private Collection<T> vcol = null;
 
   /**
-   * Instantiates a new <code>PersistedList</code> object.
+   * Instantiates a new <code>PersistedMap</code> object.
+   *
+   * @author paouelle
+   *
+   * @param pmap the persisted map from which we are creating another view
+   * @param map the map view we are creating
+   */
+  PersistedMap(
+    PersistedMap<K, T, PT> pmap, Map<K, PersistedValue<T, PT>> map
+  ) {
+    this.persisted = pmap.persisted;
+    this.persister = pmap.persister;
+    this.fname = pmap.fname;
+    this.map = map;
+  }
+
+  /**
+   * Instantiates a new <code>PersistedMap</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  persisted the non-<code>null</code> persisted annotation
+   * @param  persister the non-<code>null</code> persister
+   * @param  fname the non-<code>null</code> field name
+   * @param  pmap the underlying persisted map
+   * @param  map the non-<code>null</code> encoded/decoded map
+   * @param  encoded <code>true</code> if the map contains encoded values;
+   *         <code>false</code> if it contains decoded values (this will force
+   *         all values to be encoded)
+   * @throws IllegalArgumentException if unable to encode/decode the values properly
+   * @throws ClassCastException if any values cannot be encoded to the expected type
+   */
+  @SuppressWarnings("unchecked")
+  PersistedMap(
+    Persisted persisted,
+    Persister<T, PT> persister,
+    String fname,
+    Map<K, PersistedValue<T, PT>> pmap,
+    Map<K, ?> map,
+    boolean encoded
+  ) {
+    this.persisted = persisted;
+    this.persister = persister;
+    this.fname = fname;
+    this.map = pmap;
+    if (encoded) {
+      for (final Map.Entry<K, PT> e: ((Map<K, PT>)map).entrySet()) {
+        this.map.put(
+          e.getKey(),
+          new PersistedValue<>(
+            persisted, persister, fname).setEncodedValue(e.getValue()
+          )
+        );
+      }
+    } else {
+      for (final Map.Entry<K, T> e: ((Map<K, T>)map).entrySet()) {
+        final PersistedValue<T, PT> pval = new PersistedValue<>(
+          persisted, persister, fname
+        ).setDecodedValue(e.getValue());
+
+        pval.getEncodedValue(); // force it to be encoded
+        this.map.put(e.getKey(), pval);
+      }
+    }
+  }
+
+  /**
+   * Instantiates a new <code>PersistedMap</code> object.
    *
    * @author paouelle
    *
@@ -113,29 +180,14 @@ public class PersistedMap<K, T, PT>
     Map<K, ?> map,
     boolean encoded
   ) {
-    this.persisted = persisted;
-    this.persister = persister;
-    this.fname = fname;
-    this.map = new LinkedHashMap<>(map.size()); // to preserve order
-    if (encoded) {
-      for (final Map.Entry<K, PT> e: ((Map<K, PT>)map).entrySet()) {
-        this.map.put(
-          e.getKey(),
-          new PersistedValue<>(
-            persisted, persister, fname).setEncodedValue(e.getValue()
-          )
-        );
-      }
-    } else {
-      for (final Map.Entry<K, T> e: ((Map<K, T>)map).entrySet()) {
-        final PersistedValue<T, PT> pval = new PersistedValue<>(
-          persisted, persister, fname
-        ).setDecodedValue(e.getValue());
-
-        pval.getEncodedValue(); // force it to be encoded
-        this.map.put(e.getKey(), pval);
-      }
-    }
+    this(
+      persisted,
+      persister,
+      fname,
+      new LinkedHashMap<>(map.size() * 3 / 2), // to preserve order
+      map,
+      encoded
+    );
   }
 
   /**
@@ -331,17 +383,17 @@ public class PersistedMap<K, T, PT>
           return new TransformIterator<Map.Entry<K, PersistedValue<T, PT>>, Map.Entry<K, T>>(eset.iterator()) {
             @Override
             protected Map.Entry<K, T> transform(Map.Entry<K, PersistedValue<T, PT>> me) {
-              return new Entry(me);
+              return new PersistedEntry(me);
             }
           };
         }
         @Override
         public Stream<Map.Entry<K, T>> stream() {
-          return eset.stream().map(me -> new Entry(me));
+          return eset.stream().map(me -> new PersistedEntry(me));
         }
         @Override
         public Stream<Map.Entry<K, T>> parallelStream() {
-          return eset.parallelStream().map(me -> new Entry(me));
+          return eset.parallelStream().map(me -> new PersistedEntry(me));
         }
         @Override
         public boolean remove(Object o) {
@@ -380,8 +432,8 @@ public class PersistedMap<K, T, PT>
   }
 
   /**
-   * The <code>Entry</code> class provides an internal implementation for the
-   * <code>Map.Entry</code> interface suitable for persisted entries.
+   * The <code>PersistedEntry</code> class provides an internal implementation
+   * for the <code>Map.Entry</code> interface suitable for persisted entries.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
    *
@@ -391,10 +443,10 @@ public class PersistedMap<K, T, PT>
    * @since 2.0
    */
   @SuppressWarnings("javadoc")
-  private class Entry implements Map.Entry<K, T> {
+  class PersistedEntry implements Map.Entry<K, T> {
     private final Map.Entry<K, PersistedValue<T, PT>> me;
 
-    Entry(final Map.Entry<K, PersistedValue<T, PT>> me) {
+    PersistedEntry(final Map.Entry<K, PersistedValue<T, PT>> me) {
       this.me = me;
     }
     @Override

@@ -36,6 +36,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
@@ -381,12 +382,39 @@ public class DataTypeImpl {
             + "."
             + field.getName()
           );
+        } else if (SortedMap.class.isAssignableFrom(clazz)) {
+          final Type type = field.getGenericType();
+
+          if (type instanceof ParameterizedType) {
+            final ParameterizedType ptype = (ParameterizedType)type;
+            final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
+
+            if (persisted != null) {
+              // if persisted then we need to decode: Map<?,persisted.as()>
+              return DataDecoder.sortedMap(
+                ReflectionUtils.getRawClass(ktype), persisted.as().CLASS, mandatory
+              );
+            }
+            final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
+
+            return DataDecoder.sortedMap(
+              ReflectionUtils.getRawClass(ktype),
+              ReflectionUtils.getRawClass(vtype),
+              mandatory
+            );
+          }
+          throw new IllegalArgumentException(
+            "unable to determine elements type for field: "
+            + field.getDeclaringClass().getName()
+            + "."
+            + field.getName()
+          );
         } else if (Map.class.isAssignableFrom(clazz)) {
           final Type type = field.getGenericType();
 
           if (type instanceof ParameterizedType) {
             final ParameterizedType ptype = (ParameterizedType)type;
-            final Type ktype = ptype.getActualTypeArguments()[0]; // lists will always have 2 arguments
+            final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
 
             if (persisted != null) {
               // if persisted then we need to decode: Map<?,persisted.as()>
@@ -394,7 +422,7 @@ public class DataTypeImpl {
                 ReflectionUtils.getRawClass(ktype), persisted.as().CLASS, mandatory
               );
             }
-            final Type vtype = ptype.getActualTypeArguments()[1]; // lists will always have 2 arguments
+            final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
 
             return DataDecoder.map(
               ReflectionUtils.getRawClass(ktype),
@@ -475,6 +503,9 @@ public class DataTypeImpl {
       }
       if (type == DataType.MAP) {
         return new PersistedMap<>(persisted, persister, fname, (Map<?, T>)val, false);
+      }
+      if (type == DataType.SORTED_MAP) {
+        return new PersistedNavigableMap<>(persisted, persister, fname, (Map<?, T>)val, false);
       }
       // for all else, simply encode the value directly
       final PersistedValue<T, PT> pval = new PersistedValue<>(
@@ -565,6 +596,9 @@ public class DataTypeImpl {
       }
       if (type == DataType.MAP) {
         return new PersistedMap<>(persisted, persister, fname, (Map<?,PT>)val, true);
+      }
+      if (type == DataType.SORTED_MAP) {
+        return new PersistedNavigableMap<>(persisted, persister, fname, (Map<?,PT>)val, true);
       }
       // for all else, simply decode the value directly
       return persister.decode(
@@ -749,6 +783,29 @@ public class DataTypeImpl {
           types.add(persisted.as());
         } else {
           DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(atype), types);
+        }
+        return;
+      }
+    } else if (SortedMap.class.isAssignableFrom(clazz)) {
+      org.apache.commons.lang3.Validate.isTrue(
+        types.isEmpty(),
+        "collection of collections is not supported in field: %s",
+        field
+      );
+      final Type type = field.getGenericType();
+
+      if (type instanceof ParameterizedType) {
+        final ParameterizedType ptype = (ParameterizedType)type;
+        final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
+        final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
+
+        types.add(DataType.SORTED_MAP);
+        // don't consider the @Persister annotation for the key
+        DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(ktype), types, null);
+        if (persisted != null) {
+          types.add(persisted.as());
+        } else {
+          DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(vtype), types);
         }
         return;
       }

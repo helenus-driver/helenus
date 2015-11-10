@@ -126,9 +126,9 @@ public @interface Column {
 
     /**
      * Optionally indicates the argument types for a collection type. Only used
-     * when {@link DataType#LIST}, {@link DataType#SET}, or {@link DataType#MAP}
-     * is defined as {@link #type} and cannot be set to one of the collection
-     * type either.
+     * when {@link DataType#LIST}, {@link DataType#SET}, {@link DataType#MAP},
+     * or {@link DataType#SORTED_MAP} is defined as {@link #type} and cannot be
+     * set to one of the collection type either.
      *
      * @author paouelle
      *

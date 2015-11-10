@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -927,6 +929,75 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected Map decodeImpl(UDTValue uval, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          uval.getType().getFieldType(name).getTypeArguments().get(1).getName().asJavaClass(),
+          uval.isNull(name) ? null : uval.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+    };
+  }
+
+  /**
+   * Gets a "map" to {@link SortedMap} decoder based on the given key and value classes.
+   *
+   * @author paouelle
+   *
+   * @param  ekclazz the non-<code>null</code> class of keys
+   * @param  evclazz the non-<code>null</code> class of values
+   * @param  mandatory if the field associated with the decoder is mandatory or
+   *         represents a primary key
+   * @return the non-<code>null</code> decoder for sorted maps of the specified key and
+   *         value classes
+   */
+  @SuppressWarnings("rawtypes")
+  public final static DataDecoder<SortedMap> sortedMap(
+    final Class<?> ekclazz, final Class<?> evclazz, final boolean mandatory
+  ) {
+    return new DataDecoder<SortedMap>(SortedMap.class) {
+      @SuppressWarnings("unchecked")
+      private SortedMap decodeImpl(Class<?> ektype, Class<?> evtype, Map<Object, Object> map) {
+        if (map == null) {
+          // safe to return mull unless mandatory, that is because Cassandra
+          // returns null for empty list and the schema definition requires
+          // that mandatory and primary keys be non null
+          if (mandatory) {
+            return new TreeMap();
+          }
+          return null;
+        }
+        final SortedMap nmap = new TreeMap();
+
+        if (ekclazz.isAssignableFrom(ektype) && evclazz.isAssignableFrom(evtype)) {
+          nmap.putAll(map);
+        } else {
+          // will need to do some conversion of each element
+          final ElementConverter kconverter = ElementConverter.getConverter(ekclazz, ektype);
+          final ElementConverter vconverter = ElementConverter.getConverter(evclazz, evtype);
+
+          for (final Map.Entry e: map.entrySet()) {
+            final Object k = e.getKey();
+            final Object v = e.getValue();
+
+            nmap.put((k != null) ? kconverter.convert(k) : null, (v != null) ? vconverter.convert(v) : null);
+          }
+        }
+        return nmap;
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected SortedMap decodeImpl(Row row, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName().asJavaClass(),
+          row.isNull(name) ? null : row.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected SortedMap decodeImpl(UDTValue uval, String name, Class clazz) {
         return decodeImpl(
           // get the element type from the row's metadata
           uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),

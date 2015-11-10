@@ -767,12 +767,14 @@ public abstract class AssignmentImpl
      */
     @Override
     void validate(TableInfoImpl<?> table) {
-      if (ctype == DataType.MAP) {
+      if ((ctype == DataType.MAP) || (ctype == DataType.SORTED_MAP)) {
         table.validateMapColumnAndKeyValues(name, (Map<?, ?>)collection);
       } else {
         final FieldInfoImpl<?> finfo = table.getColumn(name);
 
-        if ((finfo != null) && (finfo.getDataType().getType() == DataType.MAP)) {
+        if ((finfo != null)
+            && ((finfo.getDataType().getType() == DataType.MAP)
+                || (finfo.getDataType().getType() == DataType.SORTED_MAP))) {
           table.validateMapColumnAndKeys(name, (Collection<?>)collection);
         } else {
           table.validateCollectionColumnAndValues(

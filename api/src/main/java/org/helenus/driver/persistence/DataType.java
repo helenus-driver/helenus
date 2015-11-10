@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.UUID;
 
@@ -61,7 +62,8 @@ public enum DataType implements CQLDataType {
   TIMEUUID("timeuuid", 0, UUID.class),
   LIST("list", 1, List.class),
   SET("set", 1, Set.class),
-  MAP("map", 2, Map.class);
+  MAP("map", 2, Map.class),
+  SORTED_MAP("map", 2, NavigableMap.class);
 
   /**
    * Checks if altering a column from a specified data type to a specified data
