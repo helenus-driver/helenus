@@ -104,13 +104,13 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   public final static String MK_PREFIX = "mk_";
 
   /**
-   * Holds the column name used for the special column that holds the collection
-   * of elements for a user-defined type that extends {@link List}, {@link Set},
-   * or {@link Map}.
+   * Holds the column name prefix used for the special column that holds the
+   * collection of elements for a user-defined type that extends {@link List},
+   * {@link Set}, or {@link Map}.
    *
    * @author paouelle
    */
-  public final static String UDT_COLLECTION = "collection_";
+  public final static String UDT_C_PREFIX = "c_";
 
   /**
    * Holds the statement manager.

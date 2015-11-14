@@ -23,7 +23,7 @@ import org.helenus.driver.persistence.Ordering;
 
 /**
  * The <code>DataTypeParser</code> provides access to the
- * {@link CassandraTypeParser} package private class functionnality.
+ * {@link CassandraTypeParser} package private class functionality.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *

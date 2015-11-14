@@ -673,7 +673,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.declaringClass = cinfo.getObjectClass();
     this.field = null;
     this.isFinal = false;
-    this.name = StatementImpl.UDT_COLLECTION;
+    this.name = StatementImpl.UDT_C_PREFIX + type.CQL;
     this.type = clazz.getSuperclass();
     this.isOptional = false;
     this.column = new Column() { // fake annotation so we can properly identify the field as a column with a special name
@@ -687,7 +687,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
       @Override
       public String name() {
-        return StatementImpl.UDT_COLLECTION;
+        return StatementImpl.UDT_C_PREFIX + type.CQL;
       }
     };
     this.persisted = null;
