@@ -379,7 +379,6 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
           final Set s = (Set)obj;
 
           s.clear();
-          System.out.println(">>>>> " + val.getClass() + " - " + val);
           s.addAll((Collection)val);
         })
       );
