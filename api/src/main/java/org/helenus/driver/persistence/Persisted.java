@@ -21,16 +21,23 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * The <code>Persisted</code> annotation can be used on a {@link Column}
- * annotated field to indicate it should be encoded before being persisted to
- * the database using a specified persister. The data type for the column will
- * automatically be set using the data type specified as part of the annotation.
- * When persisting a collection column, each elements of the collection will be
- * be passed into the persister before being saved to the database. The resulting
- * database data type for the column will be changed based on the data type
- * specified here. For example, if the data type is set to "blob" the data type
- * for collection columns would be "list&lt;blob&gt;", "map&lt;?,blob&gt;", or "set&lt;blob&gt;".
+ * annotated field or on a {@link UDTEntity} annotated user-defined class that
+ * implements {@link List}, {@link Set}, or {@link Map} in order to indicate the
+ * field or the collection elements should be encoded before being persisted to
+ * the database using a specified persister. The data type for the column or the
+ * collected elements will automatically be set using the data type specified
+ * as part of the annotation. When persisting a collection column or class, each
+ * elements of the collection will be be passed into the persister before being
+ * saved to the database. The resulting database data type for the column will
+ * be changed based on the data type specified here. For example, if the data
+ * type is set to "blob" the data type for collection columns or classes would
+ * be "list&lt;blob&gt;", "map&lt;?,blob&gt;", or "set&lt;blob&gt;".
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -39,7 +46,7 @@ import java.lang.annotation.Target;
  *
  * @since 1.0
  */
-@Target({ElementType.METHOD, ElementType.FIELD})
+@Target({ElementType.METHOD, ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Persisted {
@@ -56,7 +63,7 @@ public @interface Persisted {
   /**
    * The resulting CQL data type after persistence. For collections, this would
    * be the element's or value's data type. For maps, the data type for the keys
-   * is preserved from the column's definition.
+   * is preserved from the column's or class' definition.
    * <p>
    * <i>Note:</i> that the data type specified cannot be one of
    * {@link DataType#INFERRED}, {@link DataType#LIST}, {@link DataType#SET},

@@ -55,6 +55,7 @@ import org.helenus.driver.persistence.Column;
 import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
+import org.helenus.driver.persistence.UDTEntity;
 
 /**
  * The <code>DataTypeImpl</code> class provides definition for Cassandra data types
@@ -465,6 +466,95 @@ public class DataTypeImpl {
     }
 
     /**
+     * Gets a decoder for this data type to decode to the specified class.
+     *
+     * @author paouelle
+     *
+     * @param  clazz the collection class to decode to its declared super type
+     * @return a decoder suitable to decode from this data type to the given class
+     * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+     * @throws IllegalArgumentException if the combination of class and data types
+     *         is not supported
+     * @throws IllegalStateException if this definition is not representing a
+     *         collection
+     */
+    @SuppressWarnings("synthetic-access")
+    public DataDecoder<?> getDecoder(Class<?> clazz) {
+      org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+      org.apache.commons.lang3.Validate.validState(isCollection(), "not a collection definition");
+      if (List.class.isAssignableFrom(clazz)) {
+        final Type type = clazz.getGenericSuperclass();
+
+        if (type instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)type;
+          final Type atype = ptype.getActualTypeArguments()[0]; // lists will always have 1 argument
+
+          return DataDecoder.list(ReflectionUtils.getRawClass(atype), true);
+        }
+        throw new IllegalArgumentException(
+          "unable to determine element type for class: "
+          + clazz.getName()
+        );
+      } else if (Set.class.isAssignableFrom(clazz)) {
+        final Type type = clazz.getGenericSuperclass();
+
+        if (type instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)type;
+          final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
+
+          return DataDecoder.set(ReflectionUtils.getRawClass(atype), true);
+        }
+        throw new IllegalArgumentException(
+          "unable to determine element type for class: "
+          + clazz.getName()
+        );
+      } else if (SortedMap.class.isAssignableFrom(clazz)) {
+        final Type type = clazz.getGenericSuperclass();
+
+        if (type instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)type;
+          final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
+          final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
+
+          return DataDecoder.sortedMap(
+            ReflectionUtils.getRawClass(ktype),
+            ReflectionUtils.getRawClass(vtype),
+            true
+          );
+        }
+        throw new IllegalArgumentException(
+          "unable to determine elements type for class: "
+          + clazz.getName()
+        );
+      } else if (Map.class.isAssignableFrom(clazz)) {
+        final Type type = clazz.getGenericSuperclass();
+
+        if (type instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)type;
+          final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
+          final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
+
+          return DataDecoder.map(
+            ReflectionUtils.getRawClass(ktype),
+            ReflectionUtils.getRawClass(vtype),
+            true
+          );
+        }
+        throw new IllegalArgumentException(
+          "unable to determine elements type for class: "
+          + clazz.getName()
+        );
+      }
+      // oh well we cannot convert that type
+      throw new IllegalArgumentException(
+        "unsupported collection type to convert to: "
+        + clazz.getSuperclass().getName()
+        + " for class: "
+        + clazz.getName()
+      );
+    }
+
+    /**
      * Encodes the specified value using the given persister based on this
      * definition.
      *
@@ -707,34 +797,82 @@ public class DataTypeImpl {
   private static void inferDataTypeFrom(
     Field field, Class<?> clazz, List<CQLDataType> types
   ) {
-    inferDataTypeFrom(field, clazz, types, field.getAnnotation(Persisted.class));
+    inferDataTypeFrom(
+      "field: " + field.getDeclaringClass().getName() + "." + field.getName(),
+      field.getGenericType(),
+      clazz,
+      types,
+      field.getAnnotation(Persisted.class)
+    );
   }
 
   /**
-   * Infers the data type for the specified field.
+   * Infers the data type for the specified class.
    *
    * @author paouelle
    *
-   * @param  field the non-<code>null</code> field to infer the CQL data type for
    * @param  clazz the non-<code>null</code> class for which to infer the CQL
-   *         data type for the field
+   *         data type for
    * @param  types the non-<code>null</code> list where to add the inferred type and
    *         its arguments
-   * @param  persisted the persisted annotation to consider for the field
    * @throws IllegalArgumentException if the data type cannot be inferred from
-   *         the field
+   *         the class
    */
   private static void inferDataTypeFrom(
-    Field field, Class<?> clazz, List<CQLDataType> types, Persisted persisted
+    Class<?> clazz, List<CQLDataType> types
   ) {
+    inferDataTypeFrom(
+      "class: " + clazz.getName(),
+      clazz.getGenericSuperclass(),
+      clazz,
+      types,
+      clazz.getAnnotation(Persisted.class)
+    );
+  }
+
+  /**
+   * Infers the data type for the specified field or class.
+   *
+   * @author paouelle
+   *
+   * @param  trace the non-<code>null</code> field or class trace string
+   *         to infer the CQL data type for
+   * @param  type the generic type for the field or class to infer the CQL data
+   *         type for
+   * @param  clazz the non-<code>null</code> class for which to infer the CQL
+   *         data type for
+   * @param  types the non-<code>null</code> list where to add the inferred type and
+   *         its arguments
+   * @param  persisted the persisted annotation to consider for the field or class
+   * @throws IllegalArgumentException if the data type cannot be inferred from
+   *         the field or class
+   */
+  private static void inferDataTypeFrom(
+    String trace,
+    Type type,
+    Class<?> clazz,
+    List<CQLDataType> types,
+    Persisted persisted
+  ) {
+    // check if it is a user-defined type
+    try {
+      final ClassInfoImpl<?> cinfo
+        = (ClassInfoImpl<?>)StatementBuilder.getClassInfo(clazz);
+
+      org.apache.commons.lang3.Validate.isTrue(
+        cinfo instanceof UDTClassInfoImpl,
+        "unable to infer data type in %s", trace
+      );
+      types.add((UDTClassInfoImpl<?>)cinfo);
+      return;
+    } catch (Exception e) { // ignore and fall-through
+    }
     if (Optional.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of optionals is not supported in field: %s",
-        field
+        "collection of optionals is not supported in %s",
+        trace
       );
-      final Type type = field.getGenericType();
-
       if (type instanceof ParameterizedType) {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type atype = ptype.getActualTypeArguments()[0]; // optional will always have 1 argument
@@ -742,18 +880,16 @@ public class DataTypeImpl {
         if (persisted != null) {
           types.add(persisted.as());
         } else {
-          DataTypeImpl.inferBasicDataTypeFrom(field, ReflectionUtils.getRawClass(atype), types, persisted);
+          DataTypeImpl.inferBasicDataTypeFrom(trace, ReflectionUtils.getRawClass(atype), types, persisted);
         }
         return;
       }
     } else if (List.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collections is not supported in field: %s",
-        field
+        "collection of collections is not supported in %s",
+        trace
       );
-      final Type type = field.getGenericType();
-
       if (type instanceof ParameterizedType) {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type atype = ptype.getActualTypeArguments()[0]; // lists will always have 1 argument
@@ -762,18 +898,16 @@ public class DataTypeImpl {
         if (persisted != null) {
           types.add(persisted.as());
         } else {
-          DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(atype), types);
+          DataTypeImpl.inferDataTypeFrom(trace, type, ReflectionUtils.getRawClass(atype), types, persisted);
         }
         return;
       }
     } else if (Set.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collections is not supported in field: %s",
-        field
+        "collection of collections is not supported in %s",
+        trace
       );
-      final Type type = field.getGenericType();
-
       if (type instanceof ParameterizedType) {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
@@ -782,18 +916,16 @@ public class DataTypeImpl {
         if (persisted != null) {
           types.add(persisted.as());
         } else {
-          DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(atype), types);
+          DataTypeImpl.inferDataTypeFrom(trace, type, ReflectionUtils.getRawClass(atype), types, persisted);
         }
         return;
       }
     } else if (SortedMap.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collections is not supported in field: %s",
-        field
+        "collection of collections is not supported in %s",
+        trace
       );
-      final Type type = field.getGenericType();
-
       if (type instanceof ParameterizedType) {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
@@ -801,22 +933,20 @@ public class DataTypeImpl {
 
         types.add(DataType.SORTED_MAP);
         // don't consider the @Persister annotation for the key
-        DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(ktype), types, null);
+        DataTypeImpl.inferDataTypeFrom(trace, type, ReflectionUtils.getRawClass(ktype), types, null);
         if (persisted != null) {
           types.add(persisted.as());
         } else {
-          DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(vtype), types);
+          DataTypeImpl.inferDataTypeFrom(trace, type, ReflectionUtils.getRawClass(vtype), types, persisted);
         }
         return;
       }
     } else if (Map.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
-        "collection of collections is not supported in field: %s",
-        field
+        "collection of collections is not supported in %s",
+        trace
       );
-      final Type type = field.getGenericType();
-
       if (type instanceof ParameterizedType) {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
@@ -824,25 +954,26 @@ public class DataTypeImpl {
 
         types.add(DataType.MAP);
         // don't consider the @Persister annotation for the key
-        DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(ktype), types, null);
+        DataTypeImpl.inferDataTypeFrom(trace, type, ReflectionUtils.getRawClass(ktype), types, null);
         if (persisted != null) {
           types.add(persisted.as());
         } else {
-          DataTypeImpl.inferDataTypeFrom(field, ReflectionUtils.getRawClass(vtype), types);
+          DataTypeImpl.inferDataTypeFrom(trace, type, ReflectionUtils.getRawClass(vtype), types, persisted);
         }
         return;
       }
     }
-    DataTypeImpl.inferBasicDataTypeFrom(field, clazz, types, persisted);
+    DataTypeImpl.inferBasicDataTypeFrom(trace, clazz, types, persisted);
   }
 
   /**
-   * Infers the data type for the specified field once it has already been
-   * processed for optional and collections.
+   * Infers the data type for the specified field or class once it has already
+   * been processed for optional and collections.
    *
    * @author paouelle
    *
-   * @param  field the non-<code>null</code> field to infer the CQL data type for
+   * @param  trace the non-<code>null</code> field or class trace string
+   *         to infer the CQL data type for
    * @param  clazz the non-<code>null</code> class for which to infer the CQL
    *         data type for the field
    * @param  types the non-<code>null</code> list where to add the inferred type and
@@ -852,7 +983,7 @@ public class DataTypeImpl {
    *         the field
    */
   private static void inferBasicDataTypeFrom(
-    Field field, Class<?> clazz, List<CQLDataType> types, Persisted persisted
+    String trace, Class<?> clazz, List<CQLDataType> types, Persisted persisted
   ) {
     clazz = ClassUtils.primitiveToWrapper(clazz);
     if (persisted != null) {
@@ -902,12 +1033,12 @@ public class DataTypeImpl {
 
         org.apache.commons.lang3.Validate.isTrue(
           cinfo instanceof UDTClassInfoImpl,
-          "unable to infer data type in field: %s", field
+          "unable to infer data type in %s", trace
         );
         types.add((UDTClassInfoImpl<?>)cinfo);
       } catch (Exception e) {
         throw new IllegalArgumentException(
-          "unable to infer data type in field: " + field, e
+          "unable to infer data type in " + trace, e
         );
       }
     }
@@ -932,10 +1063,23 @@ public class DataTypeImpl {
       final Column.Data cdata = field.getAnnotation(Column.Data.class);
 
       if (cdata != null) {
-        final DataType type = cdata.type();
+        final List<CQLDataType> itypes = new ArrayList<>(3); // full set o inferred type if processed
+        DataType type = cdata.type();
         final List<CQLDataType> atypes
           = new ArrayList<>(Arrays.asList(cdata.arguments()));
 
+        if (!atypes.isEmpty() && (type == DataType.INFERRED)) {
+          // we have an inferred type for the collection so calculate as
+          // if it was all inferred and extract only the part we need
+          DataTypeImpl.inferDataTypeFrom(field, field.getType(), itypes);
+          org.apache.commons.lang3.Validate.isTrue(
+            itypes.get(0) instanceof DataType,
+            "missing data type value in field: %s.%s",
+            field.getDeclaringClass().getName(),
+            field.getName()
+          );
+          type = (DataType)itypes.get(0);
+        }
         if (type != DataType.INFERRED) {
           org.apache.commons.lang3.Validate.isTrue(
             !(atypes.size() < type.NUM_ARGUMENTS),
@@ -968,7 +1112,7 @@ public class DataTypeImpl {
             org.apache.commons.lang3.Validate.isTrue(
               !((type.NUM_ARGUMENTS > 1)
                 && (((DataType)atypes.get(1)).NUM_ARGUMENTS != 0)),
-              "collection of collection is not supported in field: %s.%s",
+              "map of collection is not supported in field: %s.%s",
               field.getDeclaringClass().getName(),
               field.getName()
             );
@@ -977,12 +1121,12 @@ public class DataTypeImpl {
                     && (((DataType)atypes.get(1)) == DataType.INFERRED))) {
               // we have an inferred part for the collection so calculate as
               // if it was all inferred and extract only the part we need
-              final List<CQLDataType> types = new ArrayList<>(3);
-
-              DataTypeImpl.inferDataTypeFrom(field, field.getType(), types);
+              if (itypes.isEmpty()) { // only do it if not already done!!!
+                DataTypeImpl.inferDataTypeFrom(field, field.getType(), itypes);
+              }
               for (int i = 0; i < atypes.size(); i++) {
                 if (atypes.get(i) == DataType.INFERRED) {
-                  atypes.set(i, types.get(i + 1)); // since index 1 corresponds to the collection type
+                  atypes.set(i, itypes.get(i + 1)); // since index 1 corresponds to the collection type
                 }
               }
             }
@@ -1015,6 +1159,87 @@ public class DataTypeImpl {
     final List<CQLDataType> types = new ArrayList<>(3);
 
     DataTypeImpl.inferDataTypeFrom(field, field.getType(), types);
+    return new Definition(types);
+  }
+
+  /**
+   * Infers the data type from the specified class' superclass.
+   *
+   * @author paouelle
+   *
+   * @param  type the collection type being inferred
+   * @param  clazz the class from which to infer the data type of its superclass
+   * @return a non-<code>null</code> data type definition
+   * @throws NullPointerException if <code>type</code> or <code>clazz</code> is
+   *         <code>null</code>
+   * @throws IllegalArgumentException if the argument data type cannot be inferred
+   *         from the superclass or the specified type is not a collection data type
+   */
+  public static Definition inferDataTypeFrom(DataType type, Class<?> clazz) {
+    org.apache.commons.lang3.Validate.notNull(type, "invalid null type");
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.isTrue(
+      type.NUM_ARGUMENTS != 0,
+      "data type '%s' is not a collection in class: %s",
+      type.CQL,
+      clazz.getName()
+    );
+    final Persisted persisted = clazz.getAnnotation(Persisted.class);
+
+    if (persisted == null) {
+      final UDTEntity.Data cdata = clazz.getAnnotation(UDTEntity.Data.class);
+
+      if (cdata != null) { // we were not asked to infer the argument type
+        final List<CQLDataType> atypes
+          = new ArrayList<>(Arrays.asList(cdata.arguments()));
+
+        org.apache.commons.lang3.Validate.isTrue(
+          !(atypes.size() < type.NUM_ARGUMENTS),
+          "missing argument data type(s) for '%s' in class: %s",
+          type.CQL,
+          clazz.getName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !(atypes.size() > type.NUM_ARGUMENTS),
+          "too many argument data type(s) for '%s' in class: %s",
+          type.CQL,
+          clazz.getName()
+        );
+        if (type.NUM_ARGUMENTS != 0) {
+          org.apache.commons.lang3.Validate.isTrue(
+            ((DataType)atypes.get(0)).NUM_ARGUMENTS == 0,
+            "collection of collection is not supported in class: %s",
+            clazz.getName()
+          );
+          org.apache.commons.lang3.Validate.isTrue(
+            !((type.NUM_ARGUMENTS > 1)
+              && (((DataType)atypes.get(1)).NUM_ARGUMENTS != 0)),
+            "map of collection is not supported in class: %s",
+            clazz.getName()
+          );
+          if ((((DataType)atypes.get(0)) == DataType.INFERRED)
+              || ((type.NUM_ARGUMENTS > 1)
+                  && (((DataType)atypes.get(1)) == DataType.INFERRED))) {
+            // we have an inferred part for the collection so calculate as
+            // if it was all inferred and extract only the part we need
+            final List<CQLDataType> types = new ArrayList<>(3);
+
+            DataTypeImpl.inferDataTypeFrom(clazz, types);
+            for (int i = 0; i < atypes.size(); i++) {
+              if (atypes.get(i) == DataType.INFERRED) {
+                atypes.set(i, types.get(i + 1)); // since index 1 corresponds to the collection type
+              }
+            }
+          }
+        }
+        return new Definition(type, atypes);
+      }
+    }
+    // if we get here then the type was either not inferred or there was no
+    // UDTEntity.Data annotation or there was a Persisted annotation
+    final List<CQLDataType> types = new ArrayList<>(3);
+
+    DataTypeImpl.inferDataTypeFrom(clazz, types);
     return new Definition(types);
   }
 

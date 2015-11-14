@@ -34,6 +34,7 @@ import org.apache.commons.lang3.ArrayUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -251,10 +252,22 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     }
     if (schema instanceof ContainerTypeSchema) {
       final ContainerTypeSchema ctschema = (ContainerTypeSchema)schema;
-      final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
+        boolean skipEnum = false;
 
-      if (ae != null) {
-        ctschema.setEnums(getEnumValues(ae, keys));
+      if (schema.isObjectSchema()) {
+        final ObjectSchema oschema = (ObjectSchema)schema;
+        final ObjectSchema.AdditionalProperties aprops = oschema.getAdditionalProperties();
+
+        if (aprops instanceof MapSchemaAdditionalProperties) {
+          skipEnum = true;
+        }
+      }
+      if (!skipEnum) {
+        final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
+
+        if (ae != null) {
+          ctschema.setEnums(getEnumValues(ae, keys));
+        }
       }
       final JsonPropertyOneOfIntegerValues ai = prop.getAnnotation(JsonPropertyOneOfIntegerValues.class);
       final JsonPropertyOneOfLongValues al = prop.getAnnotation(JsonPropertyOneOfLongValues.class);
@@ -279,19 +292,19 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ObjectSchema.SchemaAdditionalProperties saprops = (ObjectSchema.SchemaAdditionalProperties)aprops;
         final JsonSchema sschema = saprops.getJsonSchema();
 
-        if (sschema.isValueTypeSchema()) {
-          updateSchema(schema, sschema, prop, false);
-        }
+        updateSchema(schema, sschema, prop, false);
       } else if (aprops instanceof MapSchemaAdditionalProperties) {
         final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
         final JsonSchema kschema = maprops.getKeysSchema();
         final JsonSchema vschema = maprops.getValuesSchema();
 
-        if (kschema.isValueTypeSchema()) {
-          updateSchema(schema, kschema, prop, true);
-        }
-        if (vschema.isValueTypeSchema()) {
-          updateSchema(schema, vschema, prop, false);
+        updateSchema(schema, kschema, prop, true);
+        updateSchema(schema, vschema, prop, false);
+        // pass description to value
+        final JsonPropertyDescription apd = prop.getAnnotation(JsonPropertyDescription.class);
+
+        if (apd != null) {
+          vschema.setDescription(apd.value());
         }
       }
     } else if (schema.isArraySchema()) {
@@ -331,17 +344,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
 
         for (final JsonSchema ischema: aitems.getJsonSchemas()) {
-          if (ischema.isValueTypeSchema()) {
-            updateSchema(schema, ischema, prop, false);
-          }
+          updateSchema(schema, ischema, prop, false);
         }
       } else if (items.isSingleItems()) {
         final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
         final JsonSchema ischema = sitems.getSchema();
 
-        if (ischema.isValueTypeSchema()) {
-          updateSchema(schema, ischema, prop, false);
-        }
+        updateSchema(schema, ischema, prop, false);
       }
     } else if (schema.isNumberSchema()) {
       final NumberSchema nschema = schema.asNumberSchema();

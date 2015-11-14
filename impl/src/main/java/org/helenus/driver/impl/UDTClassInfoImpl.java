@@ -20,7 +20,10 @@ import java.lang.reflect.Modifier;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.SortedMap;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -33,6 +36,7 @@ import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
+import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.UDTEntity;
 
 /**
@@ -350,6 +354,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
    *         a valid POJO class
    */
+  @SuppressWarnings({"rawtypes", "unchecked"})
   UDTClassInfoImpl(StatementManagerImpl mgr, Class<T> clazz) {
     super(mgr, clazz, UDTEntity.class);
     org.apache.commons.lang3.Validate.isTrue(
@@ -358,6 +363,40 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
     );
     this.name = findName();
     this.table = tablesImpl().findFirst().get();
+    // handle special UDT types that extends List, Set, or Map
+    if (List.class.isAssignableFrom(clazz)) {
+      table.addNonPrimaryColumn(
+        new FieldInfoImpl<>(this, DataType.LIST, (obj, val) -> {
+          final List l = (List)obj;
+
+          l.clear();
+          l.addAll((Collection)val);
+        })
+      );
+    } else if (Set.class.isAssignableFrom(clazz)) {
+      table.addNonPrimaryColumn(
+        new FieldInfoImpl<>(this, DataType.SET, (obj, val) -> {
+          final Set s = (Set)obj;
+
+          s.clear();
+          System.out.println(">>>>> " + val.getClass() + " - " + val);
+          s.addAll((Collection)val);
+        })
+      );
+    } else if (Map.class.isAssignableFrom(clazz)) {
+      table.addNonPrimaryColumn(
+        new FieldInfoImpl<>(
+          this,
+          SortedMap.class.isAssignableFrom(clazz) ? DataType.SORTED_MAP : DataType.MAP,
+          (obj, val) -> {
+            final Map m = (Map)obj;
+
+            m.clear();
+            m.putAll((Map)val);
+          }
+        )
+      );
+    }
   }
 
   /**

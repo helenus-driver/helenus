@@ -27,8 +27,12 @@ import java.lang.reflect.Type;
 import java.io.IOException;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -239,20 +243,23 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final Object finalValue;
 
   /**
-   * Holds the getter method to retrieve the value of this field from an
-   * instance.
+   * Holds the consumer used to update the value for this field for an instance.
+   * <p>
+   * The first argument is the instance where to update the value of the field
+   * and the second one is the value to set.
    *
-   * @author vasu
+   * @author paouelle
    */
-  private final Method getter;
+  private final BiConsumer<Object, Object> setter;
 
   /**
-   * Holds the setter method to update the value for this field from an
-   * instance.
+   * Holds the function used to retrieve the value of the field from an instance.
+   * <p>
+   * The argument is the instance from which to retrieve the value for this field.
    *
-   * @author vasu
+   * @author paouelle
    */
-  private final Method setter;
+  private final Function<Object, Object> getter;
 
   /**
    * Flag indicating if this is the last key in the partition or the cluster.
@@ -262,7 +269,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private volatile boolean isLast = false;
 
   /**
-   * Instantiates a new <code>FieldInfo</code> object for a root element pojo
+   * Instantiates a new <code>FieldInfoImpl</code> object for a root element pojo
    * class.
    *
    * @author paouelle
@@ -298,13 +305,13 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.decoder = field.decoder;
     this.isFinal = field.isFinal;
     this.finalValue = field.finalValue;
-    this.getter = field.getter;
     this.setter = field.setter;
+    this.getter = field.getter;
     this.isLast = field.isLast;
   }
 
   /**
-   * Instantiates a new <code>FieldInfo</code> object not part of a defined
+   * Instantiates a new <code>FieldInfoImpl</code> object not part of a defined
    * table.
    *
    * @author vasu
@@ -339,13 +346,13 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.multiKeyType = null; // we don't care about this for keyspace suffixes
     this.definition = null; // we don't care about this for keyspace suffixes
     this.decoder = null; // we don't care about this for keyspace suffixes
-    this.getter = findGetterMethod(declaringClass);
-    this.setter = findSetterMethod(declaringClass);
+    this.getter = findGetter(declaringClass);
+    this.setter = findSetter(declaringClass);
     this.finalValue = findFinalValue();
   }
 
   /**
-   * Instantiates a new <code>FieldInfo</code> object as a column part of a
+   * Instantiates a new <code>FieldInfoImpl</code> object as a column part of a
    * defined table.
    *
    * @author vasu
@@ -523,8 +530,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       this.decoder = null;
       this.multiKeyType = null;
     }
-    this.getter = findGetterMethod(declaringClass);
-    this.setter = findSetterMethod(declaringClass);
+    this.getter = findGetter(declaringClass);
+    this.setter = findSetter(declaringClass);
     this.finalValue = findFinalValue();
     // validate some stuff
     if (isInTable) {
@@ -607,7 +614,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Instantiates a new fake <code>FieldInfo</code> object to represent a
+   * Instantiates a new fake <code>FieldInfoImpl</code> object to represent a
    * suffix key associated with the POJO class of a user-defined type.
    *
    * @author paouelle
@@ -639,6 +646,63 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.decoder = null; // we don't care about this for keyspace suffixes
     this.getter = null;
     this.setter = null;
+    this.finalValue = null;
+  }
+
+  /**
+   * Instantiates a new fake <code>FieldInfoImpl</code> object to holds the
+   * collection of elements for a user-defined type that extends {@link List},
+   * {@link Set}, or {@link Map}.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the non-<code>null</code> class info for the POJO
+   * @param  type the non-<code>null</code> data type for the collection for the
+   *         POJO
+   * @param  setter the non-<code>null</code> consumer to use for setting the
+   *         collection values stored in Cassandra back into the instance
+   */
+  FieldInfoImpl(
+    ClassInfoImpl<T> cinfo,
+    DataType type,
+    BiConsumer<Object, Object> setter
+  ) {
+    this.clazz = cinfo.getObjectClass();
+    this.cinfo = cinfo;
+    this.tinfo = null;
+    this.declaringClass = cinfo.getObjectClass();
+    this.field = null;
+    this.isFinal = false;
+    this.name = StatementImpl.UDT_COLLECTION;
+    this.type = clazz.getSuperclass();
+    this.isOptional = false;
+    this.column = new Column() { // fake annotation so we can properly identify the field as a column with a special name
+      @Override
+      public Class<? extends Annotation> annotationType() {
+        return Column.class;
+      }
+      @Override
+      public String table() {
+        return Table.ALL;
+      }
+      @Override
+      public String name() {
+        return StatementImpl.UDT_COLLECTION;
+      }
+    };
+    this.persisted = null;
+    this.persister = null;
+    this.suffix = null;
+    this.mandatory = true; // collection column is mandatory
+    this.index = null;
+    this.partitionKey = null;
+    this.clusteringKey = null;
+    this.typeKey = null;
+    this.multiKeyType = null;
+    this.definition = DataTypeImpl.inferDataTypeFrom(type, clazz);
+    this.decoder = definition.getDecoder(clazz);
+    this.getter = obj -> obj; // return the instance itself as the value for the field
+    this.setter = setter;
     this.finalValue = null;
   }
 
@@ -699,23 +763,50 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Finds the getter method from the declaring class suitable to get a
+   * Finds the getter from the declaring class suitable to get a
    * reference to the field.
    *
    * @author paouelle
    *
    * @param  declaringClass the non-<code>null</code> class declaring the field
-   * @return the getter method for the field or <code>null</code> if none found
+   * @return the function to use for retrieving the field value
    * @throws IllegalArgumentException if unable to find a suitable getter
    */
-  private Method findGetterMethod(Class<?> declaringClass) {
+  private Function<Object, Object> findGetter(Class<?> declaringClass) {
     Method getter = findGetterMethod(declaringClass, "get");
 
     if ((getter == null) && (type == Boolean.class) || (type == Boolean.TYPE)) {
       // try for "is"
       getter = findGetterMethod(declaringClass, "is");
     }
-    return getter;
+    if (getter != null) {
+      final Method g = getter;
+
+      return obj -> {
+        try {
+          return g.invoke(obj);
+        } catch (IllegalAccessException e) { // should not happen
+          throw new IllegalStateException(declaringClass.getName(), e);
+        } catch (InvocationTargetException e) {
+          final Throwable t = e.getTargetException();
+
+          if (t instanceof Error) {
+            throw (Error)t;
+          } else if (t instanceof RuntimeException) {
+            throw (RuntimeException)t;
+          } else { // we don't expect any of those
+            throw new IllegalStateException(declaringClass.getName(), t);
+          }
+        }
+      };
+    }
+    return obj -> {
+      try {
+        return field.get(obj);
+      } catch (IllegalAccessException e) { // should not happen
+        throw new IllegalStateException(declaringClass.getName(), e);
+      }
+    };
   }
 
   /**
@@ -758,16 +849,17 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Finds the setter method from the declaring class suitable to set a
+   * Finds the setter from the declaring class suitable to set a
    * value for the field.
    *
    * @author paouelle
    *
    * @param  declaringClass the non-<code>null</code> class declaring the field
-   * @return the setter method for the field or <code>null</code> if none found
+   * @return the consumer to use for setting the value of the field or
+   *         <code>null</code> if none found
    * @throws IllegalArgumentException if unable to find a suitable setter
    */
-  private Method findSetterMethod(Class<?> declaringClass) {
+  private BiConsumer<Object, Object> findSetter(Class<?> declaringClass) {
     final String mname = "set" + WordUtils.capitalize(name, '_', '-');
 
     try {
@@ -803,9 +895,35 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         );
       }
       m.setAccessible(true);
-      return m;
+      return (obj, val) -> {
+        try {
+          m.invoke(obj, val);
+        } catch (IllegalAccessException e) { // should not happen
+          throw new IllegalStateException(e);
+        } catch (InvocationTargetException e) {
+          final Throwable t = e.getTargetException();
+
+          if (t instanceof Error) {
+            throw (Error)t;
+          } else if (t instanceof RuntimeException) {
+            throw (RuntimeException)t;
+          } else { // we don't expect any of those
+            throw new IllegalStateException(t);
+          }
+        }
+      };
     } catch (NoSuchMethodException e) {
-      return null;
+      // fallback to the field itself unless it is marked final
+      if (isFinal) {
+        return null;
+      }
+      return (obj, val) -> {
+        try {
+          field.set(obj, val);
+        } catch (IllegalAccessException iae) { // should not happen
+          throw new IllegalStateException(iae);
+        }
+      };
     }
   }
 
@@ -1468,31 +1586,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   public Object getNonEncodedValue(Class<?> clazz, T object) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
-    Object val;
+    Object val = getter.apply(object);
 
-    try {
-      if (getter != null) {
-        val = getter.invoke(object);
-      } else { // get it from field directly
-        val = field.get(object);
-      }
-      if (val instanceof Optional) {
-        val = ((Optional<?>)val).orElse(null);
-      }
-      val = clazz.cast(val);
-    } catch (IllegalAccessException e) { // should not happen
-      throw new IllegalStateException(declaringClass.getName(), e);
-    } catch (InvocationTargetException e) {
-      final Throwable t = e.getTargetException();
-
-      if (t instanceof Error) {
-        throw (Error)t;
-      } else if (t instanceof RuntimeException) {
-        throw (RuntimeException)t;
-      } else { // we don't expect any of those
-        throw new IllegalStateException(declaringClass.getName(), t);
-      }
+    if (val instanceof Optional) {
+      val = ((Optional<?>)val).orElse(null);
     }
+    val = clazz.cast(val);
     if (isTypeKey()) { // this is the type key
       final String type;
 
@@ -1612,11 +1711,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   public void setValue(T object, Object value) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
-    // nothing to update if field was declared final and no setter provided
-    // this is in case a field defined as a collection is final but a setter
-    // method is provided to replace the content of the collection instead
-    // of the whole field
-    if (isFinal && (setter == null)) {
+    // nothing to update if no setter was defined
+    if (setter == null) {
       return;
     }
     if (isOptional) {
@@ -1639,25 +1735,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         getColumnName()
       );
     }
-    try {
-      if (setter != null) {
-        setter.invoke(object, value);
-      } else { // set it in field directly
-        field.set(object, value);
-      }
-    } catch (IllegalAccessException e) { // should not happen
-      throw new IllegalStateException(e);
-    } catch (InvocationTargetException e) {
-      final Throwable t = e.getTargetException();
-
-      if (t instanceof Error) {
-        throw (Error)t;
-      } else if (t instanceof RuntimeException) {
-        throw (RuntimeException)t;
-      } else { // we don't expect any of those
-        throw new IllegalStateException(t);
-      }
-    }
+    setter.accept(object, value);
   }
 
   /**

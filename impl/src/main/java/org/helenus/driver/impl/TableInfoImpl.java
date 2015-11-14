@@ -515,7 +515,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * <p>
    * This method will be called by the root entity when it is adding non-primary
    * column fields defined only in its type POJO classes to complement its
-   * schema definition.
+   * schema definition. It will also be called by the udt entity when it is adding
+   * a special collection columns for user-defined type that extends {@link List},
+   * {@link Set}, or {@link Map}.
    * <p>
    * <i>Note:</i> The provided column will not be added to this table if a
    * compatible column with the same name already exist in this table.
@@ -527,9 +529,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws IllegalArgumentException if the column being added is not compatible
    *         to one already defined with the same column name in this table
    */
+  @SuppressWarnings("unchecked")
   void addNonPrimaryColumn(FieldInfoImpl<? extends T> col) {
     org.apache.commons.lang3.Validate.isTrue(
-      cinfo instanceof RootClassInfoImpl,
+      (cinfo instanceof RootClassInfoImpl) || (cinfo instanceof UDTClassInfoImpl),
       "should not have been called for class '%s'", cinfo.getClass().getName()
     );
     final FieldInfoImpl<T> old = columns.get(col.getColumnName());
@@ -555,9 +558,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       );
       return;
     }
-    final FieldInfoImpl<T> rcol
-      = new FieldInfoImpl<>((RootClassInfoImpl<T>)cinfo, this, col);
+    final FieldInfoImpl<T> rcol;
 
+    if (cinfo instanceof RootClassInfoImpl) {
+      // clone the type column so we have a brand new one in the root class info
+      rcol = new FieldInfoImpl<>((RootClassInfoImpl<T>)cinfo, this, col);
+    } else {
+      rcol = (FieldInfoImpl<T>)col;
+    }
     if (rcol.getDataType().isCollection()) {
       this.hasCollectionColumns = true;
     }

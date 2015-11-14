@@ -15,6 +15,9 @@
  */
 package org.helenus.driver.impl;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang3.StringUtils;
@@ -99,6 +102,15 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @author paouelle
    */
   public final static String MK_PREFIX = "mk_";
+
+  /**
+   * Holds the column name used for the special column that holds the collection
+   * of elements for a user-defined type that extends {@link List}, {@link Set},
+   * or {@link Map}.
+   *
+   * @author paouelle
+   */
+  public final static String UDT_COLLECTION = "collection_";
 
   /**
    * Holds the statement manager.

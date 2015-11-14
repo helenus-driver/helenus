@@ -727,7 +727,7 @@ public class ReflectionUtils {
     Type tt = t;
 
     while (!(tt instanceof Class<?>)) {
-      if (tt instanceof ParameterizedType ) {
+      if (tt instanceof ParameterizedType) {
         tt = ((ParameterizedType)t).getRawType();
       } else {
         throw new IllegalStateException("there should be a raw class for: " + t);
