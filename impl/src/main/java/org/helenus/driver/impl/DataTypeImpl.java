@@ -854,9 +854,13 @@ public class DataTypeImpl {
     List<CQLDataType> types,
     Persisted persisted
   ) {
+    // check if the class is annotated as a UDT in which case we kind of allow
+    // collections of collections since clazz is actually a udt
+    final boolean isUDT = clazz.getAnnotation(UDTEntity.class) != null;
+
     if (Optional.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
-        types.isEmpty(),
+        isUDT || types.isEmpty(),
         "collection of optionals is not supported in %s",
         trace
       );
@@ -873,7 +877,7 @@ public class DataTypeImpl {
       }
     } else if (List.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
-        types.isEmpty(),
+        isUDT || types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -891,7 +895,7 @@ public class DataTypeImpl {
       }
     } else if (Set.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
-        types.isEmpty(),
+        isUDT || types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -909,7 +913,7 @@ public class DataTypeImpl {
       }
     } else if (SortedMap.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
-        types.isEmpty(),
+        isUDT || types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -930,7 +934,7 @@ public class DataTypeImpl {
       }
     } else if (Map.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
-        types.isEmpty(),
+        isUDT || types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
