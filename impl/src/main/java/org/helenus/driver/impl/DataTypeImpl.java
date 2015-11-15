@@ -854,19 +854,6 @@ public class DataTypeImpl {
     List<CQLDataType> types,
     Persisted persisted
   ) {
-    // check if it is a user-defined type
-    try {
-      final ClassInfoImpl<?> cinfo
-        = (ClassInfoImpl<?>)StatementBuilder.getClassInfo(clazz);
-
-      org.apache.commons.lang3.Validate.isTrue(
-        cinfo instanceof UDTClassInfoImpl,
-        "unable to infer data type in %s", trace
-      );
-      types.add((UDTClassInfoImpl<?>)cinfo);
-      return;
-    } catch (Exception e) { // ignore and fall-through
-    }
     if (Optional.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
         types.isEmpty(),
