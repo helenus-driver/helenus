@@ -55,6 +55,7 @@ import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonNumberFormatVisitor
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonStringFormatVisitor;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonValueFormat;
+import com.fasterxml.jackson.databind.ser.std.JsonValueSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdKeySerializers;
 import com.fasterxml.jackson.databind.ser.std.StringSerializer;
 import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
@@ -650,6 +651,15 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           // special handling for keys such that they don't get their schema
           // generated as an ANY schema
           handler = new StringSerializer();
+        } else if (handler instanceof JsonValueSerializer) {
+          final JsonValueSerializer jvhandler = (JsonValueSerializer)handler;
+
+          if (jvhandler.handledType().equals(String.class)) {
+            // special handling for keys that are not string but are of a class that
+            // is annotated with @JsonValue which returns a string such that they
+            // don't get their schema generated as an ANY schema
+            handler = new StringSerializer();
+          }
         }
         final JsonSchema schema = propertySchema(handler, keyType);
 
