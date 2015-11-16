@@ -1685,6 +1685,24 @@ public class StatementManagerImpl extends StatementManager {
   }
 
   /**
+   * Find a class info structure that defines the specified POJO class.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with this statement
+   *
+   * @param  clazz the class of POJO for which to get a class info object for
+   * @return the class info object representing the given POJO class or
+   *         <code>null</code> if none defined yet
+   */
+  @SuppressWarnings("unchecked")
+  public <T> ClassInfoImpl<T> findClassInfoImpl(Class<T> clazz) {
+    synchronized (classInfoCache) {
+      return (ClassInfoImpl<T>)classInfoCache.get(clazz);
+    }
+  }
+
+  /**
    * Gets a class info structure that defines the specified POJO class.
    *
    * @author paouelle

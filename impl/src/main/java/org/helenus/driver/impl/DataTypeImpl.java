@@ -795,7 +795,9 @@ public class DataTypeImpl {
    *         the field
    */
   private static void inferDataTypeFrom(
-    Field field, Class<?> clazz, List<CQLDataType> types
+    Field field,
+    Class<?> clazz,
+    List<CQLDataType> types
   ) {
     inferDataTypeFrom(
       "field: " + field.getDeclaringClass().getName() + "." + field.getName(),
@@ -821,10 +823,13 @@ public class DataTypeImpl {
   private static void inferDataTypeFrom(
     Class<?> clazz, List<CQLDataType> types
   ) {
+    // at this point we are trying to infer the type from the superclass in
+    // order to generate a fake field, so make sure to continue on with the
+    // class super class
     inferDataTypeFrom(
       "class: " + clazz.getName(),
       clazz.getGenericSuperclass(),
-      clazz,
+      clazz.getSuperclass(),
       types,
       clazz.getAnnotation(Persisted.class)
     );
@@ -860,7 +865,7 @@ public class DataTypeImpl {
 
     if (Optional.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(
-        isUDT || types.isEmpty(),
+        !isUDT && types.isEmpty(),
         "collection of optionals is not supported in %s",
         trace
       );
@@ -876,8 +881,14 @@ public class DataTypeImpl {
         return;
       }
     } else if (List.class.isAssignableFrom(clazz)) {
+      if (isUDT) {
+        // we need to this because a UDT can actually implement List and in such case,
+        // we want to return its UDT type and not a list
+        DataTypeImpl.inferBasicDataTypeFrom(trace, clazz, types, persisted);
+        return;
+      }
       org.apache.commons.lang3.Validate.isTrue(
-        isUDT || types.isEmpty(),
+        types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -894,8 +905,14 @@ public class DataTypeImpl {
         return;
       }
     } else if (Set.class.isAssignableFrom(clazz)) {
+      if (isUDT) {
+        // we need to this because a UDT can actually implement Set and in such case,
+        // we want to return its UDT type and not a set
+        DataTypeImpl.inferBasicDataTypeFrom(trace, clazz, types, persisted);
+        return;
+      }
       org.apache.commons.lang3.Validate.isTrue(
-        isUDT || types.isEmpty(),
+        types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -912,8 +929,14 @@ public class DataTypeImpl {
         return;
       }
     } else if (SortedMap.class.isAssignableFrom(clazz)) {
+      if (isUDT) {
+        // we need to this because a UDT can actually implement Map and in such case,
+        // we want to return its UDT type and not a map
+        DataTypeImpl.inferBasicDataTypeFrom(trace, clazz, types, persisted);
+        return;
+      }
       org.apache.commons.lang3.Validate.isTrue(
-        isUDT || types.isEmpty(),
+        types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -933,8 +956,14 @@ public class DataTypeImpl {
         return;
       }
     } else if (Map.class.isAssignableFrom(clazz)) {
+      if (isUDT) {
+        // we need to this because a UDT can actually implement Map and in such case,
+        // we want to return its UDT type and not a map
+        DataTypeImpl.inferBasicDataTypeFrom(trace, clazz, types, persisted);
+        return;
+      }
       org.apache.commons.lang3.Validate.isTrue(
-        isUDT || types.isEmpty(),
+        types.isEmpty(),
         "collection of collections is not supported in %s",
         trace
       );
@@ -974,7 +1003,10 @@ public class DataTypeImpl {
    *         the field
    */
   private static void inferBasicDataTypeFrom(
-    String trace, Class<?> clazz, List<CQLDataType> types, Persisted persisted
+    String trace,
+    Class<?> clazz,
+    List<CQLDataType> types,
+    Persisted persisted
   ) {
     clazz = ClassUtils.primitiveToWrapper(clazz);
     if (persisted != null) {
@@ -1017,7 +1049,7 @@ public class DataTypeImpl {
     } else if (Instant.class == clazz) {
       types.add(DataType.TIMESTAMP);
     } else {
-      // check if it is a user-defined type
+      // check if it is a user-defined type (possibly defining it if not defined yet)
       try {
         final ClassInfoImpl<?> cinfo
           = (ClassInfoImpl<?>)StatementBuilder.getClassInfo(clazz);

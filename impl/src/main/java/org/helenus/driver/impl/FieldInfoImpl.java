@@ -687,7 +687,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
       @Override
       public String name() {
-        return StatementImpl.UDT_C_PREFIX + type.CQL;
+        return getName();
       }
     };
     this.persisted = null;
