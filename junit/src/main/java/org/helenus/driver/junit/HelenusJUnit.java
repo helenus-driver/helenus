@@ -2045,7 +2045,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Registers a callback to be notified when a statement is sent to Cassandra.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  consumer the consumer to register to be notified every time a
    *         statement is sent to Cassandra
@@ -2123,7 +2123,7 @@ public class HelenusJUnit implements MethodRule {
     /**
      * {@inheritDoc}
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      *
      * @see org.helenus.driver.impl.StatementManagerImpl#sent(org.helenus.driver.impl.StatementImpl, com.datastax.driver.core.ResultSetFuture)
      */

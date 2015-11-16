@@ -33,7 +33,7 @@ public class Arrays {
    * Compares the two objects together while supporting deep equality with a
    * tolerable error and supporting arrays.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  e1 the first object to compare
    * @param  e2 the second one to compare with

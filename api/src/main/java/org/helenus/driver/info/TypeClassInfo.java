@@ -37,7 +37,7 @@ public interface TypeClassInfo<T> extends ClassInfo<T> {
    * Checks if this type was dynamically added to its root or if it was known
    * to the root via its @RootEntity annotation.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @return <code>true</code> if this type is dynamically being added
    *         to the root; <code>false</code> if it was known to the root via

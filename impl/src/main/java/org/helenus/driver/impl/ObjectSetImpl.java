@@ -66,7 +66,7 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
   /**
    * Holds the next object to be returned.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private volatile T next = null;
 
