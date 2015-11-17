@@ -35,7 +35,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -58,6 +57,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -215,18 +215,20 @@ public class HelenusJUnit implements MethodRule {
 
   /**
    * Hold a set of pojo class for which we have loaded the schema definition
-   * onto the embedded cassandra database.
+   * onto the embedded cassandra database along with the complete set of initial
+   * objects to re-insert when resetting the schema.
    *
    * @author paouelle
    */
-  static final Set<Class<?>> schemas = new HashSet<>();
+  static final Map<Class<?>, List<Object>> schemas = new HashMap<>();
 
   /**
-   * Holds a cache of class info structures created by previous test cases.
+   * Holds a cache of class info structures and full set of initial objects
+   * created by previous test cases.
    *
    * @author paouelle
    */
-  static final Map<Class<?>, ClassInfoImpl<?>> fromPreviousTestsCacheInfoCache
+  static final Map<Class<?>, Pair<ClassInfoImpl<?>, List<Object>>> fromPreviousTestsCacheInfoCache
     = new LinkedHashMap<>(64);
 
   /**
@@ -953,7 +955,9 @@ public class HelenusJUnit implements MethodRule {
           seq.execute();
           // next preserve all class infos already cached
           mgr.classInfoImpls()
-            .forEach(c -> HelenusJUnit.fromPreviousTestsCacheInfoCache.put(c.getObjectClass(), c));
+            .forEach(c -> HelenusJUnit.fromPreviousTestsCacheInfoCache.put(
+              c.getObjectClass(), Pair.of(c, HelenusJUnit.schemas.get(c.getObjectClass()))
+            ));
           // make sure to also clear the pojo class info in order to force the dependencies
           // to other pojos to be re-created when they are referenced
           mgr.clearCache();
@@ -982,22 +986,22 @@ public class HelenusJUnit implements MethodRule {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
     // check whether the schema for this pojo has already been loaded
     synchronized (HelenusJUnit.schemas) {
-      if (!HelenusJUnit.schemas.add(clazz)) {
+      if (HelenusJUnit.schemas.putIfAbsent(clazz, new ArrayList<>(0)) != null) {
         return; // nothing to do more
       }
       final boolean old = HelenusJUnit.capturing;
 
       try {
-        final ClassInfo<?> cinfo = manager.getClassInfoImpl(clazz);
+        final ClassInfoImpl<?> cinfo = manager.getClassInfoImpl(clazz);
 
-        if ((cinfo instanceof TypeClassInfo) && !((TypeClassInfo<?>)cinfo).isDynamic()) {
+        if ((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic()) {
           // nothing to do for those since everything is done through the root
           return;
-        } else if (cinfo instanceof RootClassInfo) {
+        } else if (cinfo instanceof RootClassInfoImpl) {
           logger.debug(
             "Creating schema for %s, %s",
             clazz.getSimpleName(),
-            ((RootClassInfo<?>)cinfo).types()
+            ((RootClassInfoImpl<?>)cinfo).types()
               .map(t -> t.getObjectClass().getSimpleName())
               .collect(Collectors.joining(", "))
           );
@@ -1021,8 +1025,13 @@ public class HelenusJUnit implements MethodRule {
           );
         }
         // now generate as many create schemas statement as required by the combination
-        // of all suffix values
+        // of all suffix values, at the same time compile separately the complete
+        // list of initial objects so we have it already computed the next time
+        // we reset the schema for this clazz
+        final List<Object> initials = new ArrayList<>();
+
         if (CollectionUtils.isEmpty(suffixes)) {
+          initials.addAll(cinfo.newContext().getInitialObjects());
           // no suffixes so just the one create schema required
           final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
@@ -1048,10 +1057,14 @@ public class HelenusJUnit implements MethodRule {
                 continue next_combination;
               }
             }
+            if (cs instanceof StatementImpl) {
+              initials.addAll(((StatementImpl<?,?,?>)cs).getContext().getInitialObjects());
+            }
             s.add(cs);
           }
           s.execute();
         }
+        HelenusJUnit.schemas.put(clazz, initials);
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(clazz);
@@ -1076,11 +1089,12 @@ public class HelenusJUnit implements MethodRule {
    * @param <T> the type of pojo being reset
    *
    * @param  cinfo the class info to reset the schema
+   * @param  initials the initials set of objects to re-insert
    * @throws AssertionError if a failure occurs while reseting the schema
    */
-  static <T> void resetSchema0(ClassInfoImpl<T> cinfo) {
+  static <T> void resetSchema0(ClassInfoImpl<T> cinfo, List<Object> initials) {
     synchronized (HelenusJUnit.schemas) {
-      HelenusJUnit.schemas.add(cinfo.getObjectClass());
+      HelenusJUnit.schemas.put(cinfo.getObjectClass(), initials);
       if (cinfo instanceof RootClassInfo) {
         logger.debug(
           "Resetting schema for %s, %s",
@@ -1101,44 +1115,15 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        // find all suffixes that are defined for this classes
-        final Collection<Collection<Strings>> suffixes = ((target != null)
-          ? HelenusJUnit.getSuffixKeyValues(cinfo)
-          : null
-        );
         final Batch batch = StatementBuilder.batch();
 
         batch.disableTracing();
-        // since we already created the schema, we should have the right number of suffixes
-        // now generate as many insert statements for each initial object as
-        // required by the combination of all suffix values
-        if (CollectionUtils.isEmpty(suffixes)) {
-          for (final T io: cinfo.newContext().getInitialObjects()) {
-            final Insert<T> insert = StatementBuilder.insert(io).intoAll();
+        for (final Object io: initials) {
+          @SuppressWarnings("unchecked")
+          final Insert<T> insert = StatementBuilder.insert((T)io).intoAll();
 
-            insert.disableTracing();
-            batch.add(insert);
-          }
-        } else {
-          next_combination:
-          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
-            final ClassInfoImpl<T>.Context context = cinfo.newContext();
-
-            // pass all required suffixes
-            for (final Strings ss: i.next()) {
-              try {
-                context.addSuffix(ss.key, ss.value);
-              } catch (ExcludedSuffixKeyException e) {// ignore this combination
-                continue next_combination;
-              }
-            }
-            for (final T io: context.getInitialObjects()) {
-              final Insert<T> insert = StatementBuilder.insert(io).intoAll();
-
-              insert.disableTracing();
-              batch.add(insert);
-            }
-          }
+          insert.disableTracing();
+          batch.add(insert);
         }
         batch.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
@@ -2152,26 +2137,28 @@ public class HelenusJUnit implements MethodRule {
     public <T> ClassInfoImpl<T> getClassInfoImpl(Class<T> clazz) {
       synchronized (HelenusJUnit.schemas) {
         // first check if we have already loaded it in previous test cases and if so, reset the schema for it
-        @SuppressWarnings("unchecked")
-        final ClassInfoImpl<T> cinfo
-          = (ClassInfoImpl<T>)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
+        @SuppressWarnings({"unchecked", "cast", "rawtypes"})
+        final Pair<ClassInfoImpl<T>, List<Object>> p
+          = (Pair<ClassInfoImpl<T>, List<Object>>)(Pair)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
 
-        if (cinfo != null) {
+        if (p != null) {
+          final ClassInfoImpl<T> cinfo = p.getLeft();
+
           if (cinfo instanceof TypeClassInfoImpl) {
             // force root to be re-cached first
             getClassInfoImpl(((TypeClassInfoImpl<T>)cinfo).getRoot().getObjectClass());
           }
           synchronized (super.classInfoCache) {
-            super.classInfoCache.put(clazz,  cinfo);
+            super.classInfoCache.put(clazz, cinfo);
           }
           // first truncate all loaded pojo tables and re-insert any schema defined
           // initial objects
-          HelenusJUnit.resetSchema0(cinfo);
+          HelenusJUnit.resetSchema0(cinfo, p.getRight());
           return cinfo;
         }
       }
       // if we get here then the cinfo was not loaded in previous tests
-      final ClassInfoImpl<T> classInfo = super.getClassInfoImpl(clazz);
+      final ClassInfoImpl<T> classInfo = super.getClassInfoImpl(clazz); // force generation of the class info
 
       // load the schemas for the pojo if required
       HelenusJUnit.createSchema0(clazz);
