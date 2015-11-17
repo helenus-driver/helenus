@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -57,7 +58,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.MutablePair;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -220,15 +221,22 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  static final Map<Class<?>, List<Object>> schemas = new HashMap<>();
+  static final Set<Class<?>> schemas = new HashSet<>();
 
   /**
-   * Holds a cache of class info structures and full set of initial objects
-   * created by previous test cases.
+   * Hold the complete set of initial objects to re-insert when resetting the
+   * schema along with the batch to do so.
    *
    * @author paouelle
    */
-  static final Map<Class<?>, Pair<ClassInfoImpl<?>, List<Object>>> fromPreviousTestsCacheInfoCache
+  static final Map<Class<?>, MutablePair<List<Object>, Batch>> initials = new HashMap<>();
+
+  /**
+   * Holds a cache of class info structures created by previous test cases.
+   *
+   * @author paouelle
+   */
+  static final Map<Class<?>, ClassInfoImpl<?>> fromPreviousTestsCacheInfoCache
     = new LinkedHashMap<>(64);
 
   /**
@@ -927,6 +935,8 @@ public class HelenusJUnit implements MethodRule {
       HelenusJUnit.schemas.clear();
       // clear anything we remembered from the previous test cases
       HelenusJUnit.fromPreviousTestsCacheInfoCache.clear();
+      // clear all initials objects
+      HelenusJUnit.initials.clear();
     }
   }
 
@@ -956,7 +966,7 @@ public class HelenusJUnit implements MethodRule {
           // next preserve all class infos already cached
           mgr.classInfoImpls()
             .forEach(c -> HelenusJUnit.fromPreviousTestsCacheInfoCache.put(
-              c.getObjectClass(), Pair.of(c, HelenusJUnit.schemas.get(c.getObjectClass()))
+              c.getObjectClass(), c
             ));
           // make sure to also clear the pojo class info in order to force the dependencies
           // to other pojos to be re-created when they are referenced
@@ -986,7 +996,7 @@ public class HelenusJUnit implements MethodRule {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
     // check whether the schema for this pojo has already been loaded
     synchronized (HelenusJUnit.schemas) {
-      if (HelenusJUnit.schemas.putIfAbsent(clazz, new ArrayList<>(0)) != null) {
+      if (!HelenusJUnit.schemas.add(clazz)) {
         return; // nothing to do more
       }
       final boolean old = HelenusJUnit.capturing;
@@ -1064,14 +1074,16 @@ public class HelenusJUnit implements MethodRule {
           }
           s.execute();
         }
-        HelenusJUnit.schemas.put(clazz, initials);
+        HelenusJUnit.initials.put(clazz, MutablePair.of(initials, null)); // cache all initials objects for next time
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(clazz);
+        HelenusJUnit.initials.remove(clazz);
         throw e;
       } catch (Throwable t) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(clazz);
+        HelenusJUnit.initials.remove(clazz);
         throw new AssertionError(
           "failed to create schema for " + clazz.getSimpleName(), t
         );
@@ -1089,12 +1101,11 @@ public class HelenusJUnit implements MethodRule {
    * @param <T> the type of pojo being reset
    *
    * @param  cinfo the class info to reset the schema
-   * @param  initials the initials set of objects to re-insert
    * @throws AssertionError if a failure occurs while reseting the schema
    */
-  static <T> void resetSchema0(ClassInfoImpl<T> cinfo, List<Object> initials) {
+  static <T> void resetSchema0(ClassInfoImpl<T> cinfo) {
     synchronized (HelenusJUnit.schemas) {
-      HelenusJUnit.schemas.put(cinfo.getObjectClass(), initials);
+      HelenusJUnit.schemas.add(cinfo.getObjectClass());
       if (cinfo instanceof RootClassInfo) {
         logger.debug(
           "Resetting schema for %s, %s",
@@ -1115,15 +1126,22 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final Batch batch = StatementBuilder.batch();
+        final MutablePair<List<Object>, Batch> p = HelenusJUnit.initials.get(cinfo.getObjectClass());
+        final Batch batch;
 
-        batch.disableTracing();
-        for (final Object io: initials) {
-          @SuppressWarnings("unchecked")
-          final Insert<T> insert = StatementBuilder.insert((T)io).intoAll();
+        if (p.getRight() != null) {
+          batch = p.getRight();
+        } else {
+          batch = StatementBuilder.batch();
+          batch.disableTracing();
+          for (final Object io: p.getLeft()) {
+            @SuppressWarnings("unchecked")
+            final Insert<T> insert = StatementBuilder.insert((T)io).intoAll();
 
-          insert.disableTracing();
-          batch.add(insert);
+            insert.disableTracing();
+            batch.add(insert);
+          }
+          p.setRight(batch); // cache the batch for next time
         }
         batch.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
@@ -2137,13 +2155,11 @@ public class HelenusJUnit implements MethodRule {
     public <T> ClassInfoImpl<T> getClassInfoImpl(Class<T> clazz) {
       synchronized (HelenusJUnit.schemas) {
         // first check if we have already loaded it in previous test cases and if so, reset the schema for it
-        @SuppressWarnings({"unchecked", "cast", "rawtypes"})
-        final Pair<ClassInfoImpl<T>, List<Object>> p
-          = (Pair<ClassInfoImpl<T>, List<Object>>)(Pair)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
+        @SuppressWarnings("unchecked")
+        final ClassInfoImpl<T> cinfo
+          = (ClassInfoImpl<T>)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
 
-        if (p != null) {
-          final ClassInfoImpl<T> cinfo = p.getLeft();
-
+        if (cinfo != null) {
           if (cinfo instanceof TypeClassInfoImpl) {
             // force root to be re-cached first
             getClassInfoImpl(((TypeClassInfoImpl<T>)cinfo).getRoot().getObjectClass());
@@ -2153,7 +2169,7 @@ public class HelenusJUnit implements MethodRule {
           }
           // first truncate all loaded pojo tables and re-insert any schema defined
           // initial objects
-          HelenusJUnit.resetSchema0(cinfo, p.getRight());
+          HelenusJUnit.resetSchema0(cinfo);
           return cinfo;
         }
       }
