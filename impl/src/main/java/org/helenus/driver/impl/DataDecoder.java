@@ -40,13 +40,12 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
 
-import org.apache.commons.lang3.LocaleUtils;
-
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 import com.datastax.driver.core.utils.Bytes;
 
+import org.helenus.commons.lang3.LocaleUtils;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.ClassInfo;
 
@@ -204,9 +203,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      final String lname = row.getString(name);
-
-      return (lname != null) ? LocaleUtils.toLocale(lname) : null;
+      return LocaleUtils.toLocale(row.getString(name));
     }
     @Override
     protected Locale decodeImpl(UDTValue uval, String name, Class<Locale> clazz) {
@@ -215,9 +212,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      final String lname = uval.getString(name);
-
-      return (lname != null) ? LocaleUtils.toLocale(lname) : null;
+      return LocaleUtils.toLocale(uval.getString(name));
     }
   };
 
