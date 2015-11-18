@@ -31,6 +31,7 @@ import java.util.stream.Stream;
 import java.time.ZoneId;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -95,6 +96,7 @@ import org.helenus.jackson.annotation.JsonPropertyReadOnly;
 import org.helenus.jackson.annotation.JsonPropertyReference;
 import org.helenus.jackson.annotation.JsonPropertyTitle;
 import org.helenus.jackson.annotation.JsonPropertyUniqueItems;
+import org.helenus.jackson.annotation.JsonPropertyValueDescription;
 import org.helenus.jackson.annotation.JsonPropertyValueFormat;
 
 /**
@@ -192,12 +194,14 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
    *        if not an item
    * @param schema the schema to update
    * @param prop the property for the schema
-   * @param keys <code>true</code> if we are updating the schema for keys;
-   *        <code>false</code> for values
+   * @param which <code>true</code> if we are updating the schema for keys;
+   *        <code>false</code> for map values and <code>null</code> for standard
+   *        property
    */
   void updateSchema(
-    JsonSchema cschema, JsonSchema schema, BeanProperty prop, boolean keys
+    JsonSchema cschema, JsonSchema schema, BeanProperty prop, Boolean which
   ) {
+    final boolean keys = (which != null) && which;
     JavaType jtype = prop.getType();
 
     if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
@@ -210,11 +214,27 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         schema.setReadonly(true);
       }
     }
-    if (keys) {
-      final JsonPropertyKeyDescription ak = prop.getAnnotation(JsonPropertyKeyDescription.class);
+    if (which != null) {
+      if (which) {
+        final JsonPropertyKeyDescription ak = prop.getAnnotation(JsonPropertyKeyDescription.class);
 
-      if ((ak != null) && !ak.value().isEmpty()) {
-        schema.setDescription(ak.value());
+        if ((ak != null) && !ak.value().isEmpty()) {
+          schema.setDescription(ak.value());
+        }
+      } else {
+        final JsonPropertyValueDescription av = prop.getAnnotation(JsonPropertyValueDescription.class);
+
+        if ((av != null) && !av.value().isEmpty()) {
+          schema.setDescription(av.value());
+        } else { // pass description to value if none set specifically
+          if (StringUtils.isEmpty(schema.getDescription())) {
+            final JsonPropertyDescription apd = prop.getAnnotation(JsonPropertyDescription.class);
+
+            if (apd != null) {
+              schema.setDescription(apd.value());
+            }
+          }
+        }
       }
     }
     if (schema instanceof SimpleTypeSchema) {
@@ -293,7 +313,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ObjectSchema.SchemaAdditionalProperties saprops = (ObjectSchema.SchemaAdditionalProperties)aprops;
         final JsonSchema sschema = saprops.getJsonSchema();
 
-        updateSchema(schema, sschema, prop, false);
+        updateSchema(schema, sschema, prop, null);
       } else if (aprops instanceof MapSchemaAdditionalProperties) {
         final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
         final JsonSchema kschema = maprops.getKeysSchema();
@@ -301,12 +321,6 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 
         updateSchema(schema, kschema, prop, true);
         updateSchema(schema, vschema, prop, false);
-        // pass description to value
-        final JsonPropertyDescription apd = prop.getAnnotation(JsonPropertyDescription.class);
-
-        if (apd != null) {
-          vschema.setDescription(apd.value());
-        }
       }
     } else if (schema.isArraySchema()) {
       final ArraySchema aschema = schema.asArraySchema();
@@ -345,13 +359,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
 
         for (final JsonSchema ischema: aitems.getJsonSchemas()) {
-          updateSchema(schema, ischema, prop, false);
+          updateSchema(schema, ischema, prop, null);
         }
       } else if (items.isSingleItems()) {
         final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
         final JsonSchema ischema = sitems.getSchema();
 
-        updateSchema(schema, ischema, prop, false);
+        updateSchema(schema, ischema, prop, null);
       }
     } else if (schema.isNumberSchema()) {
       final NumberSchema nschema = schema.asNumberSchema();
@@ -607,7 +621,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           super.optionalProperty(writer);
           final JsonSchema schema = getPropertySchema(writer);
 
-          updateSchema(null, schema, writer, false);
+          updateSchema(null, schema, writer, null);
           updateForTypeId(schema, writer);
         }
       }
@@ -617,7 +631,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           super.property(writer);
           final JsonSchema schema = getPropertySchema(writer);
 
-          updateSchema(null, schema, writer, false);
+          updateSchema(null, schema, writer, null);
           updateForTypeId(schema, writer);
         }
       }
