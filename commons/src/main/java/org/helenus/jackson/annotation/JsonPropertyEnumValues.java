@@ -21,6 +21,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import java.util.Locale;
+
+import java.time.ZoneId;
+
 import com.fasterxml.jackson.annotation.JacksonAnnotation;
 
 /**
@@ -65,6 +69,20 @@ public @interface JsonPropertyEnumValues {
   Class<?>[] valueSubTypesOf() default {};
 
   /**
+   * Defines all possible values that are valid for the annotated property or
+   * its contained values from the specified class' available values. Supported
+   * classes are {@link Locale} and {@link ZoneId}.
+   * <p>
+   * <i>Note:</i> Only defined one class.
+   *
+   * @author paouelle
+   *
+   * @return the class from which to get all sub-types for all possible values
+   *         that are valid for the property or its contained values
+   */
+  Class<?>[] valueAvailablesOf() default {};
+
+  /**
    * Defines all possible values that are valid for the annotated property
    * contained keys.
    *
@@ -86,4 +104,18 @@ public @interface JsonPropertyEnumValues {
    *         that are valid for the property contained keys
    */
   Class<?>[] keySubTypesOf() default {};
+
+  /**
+   * Defines all possible values that are valid for the annotated property
+   * contained keys from the specified class' available values. Supported
+   * classes are {@link Locale} and {@link ZoneId}.
+   * <p>
+   * <i>Note:</i> Only defined one class.
+   *
+   * @author paouelle
+   *
+   * @return the class from which to get all available possible values
+   *         that are valid for the property contained keys
+   */
+  Class<?>[] keyAvailablesOf() default {};
 }

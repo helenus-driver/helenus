@@ -158,15 +158,15 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
    * @return a set of all provided enum values
    */
   private Set<String> getEnumValues(JsonPropertyEnumValues ae, boolean keys) {
-    final Class<?>[] classes = keys ? ae.keySubTypesOf() : ae.valueSubTypesOf();
+    final Class<?>[] sclasses = keys ? ae.keySubTypesOf() : ae.valueSubTypesOf();
     Stream<String> s = Stream.empty();
 
-    if (classes.length > 0) {
-      final JsonSubTypes jst = ReflectionUtils.findFirstAnnotation(classes[0], JsonSubTypes.class);
+    if (sclasses.length > 0) {
+      final JsonSubTypes jst = ReflectionUtils.findFirstAnnotation(sclasses[0], JsonSubTypes.class);
 
       if (jst != null) {
         s = Stream.of(jst.value())
-          .filter(t -> classes[0].isAssignableFrom(t.value()))
+          .filter(t -> sclasses[0].isAssignableFrom(t.value()))
           .map(t -> {
             if (!t.name().isEmpty()) {
               return t.name();
@@ -180,9 +180,19 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           });
       }
     }
-    return Stream.concat(
-      Stream.of(keys ? ae.key() : ae.value()), s
-    ).collect(Collectors.toCollection(LinkedHashSet::new));
+    final Class<?>[] iclasses = keys ? ae.keyAvailablesOf() : ae.valueAvailablesOf();
+    Stream<String> i = Stream.empty();
+
+    if (iclasses.length > 0) {
+      if (iclasses[0] == Locale.class) {
+        i = Stream.of(Locale.getAvailableLocales()).map(Locale::toString);
+      } else if (iclasses[0] == ZoneId.class) {
+        i = ZoneId.getAvailableZoneIds().stream();
+      }
+    }
+    return Stream.of(
+      Stream.of(keys ? ae.key() : ae.value()), s, i
+    ).flatMap(e -> e).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
