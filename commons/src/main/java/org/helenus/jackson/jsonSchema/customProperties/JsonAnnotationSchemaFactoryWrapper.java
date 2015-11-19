@@ -190,9 +190,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         i = ZoneId.getAvailableZoneIds().stream();
       }
     }
+    final String[] exclude = keys ? ae.keyExclude() : ae.valueExclude();
+
     return Stream.of(
       Stream.of(keys ? ae.key() : ae.value()), s, i
-    ).flatMap(e -> e).collect(Collectors.toCollection(LinkedHashSet::new));
+    ).flatMap(e -> e)
+     .filter(e -> !ArrayUtils.contains(exclude, e))
+     .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**

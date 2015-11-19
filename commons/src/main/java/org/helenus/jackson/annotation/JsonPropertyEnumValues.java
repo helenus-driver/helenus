@@ -83,6 +83,17 @@ public @interface JsonPropertyEnumValues {
   Class<?>[] valueAvailablesOf() default {};
 
   /**
+   * Set of enum values to exclude from the schema for the annotated property or
+   * its contained values.
+   *
+   * @author paouelle
+   *
+   * @return a set of enum values to exclude from the schema for the property
+   *         or its contained values
+   */
+  String[] valueExclude() default {};
+
+  /**
    * Defines all possible values that are valid for the annotated property
    * contained keys.
    *
@@ -118,4 +129,15 @@ public @interface JsonPropertyEnumValues {
    *         that are valid for the property contained keys
    */
   Class<?>[] keyAvailablesOf() default {};
+
+  /**
+   * Set of enum values to exclude from the schema for the annotated property
+   * contained keys.
+   *
+   * @author paouelle
+   *
+   * @return a set of enum values to exclude from the schema for the property
+   *         contained keys
+   */
+  String[] keyExclude() default {};
 }
