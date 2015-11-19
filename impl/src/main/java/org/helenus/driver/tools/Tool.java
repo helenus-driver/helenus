@@ -1346,9 +1346,13 @@ public class Tool {
         );
         continue;
       }
-      final Batch batch = StatementBuilder.batch();
+      final Sequence sequence = StatementBuilder.sequence();
+      Batch batch = StatementBuilder.batch();
+      int num = 0;
 
-      initials.forEach((m, cs) -> {
+      sequence.add(batch);
+      for (final Map.Entry<Method, Class<?>[]> e: initials.entrySet()) {
+        final Method m = e.getKey();
         final Collection<?> ios = Tool.getInitialObjects(m, suffixes);
 
         System.out.println(
@@ -1363,15 +1367,19 @@ public class Tool {
           + m.getName()
           + "()"
         );
-
         for (final Object io: ios) {
+          if (batch.hasReachedRecommendedSize()) { // switch to a new batch
+            batch = StatementBuilder.batch();
+            sequence.add(batch);
+          }
+          num++;
           batch.add(StatementBuilder.insert(io).intoAll());
         }
-      });
-      if (batch.isEmpty() || (batch.getQueryString() == null)) {
+      }
+      if (num > 0) {
         System.out.println(Tool.class.getSimpleName() + ": no objects to insert");
       } else {
-        executeCQL(batch);
+        executeCQL(sequence);
       }
     }
   }

@@ -25,6 +25,7 @@ import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
 import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -199,7 +200,18 @@ public class CreateSchemaImpl<T>
       }
     }
     // finish with initial objects
-    final BatchImpl batch = new BatchImpl(
+    // create sequences of batches since it is possible that the number of objects
+    // to insert exceeds the recommended size for a batch
+    final SequenceImpl sequence = new SequenceImpl(
+      Optional.empty(), new SequenceableStatement[0], mgr, bridge
+    );
+
+    if (isTracing()) {
+      sequence.enableTracing();
+    } else {
+      sequence.disableTracing();
+    }
+    BatchImpl batch = new BatchImpl(
       Optional.empty(), new BatchableStatement[0], true, mgr, bridge
     );
 
@@ -208,6 +220,7 @@ public class CreateSchemaImpl<T>
     } else {
       batch.disableTracing();
     }
+    sequence.add(batch);
     for (final T io: getContext().getInitialObjects()) {
       final InsertImpl<T> insert = new InsertImpl<>(
         getContext().getClassInfo().newContext(io),
@@ -221,12 +234,25 @@ public class CreateSchemaImpl<T>
       } else {
         insert.disableTracing();
       }
+      if (batch.hasReachedRecommendedSize()) { // switch to a new batch
+        batch = new BatchImpl(
+          Optional.empty(), new BatchableStatement[0], true, mgr, bridge
+        );
+        if (isTracing()) {
+          batch.enableTracing();
+        } else {
+          batch.disableTracing();
+        }
+        sequence.add(batch);
+      }
       batch.add(insert);
     }
-    final StringBuilder builder = batch.buildQueryString();
+    final StringBuilder[] sbuilders = sequence.buildQueryStrings();
 
-    if (builder != null) {
-      builders.add(builder);
+    if (sbuilders != null) {
+      for (final StringBuilder sb: sbuilders) {
+        builders.add(sb);
+      }
     }
     if (builders.isEmpty()) {
       return null;
