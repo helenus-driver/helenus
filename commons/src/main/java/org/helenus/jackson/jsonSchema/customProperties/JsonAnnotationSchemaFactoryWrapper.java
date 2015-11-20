@@ -569,15 +569,15 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
             jtype = jtype.getReferencedType();
           }
-          final Set<JavaType> jstypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(jtype.getRawClass())
-            .map(c -> SimpleType.construct(c))
-            .collect(Collectors.toSet());
-
           if (schema instanceof ArraySchema) {
             final ArraySchema aschema = (ArraySchema)schema;
             final ArraySchema.Items items = aschema.getItems();
 
             jtype = jtype.getContentType();
+            final Set<JavaType> jstypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(jtype.getRawClass())
+              .map(c -> SimpleType.construct(c))
+              .collect(Collectors.toCollection(LinkedHashSet::new));
+
             if (items.isArrayItems()) {
               final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
               final JsonSchema[] aschemas = aitems.getJsonSchemas();
@@ -617,29 +617,82 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 
             if (aprops instanceof MapSchemaAdditionalProperties) {
               final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
-              final JsonSchema kschema = maprops.getKeysSchema();
+              final JsonSchema vschema = maprops.getValuesSchema();
 
-              if (kschema instanceof ObjectSchema) {
-                final Set<JavaType> jsktypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(
-                  maprops.getKeysType().getRawClass()
+              if (vschema instanceof ObjectSchema) {
+                final Set<JavaType> jsvtypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(
+                  maprops.getValuesType().getRawClass()
                 ).map(c -> SimpleType.construct(c))
-                 .collect(Collectors.toSet());
+                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-                if (jsktypes.isEmpty()) {
-                  maprops.setKeysSchema(
+                if (jsvtypes.isEmpty()) {
+                  maprops.setValuesSchema(
                     new ReferenceSchema(
-                      visitorContext.javaTypeToUrn(maprops.getKeysType())
+                      visitorContext.javaTypeToUrn(maprops.getValuesType())
                     )
                   );
                 } else {
-                  maprops.setKeysSchema(new ReferenceSchema(
-                    jsktypes.stream()
+                  maprops.setValuesSchema(new ReferenceSchema(
+                    jsvtypes.stream()
                       .map(t -> visitorContext.javaTypeToUrn(t))
                       .collect(Collectors.joining(" or "))
                   ));
                 }
+              } else if (vschema instanceof ArraySchema) {
+                final ArraySchema aschema = (ArraySchema)vschema;
+                final ArraySchema.Items items = aschema.getItems();
+                final Set<JavaType> jstypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(
+                  maprops.getValuesType().getContentType().getRawClass()
+                ).map(c -> SimpleType.construct(c))
+                 .collect(Collectors.toCollection(LinkedHashSet::new));
+
+                if (items.isArrayItems()) {
+                  final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
+                  final JsonSchema[] aschemas = aitems.getJsonSchemas();
+
+                  for (int i = 0; i < aitems.getJsonSchemas().length; i++) {
+                    if (aschemas[i] instanceof ObjectSchema) {
+                      if (jstypes.isEmpty()) {
+                        aschemas[i] = new ReferenceSchema(
+                          visitorContext.javaTypeToUrn(
+                            maprops.getValuesType().getContentType()
+                          )
+                        );
+                      } else {
+                        aschemas[i] = new ReferenceSchema(
+                          jstypes.stream()
+                            .map(t -> visitorContext.javaTypeToUrn(t))
+                            .collect(Collectors.joining(" or "))
+                        );
+                      }
+                    }
+                  }
+                } else if (items.isSingleItems()) {
+                  final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
+                  final JsonSchema ischema = sitems.getSchema();
+
+                  if (ischema instanceof ObjectSchema) {
+                    if (jstypes.isEmpty()) {
+                      sitems.setSchema(new ReferenceSchema(
+                        visitorContext.javaTypeToUrn(
+                          maprops.getValuesType().getContentType()
+                        )
+                      ));
+                    } else {
+                      sitems.setSchema(new ReferenceSchema(
+                        jstypes.stream()
+                        .map(t -> visitorContext.javaTypeToUrn(t))
+                        .collect(Collectors.joining(" or "))
+                      ));
+                    }
+                  }
+                }
               }
             } else {
+              final Set<JavaType> jstypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(jtype.getRawClass())
+                .map(c -> SimpleType.construct(c))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
               if (jstypes.isEmpty()) {
                 schema = new ReferenceSchema(visitorContext.javaTypeToUrn(jtype));
               } else {
@@ -662,23 +715,23 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 
             if (aprops instanceof MapSchemaAdditionalProperties) {
               final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
-              final JsonSchema vschema = maprops.getValuesSchema();
+              final JsonSchema kschema = maprops.getKeysSchema();
 
-              if (vschema instanceof ObjectSchema) {
-                final Set<JavaType> jsvtypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(
-                  maprops.getValuesType().getRawClass()
+              if (kschema instanceof ObjectSchema) {
+                final Set<JavaType> jsktypes = JsonAnnotationSchemaFactoryWrapper.getJsonSubTypesFrom(
+                  maprops.getKeysType().getRawClass()
                 ).map(c -> SimpleType.construct(c))
-                 .collect(Collectors.toSet());
+                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-                if (jsvtypes.isEmpty()) {
-                  maprops.setValuesSchema(
+                if (jsktypes.isEmpty()) {
+                  maprops.setKeysSchema(
                     new ReferenceSchema(
-                      visitorContext.javaTypeToUrn(maprops.getValuesType())
+                      visitorContext.javaTypeToUrn(maprops.getKeysType())
                     )
                   );
                 } else {
-                  maprops.setValuesSchema(new ReferenceSchema(
-                    jsvtypes.stream()
+                  maprops.setKeysSchema(new ReferenceSchema(
+                    jsktypes.stream()
                     .map(t -> visitorContext.javaTypeToUrn(t))
                     .collect(Collectors.joining(" or "))
                   ));
