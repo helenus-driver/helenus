@@ -91,7 +91,8 @@ import com.fasterxml.jackson.module.jsonSchema.types.StringSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.ValueTypeSchema;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.jackson.annotation.JsonPropertyDefaultValue;
+import org.helenus.jackson.annotation.JsonPropertyDefaultValues;
+import org.helenus.jackson.annotation.JsonPropertyDefaultValuesProvider;
 import org.helenus.jackson.annotation.JsonPropertyDivisibleBy;
 import org.helenus.jackson.annotation.JsonPropertyEnumValues;
 import org.helenus.jackson.annotation.JsonPropertyEnumValuesProvider;
@@ -212,7 +213,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         i = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
           iclasses[0], JsonPropertyEnumValuesProvider.class, true
         ).keySet().stream()
-         .map(m -> {
+         .flatMap(m -> {
           // validate the method is static
           if (!Modifier.isStatic(m.getModifiers())) {
             throw new IllegalArgumentException(
@@ -266,7 +267,6 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
             }
           }
         })
-        .flatMap(o -> o)
         .filter(o -> o != null)
         .map(o -> o.toString());
       }
@@ -359,10 +359,74 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           sschema.setTitle(t);
         }
       }
-      final JsonPropertyDefaultValue adv = prop.getAnnotation(JsonPropertyDefaultValue.class);
+      final JsonPropertyDefaultValues adv = prop.getAnnotation(JsonPropertyDefaultValues.class);
 
       if (adv != null) {
-        sschema.setDefault(adv.value());
+        sschema.setDefault(
+          Stream.concat(
+            Stream.of(adv.value()),
+            Stream.of(adv.valueFromClass())
+              .flatMap(c -> ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+                c, JsonPropertyDefaultValuesProvider.class, true
+              ).keySet().stream())
+              .flatMap(m -> {
+                // validate the method is static
+                if (!Modifier.isStatic(m.getModifiers())) {
+                  throw new IllegalArgumentException(
+                    "json property default values provider method '"
+                    + m.getName()
+                    + "' is not static in class: "
+                    + m.getDeclaringClass().getSimpleName()
+                  );
+                }
+                try {
+                  final Object ret = m.invoke(null);
+
+                  if (ret == null) {
+                    return Stream.empty();
+                  }
+                  final Class<?> type = m.getReturnType();
+
+                  if (type.isArray()) {
+                    return IntStream.range(0, Array.getLength(ret)).mapToObj(j -> Array.get(ret, j));
+                  } else if (ret instanceof Collection) {
+                    return ((Collection<?>)ret).stream();
+                  } else if (ret instanceof Stream) {
+                    return ((Stream<?>)ret);
+                  } else if (ret instanceof Iterator) {
+                    return StreamSupport.stream(
+                      Spliterators.spliteratorUnknownSize(
+                        (Iterator<?>)ret, Spliterator.ORDERED
+                      ), false
+                    );
+                  } else if (ret instanceof Enumeration<?>) {
+                    return StreamSupport.stream(
+                      Spliterators.spliteratorUnknownSize(
+                        new EnumerationIterator<>((Enumeration<?>)ret), Spliterator.ORDERED
+                      ), false
+                    );
+                  } else if (ret instanceof Iterable) {
+                    return StreamSupport.stream(((Iterable<?>)ret).spliterator(), false);
+                  }
+                  return Stream.of(ret);
+                } catch (IllegalAccessException e) { // should not happen
+                  throw new IllegalStateException(e);
+                } catch (InvocationTargetException e) {
+                  final Throwable t = e.getTargetException();
+
+                  if (t instanceof Error) {
+                    throw (Error)t;
+                  } else if (t instanceof RuntimeException) {
+                    throw (RuntimeException)t;
+                  } else { // we don't expect any of those
+                    throw new IllegalStateException(t);
+                  }
+                }
+              })
+              .filter(o -> o != null)
+              .map(o -> o.toString())
+          ).collect(Collectors.joining(", "))
+        );
       }
     }
     if (schema instanceof ValueTypeSchema) {

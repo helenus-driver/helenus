@@ -21,30 +21,34 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.stream.Stream;
+
 import com.fasterxml.jackson.annotation.JacksonAnnotation;
 
 /**
- * The <code>JsonPropertyDefaultValue</code> annotation is used to indicate that
- * the annotated property falls back to a default value.
+ * The <code>JsonPropertyDefaultValuesProvider</code> annotation is used to annotated
+ * a static method in a class which is able to provide the set of valid default values
+ * for a Json property annotated with {@link JsonPropertyDefaultValues} and defining
+ * a class using the {@link JsonPropertyDefaultValues#valueFromClass}.
+ * <p>
+ * The referenced method must be public and static. It can return an array, a
+ * {@link Collection}, an {@link Iterable}, an {@link Iterator}, an
+ * {@link Enumeration}, or a {@link Stream} of objects or a single object.
+ * The string representation of each returned object will be used as a possible
+ * default value for the Json property.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Oct 29, 2015 - paouelle - Creation
+ * @version 1 - Nov 20, 2015 - paouelle - Creation
  *
  * @since 1.0
  */
-@Target({ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @JacksonAnnotation
-public @interface JsonPropertyDefaultValue {
-  /**
-   * Defines the default value for the annotated property if not specified.
-   *
-   * @author paouelle
-   *
-   * @return the default value for the property if not specified
-   */
-  String value();
-}
+public @interface JsonPropertyDefaultValuesProvider {}
