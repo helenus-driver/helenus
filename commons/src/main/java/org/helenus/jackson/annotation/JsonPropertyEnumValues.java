@@ -71,7 +71,7 @@ public @interface JsonPropertyEnumValues {
   /**
    * Defines all possible values that are valid for the annotated property or
    * its contained values from the specified class' available values. Supported
-   * classes are {@link Locale} and {@link ZoneId}.
+   * classes are {@link Locale}, {@link ZoneId}, and all enum classes.
    * <p>
    * <i>Note:</i> Only defined one class.
    *
@@ -119,7 +119,7 @@ public @interface JsonPropertyEnumValues {
   /**
    * Defines all possible values that are valid for the annotated property
    * contained keys from the specified class' available values. Supported
-   * classes are {@link Locale} and {@link ZoneId}.
+   * classes are {@link Locale}, {@link ZoneId}, and all enum classes.
    * <p>
    * <i>Note:</i> Only defined one class.
    *

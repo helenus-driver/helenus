@@ -188,6 +188,8 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         i = Stream.of(Locale.getAvailableLocales()).map(Locale::toString);
       } else if (iclasses[0] == ZoneId.class) {
         i = ZoneId.getAvailableZoneIds().stream();
+      } else if (Enum.class.isAssignableFrom(iclasses[0])) {
+        i = Stream.of(iclasses[0].getEnumConstants()).map(e -> ((Enum<?>)e).name());
       }
     }
     final String[] exclude = keys ? ae.keyExclude() : ae.valueExclude();
