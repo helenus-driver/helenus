@@ -63,7 +63,6 @@ public @interface JsonPropertyMinimumValue {
    */
   boolean valueExclusive() default false;
 
-
   /**
    * Defines the minimum value for the annotated property contained keys.
    * <p>
