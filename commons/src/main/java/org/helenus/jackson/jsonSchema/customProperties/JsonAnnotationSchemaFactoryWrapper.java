@@ -15,21 +15,32 @@
  */
 package org.helenus.jackson.jsonSchema.customProperties;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+
 import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import java.time.ZoneId;
 
+import org.apache.commons.collections4.iterators.EnumerationIterator;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -83,6 +94,7 @@ import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.jackson.annotation.JsonPropertyDefaultValue;
 import org.helenus.jackson.annotation.JsonPropertyDivisibleBy;
 import org.helenus.jackson.annotation.JsonPropertyEnumValues;
+import org.helenus.jackson.annotation.JsonPropertyEnumValuesProvider;
 import org.helenus.jackson.annotation.JsonPropertyKeyDescription;
 import org.helenus.jackson.annotation.JsonPropertyKeyReference;
 import org.helenus.jackson.annotation.JsonPropertyLength;
@@ -135,7 +147,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
   /**
    * Gets Json sub types from the specified class annotated with {@link JsonSubTypes}.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  clazz the class for which to find the sub types
    * @return a stream of all sub type classes
@@ -154,22 +166,6 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
   }
 
   /**
-   * Holds the type for the schema.
-   *
-   * @author paouelle
-   */
-  private JavaType type;
-
-  /**
-   * Instantiates a new <code>JsonViewSchemaFactoryWrapper</code> object.
-   *
-   * @author paouelle
-   */
-  public JsonAnnotationSchemaFactoryWrapper() {
-    super(new JsonAnnotationSchemaFactoryWrapperFactory());
-  }
-
-  /**
    * Gets the enum values based on the specified annotation.
    *
    * @author paouelle
@@ -179,7 +175,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
    *         <code>false</code> for values
    * @return a set of all provided enum values
    */
-  private Set<String> getEnumValues(JsonPropertyEnumValues ae, boolean keys) {
+  private static Set<String> getEnumValues(JsonPropertyEnumValues ae, boolean keys) {
     final Class<?>[] sclasses = keys ? ae.keySubTypesOf() : ae.valueSubTypesOf();
     Stream<String> s = Stream.empty();
 
@@ -212,6 +208,67 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         i = ZoneId.getAvailableZoneIds().stream();
       } else if (Enum.class.isAssignableFrom(iclasses[0])) {
         i = Stream.of(iclasses[0].getEnumConstants()).map(e -> ((Enum<?>)e).name());
+      } else { // check if the class provides a method annotated with JsonPropertyEnumValuesProvider
+        i = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+          iclasses[0], JsonPropertyEnumValuesProvider.class, true
+        ).keySet().stream()
+         .map(m -> {
+          // validate the method is static
+          if (!Modifier.isStatic(m.getModifiers())) {
+            throw new IllegalArgumentException(
+              "json property enum values provider method '"
+              + m.getName()
+              + "' is not static in class: "
+              + iclasses[0].getSimpleName()
+            );
+          }
+          try {
+            final Object ret = m.invoke(null);
+
+            if (ret == null) {
+              return Stream.empty();
+            }
+            final Class<?> type = m.getReturnType();
+
+            if (type.isArray()) {
+              return IntStream.range(0, Array.getLength(ret)).mapToObj(j -> Array.get(ret, j));
+            } else if (ret instanceof Collection) {
+              return ((Collection<?>)ret).stream();
+            } else if (ret instanceof Stream) {
+              return ((Stream<?>)ret);
+            } else if (ret instanceof Iterator) {
+              return StreamSupport.stream(
+                Spliterators.spliteratorUnknownSize(
+                  (Iterator<?>)ret, Spliterator.ORDERED
+                ), false
+              );
+            } else if (ret instanceof Enumeration<?>) {
+              return StreamSupport.stream(
+                Spliterators.spliteratorUnknownSize(
+                  new EnumerationIterator<>((Enumeration<?>)ret), Spliterator.ORDERED
+                ), false
+              );
+            } else if (ret instanceof Iterable) {
+              return StreamSupport.stream(((Iterable<?>)ret).spliterator(), false);
+            }
+            return Stream.of(ret);
+          } catch (IllegalAccessException e) { // should not happen
+            throw new IllegalStateException(e);
+          } catch (InvocationTargetException e) {
+            final Throwable t = e.getTargetException();
+
+            if (t instanceof Error) {
+              throw (Error)t;
+            } else if (t instanceof RuntimeException) {
+              throw (RuntimeException)t;
+            } else { // we don't expect any of those
+              throw new IllegalStateException(t);
+            }
+          }
+        })
+        .flatMap(o -> o)
+        .filter(o -> o != null)
+        .map(o -> o.toString());
       }
     }
     final String[] exclude = keys ? ae.keyExclude() : ae.valueExclude();
@@ -221,6 +278,22 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     ).flatMap(e -> e)
      .filter(e -> !ArrayUtils.contains(exclude, e))
      .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * Holds the type for the schema.
+   *
+   * @author paouelle
+   */
+  private JavaType type;
+
+  /**
+   * Instantiates a new <code>JsonViewSchemaFactoryWrapper</code> object.
+   *
+   * @author paouelle
+   */
+  public JsonAnnotationSchemaFactoryWrapper() {
+    super(new JsonAnnotationSchemaFactoryWrapperFactory());
   }
 
   /**
@@ -297,7 +370,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
       final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
 
       if (ae != null) {
-        vtschema.setEnums(getEnumValues(ae, keys));
+        vtschema.setEnums(JsonAnnotationSchemaFactoryWrapper.getEnumValues(ae, keys));
       }
       final JsonPropertyValueFormat avf = prop.getAnnotation(JsonPropertyValueFormat.class);
 
@@ -325,7 +398,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
 
         if (ae != null) {
-          ctschema.setEnums(getEnumValues(ae, keys));
+          ctschema.setEnums(JsonAnnotationSchemaFactoryWrapper.getEnumValues(ae, keys));
         }
       }
       final JsonPropertyOneOfIntegerValues ai = prop.getAnnotation(JsonPropertyOneOfIntegerValues.class);
