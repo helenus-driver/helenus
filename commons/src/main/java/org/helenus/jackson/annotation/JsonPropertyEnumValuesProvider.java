@@ -40,6 +40,14 @@ import com.fasterxml.jackson.annotation.JacksonAnnotation;
  * {@link Enumeration}, or a {@link Stream} of objects or a single object.
  * The string representation of each returned object will be used as a possible
  * enum value for the Json property.
+ * <p>
+ * If the method is used to in association with an enum class, it is possible to
+ * have it accept one argument of type array of that enum and annotate the property
+ * that references this enum class with a {@link JsonPropertyEnumValues} annotation
+ * that uses the {@link JsonPropertyEnumValues#valueAvailablesOf} or
+ * {@link JsonPropertyEnumValues#keyAvailablesOf} with a class that
+ * provides a method annotated with {@JsonPropertyEnumValueProvider} which returns
+ * a subset of enum values that would then be passed in argument here.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *

@@ -17,9 +17,11 @@ package org.helenus.jackson.jsonSchema.customProperties;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -112,6 +114,7 @@ import org.helenus.jackson.annotation.JsonPropertyTitle;
 import org.helenus.jackson.annotation.JsonPropertyUniqueItems;
 import org.helenus.jackson.annotation.JsonPropertyValueDescription;
 import org.helenus.jackson.annotation.JsonPropertyValueFormat;
+import org.helenus.util.function.EBiConsumer;
 
 /**
  * The <code>JsonAnnotationSchemaFactoryWrapper</code> class extends on
@@ -172,11 +175,15 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
    * @author paouelle
    *
    * @param  ae the Json enum values annotation
+   * @param  filteredEnums the set of enum values to use when filtering default
+   *         and enum values for the various properties of the schema
    * @param  keys <code>true</code> if we are updating the schema for keys;
    *         <code>false</code> for values
    * @return a set of all provided enum values
    */
-  private static Set<String> getEnumValues(JsonPropertyEnumValues ae, boolean keys) {
+  private static Set<String> getEnumValues(
+    JsonPropertyEnumValues ae, Set<Enum<?>> filteredEnums, boolean keys
+  ) {
     final Class<?>[] sclasses = keys ? ae.keySubTypesOf() : ae.valueSubTypesOf();
     Stream<String> s = Stream.empty();
 
@@ -203,72 +210,80 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     Stream<String> i = Stream.empty();
 
     if (iclasses.length > 0) {
-      if (iclasses[0] == Locale.class) {
+      // check if the class provides a method annotated with JsonPropertyEnumValuesProvider
+      final Set<Method> providers = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+        iclasses[0], JsonPropertyEnumValuesProvider.class, true
+      ).keySet();
+
+      if (!providers.isEmpty()) {
+        i = providers.stream()
+          .flatMap(m -> {
+           // validate the method is static
+           if (!Modifier.isStatic(m.getModifiers())) {
+             throw new IllegalArgumentException(
+               "json property enum values provider method '"
+               + m.getName()
+               + "' is not static in class: "
+               + iclasses[0].getSimpleName()
+             );
+           }
+           try {
+             final Object ret;
+
+             if (m.getParameterCount() == 1) {
+               ret = m.invoke(null, filteredEnums);
+             } else {
+               ret = m.invoke(null);
+             }
+             if (ret == null) {
+               return Stream.empty();
+             }
+             final Class<?> type = m.getReturnType();
+
+             if (type.isArray()) {
+               return IntStream.range(0, Array.getLength(ret)).mapToObj(j -> Array.get(ret, j));
+             } else if (ret instanceof Collection) {
+               return ((Collection<?>)ret).stream();
+             } else if (ret instanceof Stream) {
+               return ((Stream<?>)ret);
+             } else if (ret instanceof Iterator) {
+               return StreamSupport.stream(
+                 Spliterators.spliteratorUnknownSize(
+                   (Iterator<?>)ret, Spliterator.ORDERED
+                 ), false
+               );
+             } else if (ret instanceof Enumeration<?>) {
+               return StreamSupport.stream(
+                 Spliterators.spliteratorUnknownSize(
+                   new EnumerationIterator<>((Enumeration<?>)ret), Spliterator.ORDERED
+                 ), false
+               );
+             } else if (ret instanceof Iterable) {
+               return StreamSupport.stream(((Iterable<?>)ret).spliterator(), false);
+             }
+             return Stream.of(ret);
+           } catch (IllegalAccessException e) { // should not happen
+             throw new IllegalStateException(e);
+           } catch (InvocationTargetException e) {
+             final Throwable t = e.getTargetException();
+
+             if (t instanceof Error) {
+               throw (Error)t;
+             } else if (t instanceof RuntimeException) {
+               throw (RuntimeException)t;
+             } else { // we don't expect any of those
+               throw new IllegalStateException(t);
+             }
+           }
+         })
+         .filter(o -> o != null)
+         .map(o -> o.toString());
+      } else if (iclasses[0] == Locale.class) {
         i = Stream.of(Locale.getAvailableLocales()).map(Locale::toString);
       } else if (iclasses[0] == ZoneId.class) {
         i = ZoneId.getAvailableZoneIds().stream();
       } else if (Enum.class.isAssignableFrom(iclasses[0])) {
         i = Stream.of(iclasses[0].getEnumConstants()).map(e -> ((Enum<?>)e).name());
-      } else { // check if the class provides a method annotated with JsonPropertyEnumValuesProvider
-        i = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
-          iclasses[0], JsonPropertyEnumValuesProvider.class, true
-        ).keySet().stream()
-         .flatMap(m -> {
-          // validate the method is static
-          if (!Modifier.isStatic(m.getModifiers())) {
-            throw new IllegalArgumentException(
-              "json property enum values provider method '"
-              + m.getName()
-              + "' is not static in class: "
-              + iclasses[0].getSimpleName()
-            );
-          }
-          try {
-            final Object ret = m.invoke(null);
-
-            if (ret == null) {
-              return Stream.empty();
-            }
-            final Class<?> type = m.getReturnType();
-
-            if (type.isArray()) {
-              return IntStream.range(0, Array.getLength(ret)).mapToObj(j -> Array.get(ret, j));
-            } else if (ret instanceof Collection) {
-              return ((Collection<?>)ret).stream();
-            } else if (ret instanceof Stream) {
-              return ((Stream<?>)ret);
-            } else if (ret instanceof Iterator) {
-              return StreamSupport.stream(
-                Spliterators.spliteratorUnknownSize(
-                  (Iterator<?>)ret, Spliterator.ORDERED
-                ), false
-              );
-            } else if (ret instanceof Enumeration<?>) {
-              return StreamSupport.stream(
-                Spliterators.spliteratorUnknownSize(
-                  new EnumerationIterator<>((Enumeration<?>)ret), Spliterator.ORDERED
-                ), false
-              );
-            } else if (ret instanceof Iterable) {
-              return StreamSupport.stream(((Iterable<?>)ret).spliterator(), false);
-            }
-            return Stream.of(ret);
-          } catch (IllegalAccessException e) { // should not happen
-            throw new IllegalStateException(e);
-          } catch (InvocationTargetException e) {
-            final Throwable t = e.getTargetException();
-
-            if (t instanceof Error) {
-              throw (Error)t;
-            } else if (t instanceof RuntimeException) {
-              throw (RuntimeException)t;
-            } else { // we don't expect any of those
-              throw new IllegalStateException(t);
-            }
-          }
-        })
-        .filter(o -> o != null)
-        .map(o -> o.toString());
       }
     }
     final String[] exclude = keys ? ae.keyExclude() : ae.valueExclude();
@@ -305,12 +320,21 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
    *        if not an item
    * @param schema the schema to update
    * @param prop the property for the schema
+   * @param filteredEnumValues the set of enum values to use when filtering default
+   *        and enum values for the various properties of the schema
+   * @param filteredEnumKeyValues the set of enum key values to use when filtering default
+   *        and enum values for the various map keys of the schema
    * @param which <code>true</code> if we are updating the schema for keys;
    *        <code>false</code> for map values and <code>null</code> for standard
    *        property
    */
   void updateSchema(
-    JsonSchema cschema, JsonSchema schema, BeanProperty prop, Boolean which
+    JsonSchema cschema,
+    JsonSchema schema,
+    BeanProperty prop,
+    Set<Enum<?>> filteredEnumValues,
+    Set<Enum<?>> filteredEnumKeyValues,
+    Boolean which
   ) {
     final boolean keys = (which != null) && which;
     JavaType jtype = prop.getType();
@@ -380,8 +404,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
                   );
                 }
                 try {
-                  final Object ret = m.invoke(null);
+                  final Object ret;
 
+                  if (m.getParameterCount() == 1) {
+                    ret = m.invoke(null, keys ? filteredEnumKeyValues : filteredEnumValues);
+                  } else {
+                    ret = m.invoke(null);
+                  }
                   if (ret == null) {
                     return Stream.empty();
                   }
@@ -434,7 +463,9 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
       final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
 
       if (ae != null) {
-        vtschema.setEnums(JsonAnnotationSchemaFactoryWrapper.getEnumValues(ae, keys));
+        vtschema.setEnums(JsonAnnotationSchemaFactoryWrapper.getEnumValues(
+          ae, keys ? filteredEnumKeyValues : filteredEnumValues, keys
+        ));
       }
       final JsonPropertyValueFormat avf = prop.getAnnotation(JsonPropertyValueFormat.class);
 
@@ -462,7 +493,9 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final JsonPropertyEnumValues ae = prop.getAnnotation(JsonPropertyEnumValues.class);
 
         if (ae != null) {
-          ctschema.setEnums(JsonAnnotationSchemaFactoryWrapper.getEnumValues(ae, keys));
+          ctschema.setEnums(JsonAnnotationSchemaFactoryWrapper.getEnumValues(
+            ae, keys ? filteredEnumKeyValues : filteredEnumValues, keys
+          ));
         }
       }
       final JsonPropertyOneOfIntegerValues ai = prop.getAnnotation(JsonPropertyOneOfIntegerValues.class);
@@ -488,14 +521,14 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ObjectSchema.SchemaAdditionalProperties saprops = (ObjectSchema.SchemaAdditionalProperties)aprops;
         final JsonSchema sschema = saprops.getJsonSchema();
 
-        updateSchema(schema, sschema, prop, null);
+        updateSchema(schema, sschema, prop, filteredEnumValues, filteredEnumKeyValues, null);
       } else if (aprops instanceof MapSchemaAdditionalProperties) {
         final MapSchemaAdditionalProperties maprops = (MapSchemaAdditionalProperties)aprops;
         final JsonSchema kschema = maprops.getKeysSchema();
         final JsonSchema vschema = maprops.getValuesSchema();
 
-        updateSchema(schema, kschema, prop, true);
-        updateSchema(schema, vschema, prop, false);
+        updateSchema(schema, kschema, prop, filteredEnumValues, filteredEnumKeyValues, true);
+        updateSchema(schema, vschema, prop, filteredEnumValues, filteredEnumKeyValues, false);
       }
     } else if (schema.isArraySchema()) {
       final ArraySchema aschema = schema.asArraySchema();
@@ -534,13 +567,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
 
         for (final JsonSchema ischema: aitems.getJsonSchemas()) {
-          updateSchema(schema, ischema, prop, null);
+          updateSchema(schema, ischema, prop, filteredEnumValues, filteredEnumKeyValues, null);
         }
       } else if (items.isSingleItems()) {
         final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
         final JsonSchema ischema = sitems.getSchema();
 
-        updateSchema(schema, ischema, prop, null);
+        updateSchema(schema, ischema, prop, filteredEnumValues, filteredEnumKeyValues, null);
       }
     } else if (schema.isNumberSchema()) {
       final NumberSchema nschema = schema.asNumberSchema();
@@ -673,6 +706,10 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
   @Override
   public JsonObjectFormatVisitor expectObjectFormat(JavaType type) {
     this.type = type;
+    // if we don't already have a recursive visitor context, create one
+    if (visitorContext == null) {
+      super.visitorContext = new JsonAnnotationVisitorContext();
+    }
     final ObjectVisitor visitor = (ObjectVisitor)super.expectObjectFormat(type);
     final SerializerProvider p = getProvider();
     final Class<?> view = (p != null) ? p.getActiveView() : null;
@@ -905,24 +942,118 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
           }
         }
       }
+      private Set<Enum<?>> getPropertyEnumValues(
+        JsonSchema schema, BeanProperty writer, boolean keys
+      ) {
+        if ((schema instanceof ObjectSchema) &&  writer.getType().isEnumType()) {
+          // check if the property was annotated with the @JsonPropertyEnumValues
+          // with valueAvailablesOf from a class that has an annotated method
+          // with @JsonPropertyEnumProvider that returns enum of that type
+          final JsonPropertyEnumValues ae = writer.getAnnotation(JsonPropertyEnumValues.class);
+
+          if (ae != null) {
+            final Class<?>[] aclasses = keys ? ae.keyAvailablesOf() : ae.valueAvailablesOf();
+
+            if (aclasses.length > 0) {
+              final Set<Enum<?>> set = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
+                aclasses[0], JsonPropertyEnumValuesProvider.class, true
+              ).keySet().stream()
+               .flatMap(m -> {
+                 // validate the method is static
+                 if (!Modifier.isStatic(m.getModifiers())) {
+                   throw new IllegalArgumentException(
+                     "json property enum values provider method '"
+                     + m.getName()
+                     + "' is not static in class: "
+                     + aclasses[0].getSimpleName()
+                   );
+                 }
+                 try {
+                   final Object ret = m.invoke(null);
+
+                   if (ret == null) {
+                     return Stream.empty();
+                   }
+                   final Class<?> type = m.getReturnType();
+
+                   if (type.isArray()) {
+                     return IntStream.range(0, Array.getLength(ret)).mapToObj(j -> Array.get(ret, j));
+                   } else if (ret instanceof Collection) {
+                     return ((Collection<?>)ret).stream();
+                   } else if (ret instanceof Stream) {
+                     return (Stream<?>)ret;
+                   } else if (ret instanceof Iterator) {
+                     return StreamSupport.stream(
+                       Spliterators.spliteratorUnknownSize(
+                         (Iterator<?>)ret, Spliterator.ORDERED
+                       ), false
+                     );
+                   } else if (ret instanceof Enumeration<?>) {
+                     return StreamSupport.stream(
+                       Spliterators.spliteratorUnknownSize(
+                         new EnumerationIterator<>((Enumeration<?>)ret), Spliterator.ORDERED
+                       ), false
+                     );
+                   } else if (ret instanceof Iterable) {
+                     return StreamSupport.stream(((Iterable<?>)ret).spliterator(), false);
+                   }
+                   return Stream.of(ret);
+                 } catch (IllegalAccessException e) { // should not happen
+                   throw new IllegalStateException(e);
+                 } catch (InvocationTargetException e) {
+                   final Throwable t = e.getTargetException();
+
+                   if (t instanceof Error) {
+                     throw (Error)t;
+                   } else if (t instanceof RuntimeException) {
+                     throw (RuntimeException)t;
+                   } else { // we don't expect any of those
+                     throw new IllegalStateException(t);
+                   }
+                 }
+               })
+               .filter(o -> writer.getType().getRawClass().isInstance(o))
+               .map(o -> (Enum<?>)o)
+               .collect(Collectors.toCollection(LinkedHashSet::new));
+
+              return Collections.unmodifiableSet(set);
+            }
+          }
+        }
+        return Collections.emptySet();
+      }
+      @SuppressWarnings("synthetic-access")
       @Override
       public void optionalProperty(BeanProperty writer) throws JsonMappingException {
         if (isIncluded(writer)) {
-          super.optionalProperty(writer);
-          final JsonSchema schema = getPropertySchema(writer);
+          ((JsonAnnotationVisitorContext)visitorContext).withEnumValuesDo(
+            getPropertyEnumValues(schema, writer, false),
+            getPropertyEnumValues(schema, writer, true),
+            (evs, eks) -> {
+              super.optionalProperty(writer);
+              final JsonSchema schema = getPropertySchema(writer);
 
-          updateSchema(null, schema, writer, null);
-          updateForTypeId(schema, writer);
+              updateSchema(null, schema, writer, evs, eks, null);
+              updateForTypeId(schema, writer);
+            }
+          );
         }
       }
+      @SuppressWarnings("synthetic-access")
       @Override
       public void property(BeanProperty writer) throws JsonMappingException {
         if (isIncluded(writer)) {
-          super.property(writer);
-          final JsonSchema schema = getPropertySchema(writer);
+          ((JsonAnnotationVisitorContext)visitorContext).withEnumValuesDo(
+            getPropertyEnumValues(schema, writer, false),
+            getPropertyEnumValues(schema, writer, true),
+            (evs, eks) -> {
+              super.property(writer);
+              final JsonSchema schema = getPropertySchema(writer);
 
-          updateSchema(null, schema, writer, null);
-          updateForTypeId(schema, writer);
+              updateSchema(null, schema, writer, evs, eks, null);
+              updateForTypeId(schema, writer);
+            }
+          );
         }
       }
     };
@@ -1302,5 +1433,89 @@ class JsonAnnotationSchemaFactoryWrapperFactory extends WrapperFactory {
     wrapper.setProvider(p);
     wrapper.setVisitorContext(rvc);
     return wrapper;
+  }
+};
+
+/**
+ * The <code>JsonAnnotationVisitorContext</code> class extends the standard
+ * {@link VisitorContext} class in order to keep track of a set of filtered
+ * enum values to be used when visiting enum classes that are serialized as
+ * Json objects instead of the usual string schema.
+ *
+ * @copyright 2015-2015 The Helenus Driver Project Authors
+ *
+ * @author  The Helenus Driver Project Authors
+ * @version 1 - Nov 22, 2015 - paouelle - Creation
+ *
+ * @since 1.0
+ */
+class JsonAnnotationVisitorContext extends VisitorContext {
+  /**
+   * Holds the current set of filtered enum values.
+   *
+   * @author paouelle
+   */
+  private Set<Enum<?>> enumValues = Collections.emptySet();
+
+  /**
+   * Holds the current set of filtered enum key values.
+   *
+   * @author paouelle
+   */
+  private Set<Enum<?>> enumKeyValues = Collections.emptySet();
+
+  /**
+   * Executes the specified piece of code after having pushed onto the current
+   * stack the provided sets of filtered enum values and filtered enum key values.
+   * The specified code will be provided with the previous sets of enum values and
+   * enum key values while any recursion from this point on will be given the
+   * specified sets of filtered enum values and filtered enum key values.
+   *
+   * @author paouelle
+   *
+   * @param  enumValues the non-<code>null</code> new set of filtered enum
+   *         values to provide to any recursion coming back into this method
+   * @param  enumKeyValues the non-<code>null</code> new set of filtered enum
+   *         values to provide to any recursion coming back into this method
+   *         defined for map keys
+   * @param  code the code to be executed with the current set of filtered enum
+   *         values and enum filtered key values
+   * @throws JsonMappingException if a mapping exception occurs
+   */
+  public void withEnumValuesDo(
+    Set<Enum<?>> enumValues,
+    Set<Enum<?>> enumKeyValues,
+    EBiConsumer<Set<Enum<?>>, Set<Enum<?>>, JsonMappingException> code
+  ) throws JsonMappingException {
+    final Set<Enum<?>> oldvs = this.enumValues;
+    final Set<Enum<?>> oldks = this.enumKeyValues;
+
+    try {
+      this.enumValues = enumValues;
+      code.accept(oldvs, oldks);
+    } finally {
+      this.enumValues = oldvs;
+      this.enumKeyValues = oldks;
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see com.fasterxml.jackson.module.jsonSchema.factories.VisitorContext#addSeenSchemaUri(com.fasterxml.jackson.databind.JavaType)
+   */
+  @Override
+  public String addSeenSchemaUri(JavaType aSeenSchema) {
+    // if the javaType is for the same type as the enum values currently being kept
+    // around then don't bother keeping track of it as we want to make sure
+    // it is not re-used afterward
+    if (aSeenSchema.isEnumType()
+        && !enumValues.isEmpty()
+        && aSeenSchema.getRawClass().isInstance(enumValues.iterator().next())) {
+      return null;
+    }
+    return super.addSeenSchemaUri(aSeenSchema);
   }
 };

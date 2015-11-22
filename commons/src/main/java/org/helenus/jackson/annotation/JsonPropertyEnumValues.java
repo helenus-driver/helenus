@@ -31,6 +31,17 @@ import com.fasterxml.jackson.annotation.JacksonAnnotation;
  * The <code>JsonPropertyEnumValues</code> annotation is used to provide a set
  * of all possible values that are valid for the annotated object, primitive,
  * <code>byte[]</code>, array, collection, or map property.
+ * <p>
+ * If annotating a property of type corresponding to a Java enum which is
+ * serialize as a Json object instead of the standard string schema and using
+ * the {@link #valueAvailablesOf} or {@link #keyAvailablesOf} with a class that
+ * provides a method annotated with {@JsonPropertyEnumValueProvider} which returns
+ * a subset of enum values of this enum class. That set will be used as a filtered
+ * set of enum values that can be passed into the method annotated using the
+ * {@link JsonPropertyEnumValuesProvider} or {@link JsonPropertyDefaultValuesProvider}
+ * by Json properties of this enum class that are annotated with either the
+ * {@link JsonPropertyEnumValues} or {@link JsonPropertyDefaultValues} annotations
+ * referencing a class that has this annotated method.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
