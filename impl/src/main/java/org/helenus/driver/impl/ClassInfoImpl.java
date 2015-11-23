@@ -1256,7 +1256,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
 
       if (table != null) {
         // find the field in the table for this column
-        final FieldInfoImpl<T> field = table.getColumn(coldef.getName());
+        final FieldInfoImpl<T> field = table.getColumnImpl(coldef.getName());
 
         if (field != null) {
           // now let's set the value for this column

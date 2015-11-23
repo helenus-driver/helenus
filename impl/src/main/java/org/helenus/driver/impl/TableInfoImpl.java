@@ -1533,7 +1533,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @param  name the name of the column to retrieve in this table
    * @return the corresponding column field or <code>null</code> if not defined
    */
-  public FieldInfoImpl<T> getColumn(CharSequence name) {
+  public FieldInfoImpl<T> getColumnImpl(CharSequence name) {
     return (name != null) ? columns.get(name.toString()) : null;
   }
 
@@ -1597,6 +1597,18 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   @Override
   public Collection<FieldInfo<T>> getColumns() {
     return Collections.unmodifiableCollection(columns.values());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.info.TableInfo#getColumn(java.lang.String)
+   */
+  @Override
+  public Optional<FieldInfo<T>> getColumn(String name) {
+    return Optional.ofNullable(columns.get(name));
   }
 
   /**

@@ -347,7 +347,7 @@ public class UpdateImpl<T>
             // in the new multi key to avoid having DELETE generate for these
             // keys which are supposed to remain in place
             if (!multiKeys.isEmpty()) {
-              final FieldInfoImpl<?> f = table.getColumn(a.getColumnName());
+              final FieldInfoImpl<?> f = table.getColumnImpl(a.getColumnName());
 
               if (f.isMultiKey()) {
                 ((Set<?>)oldval).removeAll((Set<?>)(ra.getValue()));

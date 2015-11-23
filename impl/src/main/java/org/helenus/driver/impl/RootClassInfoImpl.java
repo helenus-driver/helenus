@@ -521,7 +521,7 @@ public class RootClassInfoImpl<T>
       // make sure there are no new non-primary columns and make sure that for
       // those defined they are of the same type
       t.getNonPrimaryKeys().stream().forEach(c -> {
-        final FieldInfoImpl<? extends T> rc = rt.getColumn(c.getColumnName());
+        final FieldInfoImpl<? extends T> rc = rt.getColumnImpl(c.getColumnName());
 
         org.apache.commons.lang3.Validate.isTrue(
           rc != null,
@@ -675,7 +675,7 @@ public class RootClassInfoImpl<T>
 
       if (table != null) {
         // find the field in the table for this column
-        final FieldInfoImpl<T> field = table.getColumn(coldef.getName());
+        final FieldInfoImpl<T> field = table.getColumnImpl(coldef.getName());
 
         if ((field != null) && field.isTypeKey()) { // get the POJO type
           final String type = Objects.toString(field.decodeValue(row), null);

@@ -438,7 +438,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
 
       if (table != null) {
         // find the field in the table for this column
-        final FieldInfoImpl<T> field = table.getColumn(coldef.getName());
+        final FieldInfoImpl<T> field = table.getColumnImpl(coldef.getName());
 
         if (field != null) {
           // now let's set the value for this column

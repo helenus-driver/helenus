@@ -17,6 +17,7 @@ package org.helenus.driver.info;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.helenus.driver.persistence.Table;
@@ -113,6 +114,16 @@ public interface TableInfo<T> extends Iterable<FieldInfo<T>> {
    * @return a non-<code>null</code> unmodifiable collection of all column fields
    */
   public Collection<FieldInfo<T>> getColumns();
+
+  /**
+   * Gets the column field for the POJO in this table given its name.
+   *
+   * @author paouelle
+   *
+   * @param  name the name of the column to retrieve
+   * @return the corresponding column field or empty if none defined with this name
+   */
+  public Optional<FieldInfo<T>> getColumn(String name);
 
   /**
    * Gets the set of column fields for the POJO in this table.

@@ -246,14 +246,14 @@ public abstract class ClauseImpl
     @Override
     void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
       Utils.appendName(name, sb).append(op);
-      FieldInfoImpl<?> finfo = tinfo.getColumn(name);
+      FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       if (finfo == null) { // check if the field is the multi-key
         String sname = name.toString();
 
         if (sname.startsWith(StatementImpl.MK_PREFIX)) {
           sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
-          finfo = tinfo.getColumn(sname);
+          finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
             Utils.appendValue(finfo.encodeElementValue(value), sb);
             return;
@@ -418,14 +418,14 @@ public abstract class ClauseImpl
         return;
       }
       Utils.appendName(name, sb).append(" IN (");
-      FieldInfoImpl<?> finfo = tinfo.getColumn(name);
+      FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       if (finfo == null) { // check if the name reference a multi-key
         String sname = name.toString();
 
         if (sname.startsWith(StatementImpl.MK_PREFIX)) {
           sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
-          finfo = tinfo.getColumn(sname);
+          finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
             if (finfo.isPersisted()) {
               final List<Object> pvals = new ArrayList<>(values.size());

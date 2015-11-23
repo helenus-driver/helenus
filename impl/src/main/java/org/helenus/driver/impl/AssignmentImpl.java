@@ -183,7 +183,7 @@ public abstract class AssignmentImpl
     void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
       Utils.appendName(name, sb);
       sb.append("=");
-      final FieldInfoImpl<?> field = tinfo.getColumn(name);
+      final FieldInfoImpl<?> field = tinfo.getColumnImpl(name);
 
       Utils.appendValue(field.encodeValue(value), sb);
     }
@@ -350,7 +350,7 @@ public abstract class AssignmentImpl
         // get a POJO context for the POJO passed on the setFrom()
         context = context.getClassInfo().newContext((T)object);
       }
-      if (table.getColumn(name) == null) { // column not defined in the table
+      if (table.getColumnImpl(name) == null) { // column not defined in the table
         return Collections.emptyList();
       }
       return (List<AssignmentImpl>)(List)Arrays.asList(
@@ -594,7 +594,7 @@ public abstract class AssignmentImpl
     @Override
     void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
       Utils.appendName(name, sb).append("=");
-      final FieldInfoImpl<?> finfo = tinfo.getColumn(name);
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       Utils.appendList((List<?>)finfo.encodeValue(value), sb);
       sb.append("+");
@@ -667,7 +667,7 @@ public abstract class AssignmentImpl
     @Override
     void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
       Utils.appendName(name, sb).append("[").append(idx).append("]=");
-      final FieldInfoImpl<?> finfo = tinfo.getColumn(name);
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       Utils.appendValue(finfo.encodeElementValue(value), sb);
     }
@@ -753,7 +753,7 @@ public abstract class AssignmentImpl
     void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
       Utils.appendName(name, sb).append("=");
       Utils.appendName(name, sb).append(isAdd ? "+" : "-");
-      final FieldInfoImpl<?> finfo = tinfo.getColumn(name);
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       Utils.appendCollection(finfo.encodeValue(collection), sb, null);
     }
@@ -770,7 +770,7 @@ public abstract class AssignmentImpl
       if ((ctype == DataType.MAP) || (ctype == DataType.SORTED_MAP)) {
         table.validateMapColumnAndKeyValues(name, (Map<?, ?>)collection);
       } else {
-        final FieldInfoImpl<?> finfo = table.getColumn(name);
+        final FieldInfoImpl<?> finfo = table.getColumnImpl(name);
 
         if ((finfo != null)
             && ((finfo.getDataType().getType() == DataType.MAP)
@@ -840,7 +840,7 @@ public abstract class AssignmentImpl
       Utils.appendName(name, sb).append("[");
       Utils.appendValue(key, sb);
       sb.append("]=");
-      final FieldInfoImpl<?> finfo = tinfo.getColumn(name);
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       // paouelle: 03/06/15 - I think this is a bug, it should be encoded as an
       // element of the map and not the type of the map as such, it should be
