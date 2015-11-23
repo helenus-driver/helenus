@@ -1376,7 +1376,7 @@ public class Tool {
           batch.add(StatementBuilder.insert(io).intoAll());
         }
       }
-      if (num > 0) {
+      if (num == 0) {
         System.out.println(Tool.class.getSimpleName() + ": no objects to insert");
       } else {
         executeCQL(sequence);
