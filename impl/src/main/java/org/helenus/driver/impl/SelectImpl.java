@@ -603,16 +603,17 @@ public class SelectImpl<T>
       // check if the table defines any final primary keys
       // in which case we want to make sure to add clauses for them too
       // and also check for multi-keys as we need to convert the provided value
-      // (if a set of size 1) into an EQ
+      // (if a set of size 1) into an EQ or an IN for the non-set column
       final List<ClauseImpl> clauses = new ArrayList<>(this.clauses);
 
       if (!table.getMultiKeys().isEmpty()) {
         // need to see if we have multi-keys in the list and if
-        // so, we need to convert its value (if a set) into an "EQ"
+        // so, we need to convert its value (if a set) into an "EQ" or an "IN"
         for (final ListIterator<ClauseImpl> i = clauses.listIterator(); i.hasNext(); ) {
           final ClauseImpl clause = i.next();
+          final FieldInfoImpl<?> f = table.getColumnImpl(clause.getColumnName());
 
-          if (table.isMultiKey(clause.getColumnName())) {
+          if (f.isMultiKey()) {
             final Set<Object> in = new LinkedHashSet<>(8); // preserve order
 
             for (final Object v: clause.values()) {
@@ -624,20 +625,26 @@ public class SelectImpl<T>
                 in.add(v);
               }
             }
-            // NOTE: Cassandra doesn't support using an 'IN' for a primary key
-            // if as part of the columns selected, one is a collection. In our
-            // case, the multi-key column is itself a collection as such, we will
-            // never be able to support the 'IN' clause for that column
             if (in.size() == 1) {
               i.set(new ClauseImpl.EqClauseImpl(
                 StatementImpl.MK_PREFIX + clause.getColumnName(), in.iterator().next()
               ));
             } else {
-              throw new IllegalArgumentException(
-                "unsupported selection of multiple values for multi-key column '"
-                + clause.getColumnName()
-                + "'"
-               );
+              // NOTE: Cassandra doesn't support using an 'IN' for a clustering key
+              // if as part of the columns selected, one is a collection. In our
+              // case, the multi-key column is itself a collection as such, we will
+              // never be able to support the 'IN' clause for that column
+              // TODO: we could look into storing the MK as a frozen set and see if that lifts this restriction
+              if (f.isClusteringKey()) {
+                throw new IllegalArgumentException(
+                  "unsupported selection of multiple values for clustering multi-key column '"
+                  + clause.getColumnName()
+                  + "'"
+                 );
+              }
+              i.set(new ClauseImpl.InClauseImpl(
+                StatementImpl.MK_PREFIX + clause.getColumnName(), in
+              ));
             }
           }
         }
