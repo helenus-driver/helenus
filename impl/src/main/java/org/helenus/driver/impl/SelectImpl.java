@@ -613,14 +613,12 @@ public class SelectImpl<T>
           final ClauseImpl clause = i.next();
           final FieldInfoImpl<?> f = table.getColumnImpl(clause.getColumnName());
 
-          if (f.isMultiKey()) {
+          if ((f != null) && f.isMultiKey()) {
             final Set<Object> in = new LinkedHashSet<>(8); // preserve order
 
             for (final Object v: clause.values()) {
-              if (v instanceof Set<?>) {
-                for (final Object sv: (Set<?>)v) {
-                  in.add(sv);
-                }
+              if (v instanceof Collection<?>) {
+                in.addAll((Collection<?>)v);
               } else {
                 in.add(v);
               }
@@ -634,7 +632,7 @@ public class SelectImpl<T>
               // if as part of the columns selected, one is a collection. In our
               // case, the multi-key column is itself a collection as such, we will
               // never be able to support the 'IN' clause for that column
-              // TODO: we could look into storing the MK as a frozen set and see if that lifts this restriction
+              // TODO: we could look into storing the actual set column for the MK as a frozen set and see if that lifts this restriction
               if (f.isClusteringKey()) {
                 throw new IllegalArgumentException(
                   "unsupported selection of multiple values for clustering multi-key column '"
@@ -651,7 +649,6 @@ public class SelectImpl<T>
       }
       for (final Map.Entry<String, Object> e: table.getFinalPrimaryKeyValues().entrySet()) {
         final String name = e.getKey();
-
         // check if we already have a clause for that column
         boolean found = false;
 
