@@ -93,7 +93,6 @@ import org.helenus.driver.impl.TypeClassInfoImpl;
 import org.helenus.driver.impl.UDTClassInfoImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
-import org.helenus.driver.info.RootClassInfo;
 import org.helenus.driver.info.TypeClassInfo;
 import org.helenus.driver.junit.util.ReflectionJUnitUtils;
 import org.helenus.driver.junit.util.Strings;
@@ -1106,17 +1105,7 @@ public class HelenusJUnit implements MethodRule {
   static <T> void resetSchema0(ClassInfoImpl<T> cinfo) {
     synchronized (HelenusJUnit.schemas) {
       HelenusJUnit.schemas.add(cinfo.getObjectClass());
-      if (cinfo instanceof RootClassInfo) {
-        logger.debug(
-          "Resetting schema for %s, %s",
-          cinfo.getObjectClass().getSimpleName(),
-          ((RootClassInfoImpl<T>)cinfo).types()
-            .map(t -> t.getObjectClass().getSimpleName())
-            .collect(Collectors.joining(", "))
-        );
-      } else {
-        logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
-      }
+      logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
       if (((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic())
           || (cinfo instanceof UDTClassInfoImpl)) {
         // nothing to reset but we want the above trace
@@ -2151,12 +2140,12 @@ public class HelenusJUnit implements MethodRule {
      *
      * @see org.helenus.driver.impl.StatementManagerImpl#getClassInfoImpl(java.lang.Class)
      */
+    @SuppressWarnings("unchecked")
     @Override
     public <T> ClassInfoImpl<T> getClassInfoImpl(Class<T> clazz) {
       synchronized (HelenusJUnit.schemas) {
         // first check if we have already loaded it in previous test cases and if so, reset the schema for it
-        @SuppressWarnings("unchecked")
-        final ClassInfoImpl<T> cinfo
+        ClassInfoImpl<T> cinfo
           = (ClassInfoImpl<T>)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
 
         if (cinfo != null) {
@@ -2170,6 +2159,15 @@ public class HelenusJUnit implements MethodRule {
           // first truncate all loaded pojo tables and re-insert any schema defined
           // initial objects
           HelenusJUnit.resetSchema0(cinfo);
+          return cinfo;
+        } // else - check if it is already cached
+        synchronized (super.classInfoCache) {
+          cinfo = (ClassInfoImpl<T>)super.classInfoCache.get(clazz);
+        }
+        if (cinfo != null) {
+          // this will be the case if we already retrieved another sub-type for
+          // a root in which case we would have already retrieved the root and
+          // removed it from the previous tests cache
           return cinfo;
         }
       }
