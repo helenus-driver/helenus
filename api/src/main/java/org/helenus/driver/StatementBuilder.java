@@ -33,6 +33,7 @@ import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 
 import org.helenus.driver.info.ClassInfo;
+import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.Column;
 
 /**
@@ -124,7 +125,7 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param <T> The type of POJO associated with the statement.
+   * @param <T> The type of POJO associated with the statement
    *
    * @param  clazz the class of POJO associated with this statement
    * @return an in-construction SELECT statement (you will need to provide a column
@@ -135,6 +136,48 @@ public final class StatementBuilder {
    */
   public static <T> Select.Selection<T> select(Class<T> clazz) {
     return StatementManager.getManager().select(clazz);
+  }
+
+  /**
+   * Start building a new SELECT statement that selects the provided names.
+   * <p>
+   * <i>Note:</i> that {@code selectFrom(table, c1, c2)} is just a shortcut for
+   * {@code selectFrom(table).column(c1).column(c2)}.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with the statement
+   *
+   * @param  table the POJO table associated with this statement to select from
+   * @param  columns the columns names that should be selected by the statement
+   * @return the SELECT statement
+   * @throws NullPointerException if <code>table</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>table</code> doesn't represent a
+   *         valid POJO class or any of the specified columns are not defined
+   *         by the POJO
+   */
+  public static <T> Select<T> selectFrom(
+    TableInfo<T> table, CharSequence... columns
+  ) {
+    return StatementManager.getManager().selectFrom(table, columns);
+  }
+
+  /**
+   * Starts building a new SELECT statement.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with the statement
+   *
+   * @param  table the POJO table associated with this statement to select from
+   * @return an in-construction SELECT statement (you will need to provide a column
+   *         selection).
+   * @throws NullPointerException if <code>table</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>table</code> doesn't represent a
+   *         valid POJO class
+   */
+  public static <T> Select.TableSelection<T> selectFrom(TableInfo<T> table) {
+    return StatementManager.getManager().selectFrom(table);
   }
 
   /**
@@ -1461,8 +1504,8 @@ public final class StatementBuilder {
    * <i>Note:</i> This version can be useful when assigning a new value to
    * a primary key column. By specifying the old value, the statement can
    * properly generate a corresponding "delete" statement for the old record
-   * using the old value before generating an "insert" statement for the new
-   * record using the new primary key value.
+   * using the old value before generating an "insert" or "delete" statement
+   * for the new record using the new primary key value.
    *
    * @author paouelle
    *
@@ -1511,6 +1554,28 @@ public final class StatementBuilder {
    */
   public static <T> Assignment setAllFrom(T object) {
     return StatementManager.getManager().setAllFrom(object);
+  }
+
+  /**
+   * Hints the statement builder to a previous value to a primary key column
+   * such the statement can properly generate a corresponding "delete" statement
+   * for the old record using the old value before generating an "insert" or
+   * "update" statement for the new record using the new primary key value.
+   * <p>
+   * <i>Note:</i> The assignment returned here when added to an "update" request
+   * will not count as an actual assignment which means the statement will still
+   * be considered empty and continue to default to setting all columns from the
+   * associated pojo
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  old the old value for the column
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   */
+  public static Assignment previous(CharSequence name, Object old) {
+    return StatementManager.getManager().previous(name, old);
   }
 
   /**

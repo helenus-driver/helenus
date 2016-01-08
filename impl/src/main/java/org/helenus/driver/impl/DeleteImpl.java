@@ -35,6 +35,7 @@ import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.Table;
 
 /**
  * The <code>DeleteImpl</code> class extends the functionality of Cassandra's
@@ -175,6 +176,38 @@ public class DeleteImpl<T>
       !(!allSelected && CollectionUtils.isEmpty(columnNames)),
       "must select at least one column"
     );
+    this.where = new WhereImpl<>(this);
+    this.usings = new OptionsImpl<>(this);
+    this.pkeys_override = pkeys_override;
+  }
+
+  /**
+   * Instantiates a new <code>DeleteImpl</code> object for all columns.
+   *
+   * @author paouelle
+   *
+   * @param  context the non-<code>null</code> class info context associated
+   *         with this statement
+   * @param  table the table to delete from
+   * @param  pkeys_override an optional map of primary key values to use instead
+   *         of those provided by the POJO context
+   * @param  mgr the non-<code>null</code> statement manager
+   * @param  bridge the non-<code>null</code> statement bridge
+   * @throws NullPointerException if <code>context</code> is <code>null</code>
+   * @throws IllegalArgumentException if unable to compute the keyspace or table
+   *         names based from the given object
+   */
+  DeleteImpl(
+    ClassInfoImpl<T>.Context context,
+    TableInfoImpl<T> table,
+    Map<String, Object> pkeys_override,
+    StatementManagerImpl mgr,
+    StatementBridge bridge
+  ) {
+    super(Void.class, context, mgr, bridge);
+    tables.add(table);
+    this.columnNames = null;
+    this.allSelected = true;
     this.where = new WhereImpl<>(this);
     this.usings = new OptionsImpl<>(this);
     this.pkeys_override = pkeys_override;
@@ -423,15 +456,36 @@ public class DeleteImpl<T>
    *
    * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
    */
+  @SuppressWarnings("synthetic-access")
   @Override
   protected StringBuilder[] buildQueryStrings() {
     if (!isEnabled()) {
       return null;
     }
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
+    InsertImpl<T> insert = null;
 
     for (final TableInfoImpl<T> table: tables) {
+      if ((table.getTable().type() == Table.Type.AUDIT)
+          || (table.getTable().type() == Table.Type.NO_DELETE)) {
+        // deal with AUDIT and NO_DELETE tables only if we were deleting all from the POJO
+        // with no clauses
+        // otherwise leave it to the statements to deal with it
+        if ((columnNames == null) && where.clauses.isEmpty()) {
+          // we must create an insert for this table if not already done
+          // otherwise, simply add this table to the list of tables to handle
+          if (insert == null) {
+            insert = init(new InsertImpl<>(getPOJOContext(), table, mgr, bridge));
+          } else { // add this table to the mix
+            insert.into(table);
+          }
+          continue;
+        } // else - fall-through to handle it normally
+      } // else - STANDARD table is handled normally
       buildQueryString(table, builders);
+    }
+    if (insert != null) {
+      insert.buildQueryStrings(builders);
     }
     if (builders.isEmpty()) {
       return null;

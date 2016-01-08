@@ -15,6 +15,8 @@
  */
 package org.helenus.driver;
 
+import org.helenus.driver.info.TableInfo;
+
 
 /**
  * The <code>Select</code> interface extends the functionality of Cassandra's
@@ -175,6 +177,23 @@ public interface Select<T> extends ObjectClassStatement<T> {
      *         columns are not defined by the POJO
      */
     public Select<T> from(String table);
+
+    /**
+     * Specify to select from the keyspace as defined in the POJO and the
+     * specified table.
+     * <p>
+     * This flavor should be used when the POJO doesn't require suffixes to the
+     * keyspace name.
+     *
+     * @author paouelle
+     *
+     * @param  table the table to select from
+     * @return a newly build SELECT statement
+     * @throws NullPointerException if <code>table</code> is <code>null</code>
+     * @throws IllegalArgumentException if the table or any of the referenced
+     *         columns are not defined by the POJO
+     */
+    public Select<T> from(TableInfo<T> table);
   }
 
   /**
@@ -277,5 +296,107 @@ public interface Select<T> extends ObjectClassStatement<T> {
      *         not defined by the POJO
      */
     public Selection<T> fcall(String name, Object... parameters);
+  }
+
+  /**
+   * The <code>TableSelection</code> interface defines a selection clause for an
+   * in-construction SELECT statement.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Jan 6, 2016 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the response from this statement.
+   *
+   * @since 1.0
+   */
+  public interface TableSelection<T> {
+    /**
+     * Selects all columns (i.e. "SELECT *  ...")
+     *
+     * @author paouelle
+     *
+     * @return the SELECT statement.
+     * @throws IllegalStateException if some columns had already been selected
+     *         for this builder
+     */
+    public Select<T> all();
+
+    /**
+     * Selects the count of all returned rows (i.e. "SELECT count(*) ...").
+     *
+     * @author paouelle
+     *
+     * @return the SELECT statement.
+     * @throws IllegalStateException if some columns had already been selected
+     *         for this builder.
+     */
+    public Select<T> countAll();
+
+    /**
+     * Selects the provided column.
+     *
+     * @author paouelle
+     *
+     * @param  name the new column name to add.
+     * @return this in-build SELECT statement
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if the specified column is not defined
+     *         by the POJO
+     */
+    public TableSelection<T> column(Object name);
+
+    /**
+     * Selects the write time of provided column.
+     * <p>
+     * This is a shortcut for {@code fcall("writetime", StatementBuilder.column(name))}.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column to select the write time of.
+     * @return this in-build SELECT statement
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if the specified column is not defined
+     *         by the POJO
+     */
+    public TableSelection<T> writeTime(String name);
+
+    /**
+     * Selects the ttl of provided column.
+     * <p>
+     * This is a shortcut for {@code fcall("ttl", StatementBuilder.column(name))}.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column to select the ttl of.
+     * @return this in-build SELECT statement
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if the specified column is not defined
+     *         by the POJO
+     */
+    public TableSelection<T> ttl(String name);
+
+    /**
+     * Creates a function call.
+     * <p>
+     * Please note that the parameters are interpreted as values, and so
+     * {@code fcall("textToBlob", "foo")} will generate the string
+     * {@code "textToBlob('foo')"}. If you want to generate
+     * {@code "textToBlob(foo)"}, i.e. if the argument must be interpreted
+     * as a column name (in a select clause), you will need to use the
+     * {@link StatementBuilder#column} method, and so
+     * {@code fcall("textToBlob", StatementBuilder.column(foo)}.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column to select the function for
+     * @param  parameters the parameters to the function
+     * @return this in-build SELECT statement
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if any of specified column parameters are
+     *         not defined by the POJO
+     */
+    public TableSelection<T> fcall(String name, Object... parameters);
   }
 }

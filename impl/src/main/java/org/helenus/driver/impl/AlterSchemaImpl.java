@@ -28,6 +28,7 @@ import org.helenus.driver.AlterSchema;
 import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -103,7 +104,7 @@ public class AlterSchemaImpl<T>
     }
     if (getClassInfo().supportsTablesAndIndexes()) {
       cy = null;
-      at = new AlterCreateTableImpl<>(getContext(), mgr, bridge);
+      at = init(new AlterCreateTableImpl<>(getContext(), mgr, bridge));
       // for indexes, we blindly drop all of them and re-create them
       for (final Map.Entry<String, List<Row>> e: at.getTableInfos().entrySet()) {
         e.getValue().stream()
@@ -121,23 +122,11 @@ public class AlterSchemaImpl<T>
             builders.add(builder);
           });
       }
-      ci = new CreateIndexImpl<>(getContext(), null, null, mgr, bridge);
-      if (isTracing()) {
-        at.enableTracing();
-        ci.enableTracing();
-      } else {
-        at.disableTracing();
-        ci.disableTracing();
-      }
+      ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
     } else {
-      cy = new AlterCreateTypeImpl<>(getContext(), mgr, bridge);
+      cy = init(new AlterCreateTypeImpl<>(getContext(), mgr, bridge));
       at = null;
       ci = null;
-      if (isTracing()) {
-        cy.enableTracing();
-      } else {
-        cy.disableTracing();
-      }
     }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     StringBuilder[] cbuilders;
@@ -146,15 +135,10 @@ public class AlterSchemaImpl<T>
     // --- do not attempt to create or alter the same keyspace twice when a set
     // --- of keyspaces is provided in the method calls (used by alter schemas)
     if ((keyspaces == null) || !keyspaces.contains(keyspace)) {
-      final AlterCreateKeyspaceImpl<T> ck = new AlterCreateKeyspaceImpl<>(
+      final AlterCreateKeyspaceImpl<T> ck = init(new AlterCreateKeyspaceImpl<>(
         getContext(), mgr, bridge
-      );
+      ));
 
-      if (isTracing()) {
-        ck.enableTracing();
-      } else {
-        ck.disableTracing();
-      }
       cbuilders = ck.buildQueryStrings();
       if (cbuilders != null) {
         for (final StringBuilder builder: cbuilders) {
@@ -198,24 +182,31 @@ public class AlterSchemaImpl<T>
       }
     }
     // finish with initial objects
-    final BatchImpl batch = new BatchImpl(
+    // create sequences of batches since it is possible that the number of objects
+    // to insert exceeds the recommended size for a batch
+    final SequenceImpl sequence = init(new SequenceImpl(
+      Optional.empty(), new SequenceableStatement[0], mgr, bridge
+    ));
+    BatchImpl batch = init(new BatchImpl(
       Optional.empty(), new BatchableStatement[0], true, mgr, bridge
-    );
+    ));
 
-    if (isTracing()) {
-      batch.enableTracing();
-    } else {
-      batch.disableTracing();
-    }
+    sequence.add(batch);
     for (final T io: getContext().getInitialObjects()) {
-      batch.add(
-        new InsertImpl<>(
-          getContext().getClassInfo().newContext(io),
-          null,
-          mgr,
-          bridge
-        )
-      );
+      final InsertImpl<T> insert = init(new InsertImpl<>(
+        getContext().getClassInfo().newContext(io),
+        (String[])null,
+        mgr,
+        bridge
+      ));
+
+      if (batch.hasReachedRecommendedSize()) { // switch to a new batch
+        batch = init(new BatchImpl(
+          Optional.empty(), new BatchableStatement[0], true, mgr, bridge
+        ));
+        sequence.add(batch);
+      }
+      batch.add(insert);
     }
     final StringBuilder builder = batch.buildQueryString();
 

@@ -44,6 +44,54 @@ import org.helenus.annotation.Keyable;
 @Documented
 public @interface Table {
   /**
+   * The <code>Type</code> enumeration is used to define the type for a table.
+   *
+   * @copyright 2015-2015 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Dec 17, 2015 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  public enum Type {
+    /**
+     * A table resulting in new entries being inserted and existing ones being
+     * updated or deleted.
+     *
+     * @author paouelle
+     */
+    STANDARD,
+
+    /**
+     * A table resulting in new entries always being inserted whether the
+     * statement is an INSERT, UPDATE, or DELETE. Note that it is the
+     * responsibility of the POJO table definition to properly define the
+     * columns such that this will be the case (e.g. adding a version
+     * column to the primary key); Helenus will simply generate INSERT
+     * statements every time.
+     * <p>
+     * <i>Note:</i> This behavior only kicks in if the statement is simply
+     * created with a reference to the POJO and not by listing specific columns.
+     *
+     * @author paouelle
+     */
+    AUDIT,
+
+    /**
+     * A table resulting in new entries being inserted and existing ones being
+     * updated (even with a delete statement). Typically the table definition
+     * should include a column to indicate that the object was deleted and set
+     * that flag to <code>true</code> prior to executing a DELETE statement.
+     * <p>
+     * <i>Note:</i> This behavior only kicks in if the statement is simply
+     * created with a reference to the POJO and not by listing specific columns.
+     *
+     * @author paouelle
+     */
+    NO_DELETE
+  };
+
+  /**
    * Special constants used in the {@link Column}, {@link PartitionKey}, and
    * {@link ClusteringKey} annotations to indicate the annotation applies to
    * all tables defined for the entity.
@@ -61,6 +109,27 @@ public @interface Table {
    * @return the name for the table
    */
   String name();
+
+  /**
+   * Flag indicating if this table is the primary table for the POJO. There can
+   * only be one primary table for a POJO and it is used to compute a primary
+   * key when needed.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this is the primary table for the POJO;
+   *         <code>false</code> otherwise (default)
+   */
+  boolean primary() default false;
+
+  /**
+   * The type of table this is.
+   *
+   * @author paouelle
+   *
+   * @return the type for this table (defaults to a standard table)
+   */
+  Type type() default Type.STANDARD;
 
   /**
    * Optional list of ordered partition keys. By default, partition keys are

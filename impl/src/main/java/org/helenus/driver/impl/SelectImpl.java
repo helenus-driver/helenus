@@ -45,6 +45,7 @@ import org.helenus.driver.Ordering;
 import org.helenus.driver.Select;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.impl.Utils.CName;
+import org.helenus.driver.info.TableInfo;
 
 /**
  * The <code>SelectImpl</code> class extends the functionality of Cassandra's
@@ -430,7 +431,7 @@ public class SelectImpl<T>
         final List<Object> svalues = ci.next();
         // create a new select statement as a dup of this one but with
         // the suffixes from the current combination
-        final SelectImpl s = new SelectImpl(this);
+        final SelectImpl s = init(new SelectImpl(this));
 
         for (int j = 0; j < snames.size(); j++) {
           try {
@@ -881,8 +882,21 @@ public class SelectImpl<T>
         context, table, columnNames, countOrAllSelected, mgr, bridge
       );
     }
-  }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.Builder#from(org.helenus.driver.info.TableInfo)
+     */
+    @Override
+    public Select<T> from(TableInfo<T> table) {
+      return new SelectImpl<>(
+        context, table.getName(), columnNames, countOrAllSelected, mgr, bridge
+      );
+    }
+  }
   /**
    * The <code>SelectionImpl</code> class defines a selection clause for an
    * in-construction SELECT statement.
@@ -1019,6 +1033,156 @@ public class SelectImpl<T>
      */
     @Override
     public Selection<T> fcall(String name, Object... parameters) {
+      return addName(new Utils.FCall(name, parameters));
+    }
+  }
+
+  /**
+   * The <code>TableSelectionImpl</code> class defines a selection clause for an
+   * in-construction SELECT statement.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Jan 6, 2015 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the response from this statement.
+   *
+   * @since 1.0
+   */
+  public static class TableSelectionImpl<T>
+    extends BuilderImpl<T>
+    implements TableSelection<T> {
+    /**
+     * Holds the table associated with this statement.
+     *
+     * @author paouelle
+     */
+    private final TableInfo<T> table;
+
+    /**
+     * Instantiates a new <code>TableSelectionImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param table the non-<code>null</code> table associated with this statement
+     * @param context the non-<code>null</code> class info context for the POJO
+     *        associated with this statement
+     * @param mgr the non-<code>null</code> statement manager
+     * @param bridge the non-<code>null</code> statement bridge
+     */
+    TableSelectionImpl(
+      TableInfo<T> table,
+      ClassInfoImpl<T>.Context context,
+      StatementManagerImpl mgr,
+      StatementBridge bridge
+    ) {
+      super(context, mgr, bridge);
+      this.table = table;
+    }
+
+    /**
+     * Adds the specified column name.
+     *
+     * @author paouelle
+     *
+     * @param  name the non-<code>null</code> column name to be added
+     * @return this for chaining
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if any of the specified columns are not defined
+     *         by the POJO
+     */
+    private TableSelection<T> addName(Object name) {
+      context.getClassInfo().validateColumn(name);
+      if (columnNames == null) {
+        super.columnNames = new ArrayList<>(25);
+      }
+      columnNames.add(name);
+      return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.TableSelection#all()
+     */
+    @Override
+    public Select<T> all() {
+      org.apache.commons.lang3.Validate.validState(
+        columnNames == null,
+        "some columns (%s) have already been selected",
+        StringUtils.join(columnNames, ", ")
+      );
+      super.countOrAllSelected = true;
+      return from(table);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.TableSelection#countAll()
+     */
+    @Override
+    public Select<T> countAll() {
+      org.apache.commons.lang3.Validate.validState(
+        columnNames == null,
+        "some columns (%s) have already been selected",
+        StringUtils.join(columnNames, ", ")
+      );
+      super.columnNames = SelectImpl.COUNT_ALL;
+      super.countOrAllSelected = true;
+      return from(table);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.TableSelection#column(java.lang.Object)
+     */
+    @Override
+    public TableSelection<T> column(Object name) {
+      return addName(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.TableSelection#writeTime(java.lang.String)
+     */
+    @Override
+    public TableSelection<T> writeTime(String name) {
+      return addName(new Utils.FCall("writetime", new Utils.CName(name)));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.TableSelection#ttl(java.lang.String)
+     */
+    @Override
+    public TableSelection<T> ttl(String name) {
+      return addName(new Utils.FCall("ttl", new Utils.CName(name)));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.TableSelection#fcall(java.lang.String, java.lang.Object[])
+     */
+    @Override
+    public TableSelection<T> fcall(String name, Object... parameters) {
       return addName(new Utils.FCall(name, parameters));
     }
   }

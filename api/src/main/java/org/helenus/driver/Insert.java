@@ -66,6 +66,8 @@ public interface Insert<T>
    * @author paouelle
    *
    * @return this INSERT statement
+   * @throws IllegalStateException if specific values have already been added
+   *         to this statement
    */
   public Insert<T> valuesFromObject();
 
@@ -78,7 +80,7 @@ public interface Insert<T>
    * @author paouelle
    *
    * @param  name the name of the column to insert
-   * @return this INSERT statement.
+   * @return this INSERT statement
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if the column name is not defined
    *         by the POJO
@@ -94,12 +96,28 @@ public interface Insert<T>
    * @author paouelle
    *
    * @param  names the names of the columns to insert
-   * @return this INSERT statement.
+   * @return this INSERT statement
    * @throws NullPointerException if any of the column names are <code>null</code>
    * @throws IllegalArgumentException if any of the column names are not defined
    *         by the POJO
    */
   public Insert<T> values(String... names);
+
+  /**
+   * Adds a column/value pair to the values inserted by this INSERT statement.
+   *
+   * @author paouelle
+   *
+   * @param  name the name of the column to insert
+   * @param  value the value to insert for the specified column
+   * @return this INSERT statement
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalStateException if all columns from the object have already
+   *         been added to this statement
+   * @throws IllegalArgumentException if any of the column names are not defined
+   *         by the POJO
+   */
+  public Insert<T> value(String name, Object value);
 
   /**
    * Adds a new options for this INSERT statement.
@@ -205,8 +223,8 @@ public interface Insert<T>
      *
      * @author paouelle
      *
-     * @param  using an INSERT option.
-     * @return this {@code Options} object.
+     * @param  using an INSERT option
+     * @return this {@code Options} object
      */
     public Options<T> and(Using using);
 
@@ -219,7 +237,7 @@ public interface Insert<T>
      * @author paouelle
      *
      * @param  name the name of the column to insert
-     * @return the INSERT statement those options are part of.
+     * @return the INSERT statement those options are part of
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      * @throws IllegalArgumentException if the column name is not defined
      *         by the POJO
@@ -235,11 +253,25 @@ public interface Insert<T>
      * @author paouelle
      *
      * @param  names the names of the columns to insert
-     * @return the INSERT statement those options are part of.
+     * @return the INSERT statement those options are part of
      * @throws NullPointerException if any of the column names are <code>null</code>
      * @throws IllegalArgumentException if any of the column names are not defined
      *         by the POJO
      */
     public Insert<T> values(String... names);
+
+    /**
+     * Adds a column/value pair to the values inserted by this INSERT statement.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column to insert
+     * @param  value the value to insert for the specified column
+     * @return the INSERT statement those options are part of
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if any of the column names are not defined
+     *         by the POJO
+     */
+    public Insert<T> value(String name, Object value);
   }
 }

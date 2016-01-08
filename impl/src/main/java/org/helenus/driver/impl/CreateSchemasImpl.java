@@ -367,15 +367,10 @@ public class CreateSchemasImpl
     final Set<Keyspace> keyspaces = new HashSet<>(contexts.size());
 
     for (final ClassInfoImpl<?>.Context context: contexts) {
-      final CreateSchemaImpl cs = new CreateSchemaImpl(context, mgr, bridge);
+      final CreateSchemaImpl cs = init(new CreateSchemaImpl(context, mgr, bridge));
 
       if (ifNotExists) {
         cs.ifNotExists();
-      }
-      if (isTracing()) {
-        cs.enableTracing();
-      } else {
-        cs.disableTracing();
       }
       final StringBuilder[] cbuilders = cs.buildQueryStrings(keyspaces);
 

@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -692,6 +693,13 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   private final Map<String, TableInfoImpl<T>> tables = new LinkedHashMap<>(12);
 
   /**
+   * Holds the primary table for the POJO.
+   *
+   * @author paouelle
+   */
+  private final TableInfoImpl<T> primary;
+
+  /**
    * Holds the set of column names defined by the POJO.
    *
    * @author paouelle
@@ -738,7 +746,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     this.constructor = findDefaultCtor(entityAnnotationClass);
     this.finalFields = findFinalFields();
     this.keyspace = findKeyspace();
-    findTables(mgr);
+    this.primary = findTables(mgr);
     findColumns();
     findSuffixKeys();
     this.initials = findInitials();
@@ -1065,12 +1073,14 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    * @author paouelle
    *
    * @param  mgr the non-<code>null</code> statement manager
+   * @return the primary table for this POJO or <code>null</code> if none defined
    * @throws IllegalArgumentException if the POJO class is improperly annotated
    */
-  private void findTables(StatementManagerImpl mgr) {
+  private TableInfoImpl<T> findTables(StatementManagerImpl mgr) {
     final Map<String, Table> tables = ReflectionUtils.getAnnotationsByType(
       String.class, Table.class, clazz
     );
+    TableInfoImpl<T> primary = null;
 
     if (this instanceof UDTClassInfoImpl) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -1096,8 +1106,23 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         final TableInfoImpl<T> tinfo = new TableInfoImpl<>(mgr, this, table);
 
         this.tables.put(tinfo.getName(), tinfo);
+        if (tinfo.getTable().primary()) {
+          if (primary != null) {
+            throw new IllegalArgumentException(
+              "class '"
+              + clazz.getSimpleName()
+              + "' annotates 2 primary tables: '"
+              + primary.getName()
+              + "' and '"
+              + tinfo.getName()
+              + "'"
+            );
+          }
+          primary = tinfo;
+        }
       }
     }
+    return primary;
   }
 
   /**
@@ -1569,6 +1594,33 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.info.ClassInfo#getPrimaryTable()
+   */
+  @Override
+  public Optional<TableInfo<T>> getPrimaryTable() {
+    return Optional.ofNullable(primary);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.info.ClassInfo#getAuditTable()
+   */
+  @SuppressWarnings({ "unchecked", "rawtypes" })
+  @Override
+  public Optional<TableInfo<T>> getAuditTable() {
+    return ((Stream<TableInfo<T>>)(Stream)tables.values().stream())
+      .filter(t -> (Table.Type.AUDIT == t.getTable().type()))
+      .findAny();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.info.ClassInfo#getNumTables()
    */
   @Override
@@ -1717,6 +1769,36 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     for (final String name: names) {
       validateColumn(name);
     }
+  }
+
+  /**
+   * Validates if a column is defined by the POJO and its potential value in
+   * any table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  value the value to validate for the column
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not defined
+   *         by the POJO or if the specified value is not of the
+   *         right type or is <code>null</code> when the column is mandatory
+   */
+  public void validateColumnAndValue(String name, Object value) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    final FieldInfoImpl<T> field = tables.values().stream()
+      .map(t -> t.getColumnImpl(name))
+      .filter(f -> f != null)
+      .findAny()
+      .orElse(null);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      field != null,
+      "%s doesn't define column '%s'",
+      clazz.getSimpleName(),
+      name
+    );
+    field.validateValue(value);
   }
 
   /**

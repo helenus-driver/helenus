@@ -18,6 +18,7 @@ package org.helenus.driver.info;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.helenus.driver.persistence.Keyspace;
@@ -107,6 +108,27 @@ public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
    *         the POJO or the POJO represented by this class doesn't support tables
    */
   public TableInfo<T> getTable(String name);
+
+  /**
+   * Gets the primary table if one is defined.
+   *
+   * @author paouelle
+   *
+   * @return the primary table defined or empty if none defined
+   */
+  public Optional<TableInfo<T>> getPrimaryTable();
+
+  /**
+   * Gets an audit table if one is defined.
+   * <p>
+   * <i>Note:</i> The behavior is not guaranteed if more than one audit table
+   * are defined for the POJO.
+   *
+   * @author paouelle
+   *
+   * @return an audit table defined or empty if none defined
+   */
+  public Optional<TableInfo<T>> getAuditTable();
 
   /**
    * Gets the number of tables defined by the POJO.

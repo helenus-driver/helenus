@@ -361,14 +361,9 @@ public class AlterSchemasImpl
     final Set<Keyspace> keyspaces = new HashSet<>(contexts.size());
 
     for (final ClassInfoImpl<?>.Context context: contexts) {
-      final AlterSchemaImpl cs = new AlterSchemaImpl(context, mgr, bridge);
+      final AlterSchemaImpl cs = init(new AlterSchemaImpl(context, mgr, bridge));
       final StringBuilder[] cbuilders = cs.buildQueryStrings(keyspaces);
 
-      if (isTracing()) {
-        cs.enableTracing();
-      } else {
-        cs.disableTracing();
-      }
       if (cbuilders != null) {
         for (final StringBuilder builder: cbuilders) {
           if (builder != null) {

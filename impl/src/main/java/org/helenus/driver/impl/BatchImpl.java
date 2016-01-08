@@ -600,7 +600,7 @@ public class BatchImpl
    */
   @Override
   public Batch duplicate() {
-    return new BatchImpl(this, Optional.empty());
+    return init(new BatchImpl(this, Optional.empty()));
   }
 
   /**
@@ -612,7 +612,7 @@ public class BatchImpl
    */
   @Override
   public Batch duplicate(Recorder recorder) {
-    return new BatchImpl(this, Optional.of(recorder));
+    return init(new BatchImpl(this, Optional.of(recorder)));
   }
 
   /**

@@ -1511,6 +1511,9 @@ public class Tool {
         connect,
         line.getOptionValues(Tool.filters.getLongOpt())
       );
+      if (fvflag) {
+        Tool.mgr.enableFullTraces();
+      }
       if (line.hasOption(Tool.replicationFactor.getLongOpt())) {
         mgr.setDefaultReplicationFactor(
           Integer.parseInt(

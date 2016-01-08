@@ -120,6 +120,28 @@ public abstract class AssignmentImpl
   }
 
   /**
+   * The <code>WithOldValue</code> interface is used by assignments that keep track
+   * of an old value for a column.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Jan 7, 2015 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  interface WithOldValue {
+    /**
+     * Gets the old value to replace.
+     *
+     * @author paouelle
+     *
+     * @return the old value to replace
+     */
+    public Object getOldValue();
+  }
+
+  /**
    * The <code>SetAssignmentImpl</code> class defines a "SET" assignment specifying
    * a column name of the POJO and a value.
    *
@@ -225,7 +247,8 @@ public abstract class AssignmentImpl
    * @since 1.0
    */
   @lombok.ToString(callSuper=true)
-  static class ReplaceAssignmentImpl extends SetAssignmentImpl {
+  static class ReplaceAssignmentImpl
+    extends SetAssignmentImpl implements WithOldValue {
     /**
      * Holds the old value to replace for the column name.
      *
@@ -267,13 +290,87 @@ public abstract class AssignmentImpl
     }
 
     /**
-     * Gets the old value to replace.
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return the old value to replace
+     * @see org.helenus.driver.impl.AssignmentImpl.WithOldValue#getOldValue()
      */
-    Object getOldValue() {
+    @Override
+    public Object getOldValue() {
+      return old;
+    }
+  }
+
+  /**
+   * The <code>PreviousAssignmentImpl</code> class defines a hint assignment for
+   * the specifying a column name of the POJO to its old value being replaced.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Jan 7, 2016 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  @lombok.ToString(callSuper=true)
+  static class PreviousAssignmentImpl
+    extends AssignmentImpl implements WithOldValue {
+    /**
+     * Holds the old value to replace for the column name.
+     *
+     * @author paouelle
+     */
+    protected volatile Object old;
+
+    /**
+     * Instantiates a new <code>PreviousAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this assignment
+     * @param  old the old value to replace for this assignment
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    PreviousAssignmentImpl(CharSequence name, Object old) {
+      super(name);
+      if (old instanceof Optional) {
+        old = ((Optional<?>)old).orElse(null);
+      }
+      this.old = old;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     */
+    @Override
+    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {}
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#validate(org.helenus.driver.impl.TableInfoImpl)
+     */
+    @Override
+    void validate(TableInfoImpl<?> table) {
+      table.validateColumnAndValue(name, old);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl.WithOldValue#getOldValue()
+     */
+    @Override
+    public Object getOldValue() {
       return old;
     }
   }
@@ -507,10 +604,10 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @param name the counter column name for this assignment
-     * @param value the increment value
-     * @param isIncr <code>true</code> if it is an increment; <code>false</code>
-     *        if it is a decrement
+     * @param  name the counter column name for this assignment
+     * @param  value the increment value
+     * @param  isIncr <code>true</code> if it is an increment; <code>false</code>
+     *         if it is a decrement
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
     CounterAssignmentImpl(CharSequence name, long value, boolean isIncr) {

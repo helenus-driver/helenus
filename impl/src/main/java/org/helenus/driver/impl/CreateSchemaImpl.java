@@ -108,24 +108,12 @@ public class CreateSchemaImpl<T>
     }
     if (getClassInfo().supportsTablesAndIndexes()) {
       cy = null;
-      ct = new CreateTableImpl<>(getContext(), null, mgr, bridge);
-      ci = new CreateIndexImpl<>(getContext(), null, null, mgr, bridge);
-      if (isTracing()) {
-        ct.enableTracing();
-        ci.enableTracing();
-      } else {
-        ct.disableTracing();
-        ci.disableTracing();
-      }
+      ct = init(new CreateTableImpl<>(getContext(), null, mgr, bridge));
+      ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
     } else {
-      cy = new CreateTypeImpl<>(getContext(), mgr, bridge);
+      cy = init(new CreateTypeImpl<>(getContext(), mgr, bridge));
       ct = null;
       ci = null;
-      if (isTracing()) {
-        cy.enableTracing();
-      } else {
-        cy.disableTracing();
-      }
     }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     StringBuilder[] cbuilders;
@@ -145,17 +133,12 @@ public class CreateSchemaImpl<T>
     // --- do not attempt to create the same keyspace twice when a set of keyspaces
     // --- is provided in the method calls (used by create schemas)
     if ((keyspaces == null) || !keyspaces.contains(keyspace)) {
-      final CreateKeyspaceImpl<T> ck = new CreateKeyspaceImpl<>(
+      final CreateKeyspaceImpl<T> ck = init(new CreateKeyspaceImpl<>(
         getContext(), mgr, bridge
-      );
+      ));
 
       if (ifNotExists) {
         ck.ifNotExists();
-      }
-      if (isTracing()) {
-        ck.enableTracing();
-      } else {
-        ck.disableTracing();
       }
       cbuilders = ck.buildQueryStrings();
       if (cbuilders != null) {
@@ -202,47 +185,26 @@ public class CreateSchemaImpl<T>
     // finish with initial objects
     // create sequences of batches since it is possible that the number of objects
     // to insert exceeds the recommended size for a batch
-    final SequenceImpl sequence = new SequenceImpl(
+    final SequenceImpl sequence = init(new SequenceImpl(
       Optional.empty(), new SequenceableStatement[0], mgr, bridge
-    );
-
-    if (isTracing()) {
-      sequence.enableTracing();
-    } else {
-      sequence.disableTracing();
-    }
-    BatchImpl batch = new BatchImpl(
+    ));
+    BatchImpl batch = init(new BatchImpl(
       Optional.empty(), new BatchableStatement[0], true, mgr, bridge
-    );
+    ));
 
-    if (isTracing()) {
-      batch.enableTracing();
-    } else {
-      batch.disableTracing();
-    }
     sequence.add(batch);
     for (final T io: getContext().getInitialObjects()) {
-      final InsertImpl<T> insert = new InsertImpl<>(
+      final InsertImpl<T> insert = init(new InsertImpl<>(
         getContext().getClassInfo().newContext(io),
-        null,
+        (String[])null,
         mgr,
         bridge
-      );
+      ));
 
-      if (isTracing()) {
-        insert.enableTracing();
-      } else {
-        insert.disableTracing();
-      }
       if (batch.hasReachedRecommendedSize()) { // switch to a new batch
-        batch = new BatchImpl(
+        batch = init(new BatchImpl(
           Optional.empty(), new BatchableStatement[0], true, mgr, bridge
-        );
-        if (isTracing()) {
-          batch.enableTracing();
-        } else {
-          batch.disableTracing();
-        }
+        ));
         sequence.add(batch);
       }
       batch.add(insert);

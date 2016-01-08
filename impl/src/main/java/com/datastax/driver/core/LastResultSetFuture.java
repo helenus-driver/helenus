@@ -26,7 +26,7 @@ import java.util.concurrent.TimeoutException;
 import com.google.common.util.concurrent.ExecutionList;
 
 import org.helenus.driver.StatementManager;
-import org.helenus.driver.impl.StatementImpl;
+import org.helenus.driver.impl.SequenceStatementImpl;
 
 /**
  * The <code>LastResultSetFuture</code> class defines a result set which is
@@ -60,6 +60,13 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
    * @author paouelle
    */
   private final StatementManager mgr;
+
+  /**
+   * Holds the associate sequence statement.
+   *
+   * @author paouelle
+   */
+  private final SequenceStatementImpl<?, ?, ?> sequence;
 
   /**
    * Holds the statements to execute.
@@ -123,7 +130,7 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
           if (LastResultSetFuture.this.statements.hasNext()) {
             final SimpleStatement s = LastResultSetFuture.this.statements.next();
 
-            StatementImpl.debugExecution(s);
+            sequence.debugExecution(s);
             LastResultSetFuture.this.future = mgr.getSession().executeAsync(s);
             LastResultSetFuture.this.future.addListener(
               LastResultSetFuture.this.listener,
@@ -148,20 +155,25 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
    * @author paouelle
    *
    * @param  statements the list of statements to execute in the specified order
+   * @param  sequence the associated sequence statement
    * @param  mgr the statement manager
-   * @throws NullPointerException if <code>mgr</code>, <code>statements</code>
-   *         or any of the statements are <code>null</code>
+   * @throws NullPointerException if <code>sequence</code>, <code>mgr</code>,
+   *         <code>statements</code>, or any of the statements are <code>null</code>
    */
   public LastResultSetFuture(
-    List<SimpleStatement> statements, StatementManager mgr
+    List<SimpleStatement> statements,
+    SequenceStatementImpl<?, ?, ?> sequence,
+    StatementManager mgr
   ) {
     super(
       null,
       mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
       null
     );
+    org.apache.commons.lang3.Validate.notNull(sequence, "invalid null sequence");
     org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!
     org.apache.commons.lang3.Validate.notNull(statements, "invalid null statements");
+    this.sequence = sequence;
     this.mgr = mgr;
     final List<SimpleStatement> ss = new ArrayList<>(statements.size());
 
@@ -174,7 +186,7 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
     if (this.statements.hasNext()) {
       final SimpleStatement s = this.statements.next();
 
-      StatementImpl.debugExecution(s);
+      sequence.debugExecution(s);
       this.future = mgr.getSession().executeAsync(s);
       this.future.addListener(listener, LastResultSetFuture.DIRECT);
     }

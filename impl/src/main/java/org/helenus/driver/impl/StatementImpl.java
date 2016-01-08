@@ -75,27 +75,6 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   private final static Logger logger = LogManager.getFormatterLogger(StatementImpl.class);
 
   /**
-   * Log to the debug level the execution of the specified simple statement.
-   *
-   * @author paouelle
-   *
-   * @param s the simple statement to log the execution
-   */
-  public static void debugExecution(SimpleStatement s) {
-    if (logger.isDebugEnabled()) {
-      if (s.isTracing()) {
-        final String query = s.getQueryString();
-
-        if (query.length() < 2048) {
-          logger.log(Level.DEBUG, "CQL -> %s", query);
-        } else {
-          logger.log(Level.DEBUG, "CQL -> %s ...", query.substring(0, 2048));
-        }
-      }
-    }
-  }
-
-  /**
    * Holds the column name prefix used for the special clustering column key
    * created for multi-clustering keys.
    *
@@ -371,6 +350,40 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
+   * Initializes the specified statement with the same settings as this statement.
+   *
+   * @author paouelle
+   *
+   * @param <S> the type of statement to initialize
+   *
+   * @param  s the non-<code>null</code> statement to initialize
+   * @return <code>s</code>
+   */
+  protected <S extends StatementImpl<?, ?, ?>> S init(S s) {
+    if (isEnabled()) {
+      s.enable();
+    } else {
+      s.disable();
+    }
+    if (getConsistencyLevel() != null) {
+      s.setConsistencyLevel(getConsistencyLevel());
+    }
+    if (getSerialConsistencyLevel() != null) {
+      s.setSerialConsistencyLevel(getSerialConsistencyLevel());
+    }
+    if (isTracing()) {
+      s.enableTracing();
+    } else {
+      s.disableTracing();
+    }
+    if (getRetryPolicy() != null) {
+     s.setRetryPolicy(getRetryPolicy());
+    }
+    s.setFetchSize(getFetchSize());
+    return s;
+  }
+
+  /**
    * Builds the query strings (one per underlying statement) to be batched if
    * the statement represents some form of batch statement.
    *
@@ -599,7 +612,8 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
       }
       if (logger.isDebugEnabled()) {
         if (isTracing()) {
-          if ((query.length() < 2048)
+          if (mgr.isFullTracesEnabled()
+              || (query.length() < 2048)
               || !((this instanceof Batch) || (this instanceof Sequence))) {
             logger.log(Level.DEBUG, "CQL -> %s", query);
           } else {
@@ -656,6 +670,17 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @return the POJO class info associated with this statement
    */
   public ClassInfo<T> getClassInfo() {
+    return context.getClassInfo();
+  }
+
+  /**
+   * Gets the POJO class information associated with this statement.
+   *
+   * @author paouelle
+   *
+   * @return the POJO class info associated with this statement
+   */
+  public ClassInfoImpl<T> getClassInfoImpl() {
     return context.getClassInfo();
   }
 
@@ -842,6 +867,27 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   @Override
   public boolean isTracing() {
     return traceQuery;
+  }
+
+  /**
+   * Log to the debug level the execution of the specified simple statement.
+   *
+   * @author paouelle
+   *
+   * @param s the simple statement to log the execution
+   */
+  public void debugExecution(SimpleStatement s) {
+    if (logger.isDebugEnabled()) {
+      if (s.isTracing()) {
+        final String query = s.getQueryString();
+
+        if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+          logger.log(Level.DEBUG, "CQL -> %s", query);
+        } else {
+          logger.log(Level.DEBUG, "CQL -> %s ...", query.substring(0, 2048));
+        }
+      }
+    }
   }
 
   /**

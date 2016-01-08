@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -68,6 +69,13 @@ public class InsertImpl<T>
    * @author paouelle
    */
   private final Set<String> columns = new LinkedHashSet<>(32);
+
+  /**
+   * Holds the column names and values being inserted.
+   *
+   * @author paouelle
+   */
+  private final Map<String, Object> values = new LinkedHashMap<>(32);
 
   /**
    * Holds the "USING" options.
@@ -124,6 +132,42 @@ public class InsertImpl<T>
   }
 
   /**
+   * Instantiates a new <code>InsertImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  context the non-<code>null</code> class info context for the POJO
+   *         associated with this statement
+   * @param  table the table to insert into
+   * @param  mgr the non-<code>null</code> statement manager
+   * @param  bridge the non-<code>null</code> statement bridge
+   * @throws NullPointerException if <code>context</code> is <code>null</code>
+   * @throws IllegalArgumentException if unable to compute the keyspace name
+   *         based from the given object
+   */
+  InsertImpl(
+    ClassInfoImpl<T>.POJOContext context,
+    TableInfoImpl<T> table,
+    StatementManagerImpl mgr,
+    StatementBridge bridge
+  ) {
+    super(Void.class, context, mgr, bridge);
+    tables.add(table);
+    this.usings = new OptionsImpl<>(this);
+  }
+
+  /**
+   * Adds the specified table to the list of tables to insert into.
+   *
+   * @author paouelle
+   *
+   * @param table the non-<code>null</code> table to insert into
+   */
+  void into(TableInfoImpl<T> table) {
+    tables.add(table);
+  }
+
+  /**
    * Builds a query string for the specified table.
    *
    * @author paouelle
@@ -158,6 +202,8 @@ public class InsertImpl<T>
         columns.putAll(getPOJOContext().getColumnValues(
           table.getName(), (Collection<CharSequence>)(Collection)this.columns)
         );
+        // finally add the specific values for this statement
+        columns.putAll(values);
       }
     } catch (EmptyOptionalPrimaryKeyException e) {
       // ignore and continue without updating this table
@@ -190,6 +236,19 @@ public class InsertImpl<T>
       }
     } else { // only one statement to generate!
       buildQueryString(table, columns, builders);
+    }
+  }
+
+  /**
+   * Build query strings for each tables into the specified list.
+   *
+   * @author paouelle
+   *
+   * @param builders the list where to store all tables generated query strings
+   */
+  void buildQueryStrings(List<StringBuilder> builders) {
+    for (final TableInfoImpl<T> table: tables) {
+      buildQueryStrings(table, builders);
     }
   }
 
@@ -249,9 +308,7 @@ public class InsertImpl<T>
     }
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
 
-    for (final TableInfoImpl<T> table: tables) {
-      buildQueryStrings(table, builders);
-    }
+    buildQueryStrings(builders);
     if (builders.isEmpty()) {
       return null;
     }
@@ -356,6 +413,10 @@ public class InsertImpl<T>
    */
   @Override
   public Insert<T> valuesFromObject() {
+    org.apache.commons.lang3.Validate.validState(
+      values.isEmpty(),
+      "separate values have already been added to this statement"
+    );
     if (!allValuesAdded) {
       columns.clear();
       this.allValuesAdded = true;
@@ -404,6 +465,28 @@ public class InsertImpl<T>
         setDirty();
       }
     }
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Insert#value(java.lang.String, java.lang.Object)
+   */
+  @Override
+  public Insert<T> value(String name, Object value) {
+    org.apache.commons.lang3.Validate.validState(
+      !allValuesAdded,
+      "all columns from the object have already been added to this statement"
+    );
+    if (value instanceof Optional) {
+      value = ((Optional<?>)value).orElse(null);
+    }
+    getPOJOContext().getClassInfo().validateColumnAndValue(name, value);
+    columns.remove(name);
+    values.put(name, value);
     return this;
   }
 
@@ -466,39 +549,6 @@ public class InsertImpl<T>
     }
 
     /**
-     * Initializes the specified insert statement with the same settings as
-     * this statement.
-     *
-     * @author paouelle
-     *
-     * @param  i the non-<code>null</code> insert statement to initialize
-     * @return <code>i</code>
-     */
-    private InsertImpl<T> init(InsertImpl<T> i) {
-      if (isEnabled()) {
-        i.enable();
-      } else {
-        i.disable();
-      }
-      if (getConsistencyLevel() != null) {
-        i.setConsistencyLevel(getConsistencyLevel());
-      }
-      if (getSerialConsistencyLevel() != null) {
-        i.setSerialConsistencyLevel(getSerialConsistencyLevel());
-      }
-      if (isTracing()) {
-        i.enableTracing();
-      } else {
-        i.disableTracing();
-      }
-      if (getRetryPolicy() != null) {
-       i.setRetryPolicy(getRetryPolicy());
-      }
-      i.setFetchSize(getFetchSize());
-      return i;
-    }
-
-    /**
      * {@inheritDoc}
      *
      * @author paouelle
@@ -545,7 +595,9 @@ public class InsertImpl<T>
      */
     @Override
     public Insert<T> intoAll() {
-      return init(new InsertImpl<>(getPOJOContext(), null, mgr, bridge));
+      return init(
+        new InsertImpl<>(getPOJOContext(), (String[])null, mgr, bridge)
+      );
     }
 
     /**
@@ -686,6 +738,18 @@ public class InsertImpl<T>
     @Override
     public Insert<T> values(String... names) {
       return statement.values(names);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Insert.Options#value(java.lang.String, java.lang.Object)
+     */
+    @Override
+    public Insert<T> value(String name, Object value) {
+      return statement.value(name, value);
     }
   }
 }

@@ -161,6 +161,14 @@ public class StatementManagerImpl extends StatementManager {
   private final List<EntityFilter> filters = new ArrayList<>(2);
 
   /**
+   * Holds a flag to control whether to trace the full statement or part of it
+   * when it exceeds 2K in size.
+   *
+   * @author paouelle
+   */
+  private boolean fullTraces = false;
+
+  /**
    * Instantiates a new <code>StatementManagerImpl</code> object.
    *
    * @author paouelle
@@ -376,6 +384,56 @@ public class StatementManagerImpl extends StatementManager {
       cinfo.getEntityAnnotationClass().getSimpleName(), clazz.getSimpleName()
     );
     return new SelectImpl.SelectionImpl<>(
+      cinfo.newContext(),
+      this,
+      bridge
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#selectFrom(org.helenus.driver.info.TableInfo, java.lang.CharSequence[])
+   */
+  @Override
+  protected <T> Select<T> selectFrom(TableInfo<T> table, CharSequence... columns) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(table.getObjectClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a select statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(),
+      table.getObjectClass().getSimpleName()
+    );
+    return new SelectImpl.BuilderImpl<>(
+      cinfo.newContext(),
+      Arrays.asList((Object[])columns),
+      this,
+      bridge
+    ).from(table);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#selectFrom(org.helenus.driver.info.TableInfo)
+   */
+  @Override
+  protected <T> Select.TableSelection<T> selectFrom(TableInfo<T> table) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(table.getObjectClass());
+
+    org.apache.commons.lang3.Validate.isTrue(
+      cinfo.supportsTablesAndIndexes(),
+      "unsupported %s POJO class '%s' for a select statement",
+      cinfo.getEntityAnnotationClass().getSimpleName(),
+      table.getObjectClass().getSimpleName()
+    );
+    return new SelectImpl.TableSelectionImpl<>(
+      table,
       cinfo.newContext(),
       this,
       bridge
@@ -1313,6 +1371,18 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#previous(java.lang.CharSequence, java.lang.Object)
+   */
+  @Override
+  protected Assignment previous(CharSequence name, Object old) {
+    return new AssignmentImpl.PreviousAssignmentImpl(name, old);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#incr(java.lang.CharSequence, long)
    */
   @Override
@@ -1877,6 +1947,37 @@ public class StatementManagerImpl extends StatementManager {
     }
     this.defaultDataCenters = defaultDataCenters;
     return this;
+  }
+
+  /**
+   * Checks if large statements (greater than 2K in size) are traced completely
+   * or partially.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if large statements are fully traced;
+   *         <code>false</code> to trace them partially
+   */
+  public boolean isFullTracesEnabled() {
+    return fullTraces;
+  }
+
+  /**
+   * Enables tracing large statements beyond 2K.
+   *
+   * @author paouelle
+   */
+  public void enableFullTraces() {
+    this.fullTraces = true;
+  }
+
+  /**
+   * Disables tracing large statements beyond 2K.
+   *
+   * @author paouelle
+   */
+  public void disableFullTraces() {
+    this.fullTraces = false;
   }
 
   /**

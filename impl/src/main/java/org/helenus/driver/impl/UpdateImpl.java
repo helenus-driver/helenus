@@ -17,6 +17,7 @@ package org.helenus.driver.impl;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +40,7 @@ import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.impl.AssignmentImpl.CounterAssignmentImpl;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.Table;
 
 /**
  * The <code>UpdateImpl</code> class extends the functionality of Cassandra's
@@ -194,9 +196,9 @@ public class UpdateImpl<T>
           assignment.validate(table);
         } catch (EmptyOptionalPrimaryKeyException e) {
           if (assignment instanceof AssignmentImpl.ReplaceAssignmentImpl) {
-            // special case for replace assignment as we will need to potentially
-            // delete the old row if old was not null or add only a new row if
-            // old was null but not new
+            // special case for replace assignments as we will need
+            // to potentially delete the old row if old was not null or add
+            // only a new row if old was null but not new
             // so fall through in all cases and let the update take care of it
           } else {
             throw e;
@@ -283,7 +285,6 @@ public class UpdateImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", usings.usings);
     }
     final Collection<FieldInfoImpl<T>> multiKeys = table.getMultiKeys();
-    // TBR: final String mkname = (multiKey != null) ? multiKey.getColumnName() : null;
     AssignmentsImpl<T> assignments = this.assignments;
 
     if (assignments.isEmpty()) {
@@ -296,6 +297,9 @@ public class UpdateImpl<T>
         // it would not have been added by the DelayedSetAll since it is marked
         // as a key. However, in this context the real key is
         // the special "mk_<name>" one and not the set which is annotated as one
+        // make sure not to report we are adding them all from that point on since
+        // we are about to add more delayed set for each multi keys
+        assignments.hasAllFromObject = false;
         for (final FieldInfoImpl<T> finfo: multiKeys) {
           assignments.assignments.add(new AssignmentImpl.DelayedSetAssignmentImpl(
             finfo.getColumnName())
@@ -321,6 +325,14 @@ public class UpdateImpl<T>
       if (as.isEmpty()) { // nothing to set for this table so skip
         return;
       }
+      for (final AssignmentImpl.WithOldValue a: this.assignments.previous.values()) {
+        try {
+          ((AssignmentImpl)a).validate(table);
+        } catch (EmptyOptionalPrimaryKeyException e) {
+          // special case as we will need to potentially delete the old row if
+          // old was not null or add only a new row if old was null but not new
+        }
+      }
       // if we detect that a primary key is part of the SET, then we can only
       // do a full INSERT of the whole POJO as we are actually creating a whole
       // new row in the table. It will be up to the user to delete any old one
@@ -334,23 +346,26 @@ public class UpdateImpl<T>
       for (final AssignmentImpl a: as) {
         if (table.getPrimaryKey(a.getColumnName()) != null) { // assigning to a primary key
           foundPK = true;
-          if (a instanceof AssignmentImpl.ReplaceAssignmentImpl) { // great, we know what was the old one!
-            final AssignmentImpl.ReplaceAssignmentImpl ra = (AssignmentImpl.ReplaceAssignmentImpl)a;
+          final AssignmentImpl.WithOldValue oa = this.assignments.previous.get(a.getColumnName().toString());
 
+          if (oa != null) { // great, we know what was the old one!
             if (old_values == null) {
               old_values = new LinkedHashMap<>(table.getPrimaryKeys().size());
             }
-            final Object oldval = ra.getOldValue();
+            final Object oldval = oa.getOldValue();
 
-            // check if this assignment is for a multi-column and if it is then we
-            // only want to keep the entries in the set that are not present in
-            // in the new multi key to avoid having DELETE generate for these
-            // keys which are supposed to remain in place
             if (!multiKeys.isEmpty()) {
-              final FieldInfoImpl<?> f = table.getColumnImpl(a.getColumnName());
+              if (a instanceof AssignmentImpl.SetAssignmentImpl) {
+                // check if this set assignment is for a multi-column and if it is then we
+                // only want to keep the entries in the set that are not present
+                // in the new multi key to avoid having DELETE generate for these
+                // keys which are supposed to remain in place
+                final AssignmentImpl.SetAssignmentImpl sa = (AssignmentImpl.SetAssignmentImpl)a;
+                final FieldInfoImpl<?> f = table.getColumnImpl(a.getColumnName());
 
-              if (f.isMultiKey()) {
-                ((Set<?>)oldval).removeAll((Set<?>)(ra.getValue()));
+                if (f.isMultiKey()) {
+                  ((Set<?>)oldval).removeAll((Set<?>)(sa.getValue()));
+                }
               }
             }
             old_values.put(a.getColumnName().toString(), oldval);
@@ -361,19 +376,17 @@ public class UpdateImpl<T>
         if (old_values != null) {
           // primary key has changed so we need to first do a delete in this
           // table which will be followed by a brand new insert
-          new DeleteImpl<>(
+          init(new DeleteImpl<>(
             getPOJOContext(),
-            new String[] { table.getName() },
-            null,
-            true,
+            table,
             old_values, // pass our old values as override for the primary keys in the POJO
             mgr,
             bridge
-          ).buildQueryString(table, builders);
+          )).buildQueryString(table, builders);
         }
         // time to shift gears to a full insert in which case we must rely
         // on the whole POJO as the assignments might not be complete
-        new InsertImpl<>(getPOJOContext(), new String[] { table.getName() }, mgr, bridge)
+        init(new InsertImpl<>(getPOJOContext(), table, mgr, bridge))
           .buildQueryStrings(table, builders);
         return;
       }
@@ -536,15 +549,35 @@ public class UpdateImpl<T>
    *
    * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
    */
+  @SuppressWarnings("synthetic-access")
   @Override
   protected StringBuilder[] buildQueryStrings() {
     if (!isEnabled()) {
       return null;
     }
     final List<StringBuilder> builders = new ArrayList<>(tables.size());
+    InsertImpl<T> insert = null;
 
     for (final TableInfoImpl<T> table: tables) {
+      if (table.getTable().type() == Table.Type.AUDIT) {
+        // deal with AUDIT tables only if we were updating all from the POJO
+        // with no clauses
+        // otherwise leave it to the statements to deal with it
+        if (assignments.hasAllFromObject() && where.clauses.isEmpty()) {
+          // we must create an insert for this table if not already done
+          // otherwise, simply add this table to the list of tables to handle
+          if (insert == null) {
+            insert = init(new InsertImpl<>(getPOJOContext(), table, mgr, bridge));
+          } else { // add this table to the mix
+            insert.into(table);
+          }
+          continue;
+        } // else - fall-through to handle it normally
+      } // else - STANDARD and DELETE tables are handled normally
       buildQueryStrings(table, builders);
+    }
+    if (insert != null) {
+      insert.buildQueryStrings(builders);
     }
     if (builders.isEmpty()) {
       return null;
@@ -749,7 +782,14 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      */
-    private final List<AssignmentImpl> assignments = new ArrayList<>(25);
+    private final List<AssignmentImpl> assignments = new ArrayList<>(8);
+
+    /**
+     * Holds the previous values for the statement.
+     *
+     * @author paouelle
+     */
+    private final Map<String, AssignmentImpl.WithOldValue> previous = new HashMap<>(8);
 
     /**
      * Flag indicating if all columns from the objects are being added using the
@@ -803,7 +843,18 @@ public class UpdateImpl<T>
           // pre-validate against any table
           getPOJOContext().getClassInfo().validateColumn(a.getColumnName().toString());
         }
-        this.assignments.add(a);
+        if (a instanceof AssignmentImpl.PreviousAssignmentImpl) {
+          final AssignmentImpl.PreviousAssignmentImpl pa = (AssignmentImpl.PreviousAssignmentImpl)a;
+
+          previous.put(pa.getColumnName().toString(), pa);
+        } else if (a instanceof AssignmentImpl.ReplaceAssignmentImpl) {
+          final AssignmentImpl.ReplaceAssignmentImpl ra = (AssignmentImpl.ReplaceAssignmentImpl)a;
+
+          previous.put(ra.getColumnName().toString(), ra);
+          this.assignments.add(a);
+        } else {
+          this.assignments.add(a);
+        }
         setDirty();
       }
       return this;

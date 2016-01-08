@@ -766,6 +766,7 @@ public class HelenusJUnit implements MethodRule {
             .addContactPoint(host)
             .withQueryOptions(null)
         );
+        HelenusJUnit.manager.enableFullTraces();
       } catch (SecurityException e) {
         // this shouldn't happen unless someone mocked the StatementManager class
         // or registered a manager of their own
