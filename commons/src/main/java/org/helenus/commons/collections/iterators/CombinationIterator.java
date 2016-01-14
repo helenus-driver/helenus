@@ -132,6 +132,7 @@ public class CombinationIterator<T>
    *          <code>null</code>
    * @throws IllegalArgumentException if no collections of items is provided
    */
+  @SuppressWarnings("unchecked")
   public CombinationIterator(Class<T> clazz, Collection<Collection<T>> items) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
     org.apache.commons.lang3.Validate.notNull(items, "invalid null items");

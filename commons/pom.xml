@@ -72,6 +72,16 @@
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <compilerArgs>
+	    <arg>-Xlint:unchecked</arg>
+	    <!-- the following argument will prevent warnings for internal
+		 proprietary API usage to pop up - also requires fork=true
+		 otherwise maven will drop the arg -->
+	    <arg>-XDignore.symbol.file</arg>
+	  </compilerArgs>
+	  <fork>true</fork>
+	</configuration>
       </plugin>
     </plugins>
   </build>
