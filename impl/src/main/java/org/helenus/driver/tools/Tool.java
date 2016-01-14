@@ -42,10 +42,9 @@ import java.util.stream.Stream;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
-import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.codec.binary.Hex;
 
@@ -202,12 +201,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option jsonview = OptionBuilder
-    .withLongOpt("view")
-    .withDescription("to specify the Json view to use when generating the schemas (defaults to none)")
+  private final static Option jsonview = Option.builder()
+    .longOpt("view")
+    .desc("to specify the Json view to use when generating the schemas (defaults to none)")
     .hasArg()
-    .withArgName("class")
-    .create();
+    .argName("class")
+    .build();
 
   /**
    * Holds the blob deserialization action.
@@ -359,13 +358,13 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option filters = OptionBuilder
-    .withLongOpt("filters")
-    .withDescription("to specify entity filter classes to register with the driver (separated with :)")
-    .withValueSeparator(':')
+  private final static Option filters = Option.builder("f")
+    .longOpt("filters")
+    .desc("to specify entity filter classes to register with the driver (separated with :)")
+    .valueSeparator(':')
     .hasArgs()
-    .withArgName("classes")
-    .create("f");
+    .argName("classes")
+    .build();
 
   /**
    * Holds the Cassandra server option.
@@ -373,12 +372,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option server = OptionBuilder
-    .withLongOpt("server")
-    .withDescription("to specify the server address for Cassandra (defaults to localhost)")
+  private final static Option server = Option.builder()
+    .longOpt("server")
+    .desc("to specify the server address for Cassandra (defaults to localhost)")
     .hasArg()
-    .withArgName("host")
-    .create();
+    .argName("host")
+    .build();
 
   /**
    * Holds the Cassandra port option.
@@ -386,12 +385,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option port = OptionBuilder
-    .withLongOpt("port")
-    .withDescription("to specify the port number for Cassandra (defaults to 9042)")
+  private final static Option port = Option.builder()
+    .longOpt("port")
+    .desc("to specify the port number for Cassandra (defaults to 9042)")
     .hasArg()
-    .withArgName("number")
-    .create();
+    .argName("number")
+    .build();
 
   /**
    * Holds the option indicating if only matches should be considered otherwise
@@ -400,10 +399,10 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option matches_only = OptionBuilder
-    .withLongOpt("matches-only")
-    .withDescription("to specify that only keyspace that matches the specified suffixes should be created")
-    .create();
+  private final static Option matches_only = Option.builder()
+    .longOpt("matches-only")
+    .desc("to specify that only keyspace that matches the specified suffixes should be created")
+    .build();
 
   /**
    * Holds the alter option.
@@ -411,10 +410,10 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option alter = OptionBuilder
-    .withLongOpt("alter")
-    .withDescription("to alter the existing schemas instead of creating it if it doesn't exist")
-    .create();
+  private final static Option alter = Option.builder()
+    .longOpt("alter")
+    .desc("to alter the existing schemas instead of creating it if it doesn't exist")
+    .build();
 
   /**
    * Holds the option indicating if dependent creators should not be considered
@@ -423,10 +422,10 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option no_dependents = OptionBuilder
-    .withLongOpt("no-dependents")
-    .withDescription("to specify that dependent creators should not be considered when creating objects")
-    .create();
+  private final static Option no_dependents = Option.builder()
+    .longOpt("no-dependents")
+    .desc("to specify that dependent creators should not be considered when creating objects")
+    .build();
 
   /**
    * Holds the Cassandra default replication factor option.
@@ -434,12 +433,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option replicationFactor = OptionBuilder
-    .withLongOpt("replication-factor")
-    .withDescription("to specify the default replication factor to use with the simple placement strategy when creating keyspaces (defaults to 2)")
+  private final static Option replicationFactor = Option.builder()
+    .longOpt("replication-factor")
+    .desc("to specify the default replication factor to use with the simple placement strategy when creating keyspaces (defaults to 2)")
     .hasArg()
-    .withArgName("value")
-    .create();
+    .argName("value")
+    .build();
 
   /**
    * Holds the Cassandra default data centers option.
@@ -447,12 +446,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option dataCenters = OptionBuilder
-    .withDescription("to specify the default data centers and number of replicas to use with the network topology strategy when creating keyspaces (e.g. -Ddatacenter1=2)")
-    .hasArgs(2)
-    .withArgName("datacenter=replicas")
-    .withValueSeparator()
-    .create("D");
+  private final static Option dataCenters = Option.builder("D")
+    .desc("to specify the default data centers and number of replicas to use with the network topology strategy when creating keyspaces (e.g. -Ddatacenter1=2)")
+    .numberOfArgs(2)
+    .argName("datacenter=replicas")
+    .valueSeparator()
+    .build();
 
   /**
    * Holds the suffix options.
@@ -460,12 +459,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option suffixes = OptionBuilder
-    .withDescription("to specify value(s) for suffix types (e.g. -Scustomer=acme, -Sregion=emea)")
-    .hasArgs(2)
-    .withArgName("type=value")
-    .withValueSeparator()
-    .create("S");
+  private final static Option suffixes = Option.builder("S")
+    .desc("to specify value(s) for suffix types (e.g. -Scustomer=acme, -Sregion=emea)")
+    .numberOfArgs(2)
+    .argName("type=value")
+    .valueSeparator()
+    .build();
 
   /**
    * Holds the Cassandra server option.
@@ -473,12 +472,12 @@ public class Tool {
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option output = OptionBuilder
-    .withLongOpt("output")
-    .withDescription("to specify the output directory (defaults to current directory)")
+  private final static Option output = Option.builder()
+    .longOpt("output")
+    .desc("to specify the output directory (defaults to current directory)")
     .hasArg()
-    .withArgName("output")
-    .create();
+    .argName("output")
+    .build();
 
   /**
    * Holds the command-line options definition.
@@ -1476,7 +1475,7 @@ public class Tool {
   public static void main(String[] args) {
     Tool.setRootLogLevel(Level.OFF); // disable logging by default
     try {
-      final CommandLineParser parser = new GnuParser();
+      final CommandLineParser parser = new DefaultParser();
       final CommandLine line = parser.parse(Tool.options, args);
 
       if (line.hasOption(Tool.verbose.getOpt())) { // do this one first
