@@ -16,16 +16,17 @@
 package org.helenus.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.RegularStatement;
-import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.driver.Batch;
@@ -33,10 +34,12 @@ import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
 import org.helenus.driver.ObjectStatement;
+import org.helenus.driver.ParentStatement;
 import org.helenus.driver.Recorder;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.info.ClassInfo;
 import org.helenus.util.Inhibit;
 import org.helenus.util.function.ERunnable;
 
@@ -111,6 +114,20 @@ public class BatchImpl
    * @author paouelle
    */
   private final OptionsImpl usings;
+
+  /**
+   * Holds the cached batched statements.
+   *
+   * @author paouelle
+   */
+  private volatile List<StatementImpl<?, ?, ?>> cacheList = null;
+
+  /**
+   * Holds the cached query strings for the batched statements.
+   *
+   * @author paouelle
+   */
+  private volatile StringBuilder[] cacheSB = null;
 
   /**
    * Instantiates a new <code>BatchImpl</code> object.
@@ -195,38 +212,74 @@ public class BatchImpl
     this.recorder = recorder;
     this.errorHandlers = new LinkedList<>(b.errorHandlers);
     this.usings = new OptionsImpl(this, b.usings);
+    this.cacheList = b.cacheList;
+    this.cacheSB = b.cacheSB;
   }
 
   /**
-   * {@inheritDoc}
+   * Gets all underlying batched statements recursively in the proper order for
+   * this statement.
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
    */
-  @Override
-  protected StringBuilder[] buildQueryStrings() {
-    if (!isEnabled()) {
-      return null;
-    }
-    final List<StringBuilder> builders = new ArrayList<>(statements.size());
+  private List<StatementImpl<?, ?, ?>> buildBatchedStatements() {
+    return statements.stream()
+      .flatMap(s -> (
+        (s instanceof BatchImpl)
+        ? ((BatchImpl)s).buildBatchedStatements().stream()
+        : Stream.of(s)
+      ))
+      .collect(Collectors.toList());
+  }
 
-    for (final StatementImpl<?, ?, ?> statement: statements) {
-      // recurse into the batch statement in case it is also batching stuff
-      final StringBuilder[] sbs = statement.buildQueryStrings();
+  /**
+   * Adds the specified statement to this batch.
+   *
+   * @author paouelle
+   *
+   * @param  s the non-<code>null</code> statement to add to this batch
+   * @return this sequence
+   */
+  @SuppressWarnings({"cast"})
+  private Batch addInternal(StatementImpl<?, ?, ?> s) {
+    // special validation for simple statements
+    if (s instanceof SimpleStatementImpl) {
+      final SimpleStatementImpl ss = (SimpleStatementImpl)s;
 
-      if (sbs != null) {
-        for (final StringBuilder sb: sbs) {
-          if (sb != null) {
-            builders.add(sb);
-          }
-        }
-      }
+      org.apache.commons.lang3.Validate.isTrue(
+        !ss.isSelect(),
+        "select statements are not supported in batch statements"
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        !ss.isBatch(),
+        "batch raw statements are not supported in batch statements"
+      );
     }
-    if (builders.isEmpty()) {
-      return null;
+    final boolean isCounterOp = s.isCounterOp();
+
+    if (this.isCounterOp == null) {
+      setCounterOp(isCounterOp);
+    } else if (isCounterOp() != isCounterOp) {
+      throw new IllegalArgumentException(
+        "cannot mix counter operations and non-counter operations in a batch statement"
+      );
     }
-    return builders.toArray(new StringBuilder[builders.size()]);
+    this.statements.add(s);
+    // cast to Object required to compile on the cmdline :-(
+    if (((Object)s) instanceof ParentStatementImpl) {
+      final ParentStatementImpl ps = (ParentStatementImpl)(Object)s;
+
+      ps.setParent(this); // set us as their parent going forward
+      // now recurse all contained object statements for the parent and report them as recorded
+      ps.objectStatements().forEach(cs -> recorded(cs, ps));
+    } else if (s instanceof ObjectStatement) {
+      recorded((ObjectStatement<?>)(Object)s, this);
+    }
+    setDirty();
+    return this;
   }
 
   /**
@@ -262,15 +315,90 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#appendOptions(java.lang.StringBuilder)
+   * @see org.helenus.driver.impl.StatementImpl#buildStatements()
    */
-  @SuppressWarnings("synthetic-access")
   @Override
-  protected void appendOptions(StringBuilder builder) {
-    if (!usings.usings.isEmpty()) {
-      builder.append(" USING ");
-      Utils.joinAndAppend(null, builder, " AND ", usings.usings);
+  protected final List<StatementImpl<?, ?, ?>> buildStatements() {
+    if (!isEnabled()) {
+      this.cacheList = null;
+      this.cacheSB = null;
+      super.simpleSize = 0;
+    } else if (isDirty() || (cacheList == null)) {
+      this.cacheList = buildBatchedStatements();
+      this.cacheSB = null;
+      super.simpleSize = cacheList.stream()
+        .mapToInt(StatementImpl::simpleSize)
+        .sum();
     }
+    return (cacheList != null) ? cacheList : Collections.emptyList();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    buildStatements();
+    return super.simpleSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   */
+  @Override
+  protected StringBuilder[] buildQueryStrings() {
+    if (isDirty() || (cacheSB == null)) {
+      final List<StatementImpl<?, ?, ?>> slist = buildStatements();
+
+      if (cacheList == null) {
+        this.cacheSB = null;
+      } else {
+        this.cacheSB = slist.stream()
+          .map(StatementImpl::getQueryString)
+          .filter(s -> s != null)
+          .map(s -> {
+            final StringBuilder sb = new StringBuilder(s);
+            // Use the same test that String#trim() uses to determine
+            // if a character is a whitespace character.
+            int l = sb.length();
+
+            while (l > 0 && sb.charAt(l - 1) <= ' ') {
+              l -= 1;
+            }
+            if (l != sb.length()) {
+              sb.setLength(l);
+            }
+            if (l == 0 || sb.charAt(l - 1) != ';') {
+              sb.append(';');
+            }
+            return sb;
+          })
+          .toArray(StringBuilder[]::new);
+      }
+    }
+    return cacheSB;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#setDirty()
+   */
+  @Override
+  protected void setDirty() {
+    super.setDirty();
+    this.cacheList = null;
+    this.cacheSB = null;
   }
 
   /**
@@ -284,9 +412,23 @@ public class BatchImpl
   protected void setDirty(boolean recurse) {
     super.setDirty(recurse);
     if (recurse) {
-      for (final StatementImpl<?,?, ?> s: statements) {
-        s.setDirty(recurse);
-      }
+      statements.forEach(s -> s.setDirty(recurse));
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#appendOptions(java.lang.StringBuilder)
+   */
+  @SuppressWarnings("synthetic-access")
+  @Override
+  protected void appendOptions(StringBuilder builder) {
+    if (!usings.usings.isEmpty()) {
+      builder.append(" USING ");
+      Utils.joinAndAppend(null, builder, " AND ", usings.usings);
     }
   }
 
@@ -307,20 +449,20 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.ParentStatementImpl#recorded(org.helenus.driver.ObjectStatement, org.helenus.driver.Group)
+   * @see org.helenus.driver.impl.ParentStatementImpl#recorded(org.helenus.driver.ObjectStatement, org.helenus.driver.ParentStatement)
    */
   @Override
-  public void recorded(ObjectStatement<?> statement, Group group) {
+  public void recorded(ObjectStatement<?> statement, ParentStatement pstatement) {
     if (statement.getObject() == null) { // not associated with a single POJO so skip it
       return;
     }
     // start by notifying the registered recorder
-    recorder.ifPresent(r ->  r.recorded(statement, group));
+    recorder.ifPresent(r ->  r.recorded(statement, pstatement));
     // now notify our parent if any
     final ParentStatementImpl p = parent;
 
     if (p != null) {
-      p.recorded(statement, group);
+      p.recorded(statement, pstatement);
     }
   }
 
@@ -391,7 +533,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#getRecorder()
+   * @see org.helenus.driver.ParentStatement#getRecorder()
    */
   @Override
   public Optional<Recorder> getRecorder() {
@@ -407,7 +549,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#isEmpty()
+   * @see org.helenus.driver.ParentStatement#isEmpty()
    */
   @Override
   public boolean isEmpty() {
@@ -423,7 +565,7 @@ public class BatchImpl
    */
   @Override
   public boolean hasReachedRecommendedSize() {
-    return size() >= Batch.RECOMMENDED_MAX;
+    return simpleSize() >= Batch.RECOMMENDED_MAX;
   }
 
   /**
@@ -431,7 +573,44 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#size()
+   * @see org.helenus.driver.Batch#hasReachedRecommendedSizeFor(java.lang.Class)
+   */
+  @Override
+  public boolean hasReachedRecommendedSizeFor(Class<?> clazz) {
+    if (clazz == null) {
+      return hasReachedRecommendedSize();
+    }
+    try {
+      return hasReachedRecommendedSizeFor(mgr.getClassInfo(clazz));
+    } catch (IllegalArgumentException e) { // fallback to what we can :-(
+      return hasReachedRecommendedSize();
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Batch#hasReachedRecommendedSizeFor(org.helenus.driver.info.ClassInfo)
+   */
+  @Override
+  public boolean hasReachedRecommendedSizeFor(ClassInfo<?> cinfo) {
+    if (cinfo == null) {
+      return hasReachedRecommendedSize();
+    }
+    final int free = Batch.RECOMMENDED_MAX - simpleSize();
+    final int num_tables = cinfo.getNumTables(); // worst case for adding an insert or update or delete
+
+    return free < ((num_tables == 0) ? 1 : num_tables);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.ParentStatement#size()
    */
   @Override
   public int size() {
@@ -456,7 +635,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#clear()
+   * @see org.helenus.driver.ParentStatement#clear()
    */
   @Override
   public void clear() {
@@ -470,8 +649,9 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#add(org.helenus.driver.BatchableStatement)
+   * @see org.helenus.driver.Batch#add(org.helenus.driver.BatchableStatement)
    */
+  @SuppressWarnings("unchecked")
   @Override
   public <R, F extends ListenableFuture<R>> Batch add(
     BatchableStatement<R, F> statement
@@ -482,42 +662,7 @@ public class BatchImpl
       "unsupported class of statements: %s",
       statement.getClass().getName()
     );
-    @SuppressWarnings("unchecked")
-    final StatementImpl<R, F, ?> s = (StatementImpl<R, F, ?>)statement;
-    final boolean isCounterOp = s.isCounterOp();
-
-    if (this.isCounterOp == null) {
-      setCounterOp(isCounterOp);
-    } else if (isCounterOp() != isCounterOp) {
-      throw new IllegalArgumentException(
-        "cannot mix counter operations and non-counter operations in a batch statement"
-      );
-    }
-    // special validation for simple statements
-    if (s instanceof SimpleStatementImpl) {
-      final SimpleStatementImpl ss = (SimpleStatementImpl)s;
-
-      org.apache.commons.lang3.Validate.isTrue(
-        !ss.isSelect(),
-        "select statements are not supported in batch statements"
-      );
-      org.apache.commons.lang3.Validate.isTrue(
-        !ss.isBatch(),
-        "batch simple statements are not supported in batch statements"
-      );
-    } else if (s instanceof BatchImpl) {
-      final BatchImpl bs = (BatchImpl)s;
-
-      bs.setParent(this); // set us as their parent going forward
-      this.includesBatches = true;
-      // now recurse all contained object statements for the batch and report them as recorded
-      bs.objectStatements().forEach(cs -> recorded(cs, bs));
-    } else if (s instanceof ObjectStatement) {
-      recorded((ObjectStatement<?>)s, this);
-    }
-    this.statements.add(s);
-    setDirty();
-    return this;
+    return addInternal((StatementImpl<R, F, ?>)statement);
   }
 
   /**
@@ -525,21 +670,12 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#add(com.datastax.driver.core.RegularStatement)
+   * @see org.helenus.driver.Batch#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
   public Batch add(com.datastax.driver.core.RegularStatement statement) {
-    final SimpleStatementImpl s = new SimpleStatementImpl(statement, mgr, bridge);
-
-    org.apache.commons.lang3.Validate.isTrue(
-      !s.isSelect(),
-      "select raw statements are not supported in batch statements"
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      !s.isBatch(),
-      "batch raw statements are not supported in batch statements"
-    );
-    return add(s);
+    org.apache.commons.lang3.Validate.notNull(statement, "invalid null statement");
+    return addInternal(new SimpleStatementImpl(statement, mgr, bridge));
   }
 
   /**
@@ -547,7 +683,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#addErrorHandler(org.helenus.util.function.ERunnable)
+   * @see org.helenus.driver.Batch#addErrorHandler(org.helenus.util.function.ERunnable)
    */
   @Override
   public Batch addErrorHandler(ERunnable<?> run) {
@@ -562,7 +698,7 @@ public class BatchImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#runErrorHandlers()
+   * @see org.helenus.driver.ParentStatement#runErrorHandlers()
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
@@ -689,7 +825,7 @@ public class BatchImpl
      * @see org.helenus.driver.Batch.Options#add(org.helenus.driver.BatchableStatement)
      */
     @Override
-    public <R, F extends AbstractFuture<R>> Batch add(
+    public <R, F extends ListenableFuture<R>> Batch add(
       BatchableStatement<R, F> statement
     ) {
       return this.statement.add(statement);

@@ -15,10 +15,15 @@
  */
 package org.helenus.driver.impl;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -31,6 +36,7 @@ import com.datastax.driver.core.EmptyResultSetFuture;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.policies.RetryPolicy;
@@ -39,6 +45,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import org.helenus.driver.Batch;
 import org.helenus.driver.GenericStatement;
+import org.helenus.driver.Group;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.ObjectSetFuture;
 import org.helenus.driver.Sequence;
@@ -165,11 +172,20 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   private volatile ConsistencyLevel serialConsistency;
 
   /**
-   * Flag indicating if tracing is enabled for this statement.
+   * Trace prefix to prepend to the statement when traced or <code>null</code>
+   * if tracing is disabled for this statement.
    *
    * @author paouelle
    */
-  private volatile boolean traceQuery = true;
+  private volatile String tracePrefix = null;
+
+  /**
+   * Error trace prefix to prepend to the statement when traced or <code>null</code>
+   * if error tracing is disabled for this statement.
+   *
+   * @author paouelle
+   */
+  private volatile String errorTracePrefix = null;
 
   /**
    * Holds the query fetch size for this statement.
@@ -191,6 +207,16 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @author paouelle
    */
   private volatile boolean dirty;
+
+  /**
+   * Holds the number of simple statements included as part of this statement.
+   * <p>
+   * <i>Note:</i> Even for inserts, this value might be bigger than one if the
+   * POJO defines multiple tables. Set to <code>-1</code> if not computed yet.
+   *
+   * @author paouelle
+   */
+  protected volatile int simpleSize = -1;
 
   /**
    * Holds the cached query string.
@@ -310,9 +336,11 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.enabled = statement.enabled;
     this.consistency = statement.consistency;
     this.serialConsistency = statement.serialConsistency;
-    this.traceQuery = statement.traceQuery;
+    this.tracePrefix = statement.tracePrefix;
+    this.errorTracePrefix = statement.errorTracePrefix;
     this.fetchSize = statement.fetchSize;
     this.retryPolicy = statement.retryPolicy;
+    this.simpleSize = statement.simpleSize;
     this.dirty = statement.dirty;
     this.cache = statement.cache;
     this.isCounterOp = statement.isCounterOp;
@@ -341,9 +369,11 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.enabled = statement.enabled;
     this.consistency = statement.consistency;
     this.serialConsistency = statement.serialConsistency;
-    this.traceQuery = statement.traceQuery;
+    this.tracePrefix = statement.tracePrefix;
+    this.errorTracePrefix = statement.errorTracePrefix;
     this.fetchSize = statement.fetchSize;
     this.retryPolicy = statement.retryPolicy;
+    this.simpleSize = statement.simpleSize;
     this.dirty = statement.dirty;
     this.cache = statement.cache;
     this.isCounterOp = statement.isCounterOp;
@@ -371,7 +401,34 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     if (getSerialConsistencyLevel() != null) {
       s.setSerialConsistencyLevel(getSerialConsistencyLevel());
     }
-    if (isTracing()) {
+    s.enableTracing(tracePrefix);
+    s.enableErrorTracing(errorTracePrefix);
+    if (getRetryPolicy() != null) {
+     s.setRetryPolicy(getRetryPolicy());
+    }
+    s.setFetchSize(getFetchSize());
+    return s;
+  }
+
+  /**
+   * Initializes the specified Cassandra statement with the same settings as
+   * this statement.
+   *
+   * @author paouelle
+   *
+   * @param <S> the type of statement to initialize
+   *
+   * @param  s the non-<code>null</code> statement to initialize
+   * @return <code>s</code>
+   */
+  protected <S extends Statement> S init(S s) {
+    if (getConsistencyLevel() != null) {
+      s.setConsistencyLevel(getConsistencyLevel());
+    }
+    if (getSerialConsistencyLevel() != null) {
+      s.setSerialConsistencyLevel(getSerialConsistencyLevel());
+    }
+    if (s.isTracing()) {
       s.enableTracing();
     } else {
       s.disableTracing();
@@ -384,12 +441,34 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
-   * Builds the query strings (one per underlying statement) to be batched if
-   * the statement represents some form of batch statement.
+   * Gets all underlying statements or this statement if none contained within.
+   * <p>
+   * <i>Note:</i> Any statements that contains other statements should be
+   * flattened out based on its type. For example, a batch will flattened out 
+   * all included batches recursively. A sequence will do the same with contained 
+   * sequences but not with contained groups or batches. A group will do the 
+   * same with contained groups but not with contained sequences or batches.
    *
    * @author paouelle
    *
-   * @return the string builders used to build the query strings to be batched
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
+   */
+  protected List<StatementImpl<?, ?, ?>> buildStatements()  {
+    if (!isEnabled()) {
+      return Collections.emptyList();
+    }
+    // by default return a list with just ourselves
+    return Collections.singletonList(this);
+  }
+
+  /**
+   * Builds the query strings (one per underlying statement) to be collected if
+   * the statement represents some a batch, sequence, or a group statement.
+   *
+   * @author paouelle
+   *
+   * @return the string builders used to build the query strings to be collected
    *         or <code>null</code> if nothing to batch
    */
   protected abstract StringBuilder[] buildQueryStrings();
@@ -478,18 +557,20 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
-   * Sets the dirty bit for the cached query string.
+   * Sets the dirty bit for the cached query string and clear the number of
+   * statements.
    *
    * @author paouelle
    */
   protected void setDirty() {
     this.dirty = true;
     this.cache = null;
+    this.simpleSize = -1; // clear the simple size as well
   }
 
   /**
-   * Sets the dirty bit for the cached query string potentially recursively for
-   * all contained statements.
+   * Sets the dirty bit for the cached query string and clear the number of
+   * statements potentially recursively for all contained statement.
    *
    * @author paouelle
    *
@@ -511,6 +592,15 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   protected boolean isDirty() {
     return dirty;
   }
+
+  /**
+   * Gets the number of simple statements in this statement.
+   *
+   * @author paouelle
+   *
+   * @return the number of simple statements in this statement
+   */
+  protected abstract int simpleSize();
 
   /**
    * Checks if we encountered a counter assignment operation.
@@ -610,38 +700,77 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
       if (StringUtils.isEmpty(query)) { // nothing to query
         return new EmptyResultSetFuture(mgr);
       }
-      if (logger.isDebugEnabled()) {
-        if (isTracing()) {
-          if (mgr.isFullTracesEnabled()
-              || (query.length() < 2048)
-              || !((this instanceof Batch) || (this instanceof Sequence))) {
-            logger.log(Level.DEBUG, "CQL -> %s", query);
-          } else {
-            if (this instanceof Batch) {
-              logger.log(Level.DEBUG, "CQL -> %s ... APPLY BATCH", query.substring(0, 2024));
-            } else {
-              logger.log(Level.DEBUG, "CQL -> %s ... APPLY SEQUENCE", query.substring(0, 2024));
-            }
+      final SimpleStatement raw = init(new SimpleStatement(query));
+
+      debugExecution(query);
+      final ResultSetFuture f = mgr.sent(this, mgr.getSession().executeAsync(raw));
+
+      return new ResultSetFuture() {
+        @Override
+        public void addListener(Runnable listener, Executor executor) {
+          f.addListener(listener, executor);
+        }
+        @Override
+        public boolean isCancelled() {
+          return f.isCancelled();
+        }
+        @Override
+        public boolean isDone() {
+          return f.isDone();
+        }
+        @SuppressWarnings("synthetic-access")
+        @Override
+        public ResultSet get() throws InterruptedException, ExecutionException {
+          try {
+            return f.get();
+          } catch (InterruptedException e) {
+            throw e;
+          } catch (Error|Exception e) {
+            errorExecution(query, e);
+            throw e; // re-throw
           }
         }
-      }
-      final SimpleStatement raw = new SimpleStatement(query);
-
-      // propagate statement properties
-      if (getConsistencyLevel() != null) {
-        raw.setConsistencyLevel(getConsistencyLevel());
-      }
-      if (getSerialConsistencyLevel() != null) {
-        raw.setSerialConsistencyLevel(getSerialConsistencyLevel());
-      }
-      if (isTracing()) {
-        raw.enableTracing();
-      } else {
-        raw.disableTracing();
-      }
-      raw.setRetryPolicy(getRetryPolicy());
-      raw.setFetchSize(getFetchSize());
-      return mgr.sent(this, mgr.getSession().executeAsync(raw));
+        @SuppressWarnings("synthetic-access")
+        @Override
+        public ResultSet get(long timeout, TimeUnit unit)
+          throws InterruptedException, ExecutionException, TimeoutException {
+          try {
+            return f.get(timeout, unit);
+          } catch (InterruptedException|TimeoutException e) {
+            throw e;
+          } catch (Error|Exception e) {
+            errorExecution(query, e);
+            throw e; // re-throw
+          }
+        }
+        @SuppressWarnings("synthetic-access")
+        @Override
+        public ResultSet getUninterruptibly() {
+          try {
+            return f.getUninterruptibly();
+          } catch (Error|Exception e) {
+            errorExecution(query, e);
+            throw e; // re-throw
+          }
+        }
+        @SuppressWarnings("synthetic-access")
+        @Override
+        public ResultSet getUninterruptibly(long timeout, TimeUnit unit)
+          throws TimeoutException {
+          try {
+            return f.getUninterruptibly(timeout, unit);
+          } catch (TimeoutException e) {
+            throw e;
+          } catch (Error|Exception e) {
+            errorExecution(query, e);
+            throw e; // re-throw
+          }
+        }
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+          return f.cancel(mayInterruptIfRunning);
+        }
+      };
     } finally {
       // let's recursively clear the query string that gets cache to reduce
       // the memory impact chance are now that it got executed, it won't be
@@ -656,7 +785,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    *
    * @author paouelle
    *
-   * @return the class for the POJO if assocaited with one
+   * @return the class for the POJO if associated with one
    */
   public Class<T> getObjectClass() {
     return pojoClass;
@@ -744,8 +873,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> enable() {
-    this.enabled = true;
-    setDirty();
+    if (!enabled) {
+      setDirty();
+      this.enabled = true;
+    }
     return this;
   }
 
@@ -758,8 +889,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> disable() {
-    this.enabled = false;
-    setDirty();
+    if (enabled) {
+      setDirty();
+      this.enabled = false;
+    }
     return this;
   }
 
@@ -784,7 +917,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> setConsistencyLevel(ConsistencyLevel consistency) {
-    this.consistency = consistency;
+    if (consistency != this.consistency) {
+      setDirty();
+      this.consistency = consistency;
+    }
     return this;
   }
 
@@ -815,7 +951,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
       "invalid serial consistency level: %s",
       serialConsistency
     );
-    this.serialConsistency = serialConsistency;
+    if (serialConsistency != this.serialConsistency) {
+      setDirty();
+      this.serialConsistency = serialConsistency;
+    }
     return this;
   }
 
@@ -840,7 +979,26 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> enableTracing() {
-    this.traceQuery = true;
+    if (!Objects.equals("", tracePrefix)) {
+      setDirty();
+      this.tracePrefix = "";
+    }
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#enableTracing(java.lang.String)
+   */
+  @Override
+  public GenericStatement<R, F> enableTracing(String prefix) {
+    if (!Objects.equals(prefix, tracePrefix)) {
+      setDirty();
+      this.tracePrefix = prefix;
+    }
     return this;
   }
 
@@ -853,7 +1011,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> disableTracing() {
-    this.traceQuery = false;
+    if (tracePrefix != null) {
+      setDirty();
+      this.tracePrefix = null;
+    }
     return this;
   }
 
@@ -866,7 +1027,68 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public boolean isTracing() {
-    return traceQuery;
+    return (tracePrefix != null);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#enableErrorTracing()
+   */
+  @Override
+  public GenericStatement<R, F> enableErrorTracing() {
+    if (!Objects.equals("", errorTracePrefix)) {
+      setDirty();
+      this.errorTracePrefix = "";
+    }
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#enableErrorTracing(java.lang.String)
+   */
+  @Override
+  public GenericStatement<R, F> enableErrorTracing(String prefix) {
+    if (!Objects.equals(prefix, errorTracePrefix)) {
+      setDirty();
+      this.errorTracePrefix = prefix;
+    }
+    this.errorTracePrefix = prefix;
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#disableErrorTracing()
+   */
+  @Override
+  public GenericStatement<R, F> disableErrorTracing() {
+    if (errorTracePrefix != null) {
+      setDirty();
+      this.errorTracePrefix = null;
+    }
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#isErrorTracing()
+   */
+  @Override
+  public boolean isErrorTracing() {
+    return (errorTracePrefix != null);
   }
 
   /**
@@ -874,19 +1096,124 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    *
    * @author paouelle
    *
-   * @param s the simple statement to log the execution
+   * @param query the query of the statement being executed
    */
-  public void debugExecution(SimpleStatement s) {
-    if (logger.isDebugEnabled()) {
-      if (s.isTracing()) {
-        final String query = s.getQueryString();
-
-        if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
-          logger.log(Level.DEBUG, "CQL -> %s", query);
-        } else {
-          logger.log(Level.DEBUG, "CQL -> %s ...", query.substring(0, 2048));
-        }
+  private void debugExecution(String query) {
+    if (logger.isDebugEnabled() && isTracing()) {
+      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+        logger.log(Level.DEBUG, "%sCQL -> %s", tracePrefix, query);
+      } else if (this instanceof Batch) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY BATCH",
+          tracePrefix,
+          query.substring(0, 2032)
+        );
+      } else if (this instanceof Sequence) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY SEQUENCE",
+          tracePrefix,
+          query.substring(0, 2029)
+        );
+      } else if (this instanceof Group) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY GROUP",
+          tracePrefix,
+          query.substring(0, 2032)
+        );
+      } else {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ...",
+          tracePrefix,
+          query.substring(0, 2044)
+        );
       }
+    }
+  }
+
+  /**
+   * Log the execution exception.
+   *
+   * @author paouelle
+   *
+   * @param query the query string of the statement that failed
+   * @param e the exception
+   */
+  private void errorExecution(String query, Throwable e) {
+    // try as an error log first
+    if (logger.isErrorEnabled() && isErrorTracing()) {
+      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+        logger.log(
+          Level.ERROR, "%sCQL ERROR -> %s", errorTracePrefix, query
+         );
+      } else if (StatementImpl.this instanceof Batch) {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ... APPLY BATCH",
+          errorTracePrefix,
+          query.substring(0, 2032)
+        );
+      } else if (StatementImpl.this instanceof Sequence) {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ... APPLY SEQUENCE",
+          errorTracePrefix,
+          query.substring(0, 2029)
+        );
+      } else if (StatementImpl.this instanceof Group) {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ... APPLY GROUP",
+          errorTracePrefix,
+          query.substring(0, 2032)
+        );
+      } else {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ...",
+          errorTracePrefix,
+          query.substring(0, 2044)
+        );
+      }
+      logger.log(Level.ERROR, "%sCQL ERROR -> ", errorTracePrefix, e);
+    } else if (logger.isDebugEnabled() && isTracing()) { // fallback to tracing
+      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+        logger.log(
+          Level.DEBUG, "%sCQL ERROR -> %s", tracePrefix, query
+        );
+      } else if (StatementImpl.this instanceof Batch) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY BATCH",
+          tracePrefix,
+          query.substring(0, 2032)
+        );
+      } else if (StatementImpl.this instanceof Sequence) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY SEQUENCE",
+          tracePrefix,
+          query.substring(0, 2029)
+        );
+      } else if (StatementImpl.this instanceof Group) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY GROUP",
+          tracePrefix,
+          query.substring(0, 2032)
+        );
+      } else {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ...",
+          tracePrefix,
+          query.substring(0, 2044)
+        );
+      }
+      logger.log(Level.DEBUG, "%sCQL ERROR -> ", tracePrefix, e);
     }
   }
 
@@ -899,7 +1226,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> setRetryPolicy(RetryPolicy policy) {
-    this.retryPolicy = policy;
+    if (!Objects.equals(policy, retryPolicy)) {
+      setDirty();
+      this.retryPolicy = policy;
+    }
     return this;
   }
 
@@ -924,7 +1254,10 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   public GenericStatement<R, F> setFetchSize(int fetchSize) {
-    this.fetchSize = fetchSize;
+    if (fetchSize != this.fetchSize) {
+      setDirty();
+      this.fetchSize = fetchSize;
+    }
     return this;
   }
 

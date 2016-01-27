@@ -18,6 +18,7 @@ package com.datastax.driver.core;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -25,13 +26,13 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.util.concurrent.ExecutionList;
 
-import org.helenus.driver.StatementManager;
-import org.helenus.driver.impl.SequenceStatementImpl;
+import org.helenus.driver.impl.StatementImpl;
+import org.helenus.driver.impl.StatementManagerImpl;
 
 /**
- * The <code>LastResultSetFuture</code> class defines a result set which is
- * designed to execute multiple statements in a sequence and return only the
- * result set from the last statement.
+ * The <code>LastResultSequentialSetFuture</code> class defines a result set
+ * which is designed to execute multiple statements in a sequence and return
+ * only the result set from the last statement.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -40,40 +41,13 @@ import org.helenus.driver.impl.SequenceStatementImpl;
  *
  * @since 1.0
  */
-public class LastResultSetFuture extends DefaultResultSetFuture {
-  /**
-   * Holds a direct executor used for future listeners
-   * registered internally.
-   *
-   * @author paouelle
-   */
-  private static final Executor DIRECT = new Executor() {
-    @Override
-    public void execute(Runnable r) {
-      r.run();
-    }
-  };
-
-  /**
-   * Holds the statement manager.
-   *
-   * @author paouelle
-   */
-  private final StatementManager mgr;
-
-  /**
-   * Holds the associate sequence statement.
-   *
-   * @author paouelle
-   */
-  private final SequenceStatementImpl<?, ?, ?> sequence;
-
+public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
   /**
    * Holds the statements to execute.
    *
    * @author paouelle
    */
-  private final Iterator<SimpleStatement> statements;
+  private final Iterator<StatementImpl<?, ?, ?>> statements;
 
   /**
    * The execution list to hold our executors.
@@ -83,11 +57,25 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
   private final ExecutionList executionList = new ExecutionList();
 
   /**
-   * Holds the future result of the currently executing statement.
+   * Holds the statement manager.
+   *
+   * @author paouelle
+   */
+  private final StatementManagerImpl mgr;
+
+  /**
+   * Holds the listenable future of the currently executing statement.
    *
    * @author paouelle
    */
   private ResultSetFuture future = null;
+
+  /**
+   * Holds a flag indicating the result set was cancelled.
+   *
+   * @author paouelle
+   */
+  private boolean cancelled = false;
 
   /**
    * Holds the result listener used to detect when a statement is done
@@ -102,17 +90,17 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
       boolean execute = false;
 
       try {
-        synchronized (LastResultSetFuture.this.statements) {
+        synchronized (statements) {
           // notified that the current future is done (success, error, or cancelled)
-          // we need to execute out own listeners only if there was an error or cancellation
+          // we need to execute our own listeners only if there was an error or cancellation
           // or if this was the last statement to execute
-          if (LastResultSetFuture.this.future.isCancelled()) {
+          if (future.isCancelled()) {
             // already cancelled so bail out
             // leaving the future intact for our own clients
             execute = true; // notify out listeners
             return;
           }
-          if (!LastResultSetFuture.this.future.isDone()) {
+          if (!future.isDone()) {
             // not done yet so bail out
             // leaving the future intact for our own clients
             return;
@@ -120,25 +108,39 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
           try {
             // test the current future result, that is the only way to detect if
             // it completed successfully or if it failed with an exception
-            LastResultSetFuture.this.future.get();
+            LastResultSequentialSetFuture.this.future.get();
+          } catch (ThreadDeath|OutOfMemoryError|StackOverflowError|AssertionError e) {
+            // ignore and return leaving the future intact for our own clients
+            execute = true; // notify our listeners
+            throw e;
           } catch (Error|Exception e) {
-            // ignore and return leaving the future intact for own own clients
-            execute = true; // notify out listeners
-            return;
+            // ignore and return leaving the future intact for our own clients
+            // to detect this error
+            execute = true; // notify our listeners
           }
-          // move on the the next if any
-          if (LastResultSetFuture.this.statements.hasNext()) {
-            final SimpleStatement s = LastResultSetFuture.this.statements.next();
+          // move on to the next if any
+          if (statements.hasNext()) {
+            try {
+              final StatementImpl<?, ?, ?> s = statements.next();
 
-            sequence.debugExecution(s);
-            LastResultSetFuture.this.future = mgr.getSession().executeAsync(s);
-            LastResultSetFuture.this.future.addListener(
-              LastResultSetFuture.this.listener,
-              LastResultSetFuture.DIRECT
-            );
+              LastResultSequentialSetFuture.this.future = s.executeAsyncRaw();
+              LastResultSequentialSetFuture.this.future.addListener(
+                LastResultSequentialSetFuture.this.listener,
+                mgr.getPoolExecutor()
+              );
+            } catch (ThreadDeath|OutOfMemoryError|StackOverflowError|AssertionError e) {
+              // hum! we need to propagate this one into an error result future
+              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(mgr, e);
+              execute = true; // notify our listeners
+              throw e;
+            } catch (Error|Exception e) {
+              // hum! we need to propagate this one into an error result future
+              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(mgr, e);
+              execute = true; // notify our listeners
+            }
           } else { // that was the last statement in the sequence
             // leave the last future intact for our own clients
-            execute = true; // notify out listeners
+            execute = true; // notify our listeners
           }
         }
       } finally {
@@ -150,45 +152,39 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
   };
 
   /**
-   * Instantiates a new <code>LastResultSetFuture</code> object.
+   * Instantiates a new <code>LastResultSequentialSetFuture</code> object.
    *
    * @author paouelle
    *
    * @param  statements the list of statements to execute in the specified order
-   * @param  sequence the associated sequence statement
    * @param  mgr the statement manager
-   * @throws NullPointerException if <code>sequence</code>, <code>mgr</code>,
-   *         <code>statements</code>, or any of the statements are <code>null</code>
+   * @throws NullPointerException if <code>mgr</code>, <code>statements</code>,
+   *         or any of the statements are <code>null</code>
    */
-  public LastResultSetFuture(
-    List<SimpleStatement> statements,
-    SequenceStatementImpl<?, ?, ?> sequence,
-    StatementManager mgr
+  public LastResultSequentialSetFuture(
+    List<StatementImpl<?, ?, ?>> statements, StatementManagerImpl mgr
   ) {
     super(
       null,
       mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
       null
     );
-    org.apache.commons.lang3.Validate.notNull(sequence, "invalid null sequence");
-    org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!
     org.apache.commons.lang3.Validate.notNull(statements, "invalid null statements");
-    this.sequence = sequence;
     this.mgr = mgr;
-    final List<SimpleStatement> ss = new ArrayList<>(statements.size());
+    final List<StatementImpl<?, ?, ?>> ss
+      = new ArrayList<>(statements.size());
 
-    for (final SimpleStatement s: statements) {
+    for (final StatementImpl<?, ?, ?> s: statements) {
       org.apache.commons.lang3.Validate.notNull(s, "invalid null statement");
       ss.add(s);
     }
     this.statements = ss.iterator();
     // execute the first one to get things going
     if (this.statements.hasNext()) {
-      final SimpleStatement s = this.statements.next();
+      final StatementImpl<?, ?, ?> s = this.statements.next();
 
-      sequence.debugExecution(s);
-      this.future = mgr.getSession().executeAsync(s);
-      this.future.addListener(listener, LastResultSetFuture.DIRECT);
+      this.future = s.executeAsyncRaw();
+      this.future.addListener(listener, mgr.getPoolExecutor());
     }
   }
 
@@ -216,7 +212,7 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
   @Override
   public boolean isCancelled() {
     synchronized (statements) {
-      return future.isCancelled();
+      return cancelled || future.isCancelled();
     }
   }
 
@@ -230,7 +226,18 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
     synchronized (statements) {
-      return future.cancel(mayInterruptIfRunning);
+      if (cancelled) {
+        return false;
+      }
+      this.cancelled = true;
+      try {
+        // if we cancelled the current or if we had more to execute then we did cancel
+        return future.cancel(mayInterruptIfRunning) || statements.hasNext();
+      } finally {
+        while (statements.hasNext()) { // empty out the iterator of statements
+          statements.next();
+        }
+      }
     }
   }
 
@@ -253,6 +260,9 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
 
     while (true) {
       synchronized (statements) {
+        if (cancelled) {
+          throw new CancellationException();
+        }
         future = this.future;
         // note that our listener above will actually be executing the next
         // statements automatically
@@ -284,6 +294,9 @@ public class LastResultSetFuture extends DefaultResultSetFuture {
 
     while (true) {
       synchronized (statements) {
+        if (cancelled) {
+          throw new CancellationException();
+        }
         future = this.future;
         // note that our listener above will actually be executing the next
         // statements automatically

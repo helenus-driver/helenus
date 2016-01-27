@@ -15,6 +15,8 @@
  */
 package org.helenus.driver;
 
+import org.helenus.driver.info.ClassInfo;
+
 /**
  * The <code>ObjectClassStatement</code> interface extends the functionality of
  * the {@link GenericStatement} interface for statements that are associated
@@ -39,4 +41,13 @@ public interface ObjectClassStatement<T>
    * @return the POJO class associated with this statement
    */
   public Class<T> getObjectClass();
+
+  /**
+   * Gets the POJO class information associated with this statement.
+   *
+   * @author paouelle
+   *
+   * @return the POJO class info associated with this statement
+   */
+  public ClassInfo<T> getClassInfo();
 }

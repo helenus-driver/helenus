@@ -17,6 +17,7 @@ package org.helenus.driver.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +107,7 @@ public class CreateTableImpl<T>
    * @throws IllegalArgumentException if any of the specified tables are not
    *         defined in the POJO
    */
+  @SuppressWarnings({"unchecked", "cast", "rawtypes"})
   public CreateTableImpl(
     ClassInfoImpl<T>.Context context,
     String[] tables,
@@ -113,27 +115,35 @@ public class CreateTableImpl<T>
     StatementBridge bridge
   ) {
     super(Void.class, context, mgr, bridge);
+    ClassInfoImpl<?> cinfo = context.getClassInfo();
+
+    if (cinfo instanceof TypeClassInfoImpl) {
+      // fallback to root entity to create the proper table
+      cinfo = ((TypeClassInfoImpl<?>)cinfo).getRoot();
+    }
     if (tables != null) {
       for (final String table: tables) {
         if (table != null) {
-          this.tables.add((TableInfoImpl<T>)context.getClassInfo().getTable(table)); // will throw IAE
+          this.tables.add((TableInfoImpl<T>)cinfo.getTable(table)); // will throw IAE
         } // else - skip
       }
     } else { // fallback to all
-      this.tables.addAll(context.getClassInfo().getTablesImpl());
+      this.tables.addAll(
+        (Collection<TableInfoImpl<T>>)(Collection)cinfo.getTablesImpl()
+      );
     }
     this.with = new OptionsImpl<>(this);
     this.where = new WhereImpl<>(this);
   }
 
   /**
-   * Builds a query string or strings for the specified table.
+   * Builds query strings for the specified table.
    *
    * @author paouelle
    *
    * @param  table the non-<code>null</code> table for which to build a query
    *         string
-   * @return the string builders used to build the query string or strings for
+   * @return the string builders used to build the query strings for
    *         the specified table or <code>null</code> if there is none for the
    *         specified table
    * @throws IllegalArgumentException if the keyspace has not yet been computed
@@ -144,7 +154,7 @@ public class CreateTableImpl<T>
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
-  StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
+  protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
     final List<String> columns = new ArrayList<>(table.getColumns().size());
     final List<String> pkeys = new ArrayList<>(table.getPartitionKeys().size());
     final Map<String, Ordering> ckeys = new LinkedHashMap<>(table.getClusteringKeys().size() * 3 / 2);
@@ -233,24 +243,17 @@ public class CreateTableImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
    */
   @Override
-  protected StringBuilder[] buildQueryStrings() {
-    if (!isEnabled()) {
-      return null;
-    }
-    final List<StringBuilder> builders = tables.stream()
+  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+    return tables.stream()
       .map(t -> buildQueryStrings(t))
       .filter(bs -> bs != null)
       .flatMap(bs -> Arrays.stream(bs))
-      .filter(b -> b != null)
+      .filter(b -> (b != null) && (b.length() != 0))
+      .map(b -> init(new SimpleStatementImpl(b.toString(), mgr, bridge)))
       .collect(Collectors.toList());
-
-    if (builders.isEmpty()) {
-      return null;
-    }
-    return builders.toArray(new StringBuilder[builders.size()]);
   }
 
   /**

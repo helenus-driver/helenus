@@ -15,6 +15,7 @@
  */
 package org.helenus.util.stream;
 
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -128,6 +129,83 @@ public class Collectors {
       valueMapper,
       mergeFunction,
       LinkedHashMap::new
+    );
+  }
+
+  /**
+   * Returns a {@link Collector} that accumulates elements into a
+   * {@link IdentityHashMap} whose keys and values are the result of applying the
+   * provided mapping functions to the input elements.
+   * <p>
+   * If the mapped keys contains duplicates (according to the <code>==</code>
+   * operator, an {@link IllegalStateException} is thrown when the collection
+   * operation is performed. If the mapped keys may have duplicates, use
+   * {@link #toIdentityMap(Function, Function, BinaryOperator)} instead.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of the input elements
+   * @param <K> the output type of the key mapping function
+   * @param <U> the output type of the value mapping function
+   *
+   * @param  keyMapper a mapping function to produce keys
+   * @param  valueMapper a mapping function to produce values
+   * @return a {@link Collector} which collects elements into a {@link IdentityHashMap}
+   *         whose keys and values are the result of applying mapping functions
+   *         to the input elements
+   *
+   * @see #toIdentityMap(Function, Function, BinaryOperator)
+   */
+  public static <T, K, U> Collector<T, ?, Map<K, U>> toIdentityMap(
+    Function<? super T, ? extends K> keyMapper,
+    Function<? super T, ? extends U> valueMapper
+  ) {
+    return java.util.stream.Collectors.toMap(
+      keyMapper,
+      valueMapper,
+      Collectors.throwingMerger(),
+      IdentityHashMap::new
+    );
+  }
+
+  /**
+   * Returns a {@Link Collector} that accumulates elements into a
+   * {@link IdentityHashMap} whose keys and values are the result of applying the
+   * provided mapping functions to the input elements.
+   * <p>
+   * If the mapped keys contains duplicates (according to the <code>==</code>
+   * operator), the value mapping function is applied to each equal element, and
+   * the results are merged using the provided merging function.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of the input elements
+   * @param <K> the output type of the key mapping function
+   * @param <U> the output type of the value mapping function
+   *
+   * @param  keyMapper a mapping function to produce keys
+   * @param  valueMapper a mapping function to produce values
+   * @param  mergeFunction a merge function, used to resolve collisions between
+   *         values associated with the same key, as supplied
+   *         to {@link Map#merge(Object, Object, BiFunction)}
+   * @return a {@link Collector} which collects elements into a {@link IdentityHashMap}
+   *         whose keys are the result of applying a key mapping function to the
+   *         input elements, and whose values are the result of applying a value
+   *         mapping function to all input elements equal to the key and combining
+   *         them using the merge function
+   *
+   * @see #toLinkedMap(Function, Function)
+   */
+  public static <T, K, U> Collector<T, ?, Map<K, U>> toIdentityMap(
+    Function<? super T, ? extends K> keyMapper,
+    Function<? super T, ? extends U> valueMapper,
+    BinaryOperator<U> mergeFunction
+  ) {
+    return java.util.stream.Collectors.toMap(
+      keyMapper,
+      valueMapper,
+      mergeFunction,
+      IdentityHashMap::new
     );
   }
 }

@@ -69,19 +69,16 @@ import org.helenus.commons.collections.graph.ConcurrentHashDirectedGraph;
 import org.helenus.commons.lang3.IllegalCycleException;
 import org.helenus.commons.lang3.SerializationUtils;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.driver.AlterSchema;
 import org.helenus.driver.AlterSchemas;
 import org.helenus.driver.Batch;
-import org.helenus.driver.CreateSchema;
 import org.helenus.driver.CreateSchemas;
 import org.helenus.driver.GenericStatement;
+import org.helenus.driver.Group;
 import org.helenus.driver.ObjectClassStatement;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.impl.StatementManagerImpl;
-import org.helenus.driver.info.ClassInfo;
-import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.persistence.InitialObjects;
 import org.helenus.jackson.jsonSchema.customProperties.JsonAnnotationSchemaFactoryWrapper;
 import org.reflections.Reflections;
@@ -563,135 +560,51 @@ public class Tool {
 
       if (query == null) {
         System.out.println(Tool.class.getSimpleName() + ": CQL -> null");
-      } else if (fvflag || (query.length() < 2048) || !((s instanceof Batch) || (s instanceof Sequence))) {
+      } else if (fvflag || (query.length() < 2048)) {
         System.out.println(
           Tool.class.getSimpleName()
           + ": CQL -> "
           + query
         );
+      } else if (s instanceof Batch) {
+        System.out.println(
+          Tool.class.getSimpleName()
+          + ": CQL -> "
+          + query.substring(0, 2032)
+          + " ... APPLY BATCH;"
+        );
+      } else if (s instanceof Sequence) {
+        System.out.println(
+          Tool.class.getSimpleName()
+          + ": CQL -> "
+          + query.substring(0, 2029)
+          + " ... APPLY SEQUENCE;"
+        );
+      } else if (s instanceof Group) {
+        System.out.println(
+          Tool.class.getSimpleName()
+          + ": CQL -> "
+          + query.substring(0, 2032)
+          + " ... APPLY GROUP;"
+        );
       } else {
-        if (s instanceof Batch) {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": CQL -> "
-            + query.substring(0, 2024)
-            + " ... APPLY BATCH;"
-          );
-        } else {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": CQL -> "
-            + query.substring(0, 2024)
-            + " ... APPLY SEQUENCE;"
-          );
-        }
+        System.out.println(
+          Tool.class.getSimpleName()
+          + ": CQL -> "
+          + query.substring(0, 2044)
+        );
       }
     }
     s.execute();
   }
 
   /**
-   * Creates all defined schemas based on the provided set of class names and
-   * options and add the statements to the specified sequence. For each class
-   * found; the corresponding array element will be nulled. All others are
-   * simply skipped.
+   * Creates all defined schemas based on the provided set of package and/or
+   * class names and options and add the statements to the specified sequence.
    *
    * @author paouelle
    *
-   * @param  cnames the set of class names to create schemas for
-   * @param  suffixes the map of provided suffix values
-   * @param  matching whether or not to only create schemas for keyspaces that
-   *         matches the specified set of suffixes
-   * @param  alter whether to alter or create the schemas
-   * @param  s the sequence where to add the generated statements
-   * @throws LinkageError if the linkage fails for one of the specified entity
-   *         class
-   * @throws ExceptionInInitializerError if the initialization provoked by one
-   *         of the specified entity class fails
-   */
-  private static void createSchemasFromClasses(
-    String[] cnames,
-    Map<String, String> suffixes,
-    boolean matching,
-    boolean alter,
-    Sequence s
-  ) {
-    next_class:
-    for (int i = 0; i < cnames.length; i++) {
-      try {
-        final Class<?> clazz = Class.forName(cnames[i]);
-
-        cnames[i] = null; // clear since we found a class
-        if (alter) {
-          final AlterSchema<?> cs = StatementBuilder.alterSchema(clazz);
-
-          // pass all required suffixes
-          for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-            // check if this suffix type is defined
-            final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
-
-            if (suffix != null) {
-              // register the suffix value with the corresponding suffix name
-              cs.where(
-                StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
-              );
-            } else if (matching) {
-              // we have one more suffix then defined with this pojo
-              // and we were requested to only do does that match the provided
-              // suffixes so skip the class
-              continue next_class;
-            }
-          }
-          s.add(cs);
-          for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
-            System.out.println(
-              Tool.class.getSimpleName()
-              + ": altering schema for "
-              + cinfo.getObjectClass().getName()
-            );
-          }
-        } else {
-          final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
-
-          cs.ifNotExists();
-          // pass all required suffixes
-          for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-            // check if this suffix type is defined
-            final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
-
-            if (suffix != null) {
-              // register the suffix value with the corresponding suffix name
-              cs.where(
-                StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
-              );
-            } else if (matching) {
-              // we have one more suffix then defined with this pojo
-              // and we were requested to only do does that match the provided
-              // suffixes so skip the class
-              continue next_class;
-            }
-          }
-          s.add(cs);
-          for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
-            System.out.println(
-              Tool.class.getSimpleName()
-              + ": creating schema for "
-              + cinfo.getObjectClass().getName()
-            );
-          }
-        }
-      } catch (ClassNotFoundException e) { // ignore and continue
-      }
-    }
-  }
-
-  /**
-   * Creates all defined schemas based on the provided set of package names and
-   * options and add the statements to the specified sequence.
-   *
-   * @author paouelle
-   *
-   * @param  pkgs the set of packages to create schemas for
+   * @param  pkgs the set of packages and/or classes to create schemas for
    * @param  suffixes the map of provided suffix values
    * @param  matching whether or not to only create schemas for keyspaces that
    *         matches the specified set of suffixes
@@ -704,61 +617,48 @@ public class Tool {
    * @throws IllegalArgumentException if no pojos are found in any of the
    *         specified packages
    */
-  private static void createSchemasFromPackages(
+  private static void createSchemasFromPackagesOrClasses(
     String[] pkgs,
     Map<String, String> suffixes,
     boolean matching,
     boolean alter,
     Sequence s
   ) {
-    for (final String pkg: pkgs) {
-      if (pkg == null) {
-        continue;
-      }
-      if (alter) {
-        final AlterSchemas cs
-          = (matching
-              ? StatementBuilder.alterMatchingSchemas(pkg)
-              : StatementBuilder.alterSchemas(pkg));
+    if (alter) {
+      final AlterSchemas cs
+        = (matching
+           ? StatementBuilder.alterMatchingSchemas(pkgs)
+           : StatementBuilder.alterSchemas(pkgs));
 
-        // pass all suffixes
-        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-          // register the suffix value with the corresponding suffix type
-          cs.where(
-            StatementBuilder.eq(e.getKey(), e.getValue())
-          );
-        }
-        for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": altering schema for "
-            + cinfo.getObjectClass().getName()
-          );
-        }
-        s.add(cs);
-      } else {
-        final CreateSchemas cs
-          = (matching
-              ? StatementBuilder.createMatchingSchemas(pkg)
-              : StatementBuilder.createSchemas(pkg));
-
-        cs.ifNotExists();
-        // pass all suffixes
-        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-          // register the suffix value with the corresponding suffix type
-          cs.where(
-            StatementBuilder.eq(e.getKey(), e.getValue())
-          );
-        }
-        for (final ClassInfo<?> cinfo: cs.getClassInfos()) {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": creating schema for "
-            + cinfo.getObjectClass().getName()
-          );
-        }
-        s.add(cs);
+      // pass all suffixes
+      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+        // register the suffix value with the corresponding suffix type
+        cs.where(StatementBuilder.eq(e.getKey(), e.getValue()));
       }
+      cs.classInfos().forEachOrdered(cinfo -> System.out.println(
+        Tool.class.getSimpleName()
+        + ": altering schema for "
+        + cinfo.getObjectClass().getName()
+      ));
+      s.add(cs);
+    } else {
+      final CreateSchemas cs
+        = (matching
+            ? StatementBuilder.createMatchingSchemas(pkgs)
+            : StatementBuilder.createSchemas(pkgs));
+
+      cs.ifNotExists();
+      // pass all suffixes
+      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+        // register the suffix value with the corresponding suffix type
+        cs.where(StatementBuilder.eq(e.getKey(), e.getValue()));
+      }
+      cs.classInfos().forEachOrdered(cinfo -> System.out.println(
+        Tool.class.getSimpleName()
+        + ": creating schema for "
+        + cinfo.getObjectClass().getName()
+      ));
+      s.add(cs);
     }
   }
 
@@ -799,10 +699,7 @@ public class Tool {
       );
     }
     System.out.println();
-    // start by assuming we have classes; if we do they will be nulled from the array
-    Tool.createSchemasFromClasses(opts, suffixes, matching, alter, s);
-    // now deal with the rest as if they were packages
-    Tool.createSchemasFromPackages(opts, suffixes, matching, alter, s);
+    Tool.createSchemasFromPackagesOrClasses(opts, suffixes, matching, alter, s);
     if (s.isEmpty() || (s.getQueryString() == null)) {
       System.out.println(
         Tool.class.getSimpleName()
@@ -814,95 +711,12 @@ public class Tool {
   }
 
   /**
-   * Creates all defined Json schemas based on the provided set of class names
-   * and options and add the schemas to the specified map. For each class found;
-   * the corresponding array element will be nulled. All others are simply
-   * skipped.
+   * Creates all defined Json schemas based on the provided set of package and/or
+   * class names and options and add the schemas to the specified map.
    *
    * @author paouelle
    *
-   * @param  cnames the set of class names to create Json schemas for
-   * @param  suffixes the map of provided suffix values
-   * @param  matching whether or not to only create schemas for keyspaces that
-   *         matches the specified set of suffixes
-   * @param  schemas the map where to record the Json schema for the pojo classes
-   *         found
-   * @param  view the json view to use when generating the schemas
-   * @throws LinkageError if the linkage fails for one of the specified entity
-   *         class
-   * @throws ExceptionInInitializerError if the initialization provoked by one
-   *         of the specified entity class fails
-   * @throws IOException if an I/O error occurs while generating the Json schemas
-   */
-  @SuppressWarnings("deprecation")
-  private static void createJsonSchemasFromClasses(
-    String[] cnames,
-    Map<String, String> suffixes,
-    boolean matching,
-    Map<Class<?>, JsonSchema> schemas,
-    Class<?> view
-  ) throws IOException {
-    next_class:
-    for (int i = 0; i < cnames.length; i++) {
-      try {
-        final Class<?> clazz = Class.forName(cnames[i]);
-        Collection<Class<?>> classes;
-
-        cnames[i] = null; // clear since we found a class
-        try {
-          final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
-
-          // pass all required suffixes
-          for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-            // check if this suffix type is defined
-            final FieldInfo<?> suffix = cs.getClassInfo().getSuffixKeyByType(e.getKey());
-
-            if (suffix != null) {
-              // register the suffix value with the corresponding suffix name
-              cs.where(
-                StatementBuilder.eq(suffix.getSuffixKeyName(), e.getValue())
-              );
-            } else if (matching) {
-              // we have one more suffix then defined with this pojo
-              // and we were requested to only do does that match the provided
-              // suffixes so skip the class
-              continue next_class;
-            }
-          }
-          classes = cs.getObjectClasses();
-        } catch (IllegalArgumentException e) { // ignore and continue with class only
-          classes = Arrays.asList(clazz);
-        }
-        for (final Class<?> c: classes) {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": creating Json schema for "
-            + c.getName()
-            + ((view != null) ? " with view '" + Tool.getViewName(view) + "'" : "")
-          );
-          final ObjectMapper m = new ObjectMapper();
-          final JsonAnnotationSchemaFactoryWrapper visitor = new JsonAnnotationSchemaFactoryWrapper();
-
-          if (view != null) {
-            m.setConfig(m.getSerializationConfig().withView(view));
-          }
-          m.registerModules(new Jdk8Module(), new com.fasterxml.jackson.datatype.jsr310.JSR310Module());
-          m.enable(SerializationFeature.INDENT_OUTPUT);
-          m.acceptJsonFormatVisitor(m.constructType(c), visitor);
-          schemas.put(c, visitor.finalSchemaWithTitle());
-        }
-      } catch (ClassNotFoundException e) { // ignore and continue
-      }
-    }
-  }
-
-  /**
-   * Creates all defined Json schemas based on the provided set of package names
-   * and options and add the schemas to the specified map.
-   *
-   * @author paouelle
-   *
-   * @param  pkgs the set of packages to create Json schemas for
+   * @param  pkgs the set of packages and/or classes to create Json schemas for
    * @param  suffixes the map of provided suffix values
    * @param  matching whether or not to only create schemas for keyspaces that
    *         matches the specified set of suffixes
@@ -918,67 +732,62 @@ public class Tool {
    * @throws IOException if an I/O error occurs while generating the Json schemas
    */
   @SuppressWarnings("deprecation")
-  private static void createJsonSchemasFromPackages(
+  private static void createJsonSchemasFromPackagesOrClasses(
     String[] pkgs,
     Map<String, String> suffixes,
     boolean matching,
     Map<Class<?>, JsonSchema> schemas,
     Class<?> view
   ) throws IOException {
-    for (final String pkg: pkgs) {
-      if (pkg == null) {
-        continue;
-      }
-      Set<Class<?>> classes;
+    Set<Class<?>> classes;
 
-      try {
-        final CreateSchemas cs
-          = (matching
-             ? StatementBuilder.createMatchingSchemas(pkg)
-             : StatementBuilder.createSchemas(pkg));
+    try {
+      final CreateSchemas cs
+        = (matching
+           ? StatementBuilder.createMatchingSchemas(pkgs)
+           : StatementBuilder.createSchemas(pkgs));
 
-        // pass all suffixes
-        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-          // register the suffix value with the corresponding suffix type
-          cs.where(
-            StatementBuilder.eq(e.getKey(), e.getValue())
-          );
-        }
-        classes = cs.getObjectClasses();
-      } catch (IllegalArgumentException e) { // ignore and continue with package only
-        final Reflections reflections = new Reflections(pkg, new SubTypesScanner(false));
-
-        classes = reflections.getAllTypes().stream()
-          .map(n -> {
-            try {
-              return Class.forName(n);
-            } catch (LinkageError|ClassNotFoundException ee) { // ignore
-              return null;
-            }
-          })
-          .filter(c -> c != null)
-          .collect(Collectors.toSet());
-        // make sure to also cover enums
-        classes.addAll(reflections.getSubTypesOf(Enum.class));
-      }
-      for (final Class<?> c: classes) {
-        System.out.println(
-          Tool.class.getSimpleName()
-          + ": creating Json schema for "
-          + c.getName()
-          + ((view != null) ? " with view '" + Tool.getViewName(view) + "'" : "")
+      // pass all suffixes
+      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+        // register the suffix value with the corresponding suffix type
+        cs.where(
+          StatementBuilder.eq(e.getKey(), e.getValue())
         );
-        final ObjectMapper m = new ObjectMapper();
-        final JsonAnnotationSchemaFactoryWrapper visitor = new JsonAnnotationSchemaFactoryWrapper();
-
-        if (view != null) {
-          m.setConfig(m.getSerializationConfig().withView(view));
-        }
-        m.registerModules(new Jdk8Module(), new com.fasterxml.jackson.datatype.jsr310.JSR310Module());
-        m.enable(SerializationFeature.INDENT_OUTPUT);
-        m.acceptJsonFormatVisitor(m.constructType(c), visitor);
-        schemas.put(c, visitor.finalSchemaWithTitle());
       }
+      classes = cs.getObjectClasses();
+    } catch (IllegalArgumentException e) { // ignore and continue with package only
+      final Reflections reflections = new Reflections(pkgs, new SubTypesScanner(false));
+
+      classes = reflections.getAllTypes().stream()
+        .map(n -> {
+          try {
+            return Class.forName(n);
+          } catch (LinkageError|ClassNotFoundException ee) { // ignore
+            return null;
+          }
+        })
+        .filter(c -> c != null)
+        .collect(Collectors.toSet());
+      // make sure to also cover enums
+      classes.addAll(reflections.getSubTypesOf(Enum.class));
+    }
+    for (final Class<?> c: classes) {
+      System.out.println(
+        Tool.class.getSimpleName()
+        + ": creating Json schema for "
+        + c.getName()
+        + ((view != null) ? " with view '" + Tool.getViewName(view) + "'" : "")
+      );
+      final ObjectMapper m = new ObjectMapper();
+      final JsonAnnotationSchemaFactoryWrapper visitor = new JsonAnnotationSchemaFactoryWrapper();
+
+      if (view != null) {
+        m.setConfig(m.getSerializationConfig().withView(view));
+      }
+      m.registerModules(new Jdk8Module(), new com.fasterxml.jackson.datatype.jsr310.JSR310Module());
+      m.enable(SerializationFeature.INDENT_OUTPUT);
+      m.acceptJsonFormatVisitor(m.constructType(c), visitor);
+      schemas.put(c, visitor.finalSchemaWithTitle());
     }
   }
 
@@ -1027,10 +836,7 @@ public class Tool {
       );
     }
     System.out.println();
-    // start by assuming we have classes; if we do they will be nulled from the array
-    Tool.createJsonSchemasFromClasses(opts, suffixes, matching, schemas, view);
-    // now deal with the rest as if they were packages
-    Tool.createJsonSchemasFromPackages(opts, suffixes, matching, schemas, view);
+    Tool.createJsonSchemasFromPackagesOrClasses(opts, suffixes, matching, schemas, view);
     if (schemas.isEmpty()) {
       System.out.println(
         Tool.class.getSimpleName()
@@ -1229,65 +1035,18 @@ public class Tool {
 
   /**
    * Finds object creators with their dependencies based on the provided set of
-   * class names. For each class found; the corresponding array element will be
-   * nulled. All others are simply skipped.
+   * package and/or class names.
    *
    * @author paouelle
    *
    * @param  classes the graph where to record creator classes
-   * @param  cnames the set of class names for object creators
+   * @param  pkgs the set of packages and/or classes to for creator objects
    * @param  no_dependents if dependents creators should not be considered
    * @throws LinkageError if the linkage fails for one entity class
    * @throws ExceptionInInitializerError if the initialization provoked by one
    *         of one the entity class fails
    */
-  private static void findCreatorsFromClasses(
-    DirectedGraph<Class<?>> classes, String[] cnames, boolean no_dependents
-  ) {
-    for (int i = 0; i < cnames.length; i++) {
-      try {
-        final Class<?> clazz = Class.forName(cnames[i]);
-
-        cnames[i] = null; // clear since we found a class
-        final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
-
-        if (initials.isEmpty()) {
-          System.out.println(
-            Tool.class.getSimpleName()
-            + ": no objects found using "
-            + clazz.getName()
-          );
-          continue;
-        }
-        initials.forEach((m, ios) -> {
-          classes.add(clazz);
-          if (!no_dependents) {
-            final DirectedGraph.Node<Class<?>> node = classes.get(clazz);
-
-            for (final Class<?> c: ios) {
-              node.add(c);
-            }
-          }
-        });
-      } catch (ClassNotFoundException e) { // ignore and continue
-      }
-    }
-  }
-
-  /**
-   * Finds object creators with their dependencies based on the provided set of
-   * package names.
-   *
-   * @author paouelle
-   *
-   * @param  classes the graph where to record creator classes
-   * @param  pkgs the set of packages to for creator objects
-   * @param  no_dependents if dependents creators should not be considered
-   * @throws LinkageError if the linkage fails for one entity class
-   * @throws ExceptionInInitializerError if the initialization provoked by one
-   *         of one the entity class fails
-   */
-  private static void findCreatorsFromPackages(
+  private static void findCreatorsFromPackagesOrClasses(
     DirectedGraph<Class<?>> classes, String[] pkgs, boolean no_dependents
   ) {
     for (final String pkg: pkgs) {
@@ -1345,11 +1104,8 @@ public class Tool {
         );
         continue;
       }
-      final Sequence sequence = StatementBuilder.sequence();
-      Batch batch = StatementBuilder.batch();
-      int num = 0;
+      final Group group = StatementBuilder.group();
 
-      sequence.add(batch);
       for (final Map.Entry<Method, Class<?>[]> e: initials.entrySet()) {
         final Method m = e.getKey();
         final Collection<?> ios = Tool.getInitialObjects(m, suffixes);
@@ -1367,18 +1123,13 @@ public class Tool {
           + "()"
         );
         for (final Object io: ios) {
-          if (batch.hasReachedRecommendedSize()) { // switch to a new batch
-            batch = StatementBuilder.batch();
-            sequence.add(batch);
-          }
-          num++;
-          batch.add(StatementBuilder.insert(io).intoAll());
+          group.add(StatementBuilder.insert(io).intoAll());
         }
       }
-      if (num == 0) {
+      if (group.isEmpty()) {
         System.out.println(Tool.class.getSimpleName() + ": no objects to insert");
       } else {
-        executeCQL(sequence);
+        executeCQL(group);
       }
     }
   }
@@ -1420,10 +1171,7 @@ public class Tool {
     System.out.println();
     final DirectedGraph<Class<?>> classes = new ConcurrentHashDirectedGraph<>();
 
-    // start by assuming we have classes; if we do they will be nulled from the array
-    Tool.findCreatorsFromClasses(classes, opts, no_dependents);
-    // now deal with the rest as if they were packages
-    Tool.findCreatorsFromPackages(classes, opts, no_dependents);
+    Tool.findCreatorsFromPackagesOrClasses(classes, opts, no_dependents);
     // now do a reverse topological sort of the specified graph of classes such that
     // we end up creating objects in the dependent order
     try {

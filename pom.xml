@@ -97,7 +97,8 @@
     <glassfish-version>1.0.4</glassfish-version>
     <tomcat-version>8.0.30</tomcat-version>
     <servlet-api-version>3.1.0</servlet-api-version>
-    <cassandra-version>2.1.9</cassandra-version>
+    <cassandra-version>2.2.4</cassandra-version>
+    <cassandra-driver-version>2.1.9</cassandra-driver-version>
 
     <netty-version>4.0.27.Final</netty-version>
     
@@ -616,7 +617,7 @@
       <dependency>
 	<groupId>com.datastax.cassandra</groupId>
 	<artifactId>cassandra-driver-core</artifactId>
-	<version>${cassandra-version}</version>
+	<version>${cassandra-driver-version}</version>
       </dependency>
       <dependency>
 	<groupId>org.apache.cassandra</groupId>

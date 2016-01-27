@@ -92,6 +92,31 @@ public class SimpleStatementImpl
     org.apache.commons.lang3.Validate.notNull(statement, "invalid null statement");
     this.query = statement.getQueryString().trim();
     setCounterOp(QueryBuilderBridge.isCounterOp(statement));
+    init(statement);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    if (super.simpleSize == -1) {
+      if (!isEnabled()) {
+        super.simpleSize = 0;
+      } else {
+        if (isBatch()) {
+          // no better way!!!! Note: it does also count those in strings
+          super.simpleSize = StringUtils.countMatches(query, ';');
+        } else {
+          super.simpleSize = 1;
+        }
+      }
+    }
+    return super.simpleSize;
   }
 
   /**

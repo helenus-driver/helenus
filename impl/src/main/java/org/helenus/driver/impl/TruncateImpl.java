@@ -17,6 +17,7 @@ package org.helenus.driver.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.helenus.driver.Clause;
 import org.helenus.driver.ExcludedSuffixKeyException;
@@ -115,7 +116,7 @@ public class TruncateImpl<T>
    * @throws IllegalArgumentException if the keyspace has not yet been computed
    *         and cannot be computed with the provided suffixes yet
    */
-  StringBuilder buildQueryString(TableInfoImpl<T> table) {
+  private StringBuilder buildQueryString(TableInfoImpl<T> table) {
     final StringBuilder builder = new StringBuilder();
 
     builder.append("TRUNCATE ");
@@ -136,26 +137,15 @@ public class TruncateImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
    */
   @Override
-  protected StringBuilder[] buildQueryStrings() {
-    if (!isEnabled()) {
-      return null;
-    }
-    final List<StringBuilder> builders = new ArrayList<>(tables.size());
-
-    for (final TableInfoImpl<T> table: tables) {
-      final StringBuilder builder = buildQueryString(table);
-
-      if (builder != null) {
-        builders.add(builder);
-      }
-    }
-    if (builders.isEmpty()) {
-      return null;
-    }
-    return builders.toArray(new StringBuilder[builders.size()]);
+  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+    return tables.stream()
+      .map(t -> buildQueryString(t))
+      .filter(b -> (b != null) && (b.length() != 0))
+      .map(b -> init(new SimpleStatementImpl(b.toString(), mgr, bridge)))
+      .collect(Collectors.toList());
   }
 
   /**

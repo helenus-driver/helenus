@@ -184,6 +184,20 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
   public GenericStatement<R, F> enableTracing();
 
   /**
+   * Enables tracing for this statement with the specified prefix to prepend to
+   * all traces.
+   * <p>
+   * By default (that is unless you call this method), tracing is not enabled.
+   *
+   * @author paouelle
+   *
+   * @param  prefix the prefix to prepend to all traced statements or <code>null</code>
+   *         to disable traces
+   * @return this {@code GenericStatement} object
+   */
+  public GenericStatement<R, F> enableTracing(String prefix);
+
+  /**
    * Disables tracing for this statement.
    *
    * @author paouelle
@@ -201,6 +215,51 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *         otherwise.
    */
   public boolean isTracing();
+
+  /**
+   * Enables error tracing for this statement.
+   * <p>
+   * By default (that is unless you call this method), error tracing is not enabled.
+   *
+   * @author paouelle
+   *
+   * @return this {@code GenericStatement} object
+   */
+  public GenericStatement<R, F> enableErrorTracing();
+
+  /**
+   * Enables error tracing for this statement with the specified prefix to
+   * prepend to all traces.
+   * <p>
+   * By default (that is unless you call this method), error tracing is not
+   * enabled.
+   *
+   * @author paouelle
+   *
+   * @param  prefix the prefix to prepend to all traced statements or <code>null</code>
+   *         to disable traces
+   * @return this {@code GenericStatement} object
+   */
+  public GenericStatement<R, F> enableErrorTracing(String prefix);
+
+  /**
+   * Disables error tracing for this statement.
+   *
+   * @author paouelle
+   *
+   * @return this for chaining
+   */
+  public GenericStatement<R, F> disableErrorTracing();
+
+  /**
+   * Checks whether error tracing is enabled for this statement or not.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this statement has error tracing enabled,
+   *         <code>false</code> otherwise.
+   */
+  public boolean isErrorTracing();
 
   /**
    * Sets the retry policy to use for this statement.

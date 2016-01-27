@@ -16,6 +16,7 @@
 package org.helenus.driver;
 
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.helenus.driver.info.ClassInfo;
 
@@ -83,6 +84,34 @@ public interface CreateSchemas
    * @return the non-<code>null</code> set of all POJO class infos found
    */
   public Set<ClassInfo<?>> getDefinedClassInfos();
+
+  /**
+   * Gets all POJO classes found for which schemas will be created.
+   *
+   * @author paouelle
+   *
+   * @return the non-<code>null</code> stream of all POJO classes found
+   */
+  public Stream<Class<?>> objectClasses();
+
+  /**
+   * Gets all POJO class informations found for which schemas will be created.
+   *
+   * @author paouelle
+   *
+   * @return the non-<code>null</code> stream of all POJO class infos found
+   */
+  public Stream<ClassInfo<?>> classInfos();
+
+  /**
+   * Gets all POJO class informations defined in the corresponding package
+   * (whether or not required suffixes are provided in where clause).
+   *
+   * @author paouelle
+   *
+   * @return the non-<code>null</code> stream of all POJO class infos found
+   */
+  public Stream<ClassInfo<?>> definedClassInfos();
 
   /**
    * Sets the 'IF NOT EXISTS' option for this CREATE SCHEMAS statement to be applied

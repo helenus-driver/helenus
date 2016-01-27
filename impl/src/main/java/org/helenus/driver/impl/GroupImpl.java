@@ -16,6 +16,7 @@
 package org.helenus.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -25,53 +26,64 @@ import java.util.stream.Stream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.datastax.driver.core.EmptyResultSetFuture;
+import com.datastax.driver.core.LastResultParallelSetFuture;
+import com.datastax.driver.core.MetadataBridge;
 import com.datastax.driver.core.RegularStatement;
+import com.datastax.driver.core.ResultSetFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
+import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.ObjectStatement;
 import org.helenus.driver.ParentStatement;
 import org.helenus.driver.Recorder;
-import org.helenus.driver.Sequence;
-import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.util.Inhibit;
 import org.helenus.util.function.ERunnable;
 
 /**
- * The <code>SequenceImpl</code> class defines support for a statement that
- * can execute a set of statements in sequence returning the result set from
- * the last one only.
+ * The <code>GroupImpl</code> class defines support for a statement that can
+ * execute a set of statements in parallel returning the result from the first
+ * one that fails. Basically, a group will sends multiple requests to Cassandra
+ * at the same time up to either its parallel factor or until it reaches a
+ * sequence statement and then wait for all results before continuing to the
+ * next set of statements to be sent in parallel.
+ * <p>
+ * The group's algorithm will allow the distributed nature of Cassandra to work
+ * for you and distribute the writes to the optimal destination which leads to
+ * not only fastest inserts/updates (assuming different partitions are being
+ * updated), but it’ll cause the least load on the cluster.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 19, 2015 - paouelle - Creation
+ * @version 1 - Jan 20, 2016 - paouelle - Creation
  *
  * @since 1.0
  */
-public class SequenceImpl
-  extends SequenceStatementImpl<Void, VoidFuture, Void>
-  implements Sequence, ParentStatementImpl {
+public class GroupImpl
+  extends StatementImpl<Void, VoidFuture, Void>
+  implements Group, ParentStatementImpl {
   /**
    * Holds the logger.
    *
    * @author paouelle
    */
-  private final static Logger logger = LogManager.getFormatterLogger(SequenceImpl.class);
+  private final static Logger logger = LogManager.getFormatterLogger(GroupImpl.class);
 
   /**
-   * Holds the statements to be sequenced together.
+   * Holds the statements to be grouped together.
    *
    * @author paouelle
    */
   private final List<StatementImpl<?, ?, ?>> statements;
 
   /**
-   * Holds the parent of this sequence. This is the sequence or group this one
+   * Holds the parent of this group. This is the sequence or group this one
    * was last added to.
    *
    * @author paouelle
@@ -93,20 +105,47 @@ public class SequenceImpl
   private final LinkedList<ERunnable<?>> errorHandlers;
 
   /**
-   * Instantiates a new <code>SequenceImpl</code> object.
+   * Holds the number of simultaneous statements to send to the Cassandra cluster
+   * at the same time before starting to wait for all responses before proceeding
+   * to the next set (assuming a sequence is not reached before that).
+   * <p>
+   * By default, the parallel factor will be based on the number of nodes in the
+   * Cassandra cluster multiplied by 32 (default number of threads in the write
+   * pool of a Cassandra node).
+   *
+   * @author paouelle
+   */
+  private int parallelFactor;
+
+  /**
+   * Holds the cached grouped statements.
+   *
+   * @author paouelle
+   */
+  private volatile List<StatementImpl<?, ?, ?>> cacheList = null;
+
+  /**
+   * Holds the cached query strings for the grouped statements.
+   *
+   * @author paouelle
+   */
+  private volatile StringBuilder[] cacheSB = null;
+
+  /**
+   * Instantiates a new <code>GroupImpl</code> object.
    *
    * @author paouelle
    *
-   * @param  recorder the optional recorder to register with this sequence
-   * @param  statements the statements to sequence
+   * @param  recorder the optional recorder to register with this group
+   * @param  statements the statements to group
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    */
-  public SequenceImpl(
+  public GroupImpl(
     Optional<Recorder> recorder,
-    SequenceableStatement<?, ?>[] statements,
+    GroupableStatement<?, ?>[] statements,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
@@ -114,26 +153,27 @@ public class SequenceImpl
     this.statements = new ArrayList<>(Math.max(statements.length, 8));
     this.recorder = recorder;
     this.errorHandlers = new LinkedList<>();
-    for (final SequenceableStatement<?, ?> statement: statements) {
+    for (final GroupableStatement<?, ?> statement: statements) {
       add(statement);
     }
+    initParallelFactor();
   }
 
   /**
-   * Instantiates a new <code>SequenceImpl</code> object.
+   * Instantiates a new <code>GroupImpl</code> object.
    *
    * @author paouelle
    *
-   * @param  recorder the optional recorder to register with this sequence
-   * @param  statements the statements to sequence
+   * @param  recorder the optional recorder to register with this group
+   * @param  statements the statements to group
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    */
-  public SequenceImpl(
+  public GroupImpl(
     Optional<Recorder> recorder,
-    Iterable<SequenceableStatement<?, ?>> statements,
+    Iterable<GroupableStatement<?, ?>> statements,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
@@ -141,28 +181,44 @@ public class SequenceImpl
     this.statements = new ArrayList<>(32);
     this.recorder = recorder;
     this.errorHandlers = new LinkedList<>();
-    for (final SequenceableStatement<?, ?> statement: statements) {
+    for (final GroupableStatement<?, ?> statement: statements) {
       add(statement);
+    }
+    initParallelFactor();
+  }
+
+  /**
+   * Initializes the parallel factor to its default value.
+   *
+   * @author paouelle
+   */
+  private void initParallelFactor() {
+    try {
+      this.parallelFactor = (
+        Math.max(1, MetadataBridge.getNumHosts(mgr.getCluster().getMetadata())) * 32
+      );
+    } catch (Exception e) { // defaults to 32 if we cannot get  the info from the cluster
+      this.parallelFactor = 32;
     }
   }
 
   /**
-   * Adds the specified statement to this sequence.
+   * Adds the specified statement to this group.
    *
    * @author paouelle
    *
-   * @param  s the non-<code>null</code> statement to add to this sequence
-   * @return this sequence
+   * @param  s the non-<code>null</code> statement to add to this group
+   * @return this group
    */
   @SuppressWarnings("cast")
-  private Sequence addInternal(StatementImpl<?, ?, ?> s) {
+  private Group addInternal(StatementImpl<?, ?, ?> s) {
     // special validation for simple statements
     if (s instanceof SimpleStatementImpl) {
       final SimpleStatementImpl ss = (SimpleStatementImpl)s;
 
       org.apache.commons.lang3.Validate.isTrue(
         !ss.isSelect(),
-        "select statements are not supported in sequence statements"
+        "select statements are not supported in group statements"
       );
     }
     this.statements.add(s);
@@ -181,21 +237,126 @@ public class SequenceImpl
   }
 
   /**
+   * Gets all underlying grouped statements recursively in the proper order for
+   * this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
+   */
+  private List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
+    return statements.stream()
+      .flatMap(s -> (
+        (s instanceof GroupImpl)
+        ? ((GroupImpl)s).buildGroupedStatements().stream()
+        : Stream.of(s)
+      ))
+      .collect(Collectors.toList());
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.StatementImpl#appendGroupType(java.lang.StringBuilder)
    */
   @Override
-  protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
-    return statements.stream()
-      .flatMap(s -> (
-        (s instanceof SequenceStatementImpl)
-        ? ((SequenceStatementImpl<?, ?, ?>)s).buildSequencedStatements().stream()
-        : Stream.of(s)
-      ))
-      .collect(Collectors.toList());
+  protected void appendGroupType(StringBuilder builder) {
+    builder.append("GROUP");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#buildStatements()
+   */
+  @Override
+  protected final List<StatementImpl<?, ?, ?>> buildStatements() {
+    if (!isEnabled()) {
+      this.cacheList = null;
+      this.cacheSB = null;
+      super.simpleSize = 0;
+    } else if (isDirty() || (cacheList == null)) {
+      this.cacheList = buildGroupedStatements();
+      this.cacheSB = null;
+      super.simpleSize = cacheList.stream()
+        .mapToInt(StatementImpl::simpleSize)
+        .sum();
+    }
+    return (cacheList != null) ? cacheList : Collections.emptyList();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    buildStatements();
+    return super.simpleSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   */
+  @SuppressWarnings("cast")
+  @Override
+  protected StringBuilder[] buildQueryStrings() {
+    if (isDirty() || (cacheSB == null)) {
+      final List<StatementImpl<?, ?, ?>> slist = buildStatements();
+
+      if (cacheList == null) {
+        this.cacheSB = null;
+      } else {
+        this.cacheSB = slist.stream()
+        .map(StatementImpl::getQueryString)
+        .filter(s -> s != null)
+        .map(s -> {
+          final StringBuilder sb = new StringBuilder(s);
+          // Use the same test that String#trim() uses to determine
+          // if a character is a whitespace character.
+          int l = sb.length();
+
+          while (l > 0 && sb.charAt(l - 1) <= ' ') {
+            l -= 1;
+          }
+          if (l != sb.length()) {
+            sb.setLength(l);
+          }
+          if (l == 0 || sb.charAt(l - 1) != ';') {
+            sb.append(';');
+          }
+          return sb;
+        })
+        .toArray(StringBuilder[]::new);
+      }
+    }
+    return cacheSB;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#setDirty()
+   */
+  @Override
+  protected void setDirty() {
+    super.setDirty();
+    this.cacheList = null;
+    this.cacheSB = null;
   }
 
   /**
@@ -210,6 +371,42 @@ public class SequenceImpl
     super.setDirty(recurse);
     if (recurse) {
       statements.forEach(s -> s.setDirty(recurse));
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#executeAsyncRaw0()
+   */
+  @Override
+  protected ResultSetFuture executeAsyncRaw0() {
+    if (!isEnabled()) {
+      return new EmptyResultSetFuture(mgr);
+    }
+    try {
+      // we do not want to rely on query strings to determine the set of statements
+      // to execute as some of those might actually be groups in which case, we
+      // want to rely on its implementation to deal with the execution. In addition
+      // each statements being executed might be customized differently when it comes
+      // to the consistency and serial consistency levels and tracing and retry policies.
+      // In this case, we want to keep their own defined values if overridden otherwise
+      // we want to fallback to the values from this sequence statement
+      final List<StatementImpl<?, ?, ?>> slist = buildStatements();
+
+      if (slist.isEmpty()) { // nothing to query
+        return new EmptyResultSetFuture(mgr);
+      } else if (slist.size() == 1) { // only one so execute it directly
+        return slist.get(0).executeAsyncRaw();
+      }
+      return mgr.sent(this, new LastResultParallelSetFuture(this, slist, mgr));
+    } finally {
+      // let's recursively clear the query string that gets cache to reduce
+      // the memory impact chance are now that it got executed, it won't be
+      // needed anymore
+      setDirty(true);
     }
   }
 
@@ -367,12 +564,12 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Sequence#add(org.helenus.driver.SequenceableStatement)
+   * @see org.helenus.driver.Group#add(org.helenus.driver.GroupableStatement)
    */
   @SuppressWarnings("unchecked")
   @Override
-  public <R, F extends ListenableFuture<R>> Sequence add(
-    SequenceableStatement<R, F> statement
+  public <R, F extends ListenableFuture<R>> Group add(
+    GroupableStatement<R, F> statement
   ) {
     org.apache.commons.lang3.Validate.notNull(statement, "invalid null statement");
     org.apache.commons.lang3.Validate.isTrue(
@@ -388,11 +585,11 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Sequence#add(org.helenus.driver.BatchableStatement)
+   * @see org.helenus.driver.Group#add(org.helenus.driver.BatchableStatement)
    */
   @SuppressWarnings("unchecked")
   @Override
-  public <R, F extends ListenableFuture<R>> Sequence add(
+  public <R, F extends ListenableFuture<R>> Group add(
     BatchableStatement<R, F> statement
   ) {
     org.apache.commons.lang3.Validate.notNull(statement, "invalid null statement");
@@ -409,10 +606,10 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Sequence#add(com.datastax.driver.core.RegularStatement)
+   * @see org.helenus.driver.Group#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
-  public Sequence add(RegularStatement statement) {
+  public Group add(RegularStatement statement) {
     org.apache.commons.lang3.Validate.notNull(statement, "invalid null statement");
     return addInternal(new SimpleStatementImpl(statement, mgr, bridge));
   }
@@ -422,10 +619,10 @@ public class SequenceImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Sequence#addErrorHandler(org.helenus.util.function.ERunnable)
+   * @see org.helenus.driver.Group#addErrorHandler(org.helenus.util.function.ERunnable)
    */
   @Override
-  public Sequence addErrorHandler(ERunnable<?> run) {
+  public Group addErrorHandler(ERunnable<?> run) {
     org.apache.commons.lang3.Validate.notNull(run, "invalid null error handler");
     // add at the beginning of the list to ensure reverse order when running them
     errorHandlers.addFirst(run);
@@ -451,5 +648,33 @@ public class SequenceImpl
         ((Group)s).runErrorHandlers();
       }
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#getParallelFactor()
+   */
+  @Override
+  public int getParallelFactor() {
+    return parallelFactor;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Group#setParallelFactor(int)
+   */
+  @Override
+  public Group setParallelFactor(int factor) {
+    if (factor != this.parallelFactor) {
+      this.parallelFactor = Math.max(32, factor);
+      setDirty();
+    }
+    return this;
   }
 }

@@ -15,17 +15,13 @@
  */
 package org.helenus.driver.impl;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-
 import com.datastax.driver.core.EmptyResultSetFuture;
-import com.datastax.driver.core.LastResultSetFuture;
+import com.datastax.driver.core.LastResultSequentialSetFuture;
 import com.datastax.driver.core.ResultSetFuture;
-import com.datastax.driver.core.SimpleStatement;
-import com.google.common.util.concurrent.AbstractFuture;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.driver.StatementBridge;
 
@@ -45,14 +41,21 @@ import org.helenus.driver.StatementBridge;
  *
  * @since 1.0
  */
-public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
+public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
   extends StatementImpl<R, F, T> {
   /**
-   * Holds the cached query strings.
+   * Holds the cached sequenced statements.
    *
    * @author paouelle
    */
-  private volatile StringBuilder[] cache;
+  private volatile List<StatementImpl<?, ?, ?>> cacheList = null;
+
+  /**
+   * Holds the cached query strings for the sequenced statements.
+   *
+   * @author paouelle
+   */
+  private volatile StringBuilder[] cacheSB = null;
 
   /**
    * Instantiates a new <code>SequenceStatementImpl</code> object.
@@ -103,13 +106,25 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
    *
    * @author paouelle
    *
-   * @param statement the non-<code>null</code> statement being copied or
+   * @param sequence the non-<code>null</code> statement being copied or
    *        wrapped
    */
-  protected SequenceStatementImpl(SequenceStatementImpl<R, F, T> statement) {
-    super(statement);
-    this.cache = statement.cache;
+  protected SequenceStatementImpl(SequenceStatementImpl<R, F, T> sequence) {
+    super(sequence);
+    this.cacheList = sequence.cacheList;
+    this.cacheSB = sequence.cacheSB;
   }
+
+  /**
+   * Gets all underlying sequenced statements recursively in the proper order
+   * for this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
+   */
+  protected abstract List<StatementImpl<?, ?, ?>> buildSequencedStatements();
 
   /**
    * {@inheritDoc}
@@ -124,45 +139,80 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
   }
 
   /**
-   * Gets the query strings for this sequence statement.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return the valid CQL query strings for this sequence statement or
-   *         <code>null</code> if nothing to sequence
-   * @throws IllegalArgumentException if the statement is associated with a POJO
-   *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   * @see org.helenus.driver.impl.StatementImpl#buildStatements()
    */
-  protected StringBuilder[] getQueryStrings() {
-    if (isDirty() || (cache == null)) {
-      final StringBuilder[] sbs = buildQueryStrings();
+  @Override
+  protected final List<StatementImpl<?, ?, ?>> buildStatements() {
+    if (!isEnabled()) {
+      this.cacheList = null;
+      this.cacheSB = null;
+      super.simpleSize = 0;
+    } else if (isDirty() || (cacheList == null)) {
+      this.cacheList = buildSequencedStatements();
+      this.cacheSB = null;
+      super.simpleSize = cacheList.stream()
+        .mapToInt(StatementImpl::simpleSize)
+        .sum();
+    }
+    return (cacheList != null) ? cacheList : Collections.emptyList();
+  }
 
-      if (sbs == null) {
-        this.cache = null;
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected final int simpleSize() {
+    buildStatements();
+    return super.simpleSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   */
+  @Override
+  protected final StringBuilder[] buildQueryStrings() {
+    if (isDirty() || (cacheSB == null)) {
+      final List<StatementImpl<?, ?, ?>> slist = buildStatements();
+
+      if (cacheList == null) {
+        this.cacheSB = null;
       } else {
-        this.cache = new StringBuilder[sbs.length];
-        for (int i = 0; i < sbs.length; i++) {
-          final StringBuilder sb = sbs[i];
+        this.cacheSB = slist.stream()
+          .map(StatementImpl::getQueryString)
+          .filter(s -> s != null)
+          .map(s -> {
+            final StringBuilder sb = new StringBuilder(s);
+            // Use the same test that String#trim() uses to determine
+            // if a character is a whitespace character.
+            int l = sb.length();
 
-          // Use the same test that String#trim() uses to determine
-          // if a character is a whitespace character.
-          int l = sb.length();
-
-          while (l > 0 && sb.charAt(l - 1) <= ' ') {
-            l -= 1;
-          }
-          if (l != sb.length()) {
-            sb.setLength(l);
-          }
-          if (l == 0 || sb.charAt(l - 1) != ';') {
-            sb.append(';');
-          }
-          this.cache[i] = sb;
-        }
+            while (l > 0 && sb.charAt(l - 1) <= ' ') {
+              l -= 1;
+            }
+            if (l != sb.length()) {
+              sb.setLength(l);
+            }
+            if (l == 0 || sb.charAt(l - 1) != ';') {
+              sb.append(';');
+            }
+            return sb;
+          })
+          .toArray(StringBuilder[]::new);
       }
     }
-    return cache;
+    return cacheSB;
   }
 
   /**
@@ -175,7 +225,8 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
   @Override
   protected void setDirty() {
     super.setDirty();
-    this.cache = null;
+    this.cacheList = null;
+    this.cacheSB = null;
   }
 
   /**
@@ -191,41 +242,21 @@ public abstract class SequenceStatementImpl<R, F extends AbstractFuture<R>, T>
       return new EmptyResultSetFuture(mgr);
     }
     try {
-      final StringBuilder[] queries = getQueryStrings();
+      // we do not want to rely on query strings to determine the set of statements
+      // to execute as some of those might actually be groups in which case, we
+      // want to rely on its implementation to deal with the execution. In addition
+      // each statements being executed might be customized differently when it comes
+      // to the consistency and serial consistency levels and tracing and retry policies.
+      // In this case, we want to keep their own defined values if overridden otherwise
+      // we want to fallback to the values from this sequence statement
+      final List<StatementImpl<?, ?, ?>> slist = buildStatements();
 
-      if (ArrayUtils.isEmpty(queries)) { // nothing to query
+      if (slist.isEmpty()) { // nothing to query
         return new EmptyResultSetFuture(mgr);
+      } else if (slist.size() == 1) { // only one so execute it directly
+        return slist.get(0).executeAsyncRaw();
       }
-      final List<SimpleStatement> raws = new ArrayList<>(queries.length);
-
-      for (final StringBuilder sb: queries) {
-        if ((sb == null) || (sb.length() == 0)) { // nothing to query
-          continue;
-        }
-        final String query = sb.toString();
-
-        if (StringUtils.isEmpty(query)) { // nothing to query
-          continue;
-        }
-        final SimpleStatement raw = new SimpleStatement(query);
-
-        // propagate statement properties
-        if (getConsistencyLevel() != null) {
-          raw.setConsistencyLevel(getConsistencyLevel());
-        }
-        if (getSerialConsistencyLevel() != null) {
-          raw.setSerialConsistencyLevel(getSerialConsistencyLevel());
-        }
-        if (isTracing()) {
-          raw.enableTracing();
-        } else {
-          raw.disableTracing();
-        }
-        raw.setRetryPolicy(getRetryPolicy());
-        raw.setFetchSize(getFetchSize());
-        raws.add(raw);
-      }
-      return mgr.sent(this, new LastResultSetFuture(raws, this, mgr));
+      return mgr.sent(this, new LastResultSequentialSetFuture(slist, mgr));
     } finally {
       // let's recursively clear the query string that gets cache to reduce
       // the memory impact chance are now that it got executed, it won't be

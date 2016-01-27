@@ -17,6 +17,7 @@ package org.helenus.driver;
 
 import java.util.stream.Stream;
 
+import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 
 /**
@@ -159,6 +160,24 @@ public interface Insert<T>
    * @since 1.0
    */
   public interface Builder<T> {
+    /**
+     * Gets the POJO class associated with this statement builder.
+     *
+     * @author paouelle
+     *
+     * @return the POJO class associated with this statement builder
+     */
+    public Class<T> getObjectClass();
+
+    /**
+     * Gets the POJO class information associated with this statement builder.
+     *
+     * @author paouelle
+     *
+     * @return the POJO class info associated with this statement builder
+     */
+    public ClassInfo<T> getClassInfo();
+
     /**
      * Adds tables to insert into using the keyspace defined in the POJO.
      *

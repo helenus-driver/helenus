@@ -138,20 +138,6 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.Context#getInitialObjects()
-     */
-    @Override
-    public Collection<T> getInitialObjects() {
-      return contexts.values().stream()
-      .flatMap(tc -> tc.getInitialObjects().stream())
-      .collect(Collectors.toList());
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @author paouelle
-     *
      * @see org.helenus.driver.impl.ClassInfoImpl.Context#addSuffix(java.lang.String, java.lang.Object)
      */
     @Override
@@ -563,8 +549,11 @@ public class RootClassInfoImpl<T>
   @Override
   public Stream<Class<? extends T>> objectClasses() {
     return Stream.concat(
-      Stream.of(clazz), ctypes.values().stream().map(t -> t.getObjectClass())
-    );
+      Stream.of(clazz),
+      ctypes.values().stream()
+        .sequential()
+        .map(t -> t.getObjectClass())
+    ).sequential();
   }
 
   /**
@@ -577,8 +566,8 @@ public class RootClassInfoImpl<T>
   @Override
   public Stream<ClassInfoImpl<? extends T>> classInfos() {
     return Stream.concat(
-      Stream.of(this), ctypes.values().stream()
-    );
+      Stream.of(this), ctypes.values().stream().sequential()
+    ).sequential();
   }
 
   /**
@@ -642,6 +631,17 @@ public class RootClassInfoImpl<T>
   @Override
   public Stream<TypeClassInfo<? extends T>> types() {
     return (Stream<TypeClassInfo<? extends T>>)(Stream)ntypes.values().stream();
+  }
+
+  /**
+   * Gets all type entities defined from this root entity.
+   *
+   * @author paouelle
+   *
+   * @return a stream of all type entities defined from this root entity
+   */
+  public Stream<TypeClassInfoImpl<? extends T>> typeImpls() {
+   return ntypes.values().stream();
   }
 
   /**

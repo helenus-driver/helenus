@@ -734,12 +734,9 @@ public class DataTypeImpl {
       if (type instanceof UDTClassInfoImpl) {
         return Stream.of((UDTClassInfoImpl<?>)type);
       }
-      final CQLDataType etype = getElementType();
-
-      if (etype instanceof UDTClassInfoImpl) {
-        return Stream.of((UDTClassInfoImpl<?>)etype);
-      }
-      return Stream.empty();
+      return arguments.stream()
+        .filter(t -> t instanceof UDTClassInfoImpl)
+        .map(t -> (UDTClassInfoImpl<?>)t);
     }
 
     /**

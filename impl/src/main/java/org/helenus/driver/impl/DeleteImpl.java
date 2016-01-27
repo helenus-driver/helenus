@@ -34,6 +34,7 @@ import org.helenus.driver.Delete;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.Table;
 
@@ -454,6 +455,25 @@ public class DeleteImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    if (super.simpleSize == -1) {
+      if (!isEnabled()) {
+        super.simpleSize = 0;
+      } else {
+        super.simpleSize = tables.size();
+      }
+    }
+    return super.simpleSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
    */
   @SuppressWarnings("synthetic-access")
@@ -853,6 +873,30 @@ public class DeleteImpl<T>
       this(context, mgr, bridge);
       context.getClassInfo().validateColumns(columnNames);
       this.columnNames = columnNames;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.CreateIndex.Builder#getObjectClass()
+     */
+    @Override
+    public Class<T> getObjectClass() {
+      return context.getObjectClass();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.CreateIndex.Builder#getClassInfo()
+     */
+    @Override
+    public ClassInfo<T> getClassInfo() {
+      return context.getClassInfo();
     }
 
     /**

@@ -13,23 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.helenus.driver;
-
-import com.google.common.util.concurrent.ListenableFuture;
+package com.datastax.driver.core;
 
 /**
- * The <code>SequenceableStatement</code> interface is used to identify statements
- * that can be sequenced together in a <code>Sequence</code> statement.
+ * The <code>MetadataHelper</code> class is used to access protected methods of
+ * the {@link Metadata}.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 15, 2015 - paouelle - Creation
- *
- * @param <R> The type of result returned when executing this statement
- * @param <F> The type of future result returned when executing this statement
+ * @version 1 - Jan 21, 2016 - paouelle - Creation
  *
  * @since 1.0
  */
-public interface SequenceableStatement<R, F extends ListenableFuture<R>>
-  extends GenericStatement<R, F>, GroupableStatement<R, F> {}
+public class MetadataBridge {
+  /**
+   * Gets the number of known hosts of the cluster based on its meta data.
+   * <p>
+   * <i>Note:</i> The implementation here avoids creating a temporary read-only
+   * collection.
+   *
+   * @author paouelle
+   *
+   * @param  mdata the meta data for the cluster
+   * @return the number of known hosts in the cluster
+   */
+  public static int getNumHosts(Metadata mdata) {
+    return mdata.allHosts().size();
+  }
+}

@@ -15,6 +15,7 @@
  */
 package org.helenus.driver;
 
+import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 
 
@@ -161,6 +162,24 @@ public interface Select<T> extends ObjectClassStatement<T> {
    * @since 1.0
    */
   public interface Builder<T> {
+    /**
+     * Gets the POJO class associated with this statement builder.
+     *
+     * @author paouelle
+     *
+     * @return the POJO class associated with this statement builder
+     */
+    public Class<T> getObjectClass();
+
+    /**
+     * Gets the POJO class information associated with this statement builder.
+     *
+     * @author paouelle
+     *
+     * @return the POJO class info associated with this statement builder
+     */
+    public ClassInfo<T> getClassInfo();
+
     /**
      * Specify to select from the keyspace as defined in the POJO and the
      * specified table.
@@ -312,6 +331,24 @@ public interface Select<T> extends ObjectClassStatement<T> {
    * @since 1.0
    */
   public interface TableSelection<T> {
+    /**
+     * Gets the POJO class associated with this statement builder.
+     *
+     * @author paouelle
+     *
+     * @return the POJO class associated with this statement builder
+     */
+    public Class<T> getObjectClass();
+
+    /**
+     * Gets the POJO class information associated with this statement builder.
+     *
+     * @author paouelle
+     *
+     * @return the POJO class info associated with this statement builder
+     */
+    public ClassInfo<T> getClassInfo();
+
     /**
      * Selects all columns (i.e. "SELECT *  ...")
      *

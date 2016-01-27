@@ -77,13 +77,13 @@ public class CreateTypeImpl<T>
   }
 
   /**
-   * Builds a query string or strings for the specified table.
+   * Builds query strings for the specified table.
    *
    * @author paouelle
    *
    * @param  table the non-<code>null</code> table for which to build a query
    *         string
-   * @return the string builders used to build the query string or strings for
+   * @return the string builders used to build the query strings for
    *         the specified table or <code>null</code> if there is none for the
    *         specified table
    * @throws IllegalArgumentException if the keyspace has not yet been computed
@@ -94,7 +94,7 @@ public class CreateTypeImpl<T>
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
-  StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
+  protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
     final List<String> columns = new ArrayList<>(table.getColumns().size());
 
     for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
@@ -123,25 +123,18 @@ public class CreateTypeImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
    */
   @Override
-  protected StringBuilder[] buildQueryStrings() {
-    if (!isEnabled()) {
-      return null;
-    }
+  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
     // by design, there should only be one table!!!
-    final List<StringBuilder> builders = ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
+    return ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
       .map(t -> buildQueryStrings(t))
       .filter(bs -> bs != null)
       .flatMap(bs -> Arrays.stream(bs))
-      .filter(b -> b != null)
+      .filter(b -> (b != null) && (b.length() != 0))
+      .map(b -> init(new SimpleStatementImpl(b.toString(), mgr, bridge)))
       .collect(Collectors.toList());
-
-    if (builders.isEmpty()) {
-      return null;
-    }
-    return builders.toArray(new StringBuilder[builders.size()]);
   }
 
   /**

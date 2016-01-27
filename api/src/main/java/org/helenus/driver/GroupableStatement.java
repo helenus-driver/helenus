@@ -18,18 +18,18 @@ package org.helenus.driver;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
- * The <code>SequenceableStatement</code> interface is used to identify statements
- * that can be sequenced together in a <code>Sequence</code> statement.
+ * The <code>GroupableStatement</code> interface is used to identify statements
+ * that can be grouped together in a <code>Group</code> statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 15, 2015 - paouelle - Creation
+ * @version 1 - Jan 21, 2016 - paouelle - Creation
  *
  * @param <R> The type of result returned when executing this statement
  * @param <F> The type of future result returned when executing this statement
  *
  * @since 1.0
  */
-public interface SequenceableStatement<R, F extends ListenableFuture<R>>
-  extends GenericStatement<R, F>, GroupableStatement<R, F> {}
+public interface GroupableStatement<R, F extends ListenableFuture<R>>
+  extends GenericStatement<R, F> {}

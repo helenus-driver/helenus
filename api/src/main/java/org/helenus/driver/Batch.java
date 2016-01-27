@@ -15,9 +15,9 @@
  */
 package org.helenus.driver;
 
-import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.helenus.driver.info.ClassInfo;
 import org.helenus.util.function.ERunnable;
 
 /**
@@ -33,10 +33,10 @@ import org.helenus.util.function.ERunnable;
  * @since 1.0
  */
 public interface Batch
-  extends Statement<Void>, BatchableStatement<Void, VoidFuture>, Group {
+  extends ParentStatement, BatchableStatement<Void, VoidFuture> {
   /**
-   * Holds the max size of the batch after which we should be committing it to
-   * Cassandra while processing the CSV file.
+   * Holds the max size of the batch after which we should be committing to
+   * Cassandra as part of a batch.
    * <p>
    * <i>Note:</i> With regard to a large number of records in a batch mutation
    * there are some potential issues. Each row becomes a task in the write
@@ -44,14 +44,13 @@ public interface Batch
    * in a mutation it will take time for the (default) 32 threads in the write
    * pool to work through the mutations. While they are doing this other
    * clients/requests will appear to be starved/stalled. There are also issues
-   * with the max message size in thrift and cql over thrift.
-   * <p>
-   * As a rule of thumb don't go over a few hundred if you have a high number of
-   * concurrent writers.
+   * with the max message size in thrift and cql over thrift. In addition,
+   * Cassandra 2.2.0 reduced the default size in bytes it will accept for a batch
+   * before it fails it to 50K.
    *
    * @author paouelle
    */
-  public final static int RECOMMENDED_MAX = 100;
+  public final static int RECOMMENDED_MAX = 5;
 
   /**
    * {@inheritDoc}
@@ -73,7 +72,7 @@ public interface Batch
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#add(org.helenus.driver.BatchableStatement)
+   * @see org.helenus.driver.ParentStatement#add(org.helenus.driver.BatchableStatement)
    */
   @Override
   public <R, F extends ListenableFuture<R>> Batch add(BatchableStatement<R, F> statement);
@@ -83,7 +82,7 @@ public interface Batch
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#add(com.datastax.driver.core.RegularStatement)
+   * @see org.helenus.driver.ParentStatement#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
   public Batch add(com.datastax.driver.core.RegularStatement statement);
@@ -93,13 +92,13 @@ public interface Batch
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#addErrorHandler(org.helenus.util.function.ERunnable)
+   * @see org.helenus.driver.ParentStatement#addErrorHandler(org.helenus.util.function.ERunnable)
    */
   @Override
   public Batch addErrorHandler(ERunnable<?> run);
 
   /**
-   * Checks the this batch has reached the recommended size for a batch in
+   * Checks if this batch has reached the recommended size for a batch in
    * system with a high number of concurrent writers.
    *
    * @author paouelle
@@ -108,6 +107,38 @@ public interface Batch
    *         exceeded for this batch; <code>false</code> otherwise
    */
   public boolean hasReachedRecommendedSize();
+
+  /**
+   * Checks if this batch has reached the recommended size for a batch in
+   * system with a high number of concurrent writers.
+   * <p>
+   * <i>Note:</i> This method will take into account the number of tables defined
+   * for the specified POJO class.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class of POJO for which to verify if the batch has reached
+   *         the recommended size
+   * @return <code>true</code> if the recommended size has been reached or
+   *         exceeded for this batch; <code>false</code> otherwise
+   */
+  public boolean hasReachedRecommendedSizeFor(Class<?> clazz);
+
+  /**
+   * Checks if this batch has reached the recommended size for a batch in
+   * system with a high number of concurrent writers.
+   * <p>
+   * <i>Note:</i> This method will take into account the number of tables defined
+   * for the specified POJO class.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the class of POJO for which to verify if the batch has reached
+   *         the recommended size
+   * @return <code>true</code> if the recommended size has been reached or
+   *         exceeded for this batch; <code>false</code> otherwise
+   */
+  public boolean hasReachedRecommendedSizeFor(ClassInfo<?> cinfo);
 
   /**
    * Adds a new options for this BATCH statement.
@@ -156,9 +187,6 @@ public interface Batch
     extends GenericStatement<Void, VoidFuture>, BatchableStatement<Void, VoidFuture> {
     /**
      * Adds the provided option.
-     * <p>
-     * <i>Note:</i> The primary key and mandatory columns are always added to the
-     * BATCH statement.
      *
      * @author paouelle
      *
@@ -172,9 +200,9 @@ public interface Batch
      *
      * @author paouelle
      *
-     * @param <R> The type of result returned when executing the statement to batch
+     * @param <R> The type of result returned when executing the statement to record
      * @param <F> The type of future result returned when executing the statement
-     *            to batch
+     *            to record
      *
      * @param  statement the new statement to add
      * @return this batch
@@ -183,7 +211,9 @@ public interface Batch
      *         are mixed or if the statement represents a "select" statement or a
      *         "batch" statement  or if the statement is not of a supported class
      */
-    public <R, F extends AbstractFuture<R>> Batch add(BatchableStatement<R, F> statement);
+    public <R, F extends ListenableFuture<R>> Batch add(
+      BatchableStatement<R, F> statement
+    );
 
     /**
      * Adds a new raw Cassandra statement to the BATCH statement these options

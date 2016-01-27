@@ -547,6 +547,25 @@ public class UpdateImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    if (super.simpleSize == -1) {
+      if (!isEnabled()) {
+        super.simpleSize = 0;
+      } else {
+        super.simpleSize = tables.size();
+      }
+    }
+    return super.simpleSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
    */
   @SuppressWarnings("synthetic-access")

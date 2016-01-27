@@ -96,10 +96,11 @@ public class AlterCreateTableImpl<T> extends CreateTableImpl<T> {
    * @see org.helenus.driver.impl.CreateTableImpl#buildQueryStrings(org.helenus.driver.impl.TableInfoImpl)
    */
   @Override
-  StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
+  protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
     final List<Row> rows = tinfos.get(table.getName());
 
-    if (CollectionUtils.isEmpty(rows)) { // that would mean the table doesn't exist
+    if (CollectionUtils.isEmpty(rows)) {
+      // that would mean the table doesn't exist, so just create it brand new
       return super.buildQueryStrings(table);
     }
     final Map<String, CQLDataType> columns = new HashMap<>(table.getColumns().size() * 3 / 2);

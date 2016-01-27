@@ -18,13 +18,18 @@ package org.helenus.driver.impl;
 import java.lang.reflect.Modifier;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.helenus.commons.collections.DirectedGraph;
 import org.helenus.commons.collections.GraphUtils;
@@ -33,10 +38,12 @@ import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.AlterSchemas;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.Keyspace;
+import org.helenus.driver.persistence.Table;
 import org.reflections.Reflections;
 
 /**
@@ -57,11 +64,11 @@ public class AlterSchemasImpl
   extends SequenceStatementImpl<Void, VoidFuture, Void>
   implements AlterSchemas {
   /**
-   * Holds the package for all POJO classes for which to alter schemas.
+   * Holds the packages for all POJO classes for which to alter schemas.
    *
    * @author paouelle
    */
-  private final String pkg;
+  private final Object[] pkgs;
 
   /**
    * Flag indicating if only POJOs with keyspace names that can be computed
@@ -97,27 +104,27 @@ public class AlterSchemasImpl
    *
    * @author paouelle
    *
-   * @param  pkg the package where to find all POJO classes to alter schemas for
-   *         associated with this statement
+   * @param  pkgs the packages and/or classes where to find all POJO classes to
+   *         alter schemas for associated with this statement
    * @param  matching <code>true</code> to only consider POJOs with keyspace names
    *         that can be computed with exactly the set of suffixes provided
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
-   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if an @Entity or @RootEntity annotated
    *         class is missing the @Keyspace annotation or two entities defines
    *         the same keyspace with different options or an entity class doesn't
    *         represent a valid POJO class or if no entities are found
    */
   public AlterSchemasImpl(
-    String pkg,
+    String[] pkgs,
     boolean matching,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
     super(Void.class, (String)null, mgr, bridge);
-    org.apache.commons.lang3.Validate.notNull(pkg, "invalid null package");
-    this.pkg = pkg;
+    org.apache.commons.lang3.Validate.notNull(pkgs, "invalid null packages");
+    this.pkgs = Stream.of(pkgs).filter(p -> p != null).toArray();
     this.matching = matching;
     this.keyspaces = findKeyspaces();
     this.where = new WhereImpl(this);
@@ -136,8 +143,8 @@ public class AlterSchemasImpl
    *         a valid POJO class or if no entities are found
    */
   private Map<Keyspace, List<ClassInfoImpl<?>>> findKeyspaces() {
-    final Map<String, Keyspace> keyspaces = new HashMap<>(25);
-    final Reflections reflections = new Reflections(pkg);
+    final Map<String, Keyspace> keyspaces = new LinkedHashMap<>(25);
+    final Reflections reflections = new Reflections(pkgs);
     // search for all POJO annotated classes with @UDTEntity
     // because of interdependencies between UDT, we need to build a graph
     // to detect circular dependencies and also to ensure a proper creation
@@ -180,7 +187,8 @@ public class AlterSchemasImpl
     // and populate the resulting cinfos map with that sorted list
     @SuppressWarnings({"cast", "unchecked", "rawtypes"})
     final Map<Keyspace, List<ClassInfoImpl<?>>> cinfos
-      = udtcinfos.entrySet().stream().collect(Collectors.toMap(
+      = udtcinfos.entrySet().stream()
+        .collect(Collectors.toMap(
           e -> ((Map.Entry<Keyspace, DirectedGraph<UDTClassInfoImpl<?>>>)e).getKey(),
           e -> {
             final List<UDTClassInfoImpl<?>> l = GraphUtils.sort(
@@ -240,7 +248,7 @@ public class AlterSchemasImpl
       List<ClassInfoImpl<?>> cs = cinfos.get(k);
 
       if (cs == null) {
-        cs = new ArrayList<>(25);
+        cs = new ArrayList<>(32);
         cinfos.put(k, cs);
       }
       cs.add(cinfo);
@@ -255,11 +263,16 @@ public class AlterSchemasImpl
           + k
         );
       }
+      // now add all @TypeEntity for this @RootEntity
+      final List<ClassInfoImpl<?>> fcs = cs;
+
+      ((RootClassInfoImpl<?>)cinfo).typeImpls()
+        .forEach(tcinfo -> fcs.add(tcinfo));
     }
     org.apache.commons.lang3.Validate.isTrue(
       !cinfos.isEmpty(),
-      "no classes annotated with @Entity, @RootEntity, or @UDTEntity found in package: %s",
-      pkg
+      "no classes annotated with @Entity, @RootEntity, or @UDTEntity found in packages: %s",
+      Arrays.toString(pkgs)
     );
     return cinfos;
   }
@@ -276,7 +289,10 @@ public class AlterSchemasImpl
   @SuppressWarnings({"synthetic-access", "unchecked", "rawtypes"})
   private List<ClassInfoImpl<?>.Context> getContexts() {
     if (contexts == null) {
-      this.contexts = new ArrayList<>(25);
+      // split UDT from the rest so we create and report those first
+      final List<ClassInfoImpl<?>.Context> ucontexts = new ArrayList<>(32);
+      final List<ClassInfoImpl<?>.Context> contexts = new ArrayList<>(32);
+
       next_keyspace:
       for (final List<ClassInfoImpl<?>> cinfos: keyspaces.values()) {
         // create contexts for all the classes associated with the keyspace
@@ -321,10 +337,17 @@ public class AlterSchemasImpl
             if (iae != null) {
               throw iae;
             }
-            contexts.add(context);
+            if (cinfo instanceof UDTClassInfoImpl) {
+              ucontexts.add(context);
+            } else {
+              contexts.add(context);
+            }
           }
         }
       }
+      this.contexts = new ArrayList<>(ucontexts.size() + contexts.size());
+      this.contexts.addAll(ucontexts);
+      this.contexts.addAll(contexts);
     }
     return contexts;
   }
@@ -347,35 +370,35 @@ public class AlterSchemasImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
-  protected StringBuilder[] buildQueryStrings() {
-    if (!isEnabled()) {
-      return null;
-    }
-    // we do not want to create the same keyspace so many times for nothing
+  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
     final List<ClassInfoImpl<?>.Context> contexts = getContexts();
-    final List<StringBuilder> builders = new ArrayList<>(contexts.size() * 2);
-    final Set<Keyspace> keyspaces = new HashSet<>(contexts.size());
+    // we do not want to alter the same keyspace or table so many times for nothing
+    final Set<Keyspace> keyspaces = new HashSet<>(contexts.size() * 3);
+    final Map<Keyspace, Set<Table>> tables = new HashMap<>(contexts.size() * 3);
+    // create one group to aggregate all initial objects
+    final GroupImpl group = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
 
-    for (final ClassInfoImpl<?>.Context context: contexts) {
-      final AlterSchemaImpl cs = init(new AlterSchemaImpl(context, mgr, bridge));
-      final StringBuilder[] cbuilders = cs.buildQueryStrings(keyspaces);
+    final List<StatementImpl<?, ?, ?>> statements = contexts.stream()
+      .sequential()
+      .flatMap(c -> {
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        final AlterSchemaImpl<?> as = init(new AlterSchemaImpl(c, mgr, bridge));
 
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
-        }
-      }
+        return as.buildSequencedStatements(keyspaces, tables, group).stream()
+          .sequential();
+      })
+      .sequential()
+      .collect(Collectors.toList());
+
+    if (!group.isEmpty()) {
+      statements.add(group);
     }
-    if (builders.isEmpty()) {
-      return null;
-    }
-    return builders.toArray(new StringBuilder[builders.size()]);
+    return statements;
   }
 
   /**
@@ -411,8 +434,8 @@ public class AlterSchemasImpl
    */
   @Override
   public Set<Class<?>> getObjectClasses() {
-    return getContexts().stream()
-      .flatMap(c -> c.getClassInfo().objectClasses())
+    return objectClasses()
+      .sequential()
       .collect(Collectors.toSet());
   }
 
@@ -425,9 +448,9 @@ public class AlterSchemasImpl
    */
   @Override
   public Set<ClassInfo<?>> getClassInfos() {
-    return getContexts().stream()
-      .flatMap(c -> c.getClassInfo().classInfos())
-      .collect(Collectors.toSet());
+    return classInfos()
+      .sequential()
+      .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -439,10 +462,52 @@ public class AlterSchemasImpl
    */
   @Override
   public Set<ClassInfo<?>> getDefinedClassInfos() {
-    return keyspaces.values().stream()
+    return definedClassInfos()
+      .sequential()
+      .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.CreateSchemas#objectClasses()
+   */
+  @SuppressWarnings({"cast", "rawtypes", "unchecked"})
+  @Override
+  public Stream<Class<?>> objectClasses() {
+    return (Stream<Class<?>>)(Stream)getContexts().stream()
+      .flatMap(c -> c.getClassInfo().objectClasses());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.CreateSchemas#classInfos()
+   */
+  @SuppressWarnings({"cast", "rawtypes", "unchecked"})
+  @Override
+  public Stream<ClassInfo<?>> classInfos() {
+    return (Stream<ClassInfo<?>>)(Stream)getContexts().stream()
+      .flatMap(c -> c.getClassInfo().classInfos());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.CreateSchemas#definedClassInfos()
+   */
+  @SuppressWarnings({"cast", "rawtypes", "unchecked"})
+  @Override
+  public Stream<ClassInfo<?>> definedClassInfos() {
+    return (Stream<ClassInfo<?>>)(Stream)keyspaces.values().stream()
       .flatMap(cl -> cl.stream())
-      .flatMap(cl -> cl.classInfos())
-      .collect(Collectors.toSet());
+      .flatMap(cl -> cl.classInfos());
   }
 
   /**

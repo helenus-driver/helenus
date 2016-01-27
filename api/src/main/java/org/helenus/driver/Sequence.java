@@ -34,7 +34,7 @@ import org.helenus.util.function.ERunnable;
  * @since 1.0
  */
 public interface Sequence
-  extends Group, SequenceableStatement<Void, VoidFuture> {
+  extends ParentStatement, SequenceableStatement<Void, VoidFuture> {
   /**
    * {@inheritDoc}
    * <p>
@@ -54,7 +54,7 @@ public interface Sequence
    * {@inheritDoc}
    * <p>
    * <i>Note:</i> This might not actually be a valid query string if there are
-   * more than one statement being sequence. it will then be a representation
+   * more than one statement being sequenced. It will then be a representation
    * of the query strings for each statement similar to a "BATCH" statement.
    *
    * @author paouelle
@@ -125,7 +125,7 @@ public interface Sequence
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#add(org.helenus.driver.BatchableStatement)
+   * @see org.helenus.driver.ParentStatement#add(org.helenus.driver.BatchableStatement)
    */
   @Override
   public <R, F extends ListenableFuture<R>> Sequence add(BatchableStatement<R, F> statement);
@@ -135,7 +135,7 @@ public interface Sequence
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#add(com.datastax.driver.core.RegularStatement)
+   * @see org.helenus.driver.ParentStatement#add(com.datastax.driver.core.RegularStatement)
    */
   @Override
   public Sequence add(com.datastax.driver.core.RegularStatement statement);
@@ -145,9 +145,9 @@ public interface Sequence
    *
    * @author paouelle
    *
-   * @param <R> The type of result returned when executing the statement to sequence
+   * @param <R> The type of result returned when executing the statement to record
    * @param <F> The type of future result returned when executing the statement
-   *            to sequence
+   *            to record
    *
    * @param  statement the new statement to add
    * @return this sequence
@@ -155,14 +155,16 @@ public interface Sequence
    * @throws ObjectValidationException if the statement's POJO is validated via
    *         an associated recorder and that validation fails
    */
-  public <R, F extends ListenableFuture<R>> Sequence add(SequenceableStatement<R, F> statement);
+  public <R, F extends ListenableFuture<R>> Sequence add(
+    SequenceableStatement<R, F> statement
+  );
 
   /**
    * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Group#addErrorHandler(org.helenus.util.function.ERunnable)
+   * @see org.helenus.driver.ParentStatement#addErrorHandler(org.helenus.util.function.ERunnable)
    */
   @Override
   public Sequence addErrorHandler(ERunnable<?> run);

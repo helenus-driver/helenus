@@ -61,19 +61,6 @@ public class CompoundObjectSetFuture<T>
   extends AbstractFuture<ObjectSet<T>>
   implements ObjectSetFuture<T> {
   /**
-   * Holds a direct executor used for future listeners
-   * registered internally.
-   *
-   * @author paouelle
-   */
-  private static final Executor DIRECT = new Executor() {
-    @Override
-    public void execute(Runnable r) {
-      r.run();
-    }
-  };
-
-  /**
    * The execution list to hold our executors.
    *
    * @author paouelle
@@ -108,14 +95,19 @@ public class CompoundObjectSetFuture<T>
    *
    * @param  context the statement context associated with this object set future
    * @param  futures the list of object set futures to compound together
-   * @throws NullPointerException if <code>context</code>, <code>statements</code>
-   *         or any of the object set futures are <code>null</code>
+   * @param  mgr the statement manager
+   * @throws NullPointerException if <code>mgr</code>, <code>context</code>,
+   *         <code>statements</code> or any of the object set futures are
+   *         <code>null</code>
    */
   public CompoundObjectSetFuture(
-    StatementManager.Context<T> context, List<ObjectSetFuture<T>> futures
+    StatementManager.Context<T> context,
+    List<ObjectSetFuture<T>> futures,
+    StatementManagerImpl mgr
   ) {
     org.apache.commons.lang3.Validate.notNull(context, "invalid null context");
     org.apache.commons.lang3.Validate.notNull(futures, "invalid null result set futures");
+    org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr");
     this.context = context;
     final List<ObjectSetFuture<T>> osets = new ArrayList<>(futures.size());
 
@@ -151,7 +143,7 @@ public class CompoundObjectSetFuture<T>
             }
           }
         }
-      }, DIRECT);
+      }, mgr.getDirectExecutor());
     }
   }
 

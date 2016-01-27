@@ -75,16 +75,25 @@ import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.service.CassandraDaemon;
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.driver.Batch;
+import org.helenus.driver.AlterSchema;
+import org.helenus.driver.AlterSchemas;
+import org.helenus.driver.CreateIndex;
+import org.helenus.driver.CreateKeyspace;
 import org.helenus.driver.CreateSchema;
+import org.helenus.driver.CreateSchemas;
+import org.helenus.driver.CreateTable;
+import org.helenus.driver.CreateType;
+import org.helenus.driver.Delete;
 import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
 import org.helenus.driver.Insert;
+import org.helenus.driver.Select;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.StatementManager;
 import org.helenus.driver.Truncate;
+import org.helenus.driver.Update;
 import org.helenus.driver.impl.ClassInfoImpl;
 import org.helenus.driver.impl.RootClassInfoImpl;
 import org.helenus.driver.impl.StatementImpl;
@@ -93,6 +102,7 @@ import org.helenus.driver.impl.TypeClassInfoImpl;
 import org.helenus.driver.impl.UDTClassInfoImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
+import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.info.TypeClassInfo;
 import org.helenus.driver.junit.util.ReflectionJUnitUtils;
 import org.helenus.driver.junit.util.Strings;
@@ -123,6 +133,13 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    */
   final static Logger logger = LogManager.getFormatterLogger(HelenusJUnit.class);
+
+  /**
+   * Holds a trace prefix for all CQL statements traced.
+   *
+   * @author paouelle
+   */
+  final static String TRACE_PREFIX = "HELENUS-JUNIT ";
 
   /**
    * Constant for the default timeout to wait for the Cassandra daemon to start
@@ -224,11 +241,11 @@ public class HelenusJUnit implements MethodRule {
 
   /**
    * Hold the complete set of initial objects to re-insert when resetting the
-   * schema along with the batch to do so.
+   * schema along with the groups to do so.
    *
    * @author paouelle
    */
-  static final Map<Class<?>, MutablePair<List<Object>, Batch>> initials = new HashMap<>();
+  static final Map<Class<?>, MutablePair<List<Object>, Group>> initials = new HashMap<>();
 
   /**
    * Holds a cache of class info structures created by previous test cases.
@@ -282,6 +299,13 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    */
   static boolean capturing = false;
+
+  /**
+   * Holds a flag indicating if internal CQL statements should be traced or not.
+   *
+   * @author paouelle
+   */
+  static volatile boolean traceInternalCQL = false;
 
   /**
    * Gets the caller's information. This would be the information about the
@@ -402,7 +426,7 @@ public class HelenusJUnit implements MethodRule {
       }
       DatabaseDescriptor.createAllDirectories();
       CommitLog.instance.getContext(); // wait for commit log allocator instantiation to avoid hanging on a race condition
-      CommitLog.instance.resetUnsafe(); // cleanup screws with CommitLog, this brings it back to safe state
+      CommitLog.instance.resetUnsafe(true); // cleanup screws with CommitLog, this brings it back to safe state
     } catch (IOException e) {
       throw new AssertionError(e);
     }
@@ -449,7 +473,8 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    *
-   * @param batch the non-<code>null</code> batch to insert the objects to create in
+   * @param group the non-<code>null</code> group to insert the objects to
+   *        create in
    * @param m the non-<code>null</code> method to invoke to get the initial objects
    * @param bo the non-<code>null</code> annotation for the method
    * @param target the test object for which we are calling the method
@@ -459,7 +484,7 @@ public class HelenusJUnit implements MethodRule {
    *        not be called if it doesn't require suffixes
    */
   private static void processBeforeObjects(
-    Batch batch,
+    Group group,
     Method m,
     BeforeObjects bo,
     Object target,
@@ -515,7 +540,7 @@ public class HelenusJUnit implements MethodRule {
         }
         ret = m.invoke(target, suffixes);
       }
-      HelenusJUnit.processObjects(batch, ret);
+      HelenusJUnit.processObjects(group, ret);
     } catch (IllegalAccessException e) { // should not happen
       throw new IllegalStateException(e);
     } catch (InvocationTargetException e) {
@@ -538,11 +563,12 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    *
-   * @param batch the non-<code>null</code> batch to insert the objects to create in
+   * @param group the non-<code>null</code> group to insert the objects to
+   *        create in
    * @param ret the return object to process
    */
   @SuppressWarnings("unchecked")
-  private static void processObjects(Batch batch, Object ret) {
+  private static void processObjects(Group group, Object ret) {
     if (ret == null) { // nothing to do
       return;
     }
@@ -553,26 +579,64 @@ public class HelenusJUnit implements MethodRule {
       final int l = Array.getLength(ret);
 
       for (int i = 0; i < l; i++) {
-        batch.add(StatementBuilder.insert(Array.get(ret, i)).intoAll());
+        final Insert<?> insert = StatementBuilder.insert(Array.get(ret, i)).intoAll();
+
+        if (HelenusJUnit.traceInternalCQL) {
+          insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        group.add(insert);
       }
     } else if (ret instanceof Collection) {
-      ((Collection<Object>)ret).forEach(o -> StatementBuilder.insert(o).intoAll());
+      ((Collection<Object>)ret).forEach(o -> {
+        final Insert<?> insert = StatementBuilder.insert(o).intoAll();
+
+        if (HelenusJUnit.traceInternalCQL) {
+          insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        group.add(insert);
+      });
     } else if (ret instanceof Stream) {
       ((Stream<Object>)ret).forEach(o -> StatementBuilder.insert(o).intoAll());
     } else if (ret instanceof Iterator) {
       for (final Iterator<?> i = (Iterator<?>)ret; i.hasNext(); ) {
-        batch.add(StatementBuilder.insert(i.next()).intoAll());
+        final Insert<?> insert = StatementBuilder.insert(i.next()).intoAll();
+
+        if (HelenusJUnit.traceInternalCQL) {
+          insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        group.add(insert);
       }
     } else if (ret instanceof Enumeration<?>) {
       for (final Enumeration<?> e = (Enumeration<?>)ret; e.hasMoreElements(); ) {
-        batch.add(StatementBuilder.insert(e.nextElement()).intoAll());
+        final Insert<?> insert = StatementBuilder.insert(e.nextElement()).intoAll();
+
+        if (HelenusJUnit.traceInternalCQL) {
+          insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        group.add(insert);
       }
     } else if (ret instanceof Iterable) {
       for (final Iterator<?> i = ((Iterable<?>)ret).iterator(); i.hasNext(); ) {
-        batch.add(StatementBuilder.insert(i.next()).intoAll());
+        final Insert<?> insert = StatementBuilder.insert(i.next()).intoAll();
+
+        if (HelenusJUnit.traceInternalCQL) {
+          insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        group.add(insert);
       }
     } else {
-      batch.add(StatementBuilder.insert(ret).intoAll());
+      final Insert<?> insert = StatementBuilder.insert(ret).intoAll();
+
+      if (HelenusJUnit.traceInternalCQL) {
+        insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+      }
+      insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+      group.add(insert);
     }
   }
 
@@ -605,13 +669,17 @@ public class HelenusJUnit implements MethodRule {
     final Map<Method, BeforeObjects[]> methods = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
       target.getClass(), BeforeObjects.class, true
     );
-    final Batch batch = StatementBuilder.batch();
+    final Group group = StatementBuilder.group();
 
+    if (HelenusJUnit.traceInternalCQL) {
+      group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+    }
+    group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
     if (CollectionUtils.isEmpty(suffixesByTypes)) {
       // no suffixes so call with empty map of suffixes
       methods.forEach(
         (m, bos) -> HelenusJUnit.processBeforeObjects(
-          batch, m, bos[0], target, method, Collections.emptyMap(), false // BeforeObjects is not repeatable so only 1 in array
+          group, m, bos[0], target, method, Collections.emptyMap(), false // BeforeObjects is not repeatable so only 1 in array
         )
       );
     } else {
@@ -625,13 +693,13 @@ public class HelenusJUnit implements MethodRule {
         isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
         methods.forEach(
           (m, bos) -> HelenusJUnit.processBeforeObjects(
-            batch, m, bos[0], target, method, suffixes, oirs // BeforeObjects is not repeatable so only 1 in array
+            group, m, bos[0], target, method, suffixes, oirs // BeforeObjects is not repeatable so only 1 in array
           )
         );
         onlyIfRequiresSuffixes = true; // from now on, only call those that requires suffixes
       }
     }
-    batch.execute();
+    group.execute();
   }
 
   /**
@@ -842,10 +910,10 @@ public class HelenusJUnit implements MethodRule {
    * @param <T> the type of pojo being cleared
    *
    * @param  cinfo the class info to clear the schema
-   * @param  seq the sequence to record all statements
+   * @param  group the group to record all statements
    * @throws AssertionError if a failure occurs while clearing the schema
    */
-  private static <T> void clearSchema0(ClassInfoImpl<T> cinfo, Sequence seq) {
+  private static <T> void clearSchema0(ClassInfoImpl<T> cinfo, Group group) {
     if (cinfo instanceof UDTClassInfoImpl) { // nothing to reset but we want the above trace
       return;
     }
@@ -865,14 +933,20 @@ public class HelenusJUnit implements MethodRule {
         // no suffixes so just the one truncate
         final Truncate<T> truncate = StatementBuilder.truncate(cinfo.getObjectClass());
 
-        truncate.disableTracing();
-        seq.add(truncate);
+        if (HelenusJUnit.traceInternalCQL) {
+          truncate.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        truncate.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        group.add(truncate);
       } else {
         next_combination:
         for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
           final Truncate<T> truncate = StatementBuilder.truncate(cinfo.getObjectClass());
 
-          truncate.disableTracing();
+          if (HelenusJUnit.traceInternalCQL) {
+            truncate.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          truncate.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
           // pass all required suffixes
           for (final Strings ss: i.next()) {
             // register the suffix value with the corresponding suffix name
@@ -882,7 +956,7 @@ public class HelenusJUnit implements MethodRule {
               continue next_combination;
             }
           }
-          seq.add(truncate);
+          group.add(truncate);
         }
       }
     } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
@@ -941,7 +1015,7 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Clears the database an the Helenus driver by partially resetting them to a
+   * Clears the database and the Helenus driver by partially resetting them to a
    * similar state they were before the previous test case.
    *
    * @author paouelle
@@ -955,14 +1029,17 @@ public class HelenusJUnit implements MethodRule {
       if (mgr != null) {
         try {
           // start by truncating all loaded pojo tables
-          final Sequence seq = StatementBuilder.sequence();
+          final Group group = StatementBuilder.group();
 
-          seq.disableTracing();
+          if (HelenusJUnit.traceInternalCQL) {
+            group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
           mgr.classInfoImpls()
             .filter(c -> !(c instanceof TypeClassInfo))
             .collect(Collectors.toSet()) // force a snapshot
-            .forEach(c -> HelenusJUnit.clearSchema0(c, seq));
-          seq.execute();
+            .forEach(c -> HelenusJUnit.clearSchema0(c, group));
+          group.execute();
           // next preserve all class infos already cached
           mgr.classInfoImpls()
             .forEach(c -> HelenusJUnit.fromPreviousTestsCacheInfoCache.put(
@@ -1004,20 +1081,7 @@ public class HelenusJUnit implements MethodRule {
       try {
         final ClassInfoImpl<?> cinfo = manager.getClassInfoImpl(clazz);
 
-        if ((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic()) {
-          // nothing to do for those since everything is done through the root
-          return;
-        } else if (cinfo instanceof RootClassInfoImpl) {
-          logger.debug(
-            "Creating schema for %s, %s",
-            clazz.getSimpleName(),
-            ((RootClassInfoImpl<?>)cinfo).types()
-              .map(t -> t.getObjectClass().getSimpleName())
-              .collect(Collectors.joining(", "))
-          );
-        } else {
-          logger.debug("Creating schema for %s", clazz.getSimpleName());
-        }
+        logger.debug("Creating schema for %s", clazz.getSimpleName());
         HelenusJUnit.capturing = false; // disable temporarily capturing
         // find all suffixes that are defined for this classes
         final Collection<Collection<Strings>> suffixes = ((target != null)
@@ -1038,25 +1102,42 @@ public class HelenusJUnit implements MethodRule {
         // of all suffix values, at the same time compile separately the complete
         // list of initial objects so we have it already computed the next time
         // we reset the schema for this clazz
+        final boolean initialsOnly = ((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic());
         final List<Object> initials = new ArrayList<>();
 
         if (CollectionUtils.isEmpty(suffixes)) {
           initials.addAll(cinfo.newContext().getInitialObjects());
-          // no suffixes so just the one create schema required
-          final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
+          if (initialsOnly) {
+            // no need to create the schema as it would have already been created
+            // by the root, we only need to insert initial objects, done later
+          } else {
+            // no suffixes so just the one create schema required
+            final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
-          cs.disableTracing();
-          cs.ifNotExists();
-          cs.execute();
+            if (HelenusJUnit.traceInternalCQL) {
+              cs.enableTracing(HelenusJUnit.TRACE_PREFIX);
+            }
+            cs.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+            cs.ifNotExists();
+            cs.execute();
+          }
         } else {
-          final Sequence s = StatementBuilder.sequence();
+          // no need to create the schema as it would have already been created
+          // by the root, we only need to insert initial objects, done later
+          final Group g = StatementBuilder.group();
 
-          s.disableTracing();
+          if (HelenusJUnit.traceInternalCQL) {
+            g.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          g.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
           next_combination:
           for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
             final CreateSchema<?> cs = StatementBuilder.createSchema(clazz);
 
-            cs.disableTracing();
+            if (HelenusJUnit.traceInternalCQL) {
+              cs.enableTracing(HelenusJUnit.TRACE_PREFIX);
+            }
+            cs.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
             cs.ifNotExists();
             // pass all required suffixes
             for (final Strings ss: i.next()) {
@@ -1070,11 +1151,21 @@ public class HelenusJUnit implements MethodRule {
             if (cs instanceof StatementImpl) {
               initials.addAll(((StatementImpl<?,?,?>)cs).getContext().getInitialObjects());
             }
-            s.add(cs);
+            g.add(cs);
           }
-          s.execute();
+          if (initialsOnly) {
+            // no need to create the schema as it would have already been created
+            // by the root, we only need to insert initial objects, done later
+          } else {
+            g.execute();
+          }
         }
         HelenusJUnit.initials.put(clazz, MutablePair.of(initials, null)); // cache all initials objects for next time
+        if (initialsOnly) {
+          // now that we have cached the set of initial objects, reset the
+          // schema to get them inserted which is done for Type POJOs only
+          resetSchema0(cinfo, false);
+        }
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(clazz);
@@ -1101,39 +1192,43 @@ public class HelenusJUnit implements MethodRule {
    * @param <T> the type of pojo being reset
    *
    * @param  cinfo the class info to reset the schema
+   * @param  trace <code>true</code> to trace the reset
    * @throws AssertionError if a failure occurs while reseting the schema
    */
-  static <T> void resetSchema0(ClassInfoImpl<T> cinfo) {
+  static <T> void resetSchema0(ClassInfoImpl<T> cinfo, boolean trace) {
     synchronized (HelenusJUnit.schemas) {
       HelenusJUnit.schemas.add(cinfo.getObjectClass());
-      logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
-      if (((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic())
-          || (cinfo instanceof UDTClassInfoImpl)) {
-        // nothing to reset but we want the above trace
-        return;
+      if (trace) {
+        logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
       }
       final boolean old = HelenusJUnit.capturing;
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final MutablePair<List<Object>, Batch> p = HelenusJUnit.initials.get(cinfo.getObjectClass());
-        final Batch batch;
+        final MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(cinfo.getObjectClass());
+        final Group group;
 
         if (p.getRight() != null) {
-          batch = p.getRight();
+          group = p.getRight();
         } else {
-          batch = StatementBuilder.batch();
-          batch.disableTracing();
+          group = StatementBuilder.group();
+          if (HelenusJUnit.traceInternalCQL) {
+            group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
           for (final Object io: p.getLeft()) {
             @SuppressWarnings("unchecked")
             final Insert<T> insert = StatementBuilder.insert((T)io).intoAll();
 
-            insert.disableTracing();
-            batch.add(insert);
+            if (HelenusJUnit.traceInternalCQL) {
+              insert.enableTracing(HelenusJUnit.TRACE_PREFIX);
+            }
+            insert.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+            group.add(insert);
           }
-          p.setRight(batch); // cache the batch for next time
+          p.setRight(group); // cache the group for next time
         }
-        batch.execute();
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         // make sure to remove cached schema indicator
         HelenusJUnit.schemas.remove(cinfo.getObjectClass());
@@ -1339,6 +1434,24 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
+   * Enables internal CQL statements tracing.
+   *
+   * @author paouelle
+   */
+  public void enableInternalCQLTracing() {
+    HelenusJUnit.traceInternalCQL = true;
+  }
+
+  /**
+   * Disables internal CQL statements tracing.
+   *
+   * @author paouelle
+   */
+  public void disableInternalCQLTracing() {
+    HelenusJUnit.traceInternalCQL = false;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -1413,10 +1526,14 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final Batch batch = StatementBuilder.batch();
+        final Group group = StatementBuilder.group();
 
-        HelenusJUnit.processObjects(batch, objs.get());
-        batch.execute();
+        if (HelenusJUnit.traceInternalCQL) {
+          group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        HelenusJUnit.processObjects(group, objs.get());
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
@@ -1468,21 +1585,25 @@ public class HelenusJUnit implements MethodRule {
         } else {
           suffixesByTypes = Collections.emptyList();
         }
-        final Batch batch = StatementBuilder.batch();
+        final Group group = StatementBuilder.group();
 
+        if (HelenusJUnit.traceInternalCQL) {
+          group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
         if (CollectionUtils.isEmpty(suffixesByTypes)) {
           // no suffixes so call with empty map of suffixes
-          HelenusJUnit.processObjects(batch, objs.apply(Collections.emptyMap()));
+          HelenusJUnit.processObjects(group, objs.apply(Collections.emptyMap()));
         } else {
           for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixesByTypes); i.hasNext(); ) {
             final List<Strings> isuffixes = i.next();
             final Map<String, String> suffixes = new HashMap<>(isuffixes.size() * 3 / 2);
 
             isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
-            HelenusJUnit.processObjects(batch, objs.apply(suffixes));
+            HelenusJUnit.processObjects(group, objs.apply(suffixes));
           }
         }
-        batch.execute();
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
@@ -1544,12 +1665,22 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final Batch batch = StatementBuilder.batch();
+        final Group group = StatementBuilder.group();
 
-        while (objs.hasNext()) {
-          batch.add(StatementBuilder.insert(objs.next()).intoAll());
+        if (HelenusJUnit.traceInternalCQL) {
+          group.enableTracing(HelenusJUnit.TRACE_PREFIX);
         }
-        batch.execute();
+        group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        while (objs.hasNext()) {
+          final Insert<?> i = StatementBuilder.insert(objs.next()).intoAll();
+
+          if (HelenusJUnit.traceInternalCQL) {
+            i.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          i.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+          group.add(i);
+        }
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
@@ -1579,10 +1710,22 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final Batch batch = StatementBuilder.batch();
+        final Group group = StatementBuilder.group();
 
-        objs.forEachOrdered(o -> batch.add(StatementBuilder.insert(o).intoAll()));
-        batch.execute();
+        if (HelenusJUnit.traceInternalCQL) {
+          group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        objs.forEachOrdered(o -> {
+          final Insert<?> i = StatementBuilder.insert(o).intoAll();
+
+          if (HelenusJUnit.traceInternalCQL) {
+            i.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          i.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+          group.add(i);
+        });
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
@@ -1647,12 +1790,22 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final Sequence sequence = StatementBuilder.sequence();
+        final Group group = StatementBuilder.group();
 
-        while (classes.hasNext()) {
-          sequence.add(StatementBuilder.truncate(classes.next()));
+        if (HelenusJUnit.traceInternalCQL) {
+          group.enableTracing(HelenusJUnit.TRACE_PREFIX);
         }
-        sequence.execute();
+        group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+        while (classes.hasNext()) {
+          final Truncate<?> truncate = StatementBuilder.truncate(classes.next());
+
+          if (HelenusJUnit.traceInternalCQL) {
+            truncate.enableTracing(HelenusJUnit.TRACE_PREFIX);
+          }
+          truncate.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+          group.add(truncate);
+        }
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
@@ -1683,8 +1836,12 @@ public class HelenusJUnit implements MethodRule {
 
       try {
         HelenusJUnit.capturing = false; // disable temporarily capturing
-        final Sequence sequence = StatementBuilder.sequence();
+        final Group group = StatementBuilder.group();
 
+        if (HelenusJUnit.traceInternalCQL) {
+          group.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        group.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
         classes.forEach(c -> {
           final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(c);
           // find all suffixes that are defined for this classes
@@ -1699,14 +1856,20 @@ public class HelenusJUnit implements MethodRule {
             // no suffixes so just the one truncate
             final Truncate<?> truncate = StatementBuilder.truncate(c);
 
-            truncate.disableTracing();
-            sequence.add(truncate);
+            if (HelenusJUnit.traceInternalCQL) {
+              truncate.enableTracing(HelenusJUnit.TRACE_PREFIX);
+            }
+            truncate.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
+            group.add(truncate);
           } else {
             next_combination:
             for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
               final Truncate<?> truncate = StatementBuilder.truncate(c);
 
-              truncate.disableTracing();
+              if (HelenusJUnit.traceInternalCQL) {
+                truncate.enableTracing(HelenusJUnit.TRACE_PREFIX);
+              }
+              truncate.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
               // pass all required suffixes
               for (final Strings ss: i.next()) {
                 try {
@@ -1716,11 +1879,11 @@ public class HelenusJUnit implements MethodRule {
                   continue next_combination;
                 }
               }
-              sequence.add(truncate);
+              group.add(truncate);
             }
           }
         });
-        sequence.execute();
+        group.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
@@ -1765,7 +1928,7 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Execute the specified simple statements
+   * Execute the specified simple statements in sequence.
    *
    * @author paouelle
    *
@@ -1784,6 +1947,10 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.capturing = false; // disable temporarily capturing
         final Sequence sequence = StatementBuilder.sequence();
 
+        if (HelenusJUnit.traceInternalCQL) {
+          sequence.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        sequence.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
         while (statements.hasNext()) {
           sequence.add(new SimpleStatement(statements.next()));
         }
@@ -1800,7 +1967,7 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Executes the specified simple statements.
+   * Executes the specified simple statements in sequence.
    *
    * @author paouelle
    *
@@ -1819,6 +1986,10 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.capturing = false; // disable temporarily capturing
         final Sequence sequence = StatementBuilder.sequence();
 
+        if (HelenusJUnit.traceInternalCQL) {
+          sequence.enableTracing(HelenusJUnit.TRACE_PREFIX);
+        }
+        sequence.enableErrorTracing(HelenusJUnit.TRACE_PREFIX);
         statements.forEach(s -> sequence.add(new SimpleStatement(s)));
         sequence.execute();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
@@ -2085,6 +2256,29 @@ public class HelenusJUnit implements MethodRule {
     }
 
     /**
+     * Handles requests to the root entity by forcing all sub-types to be cached
+     * properly so that all required initial objects be inserted in the DB prior
+     * to processing a request to the root.
+     *
+     * @author paouelle
+     *
+     * @param cinfo the non-<code>null</code> class info to check if it is
+     *        represents a root entity
+     */
+    private <T> void handleRootClassInfo(ClassInfo<T> cinfo) {
+      synchronized (HelenusJUnit.class) {
+        if (!HelenusJUnit.capturing) {
+          // don't bother if we are recursing from within HelenusJUnit
+          return;
+        }
+      }
+      if (cinfo instanceof RootClassInfoImpl) {
+        ((RootClassInfoImpl<T>)cinfo).types()
+          .forEachOrdered(t -> getClassInfoImpl(t.getObjectClass()));
+      }
+    }
+
+    /**
      * Clears the cache of pojo class info.
      *
      * @author paouelle
@@ -2135,6 +2329,372 @@ public class HelenusJUnit implements MethodRule {
     /**
      * {@inheritDoc}
      *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#insert(java.lang.Object)
+     */
+    @Override
+    protected <T> Insert.Builder<T> insert(T object) {
+      final Insert.Builder<T> b = super.insert(object);
+
+      handleRootClassInfo(b.getClassInfo());
+      return b;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#update(java.lang.Object)
+     */
+    @Override
+    protected <T> Update<T> update(T object) {
+      final Update<T> u = super.update(object);
+
+      handleRootClassInfo(u.getClassInfo());
+      return u;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#update(java.lang.Object, java.lang.String[])
+     */
+    @Override
+    protected <T> Update<T> update(T object, String... tables) {
+      final Update<T> u = super.update(object, tables);
+
+      handleRootClassInfo(u.getClassInfo());
+      return u;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#delete(java.lang.Object, java.lang.String[])
+     */
+    @Override
+    protected <T> Delete.Builder<T> delete(
+      T object, String... columns
+    ) {
+      final Delete.Builder<T> b = super.delete(object, columns);
+
+      handleRootClassInfo(b.getClassInfo());
+      return b;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#delete(java.lang.Object)
+     */
+    @Override
+    protected <T> Delete.Selection<T> delete(T object) {
+      final Delete.Selection<T> s = super.delete(object);
+
+      handleRootClassInfo(s.getClassInfo());
+      return s;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#delete(java.lang.Class, java.lang.String[])
+     */
+    @Override
+    protected <T> Delete.Builder<T> delete(
+      Class<T> clazz, String... columns
+    ) {
+      final Delete.Builder<T> b = super.delete(clazz, columns);
+
+      handleRootClassInfo(b.getClassInfo());
+      return b;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#delete(java.lang.Class)
+     */
+    @Override
+    protected <T> Delete.Selection<T> delete(Class<T> clazz) {
+      final Delete.Selection<T> s = super.delete(clazz);
+
+      handleRootClassInfo(s.getClassInfo());
+      return s;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createKeyspace(java.lang.Class)
+     */
+    @Override
+    protected <T> CreateKeyspace<T> createKeyspace(Class<T> clazz) {
+      final CreateKeyspace<T> c = super.createKeyspace(clazz);
+
+      handleRootClassInfo(c.getClassInfo());
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createType(java.lang.Class)
+     */
+    @Override
+    protected <T> CreateType<T> createType(Class<T> clazz) {
+      final CreateType<T> c = super.createType(clazz);
+
+      handleRootClassInfo(c.getClassInfo());
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createTable(java.lang.Class)
+     */
+    @Override
+    protected <T> CreateTable<T> createTable(Class<T> clazz) {
+      final CreateTable<T> c = super.createTable(clazz);
+
+      handleRootClassInfo(c.getClassInfo());
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createTable(java.lang.Class, java.lang.String[])
+     */
+    @Override
+    protected <T> CreateTable<T> createTable(Class<T> clazz, String... tables) {
+      final CreateTable<T> c = super.createTable(clazz, tables);
+
+      handleRootClassInfo(c.getClassInfo());
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createIndex(java.lang.Class)
+     */
+    @Override
+    protected <T> CreateIndex.Builder<T> createIndex(Class<T> clazz) {
+      final CreateIndex.Builder<T> b = super.createIndex(clazz);
+
+      handleRootClassInfo(b.getClassInfo());
+      return b;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createSchema(java.lang.Class)
+     */
+    @Override
+    protected <T> CreateSchema<T> createSchema(Class<T> clazz) {
+      final CreateSchema<T> c = super.createSchema(clazz);
+
+      handleRootClassInfo(c.getClassInfo());
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createSchemas(java.lang.String[])
+     */
+    @Override
+    protected CreateSchemas createSchemas(String[] pkgs) {
+      final CreateSchemas c = super.createSchemas(pkgs);
+
+      c.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#createMatchingSchemas(java.lang.String[])
+     */
+    @Override
+    protected CreateSchemas createMatchingSchemas(String[] pkgs) {
+      final CreateSchemas c = super.createMatchingSchemas(pkgs);
+
+      c.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      return c;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#alterSchema(java.lang.Class)
+     */
+    @Override
+    protected <T> AlterSchema<T> alterSchema(Class<T> clazz) {
+      final AlterSchema<T> a = super.alterSchema(clazz);
+
+      handleRootClassInfo(a.getClassInfo());
+      return a;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#alterSchemas(java.lang.String[])
+     */
+    @Override
+    protected AlterSchemas alterSchemas(String[] pkgs) {
+      final AlterSchemas a = super.alterSchemas(pkgs);
+
+      a.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      return a;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#alterMatchingSchemas(java.lang.String[])
+     */
+    @Override
+    protected AlterSchemas alterMatchingSchemas(String[] pkgs) {
+      final AlterSchemas a = super.alterMatchingSchemas(pkgs);
+
+      a.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      return a;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#truncate(java.lang.Class)
+     */
+    @Override
+    protected <T> Truncate<T> truncate(Class<T> clazz) {
+      final Truncate<T> t = super.truncate(clazz);
+
+      handleRootClassInfo(t.getClassInfo());
+      return t;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#truncate(java.lang.Class, java.lang.String[])
+     */
+    @Override
+    protected <T> Truncate<T> truncate(Class<T> clazz, String... tables) {
+      final Truncate<T> t = super.truncate(clazz, tables);
+
+      handleRootClassInfo(t.getClassInfo());
+      return t;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#select(java.lang.Class, java.lang.CharSequence[])
+     */
+    @Override
+    protected <T> Select.Builder<T> select(Class<T> clazz, CharSequence... columns) {
+      final Select.Builder<T> b = super.select(clazz, columns);
+
+      handleRootClassInfo(b.getClassInfo());
+      return b;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#select(java.lang.Class)
+     */
+    @Override
+    protected <T> Select.Selection<T> select(Class<T> clazz) {
+      final Select.Selection<T> s = super.select(clazz);
+
+      handleRootClassInfo(s.getClassInfo());
+      return s;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#selectFrom(org.helenus.driver.info.TableInfo, java.lang.CharSequence[])
+     */
+    @Override
+    protected <T> Select<T> selectFrom(
+      TableInfo<T> table, CharSequence... columns
+    ) {
+      final Select<T> s = super.selectFrom(table, columns);
+
+      handleRootClassInfo(s.getClassInfo());
+      return s;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementManagerImpl#selectFrom(org.helenus.driver.info.TableInfo)
+     */
+    @Override
+    protected <T> Select.TableSelection<T> selectFrom(TableInfo<T> table) {
+      final Select.TableSelection<T> s = super.selectFrom(table);
+
+      handleRootClassInfo(s.getClassInfo());
+      return s;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
      * Overridden to automatically load the schemas of referenced pojos.
      *
      * @author paouelle
@@ -2159,7 +2719,7 @@ public class HelenusJUnit implements MethodRule {
           }
           // first truncate all loaded pojo tables and re-insert any schema defined
           // initial objects
-          HelenusJUnit.resetSchema0(cinfo);
+          HelenusJUnit.resetSchema0(cinfo, true);
           return cinfo;
         } // else - check if it is already cached
         synchronized (super.classInfoCache) {
@@ -2173,6 +2733,8 @@ public class HelenusJUnit implements MethodRule {
         }
       }
       // if we get here then the cinfo was not loaded in previous tests
+      // go to the super's implementation which will take care of calling back
+      // this method for the root if this is for a type entity
       final ClassInfoImpl<T> classInfo = super.getClassInfoImpl(clazz); // force generation of the class info
 
       // load the schemas for the pojo if required

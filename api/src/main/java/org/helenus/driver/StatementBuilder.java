@@ -426,7 +426,7 @@ public final class StatementBuilder {
    *
    * @param  recorder the recorder to register
    * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
+   * @return a new {@code Batch} that batch {@code statements}
    * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
    *         or any of the statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
@@ -455,7 +455,7 @@ public final class StatementBuilder {
    *
    * @param  recorder the recorder to register
    * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
+   * @return a new {@code Batch} that batch {@code statements}
    * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
    *         or any of the statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
@@ -481,8 +481,8 @@ public final class StatementBuilder {
    * resulting batch will be a COUNTER one.
    *
    * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
-   *         without using the batch log
+   * @return a new {@code Batch} that batch {@code statements} without using the
+   *         batch log
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
@@ -506,8 +506,8 @@ public final class StatementBuilder {
    * resulting batch will be a COUNTER one.
    *
    * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
-   *         without using the batch log
+   * @return a new {@code Batch} that batch {@code statements} without using the
+   *         batch log
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
@@ -537,8 +537,8 @@ public final class StatementBuilder {
    *
    * @param  recorder the recorder to register
    * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
-   *         without using the batch log
+   * @return a new {@code Batch} that batch {@code statements} without using the
+   *         batch log
    * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
    *         or any of the statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
@@ -570,8 +570,8 @@ public final class StatementBuilder {
    *
    * @param  recorder the recorder to register
    * @param  statements the statements to batch
-   * @return a new {@code BatchableStatement} that batch {@code statements}
-   *         without using the batch log
+   * @return a new {@code Batch} that batch {@code statements} without using the
+   *         batch log
    * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
    *         or any of the statements are <code>null</code>
    * @throws IllegalArgumentException if counter and non-counter operations
@@ -747,9 +747,9 @@ public final class StatementBuilder {
 
   /**
    * Starts building a new CREATE SCHEMAS statement for all POJO classes defined
-   * in a given package. This will create all the required elements to support
-   * the schema for each POJO. It will take care of creating the required
-   * keyspaces, user-defined types, tables, and indexes.
+   * in the given packages and/or classes. This will create all the required
+   * elements to support the schema for each POJO. It will take care of creating
+   * the required keyspaces, user-defined types, tables, and indexes.
    * <p>
    * <i>Note:</i> This statement will create the schemas for all POJOs for which
    * the defined keyspace can be computed with any of the specified suffixes via
@@ -764,23 +764,23 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  pkg the package where the POJOs for which to create schemas are
-   *         defined
+   * @param  pkgs the packages and/or classes where the POJOs for which to create
+   *         schemas are defined
    * @return a new CREATE SCHEMAS statement
-   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
    *         with different options or an entity class doesn't represent
    *         a valid POJO class or if no entities are found
    */
-  public static CreateSchemas createSchemas(String pkg) {
-    return StatementManager.getManager().createSchemas(pkg);
+  public static CreateSchemas createSchemas(String... pkgs) {
+    return StatementManager.getManager().createSchemas(pkgs);
   }
 
   /**
    * Starts building a new CREATE SCHEMAS statement for all POJO classes defined
-   * in a given package. This will create all the required elements to support
-   * the schema for each POJO. It will take care of creating the required
-   * keyspaces, user-defined types, tables, and indexes.
+   * in the given packages and/or classes. This will create all the required
+   * elements to support the schema for each POJO. It will take care of creating
+   * the required keyspaces, user-defined types, tables, and indexes.
    * <p>
    * <i>Note:</i> This statement will create the schemas for only the POJOs for
    * which the defined keyspace can be computed with exactly all of the specified
@@ -795,16 +795,16 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  pkg the package where the POJOs for which to create schemas are
-   *         defined
+   * @param  pkgs the packages and/or classes where the POJOs for which to create
+   *         schemas are defined
    * @return a new CREATE SCHEMAS statement
-   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
    *         with different options or an @Entitiy annotated class doesn't represent
    *         a valid POJO class or if no entities are found
    */
-  public static CreateSchemas createMatchingSchemas(String pkg) {
-    return StatementManager.getManager().createMatchingSchemas(pkg);
+  public static CreateSchemas createMatchingSchemas(String... pkgs) {
+    return StatementManager.getManager().createMatchingSchemas(pkgs);
   }
 
   /**
@@ -837,9 +837,10 @@ public final class StatementBuilder {
 
   /**
    * Starts building a new ALTER SCHEMAS statement for all POJO classes defined
-   * in a given package. This will create and/or alter all the required elements
-   * to support the schema for each POJO. It will take care of creating and/or
-   * altering the required keyspaces, user-defined types, tables, and indexes.
+   * in the given packages and/or classes. This will create and/or alter all the
+   * required elements to support the schema for each POJO. It will take care of
+   * creating and/or altering the required keyspaces, user-defined types, tables,
+   * and indexes.
    * <p>
    * <i>Note:</i> This statement will create and/or alter the schemas for all
    * POJOs for which the defined keyspace can be computed with any of the
@@ -855,23 +856,24 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  pkg the package where the POJOs for which to create and/or alter
-   *         schemas are defined
+   * @param  pkgs the packages and/or classes where the POJOs for which to create
+   *         and/or alter schemas are defined
    * @return a new ALTER SCHEMAS statement
-   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
    *         with different options or an entity class doesn't represent
    *         a valid POJO class or if no entities are found
    */
-  public static AlterSchemas alterSchemas(String pkg) {
-    return StatementManager.getManager().alterSchemas(pkg);
+  public static AlterSchemas alterSchemas(String... pkgs) {
+    return StatementManager.getManager().alterSchemas(pkgs);
   }
 
   /**
    * Starts building a new ALTER SCHEMAS statement for all POJO classes defined
-   * in a given package. This will create and/or alter all the required elements
-   * to support the schema for each POJO. It will take care of creating and/or
-   * altering the required keyspaces, user-defined types, tables, and indexes.
+   * in the given packages and/or classes. This will create and/or alter all the
+   * required elements to support the schema for each POJO. It will take care of
+   * creating and/or altering the required keyspaces, user-defined types, tables,
+   * and indexes.
    * <p>
    * <i>Note:</i> This statement will create and/or alter the schemas for only
    * the POJOs for which the defined keyspace can be computed with exactly all
@@ -887,16 +889,16 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  pkg the package where the POJOs for which to create and/or alter
-   *         schemas are defined
+   * @param  pkgs the packages and/or classes where the POJOs for which to create
+   *         and/or alter schemas are defined
    * @return a new ALTER SCHEMAS statement
-   * @throws NullPointerException if <code>pkg</code> is <code>null</code>
+   * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
    *         with different options or an @Entitiy annotated class doesn't represent
    *         a valid POJO class or if no entities are found
    */
-  public static AlterSchemas alterMatchingSchemas(String pkg) {
-    return StatementManager.getManager().alterMatchingSchemas(pkg);
+  public static AlterSchemas alterMatchingSchemas(String... pkgs) {
+    return StatementManager.getManager().alterMatchingSchemas(pkgs);
   }
 
   /**
@@ -948,7 +950,7 @@ public final class StatementBuilder {
    * statements.
    *
    * @param  statements the statements to sequence
-   * @return a new {@code SequenceableStatement} that sequence {@code statements}
+   * @return a new {@code Sequence} that sequence {@code statements}
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    */
@@ -967,7 +969,7 @@ public final class StatementBuilder {
    * statements.
    *
    * @param  statements the statements to sequence
-   * @return a new {@code SequenceableStatement} that sequence {@code statements}
+   * @return a new {@code Sequence} that sequence {@code statements}
    * @throws NullPointerException if <code>statement</code> or any of the
    *         statements are <code>null</code>
    */
@@ -992,8 +994,8 @@ public final class StatementBuilder {
    *
    * @param  recorder the recorder to register
    * @param  statements the statements to sequence
-   * @return a new {@code SequenceableStatement} that sequence {@code statements}
-   * @throws NullPointerException if <code>sequence</code>, <code>statement</code>,
+   * @return a new {@code Sequence} that sequence {@code statements}
+   * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
    *         or any of the statements are <code>null</code>
    */
   public static Sequence sequence(
@@ -1019,14 +1021,112 @@ public final class StatementBuilder {
    *
    * @param  recorder the recorder to register
    * @param  statements the statements to sequence
-   * @return a new {@code SequenceableStatement} that sequence {@code statements}
-   * @throws NullPointerException if <code>sequence</code>, <code>statement</code>,
+   * @return a new {@code Sequence} that sequence {@code statements}
+   * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
    *         or any of the statements are <code>null</code>
    */
   public static Sequence sequence(
     Recorder recorder, Iterable<SequenceableStatement<?, ?>> statements
   ) {
     return StatementManager.getManager().sequence(Optional.of(recorder), statements);
+  }
+
+  /**
+   * Starts building a new group of statements that will execute them in parallel
+   * subsets where each subsets will be executed one after the other.
+   * <p>
+   * <i>Note:</i> Executing this statement will attempt to group together
+   * statements in the given order up to either the parallel factor or until
+   * a sequence statement is reached. It will then wait for all statements to
+   * in this subset to have completed before proceeding. This will result in a
+   * non-atomic execution of the statements. The process will stop at first
+   * failure encountered will executing a subset of statements and will not
+   * revert back any of the previously executed statements.
+   *
+   * @param  statements the statements to group
+   * @return a new {@code Group} that groups {@code statements}
+   * @throws NullPointerException if <code>statement</code> or any of the
+   *         statements are <code>null</code>
+   */
+  @SafeVarargs
+  public static Group group(GroupableStatement<?, ?>... statements) {
+    return StatementManager.getManager().group(Optional.empty(), statements);
+  }
+
+  /**
+   * Starts building a new group of statements that will execute them in parallel
+   * subsets where each subsets will be executed one after the other.
+   * <p>
+   * <i>Note:</i> Executing this statement will attempt to group together
+   * statements in the given order up to either the parallel factor or until
+   * a sequence statement is reached. It will then wait for all statements to
+   * in this subset to have completed before proceeding. This will result in a
+   * non-atomic execution of the statements. The process will stop at first
+   * failure encountered will executing a subset of statements and will not
+   * revert back any of the previously executed statements.
+   *
+   * @param  statements the statements to group
+   * @return a new {@code Group} that groups {@code statements}
+   * @throws NullPointerException if <code>statement</code> or any of the
+   *         statements are <code>null</code>
+   */
+  public static Group group(Iterable<GroupableStatement<?, ?>> statements) {
+    return StatementManager.getManager().group(Optional.empty(), statements);
+  }
+
+  /**
+   * Starts building a new group of statements that will execute them in parallel
+   * subsets where each subsets will be executed one after the other.
+   * <p>
+   * <i>Note:</i> Executing this statement will attempt to group together
+   * statements in the given order up to either the parallel factor or until
+   * a sequence statement is reached. It will then wait for all statements to
+   * in this subset to have completed before proceeding. This will result in a
+   * non-atomic execution of the statements. The process will stop at first
+   * failure encountered will executing a subset of statements and will not
+   * revert back any of the previously executed statements.
+   * <p>
+   * <i>Note:</i> This version of the <code>group()</code> method allows one to
+   * register a recorder with the group such as to be notified whenever a
+   * pojo-specific statement is added to the group or any batches/sequences/groups
+   * added to the returned group recursively.
+   *
+   * @param  recorder the recorder to register
+   * @param  statements the statements to group
+   * @return a new {@code Group} that groups {@code statements}
+   * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
+   *         or any of the statements are <code>null</code>
+   */
+  @SafeVarargs
+  public static Group group(Recorder recorder, GroupableStatement<?, ?>... statements) {
+    return StatementManager.getManager().group(Optional.of(recorder), statements);
+  }
+
+  /**
+   * Starts building a new group of statements that will execute them in parallel
+   * subsets where each subsets will be executed one after the other.
+   * <p>
+   * <i>Note:</i> Executing this statement will attempt to group together
+   * statements in the given order up to either the parallel factor or until
+   * a sequence statement is reached. It will then wait for all statements to
+   * in this subset to have completed before proceeding. This will result in a
+   * non-atomic execution of the statements. The process will stop at first
+   * failure encountered will executing a subset of statements and will not
+   * revert back any of the previously executed statements.
+   * <p>
+   * <i>Note:</i> This version of the <code>group()</code> method allows one to
+   * register a recorder with the group such as to be notified whenever a
+   * pojo-specific statement is added to the group or any batches/sequences/groups
+   * added to the returned group recursively.
+   *
+   * @param  recorder the recorder to register
+   * @param  statements the statements to group
+   * @return a new {@code Group} that groups {@code statements}
+   * @throws NullPointerException if <code>recorder</code>, <code>statement</code>,
+   *         or any of the statements are <code>null</code>
+   */
+  public static Group group(Recorder recorder, Iterable<GroupableStatement<?, ?>> statements) {
+    return StatementManager.getManager().group(Optional.of(recorder), statements);
   }
 
   /**

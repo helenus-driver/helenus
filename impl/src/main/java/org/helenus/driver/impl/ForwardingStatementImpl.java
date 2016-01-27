@@ -15,6 +15,8 @@
  */
 package org.helenus.driver.impl;
 
+import java.util.List;
+
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
@@ -113,6 +115,18 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#buildStatements()
+   */
+  @Override
+  protected List<StatementImpl<?, ?, ?>> buildStatements() {
+    return statement.buildStatements();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#buildQueryString()
    */
   @Override
@@ -137,11 +151,35 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#setDirty(boolean)
+   */
+  @Override
+  protected void setDirty(boolean recurse) {
+    statement.setDirty(recurse);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#isDirty()
    */
   @Override
   protected boolean isDirty() {
     return statement.isDirty();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    return statement.simpleSize();
   }
 
   /**
@@ -319,6 +357,18 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#enableTracing(java.lang.String)
+   */
+  @Override
+  public GenericStatement<R, F> enableTracing(String prefix) {
+    return statement.enableTracing(prefix);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#disableTracing()
    */
   @Override
@@ -336,6 +386,54 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
   @Override
   public boolean isTracing() {
     return statement.isTracing();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#enableErrorTracing()
+   */
+  @Override
+  public GenericStatement<R, F> enableErrorTracing() {
+    return statement.enableErrorTracing();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#enableErrorTracing(java.lang.String)
+   */
+  @Override
+  public GenericStatement<R, F> enableErrorTracing(String prefix) {
+    return statement.enableErrorTracing(prefix);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#disableErrorTracing()
+   */
+  @Override
+  public GenericStatement<R, F> disableErrorTracing() {
+    return statement.disableErrorTracing();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#isErrorTracing()
+   */
+  @Override
+  public boolean isErrorTracing() {
+    return statement.isErrorTracing();
   }
 
   /**

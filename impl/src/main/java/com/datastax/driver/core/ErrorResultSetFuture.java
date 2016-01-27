@@ -20,23 +20,25 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.datastax.driver.core.exceptions.DriverException;
+import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.google.common.util.concurrent.ExecutionList;
 
 import org.helenus.driver.StatementManager;
 
 /**
- * The <code>EmptyResultSetFuture</code> class extends Cassandra
- * {@link ResultSetFuture} in order to provide an empty result set when no
- * query needed to be sent.
+ * The <code>ErrorResultSetFuture</code> class extends Cassandra
+ * {@link ResultSetFuture} in order to provide an error result set when an
+ * error occurred processing a intermediate query.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 19, 2015 - paouelle - Creation
+ * @version 1 - Jan 26, 2016 - paouelle - Creation
  *
  * @since 1.0
  */
-public class EmptyResultSetFuture extends DefaultResultSetFuture {
+public class ErrorResultSetFuture extends DefaultResultSetFuture {
   /**
    * Finalized executor list used to dispatch to added listeners right away.
    *
@@ -48,38 +50,60 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
     // make sure the state of the execution list is executed
     // such that any listeners added will simply result in a direct
     // execution of the listener
-    EmptyResultSetFuture.execution.execute();
+    ErrorResultSetFuture.execution.execute();
   }
 
   /**
-   * Holds a generic empty result set.
+   * Holds the error that occurred.
    *
    * @author paouelle
    */
-  private final ResultSet empty;
+  private final Throwable error;
 
   /**
-   * Instantiates a new <code>EmptyResultSetFuture</code> object.
+   * Instantiates a new <code>ErrorResultSetFuture</code> object.
    *
    * @author paouelle
    *
    * @param  mgr the statement manager
-   * @throws NullPointerException if <code>mgr</code> is <code>null</code>
+   * @param  error the error that occurred
+   * @throws NullPointerException if <code>mgr</code> or <code>error</code> is
+   *         <code>null</code>
    */
-  public EmptyResultSetFuture(StatementManager mgr) {
+  public ErrorResultSetFuture(StatementManager mgr, Throwable error) {
     super(
       null,
       mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!
-    this.empty = ArrayBackedResultSet.fromMessage(
-      new Responses.Result(Responses.Result.Kind.VOID) {}, // VOID to force an empty result
-      null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
-      null,
-      null
-    );
+    org.apache.commons.lang3.Validate.notNull(error, "invalid null error");
+    this.error = error;
+  }
+
+  /**
+   * Propagates the original error properly wrapped.
+   *
+   * @author paouelle
+   *
+   * @return nothing as an exception is always thrown
+   * @throws Error if an error occurred
+   * @throws DriverException if a driver exception occurred
+   * @throws DriverInternalError if any other error occurred
+   */
+  RuntimeException propagateError() {
+    if (error instanceof Error) {
+      throw ((Error)error);
+    }
+    // We could just rethrow error. However, the cause of the ExecutionException has likely been
+    // created on the I/O thread receiving the response. Which means that the stacktrace associated
+    // with said cause will make no mention of the current thread. This is painful for say, finding
+    // out which execute() statement actually raised the exception. So instead, we re-create the
+    // exception.
+    if (error instanceof DriverException) {
+      throw ((DriverException)error).copy();
+    }
+    throw new DriverInternalError("Unexpected exception thrown", error);
   }
 
   /**
@@ -91,7 +115,7 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public ResultSet getUninterruptibly() {
-    return empty;
+    throw propagateError();
   }
 
   /**
@@ -104,7 +128,7 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
   @Override
   public ResultSet getUninterruptibly(long timeout, TimeUnit unit)
     throws TimeoutException {
-    return empty;
+    throw propagateError();
   }
 
   /**
@@ -116,7 +140,7 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
-    return false; // nothing to cancel; already done!
+    return false; // nothing to cancel; already failed
   }
 
   /**
@@ -129,7 +153,7 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
   @Override
   public ResultSet get(long timeout, TimeUnit unit)
     throws InterruptedException, TimeoutException, ExecutionException {
-    return empty;
+    throw propagateError();
   }
 
   /**
@@ -141,7 +165,7 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public ResultSet get() throws InterruptedException, ExecutionException {
-    return empty;
+    throw propagateError();
   }
 
   /**
@@ -177,8 +201,8 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public void addListener(Runnable listener, Executor exec) {
-    // since such an empty result is always done by design, we simulate what is
+    // since such an error result is always done by design, we simulate what is
     // normally done by an execution list which is to call the listener right
-    EmptyResultSetFuture.execution.add(listener, exec);
+    ErrorResultSetFuture.execution.add(listener, exec);
   }
 }

@@ -45,6 +45,7 @@ import org.helenus.driver.Ordering;
 import org.helenus.driver.Select;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.impl.Utils.CName;
+import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 
 /**
@@ -221,7 +222,8 @@ public class SelectImpl<T>
       // and aggregate the results
       final List<String> snames = new ArrayList<>(suffixes.keySet());
       final CombinationIterator<Object> ci = new CombinationIterator<>(
-        Object.class, (Collection<Collection<Object>>)(Collection)suffixes.values()
+        Object.class,
+        (Collection<Collection<Object>>)(Collection)suffixes.values()
       );
       final List<SelectImpl<T>> statements = new ArrayList<>(ci.size());
 
@@ -259,6 +261,34 @@ public class SelectImpl<T>
       return null;
     }
     return new StringBuilder[] { buildQueryString() };
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+  protected int simpleSize() {
+    if (super.simpleSize == -1) {
+      if (!isEnabled()) {
+        super.simpleSize = 0;
+      } else {
+        if (statements != null) {
+          super.simpleSize = statements.size();
+        } else {
+          // this is the worst case scenario where all combinations are valid
+          super.simpleSize = new CombinationIterator<>(
+            Object.class,
+            (Collection<Collection<Object>>)(Collection)suffixes.values()
+          ).size();
+        }
+      }
+    }
+    return super.simpleSize;
   }
 
   /**
@@ -396,7 +426,8 @@ public class SelectImpl<T>
       getContext(),
       statements()
         .map(s -> s.executeAsync0())
-        .collect(Collectors.toList())
+        .collect(Collectors.toList()),
+      mgr
     );
   }
 
@@ -867,6 +898,30 @@ public class SelectImpl<T>
       this(context, mgr, bridge);
       context.getClassInfo().validateColumns(columnNames);
       this.columnNames = columnNames;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.Builder#getObjectClass()
+     */
+    @Override
+    public Class<T> getObjectClass() {
+      return context.getObjectClass();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * paouelle
+     *
+     * @see org.helenus.driver.Select.Builder#getClassInfo()
+     */
+    @Override
+    public ClassInfo<T> getClassInfo() {
+      return context.getClassInfo();
     }
 
     /**

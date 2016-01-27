@@ -16,20 +16,24 @@
 package org.helenus.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
 import org.helenus.driver.ExcludedSuffixKeyException;
-import org.helenus.driver.SequenceableStatement;
+import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.Keyspace;
+import org.helenus.driver.persistence.Table;
 
 /**
  * The <code>CreateSchemaImpl</code> class defines a CREATE SCHEMA statement.
@@ -80,55 +84,37 @@ public class CreateSchemaImpl<T>
   }
 
   /**
-   * Builds the query strings for this create schemas with the ability to
-   * optionally tracked and skipped already created keyspaces.
+   * Gets all underlying sequenced statements for this create schemas with the
+   * ability to optionally tracked and skipped already created keyspaces and/or
+   * tables.
    *
    * @author paouelle
    *
    * @param  keyspaces an optional set of keyspaces already created when
    *         used as part of a create schemas statement or <code>null</code>
-   * @return the string builders used to build the query strings or
-   *         <code>null</code> if nothing to be done
+   * @param  tables an optional map of tables already for given keyspaces created
+   *         when used as part of a create schemas statement or <code>null</code>
+   * @param  group a group where to place all insert statements for initial
+   *         objects or <code>null</code> if a separate one should be created
+   *         and returned as part of the list
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
    */
-  StringBuilder[] buildQueryStrings(Set<Keyspace> keyspaces) {
+  List<StatementImpl<?, ?, ?>> buildSequencedStatements(
+    Set<Keyspace> keyspaces, Map<Keyspace, Set<Table>> tables, GroupImpl group
+  ) {
     if (!isEnabled()) {
-      return null;
+      return Collections.emptyList();
     }
-    final List<StringBuilder> builders
-      = new ArrayList<>(getContext().getClassInfo().getTables().size() + 2);
-    final CreateTypeImpl<T> cy;
-    final CreateTableImpl<T> ct;
-    final CreateIndexImpl<T> ci;
-
     // make sure we have a valid keyspace (handling suffix exclusions if any)
     try {
       getKeyspace();
     } catch (ExcludedSuffixKeyException e) { // skip it
-      return null;
+      return Collections.emptyList();
     }
-    if (getClassInfo().supportsTablesAndIndexes()) {
-      cy = null;
-      ct = init(new CreateTableImpl<>(getContext(), null, mgr, bridge));
-      ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
-    } else {
-      cy = init(new CreateTypeImpl<>(getContext(), mgr, bridge));
-      ct = null;
-      ci = null;
-    }
+    final List<StatementImpl<?, ?, ?>> statements = new ArrayList<>(32);
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
-    StringBuilder[] cbuilders;
 
-    if (ifNotExists) {
-      if (cy != null) {
-        cy.ifNotExists();
-      }
-      if (ct != null) {
-        ct.ifNotExists();
-      }
-      if (ci != null) {
-        ci.ifNotExists();
-      }
-    }
     // start by generating the keyspace
     // --- do not attempt to create the same keyspace twice when a set of keyspaces
     // --- is provided in the method calls (used by create schemas)
@@ -140,98 +126,73 @@ public class CreateSchemaImpl<T>
       if (ifNotExists) {
         ck.ifNotExists();
       }
-      cbuilders = ck.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
-        }
-      }
+      statements.add(ck);
       if (keyspaces != null) { // keep track of created keyspaces if requested
         keyspaces.add(keyspace);
       }
     }
-    if (cy != null) { // now deal with types
-      cbuilders = cy.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
+    if (getClassInfo().supportsTablesAndIndexes()) {
+      boolean createTable = true;
+
+      if (tables != null) {
+        createTable = false; // until proven otherwise
+        for (final TableInfoImpl<T> table: getContext().getClassInfo().getTablesImpl()) {
+          Set<Table> stables = tables.get(keyspace);
+
+          if (stables == null) {
+            stables = new HashSet<>(8);
+            tables.put(keyspace,  stables);
+          }
+          if (stables.add(table.getTable())) {
+            createTable = true;
           }
         }
       }
-    }
-    if (ct != null) { // now deal with tables
-      cbuilders = ct.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
+      if (createTable) {
+        final CreateTableImpl<T> ct = init(new CreateTableImpl<>(getContext(), null, mgr, bridge));
+        final CreateIndexImpl<T> ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
+
+        if (ifNotExists) {
+          ct.ifNotExists();
+          ci.ifNotExists();
         }
+        statements.add(ct);
+        statements.add(ci);
       }
-    }
-    if (ci != null) { // now deal with indexes
-      cbuilders = ci.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
-        }
+    } else {
+      final CreateTypeImpl<T> ct = init(new CreateTypeImpl<>(getContext(), mgr, bridge));
+
+      if (ifNotExists) {
+        ct.ifNotExists();
       }
+      statements.add(ct);
     }
     // finish with initial objects
-    // create sequences of batches since it is possible that the number of objects
-    // to insert exceeds the recommended size for a batch
-    final SequenceImpl sequence = init(new SequenceImpl(
-      Optional.empty(), new SequenceableStatement[0], mgr, bridge
-    ));
-    BatchImpl batch = init(new BatchImpl(
-      Optional.empty(), new BatchableStatement[0], true, mgr, bridge
-    ));
+    final Collection<T> objs = getContext().getInitialObjects();
 
-    sequence.add(batch);
-    for (final T io: getContext().getInitialObjects()) {
-      final InsertImpl<T> insert = init(new InsertImpl<>(
-        getContext().getClassInfo().newContext(io),
-        (String[])null,
-        mgr,
-        bridge
-      ));
+    if (!objs.isEmpty()) {
+      final GroupImpl g;
 
-      if (batch.hasReachedRecommendedSize()) { // switch to a new batch
-        batch = init(new BatchImpl(
-          Optional.empty(), new BatchableStatement[0], true, mgr, bridge
+      if (group != null) {
+        g = group;
+      } else {
+        g = init(new GroupImpl(
+          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
         ));
-        sequence.add(batch);
       }
-      batch.add(insert);
-    }
-    final StringBuilder[] sbuilders = sequence.buildQueryStrings();
-
-    if (sbuilders != null) {
-      for (final StringBuilder sb: sbuilders) {
-        builders.add(sb);
+      for (final T io: objs) {
+        g.add(init(new InsertImpl<>(
+          getContext().getClassInfo().newContext(io),
+          (String[])null,
+          mgr,
+          bridge
+        )));
+      }
+      if (group == null) {
+        statements.add(g);
       }
     }
-    if (builders.isEmpty()) {
-      return null;
-    }
-    return builders.toArray(new StringBuilder[builders.size()]);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
-   */
-  @Override
-  protected StringBuilder[] buildQueryStrings() {
-    return buildQueryStrings(null);
+    return statements;
   }
 
   /**
@@ -256,6 +217,18 @@ public class CreateSchemaImpl<T>
   @Override
   protected void appendGroupType(StringBuilder builder) {
     builder.append("SCHEMA");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   */
+  @Override
+  protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+    return buildSequencedStatements(null, null, null);
   }
 
   /**

@@ -68,7 +68,7 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
    * @see org.helenus.driver.impl.CreateTypeImpl#buildQueryStrings(org.helenus.driver.impl.TableInfoImpl)
    */
   @Override
-  StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
+  protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
     // start by querying Cassandra system table to figure out the existing schema
     // for the required type
     final Row row = mgr.getSession().executeAsync(new SimpleStatement(
@@ -79,7 +79,8 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
       + "' LIMIT 1"
     )).getUninterruptibly().one();
 
-    if (row == null) { // that would mean the type doesn't exist
+    if (row == null) {
+      // that would mean the type doesn't exist, so just created it brand new
       return super.buildQueryStrings(table);
     }
     final Map<String, CQLDataType> columns = new HashMap<>(table.getColumns().size() * 3 / 2);

@@ -28,6 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,6 +46,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.helenus.commons.collections.iterators.SnapshotIterator;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
@@ -59,13 +64,14 @@ import org.helenus.driver.CreateTable;
 import org.helenus.driver.CreateType;
 import org.helenus.driver.Delete;
 import org.helenus.driver.Delete.Builder;
+import org.helenus.driver.Group;
+import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.Insert;
 import org.helenus.driver.KeyspaceWith;
 import org.helenus.driver.Ordering;
 import org.helenus.driver.Recorder;
 import org.helenus.driver.RegularStatement;
 import org.helenus.driver.Select;
-import org.helenus.driver.Select.Selection;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
@@ -161,6 +167,22 @@ public class StatementManagerImpl extends StatementManager {
   private final List<EntityFilter> filters = new ArrayList<>(2);
 
   /**
+   * Holds a direct executing service which uses the same thread to execute
+   * tasks.
+   *
+   * @author paouelle
+   */
+  private final ExecutorService directExecutor = MoreExecutors.sameThreadExecutor();
+
+  /**
+   * Holds a thread pool executor used for processing internal short lived tasks
+   * such as event dispatch for future listeners.
+   *
+   * @author paouelle
+   */
+  private final ExecutorService poolExecutor;
+
+  /**
    * Holds a flag to control whether to trace the full statement or part of it
    * when it exceeds 2K in size.
    *
@@ -191,6 +213,15 @@ public class StatementManagerImpl extends StatementManager {
     this.cluster = Cluster.buildFrom(initializer);
     this.session = connect ? cluster.connect() : null;
     this.bridge = setManager(this);
+    this.poolExecutor = MoreExecutors.getExitingExecutorService(
+      new ThreadPoolExecutor(
+        64,
+        64,
+        0L,
+        TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<Runnable>()
+      )
+    );
   }
 
   /**
@@ -375,7 +406,7 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#select(java.lang.Class)
    */
   @Override
-  protected <T> Selection<T> select(Class<T> clazz) {
+  protected <T> Select.Selection<T> select(Class<T> clazz) {
     final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
 
     org.apache.commons.lang3.Validate.isTrue(
@@ -812,12 +843,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.StatementManager#createSchemas(java.lang.String)
+   * @see org.helenus.driver.StatementManager#createSchemas(java.lang.String[])
    */
   @Override
-  protected CreateSchemas createSchemas(String pkg) {
+  protected CreateSchemas createSchemas(String[] pkgs) {
     return new CreateSchemasImpl(
-      pkg,
+      pkgs,
       false,
       this,
       bridge
@@ -829,12 +860,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.StatementManager#createMatchingSchemas(java.lang.String)
+   * @see org.helenus.driver.StatementManager#createMatchingSchemas(java.lang.String[])
    */
   @Override
-  protected CreateSchemas createMatchingSchemas(String pkg) {
+  protected CreateSchemas createMatchingSchemas(String[] pkgs) {
     return new CreateSchemasImpl(
-      pkg,
+      pkgs,
       true,
       this,
       bridge
@@ -862,12 +893,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.StatementManager#alterSchemas(java.lang.String)
+   * @see org.helenus.driver.StatementManager#alterSchemas(java.lang.String[])
    */
   @Override
-  protected AlterSchemas alterSchemas(String pkg) {
+  protected AlterSchemas alterSchemas(String[] pkgs) {
     return new AlterSchemasImpl(
-      pkg,
+      pkgs,
       false,
       this,
       bridge
@@ -879,12 +910,12 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.StatementManager#alterMatchingSchemas(java.lang.String)
+   * @see org.helenus.driver.StatementManager#alterMatchingSchemas(java.lang.String[])
    */
   @Override
-  protected AlterSchemas alterMatchingSchemas(String pkg) {
+  protected AlterSchemas alterMatchingSchemas(String[] pkgs) {
     return new AlterSchemasImpl(
-      pkg,
+      pkgs,
       true,
       this,
       bridge
@@ -947,12 +978,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Sequence sequence(Optional<Recorder> recorder, SequenceableStatement<?, ?>... statements) {
-    return new SequenceImpl(
-      recorder,
-      statements,
-      this,
-      bridge
-    );
+    return new SequenceImpl(recorder, statements, this, bridge);
   }
 
   /**
@@ -964,12 +990,31 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Sequence sequence(Optional<Recorder> recorder, Iterable<SequenceableStatement<?, ?>> statements) {
-    return new SequenceImpl(
-      recorder,
-      statements,
-      this,
-      bridge
-    );
+    return new SequenceImpl(recorder, statements, this, bridge);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#group(java.util.Optional, org.helenus.driver.GroupableStatement[])
+   */
+  @Override
+  protected Group group(Optional<Recorder> recorder, GroupableStatement<?, ?>... statements) {
+    return new GroupImpl(recorder, statements, this, bridge);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#group(java.util.Optional, java.lang.Iterable)
+   */
+  @Override
+  protected Group group(Optional<Recorder> recorder, Iterable<GroupableStatement<?, ?>> statements) {
+    return new GroupImpl(recorder, statements, this, bridge);
   }
 
   /**
@@ -1875,6 +1920,30 @@ public class StatementManagerImpl extends StatementManager {
   }
 
   /**
+   * Gets a thread pool executor used for processing internal short lived tasks
+   * such as event dispatch for future listeners.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> thread pool executor service
+   */
+  public ExecutorService getPoolExecutor() {
+    return poolExecutor;
+  }
+
+  /**
+   * Gets a direct executor used for processing internal short lived tasks
+   * such as event dispatch for future listeners on the same thread.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> direct executor service
+   */
+  public ExecutorService getDirectExecutor() {
+    return directExecutor;
+  }
+
+  /**
    * Gets the default replication factor to use when POJOS are defined with the
    * SIMPLE strategy and do not specify a factor.
    *
@@ -1993,7 +2062,7 @@ public class StatementManagerImpl extends StatementManager {
    * {@link CloseFuture#force} can be called on the result future.
    * <p>
    * This method has no particular effect if the statement manager was already
-   * shut down (in which case the returned future will return immediately).
+   * shutdown (in which case the returned future will return immediately).
    *
    * @author paouelle
    *
@@ -2001,7 +2070,16 @@ public class StatementManagerImpl extends StatementManager {
    *         process
    */
   public CloseFuture closeAsync() {
-    return cluster.closeAsync();
+    final CloseFuture future = cluster.closeAsync();
+
+    future.addListener(new Runnable() { // wait for it to be done before shutting down the pool
+      @SuppressWarnings("synthetic-access")
+      @Override
+      public void run() {
+        poolExecutor.shutdown();
+      }
+    }, directExecutor);
+    return future;
   }
 
   /**
@@ -2009,11 +2087,12 @@ public class StatementManagerImpl extends StatementManager {
    * that shutdown completes.
    * <p>
    * This method has no particular effect if the statement manager was already
-   * shut down.
+   * shutdown.
    *
    * @author paouelle
    */
   public void close() {
     cluster.close();
+    poolExecutor.shutdown();
   }
 }

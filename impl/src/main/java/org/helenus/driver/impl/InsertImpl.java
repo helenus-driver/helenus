@@ -299,6 +299,25 @@ public class InsertImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+   */
+  @Override
+  protected int simpleSize() {
+    if (super.simpleSize == -1) {
+      if (!isEnabled()) {
+        super.simpleSize = 0;
+      } else {
+        super.simpleSize = tables.size();
+      }
+    }
+    return super.simpleSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
    */
   @Override
@@ -547,6 +566,19 @@ public class InsertImpl<T>
     ) {
       super(Void.class, context, mgr, bridge);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.StatementImpl#simpleSize()
+     */
+    @Override
+    protected int simpleSize() {
+      return getContext().getClassInfo().getNumTables(); // don't know more yet!!!
+    }
+
 
     /**
      * {@inheritDoc}

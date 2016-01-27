@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import com.google.common.util.concurrent.ExecutionList;
 import com.google.common.util.concurrent.ListenableFuture;
 
-import org.helenus.driver.StatementManager;
+import org.helenus.driver.impl.StatementManagerImpl;
 
 /**
  * The <code>CompoundResultSetFuture</code> class defines a result set which is
@@ -46,19 +46,6 @@ import org.helenus.driver.StatementManager;
  * @since 1.0
  */
 public class CompoundResultSetFuture extends DefaultResultSetFuture {
-  /**
-   * Holds a direct executor used for future listeners
-   * registered internally.
-   *
-   * @author paouelle
-   */
-  private static final Executor DIRECT = new Executor() {
-    @Override
-    public void execute(Runnable r) {
-      r.run();
-    }
-  };
-
   /**
    * The execution list to hold our executors.
    *
@@ -91,7 +78,7 @@ public class CompoundResultSetFuture extends DefaultResultSetFuture {
    *         or any of the result set futures are <code>null</code>
    */
   public CompoundResultSetFuture(
-    List<ResultSetFuture> futures, StatementManager mgr
+    List<ResultSetFuture> futures, StatementManagerImpl mgr
   ) {
     super(
       null,
@@ -134,7 +121,7 @@ public class CompoundResultSetFuture extends DefaultResultSetFuture {
             }
           }
         }
-      }, DIRECT);
+      }, mgr.getDirectExecutor());
     }
   }
 

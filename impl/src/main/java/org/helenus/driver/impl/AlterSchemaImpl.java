@@ -16,6 +16,10 @@
 package org.helenus.driver.impl;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,14 +29,14 @@ import java.util.stream.Collectors;
 import com.datastax.driver.core.Row;
 
 import org.helenus.driver.AlterSchema;
-import org.helenus.driver.BatchableStatement;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ExcludedSuffixKeyException;
-import org.helenus.driver.SequenceableStatement;
+import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.Keyspace;
+import org.helenus.driver.persistence.Table;
 
 /**
  * The <code>AlterSchemaImpl</code> class defines a ALTER SCHEMA statement.
@@ -76,159 +80,124 @@ public class AlterSchemaImpl<T>
   }
 
   /**
-   * Builds the query strings for this alter schemas with the ability to
-   * optionally tracked and skipped already created or altered keyspaces.
+   * Gets all underlying sequenced statements for this create schemas with the
+   * ability to optionally tracked and skipped already created keyspaces and/or
+   * tables.
    *
    * @author paouelle
    *
-   * @param  keyspaces an optional set of keyspaces already created or altered
+   * @param  keyspaces an optional set of keyspaces already created when
+   *         used as part of a create schemas statement or <code>null</code>
+   * @param  tables an optional map of tables already for given keyspaces created
    *         when used as part of a create schemas statement or <code>null</code>
-   * @return the string builders used to build the query strings or
-   *         <code>null</code> if nothing to be done
+   * @param  group a group where to place all insert statements for initial
+   *         objects or <code>null</code> if a separate one should be created
+   *         and returned as part of the list
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
    */
-  StringBuilder[] buildQueryStrings(Set<Keyspace> keyspaces) {
+  List<StatementImpl<?, ?, ?>> buildSequencedStatements(
+    Set<Keyspace> keyspaces, Map<Keyspace, Set<Table>> tables, GroupImpl group
+  ) {
     if (!isEnabled()) {
-      return null;
+      return Collections.emptyList();
     }
-    final List<StringBuilder> builders
-      = new ArrayList<>(getContext().getClassInfo().getTables().size() + 2);
-    final AlterCreateTypeImpl<T> cy;
-    final AlterCreateTableImpl<T> at;
-    final CreateIndexImpl<T> ci;
-
     // make sure we have a valid keyspace (handling suffix exclusions if any)
     try {
       getKeyspace();
     } catch (ExcludedSuffixKeyException e) { // skip it
-      return null;
+      return Collections.emptyList();
     }
-    if (getClassInfo().supportsTablesAndIndexes()) {
-      cy = null;
-      at = init(new AlterCreateTableImpl<>(getContext(), mgr, bridge));
-      // for indexes, we blindly drop all of them and re-create them
-      for (final Map.Entry<String, List<Row>> e: at.getTableInfos().entrySet()) {
-        e.getValue().stream()
-          .map(r -> r.getString(4))
-          .filter(i -> i != null)
-          .distinct()
-          .forEach(i -> {
-            final StringBuilder builder = new StringBuilder("DROP INDEX ");
-
-            if (getKeyspace() != null) {
-              Utils.appendName(getKeyspace(), builder).append('.');
-            }
-            Utils.appendName(i, builder);
-            builder.append(';');
-            builders.add(builder);
-          });
-      }
-      ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
-    } else {
-      cy = init(new AlterCreateTypeImpl<>(getContext(), mgr, bridge));
-      at = null;
-      ci = null;
-    }
+    final List<StatementImpl<?, ?, ?>> statements = new ArrayList<>(32);
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
-    StringBuilder[] cbuilders;
 
     // start by generating the keyspace
     // --- do not attempt to create or alter the same keyspace twice when a set
     // --- of keyspaces is provided in the method calls (used by alter schemas)
     if ((keyspaces == null) || !keyspaces.contains(keyspace)) {
-      final AlterCreateKeyspaceImpl<T> ck = init(new AlterCreateKeyspaceImpl<>(
+      final AlterCreateKeyspaceImpl<T> ak = init(new AlterCreateKeyspaceImpl<>(
         getContext(), mgr, bridge
       ));
 
-      cbuilders = ck.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
-        }
-      }
+      statements.add(ak);
       if (keyspaces != null) { // keep track of created keyspaces if requested
         keyspaces.add(keyspace);
       }
     }
-    if (cy != null) { // now deal with types
-      cbuilders = cy.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
+    if (getClassInfo().supportsTablesAndIndexes()) {
+      boolean alterTable = true;
+
+      if (tables != null) {
+        alterTable = false; // until proven otherwise
+        for (final TableInfoImpl<T> table: getContext().getClassInfo().getTablesImpl()) {
+          Set<Table> stables = tables.get(keyspace);
+
+          if (stables == null) {
+            stables = new HashSet<>(8);
+            tables.put(keyspace,  stables);
+          }
+          if (stables.add(table.getTable())) {
+            alterTable = true;
           }
         }
       }
-    }
-    if (at != null) { // now deal with tables
-      cbuilders = at.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
+      if (alterTable) {
+        final AlterCreateTableImpl<T> at = init(
+          new AlterCreateTableImpl<>(getContext(), mgr, bridge)
+        );
+
+        statements.add(at);
+        // for indexes, we blindly drop all of them and re-create them
+        for (final Map.Entry<String, List<Row>> e: at.getTableInfos().entrySet()) {
+          e.getValue().stream()
+            .map(r -> r.getString(4))
+            .filter(i -> i != null)
+            .distinct()
+            .forEach(i -> {
+              final StringBuilder builder = new StringBuilder("DROP INDEX ");
+
+              if (getKeyspace() != null) {
+                Utils.appendName(getKeyspace(), builder).append('.');
+              }
+              Utils.appendName(i, builder);
+              builder.append(';');
+              statements.add(new SimpleStatementImpl(builder.toString(), mgr, bridge));
+            });
         }
+        statements.add(
+          init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge))
+        );
       }
-    }
-    if (ci != null) { // now deal with indexes
-      cbuilders = ci.buildQueryStrings();
-      if (cbuilders != null) {
-        for (final StringBuilder builder: cbuilders) {
-          if (builder != null) {
-            builders.add(builder);
-          }
-        }
-      }
+    } else {
+      statements.add(init(new AlterCreateTypeImpl<>(getContext(), mgr, bridge)));
     }
     // finish with initial objects
-    // create sequences of batches since it is possible that the number of objects
-    // to insert exceeds the recommended size for a batch
-    final SequenceImpl sequence = init(new SequenceImpl(
-      Optional.empty(), new SequenceableStatement[0], mgr, bridge
-    ));
-    BatchImpl batch = init(new BatchImpl(
-      Optional.empty(), new BatchableStatement[0], true, mgr, bridge
-    ));
+    final Collection<T> objs = getContext().getInitialObjects();
 
-    sequence.add(batch);
-    for (final T io: getContext().getInitialObjects()) {
-      final InsertImpl<T> insert = init(new InsertImpl<>(
-        getContext().getClassInfo().newContext(io),
-        (String[])null,
-        mgr,
-        bridge
-      ));
+    if (!objs.isEmpty()) {
+      final GroupImpl g;
 
-      if (batch.hasReachedRecommendedSize()) { // switch to a new batch
-        batch = init(new BatchImpl(
-          Optional.empty(), new BatchableStatement[0], true, mgr, bridge
+      if (group != null) {
+        g = group;
+      } else {
+        g = init(new GroupImpl(
+          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
         ));
-        sequence.add(batch);
       }
-      batch.add(insert);
-    }
-    final StringBuilder builder = batch.buildQueryString();
 
-    if (builder != null) {
-      builders.add(builder);
+      for (final T io: objs) {
+        g.add(init(new InsertImpl<>(
+          getContext().getClassInfo().newContext(io),
+          (String[])null,
+          mgr,
+          bridge
+        )));
+      }
+      if (group == null) {
+        statements.add(g);
+      }
     }
-    if (builders.isEmpty()) {
-      return null;
-    }
-    return builders.toArray(new StringBuilder[builders.size()]);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see org.helenus.driver.impl.StatementImpl#buildQueryStrings()
-   */
-  @Override
-  protected StringBuilder[] buildQueryStrings() {
-    return buildQueryStrings(null);
+    return statements;
   }
 
   /**
@@ -260,12 +229,24 @@ public class AlterSchemaImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   */
+  @Override
+  protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+    return buildSequencedStatements(null, null, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.CreateSchema#getObjectClasses()
    */
   @Override
   public Set<Class<?>> getObjectClasses() {
     return getContext().getClassInfo().objectClasses()
-      .collect(Collectors.toSet());
+      .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
@@ -278,7 +259,7 @@ public class AlterSchemaImpl<T>
   @Override
   public Set<ClassInfo<?>> getClassInfos() {
     return getContext().getClassInfo().classInfos()
-      .collect(Collectors.toSet());
+      .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
