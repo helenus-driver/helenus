@@ -71,6 +71,13 @@ public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
   private ResultSetFuture future = null;
 
   /**
+   * Holds the currently executing statement.
+   *
+   * @author paouelle
+   */
+  private StatementImpl<?, ?, ?> statement = null;
+
+  /**
    * Holds a flag indicating the result set was cancelled.
    *
    * @author paouelle
@@ -121,9 +128,8 @@ public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
           // move on to the next if any
           if (statements.hasNext()) {
             try {
-              final StatementImpl<?, ?, ?> s = statements.next();
-
-              LastResultSequentialSetFuture.this.future = s.executeAsyncRaw();
+              LastResultSequentialSetFuture.this.statement = statements.next();
+              LastResultSequentialSetFuture.this.future = statement.executeAsyncRaw();
               LastResultSequentialSetFuture.this.future.addListener(
                 LastResultSequentialSetFuture.this.listener,
                 mgr.getPoolExecutor()
@@ -181,9 +187,8 @@ public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
     this.statements = ss.iterator();
     // execute the first one to get things going
     if (this.statements.hasNext()) {
-      final StatementImpl<?, ?, ?> s = this.statements.next();
-
-      this.future = s.executeAsyncRaw();
+      this.statement = this.statements.next();
+      this.future = statement.executeAsyncRaw();
       this.future.addListener(listener, mgr.getPoolExecutor());
     }
   }
@@ -225,18 +230,27 @@ public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
-    synchronized (statements) {
-      if (cancelled) {
-        return false;
-      }
-      this.cancelled = true;
-      try {
-        // if we cancelled the current or if we had more to execute then we did cancel
-        return future.cancel(mayInterruptIfRunning) || statements.hasNext();
-      } finally {
-        while (statements.hasNext()) { // empty out the iterator of statements
-          statements.next();
+    boolean execute = false;
+
+    try {
+      synchronized (statements) {
+        if (cancelled) {
+          return false;
         }
+        execute = true;
+        this.cancelled = true;
+        try {
+          // if we cancelled the current or if we had more to execute then we did cancel
+          return future.cancel(mayInterruptIfRunning) || statements.hasNext();
+        } finally {
+          while (statements.hasNext()) { // empty out the iterator of statements
+            statements.next();
+          }
+        }
+      }
+    } finally {
+      if (execute) { // do outside of lock
+        executionList.execute();
       }
     }
   }

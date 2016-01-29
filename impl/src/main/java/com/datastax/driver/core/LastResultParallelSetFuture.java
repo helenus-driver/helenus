@@ -28,7 +28,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.util.concurrent.ExecutionList;
 
-import org.helenus.driver.impl.GroupImpl;
+import org.helenus.driver.impl.GroupStatementImpl;
 import org.helenus.driver.impl.SequenceStatementImpl;
 import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
@@ -153,11 +153,11 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
             // setting the error future for our own clients
             LastResultParallelSetFuture.this.error = future;
             LastResultParallelSetFuture.this.success = null;
-            execute = true; // notify out listeners
+            execute = true; // notify our listeners
             statements.notifyAll(); // wake up anything in case
             return;
           }
-          if (!future.isDone()) { // normally this should never happen!!!
+          if (!future.isDone()) { // this should never happen!!!
             // not done yet so bail out
             // leaving the error & success future intact for our own clients
             futures.put(future, statement); // put it back!!!
@@ -238,7 +238,7 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
    *         <code>null</code>
    */
   public LastResultParallelSetFuture(
-    GroupImpl group,
+    GroupStatementImpl group,
     List<StatementImpl<?, ?, ?>> statements,
     StatementManagerImpl mgr
   ) {
@@ -319,26 +319,35 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
-    synchronized (statements) {
-      if (cancelled) {
-        return false;
-      }
-      this.cancelled = true;
-      statements.notifyAll(); // wake up anything in case
-      boolean did = false; // until proven otherwise
+    boolean execute = false;
 
-      try {
-        for (final ResultSetFuture f: futures.keySet()) {
-          if (f.cancel(mayInterruptIfRunning)) {
-            did = true;
+    try {
+      synchronized (statements) {
+        if (cancelled) {
+          return false;
+        }
+        execute = true;
+        this.cancelled = true;
+        statements.notifyAll(); // wake up anything in case
+        boolean did = false; // until proven otherwise
+
+        try {
+          for (final ResultSetFuture f: futures.keySet()) {
+            if (f.cancel(mayInterruptIfRunning)) {
+              did = true;
+            }
+          }
+          // if we cancelled one or if we had more to execute then we did cancel
+          return did || statements.hasNext();
+        } finally {
+          while (statements.hasNext()) { // empty out the iterator of statements
+            statements.next();
           }
         }
-        // if we cancelled one or if we had more to execute then we did cancel
-        return did || statements.hasNext();
-      } finally {
-        while (statements.hasNext()) { // empty out the iterator of statements
-          statements.next();
-        }
+      }
+    } finally {
+      if (execute) { // do outside of lock
+        executionList.execute();
       }
     }
   }

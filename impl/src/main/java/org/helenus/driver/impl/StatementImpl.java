@@ -444,9 +444,9 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * Gets all underlying statements or this statement if none contained within.
    * <p>
    * <i>Note:</i> Any statements that contains other statements should be
-   * flattened out based on its type. For example, a batch will flattened out 
-   * all included batches recursively. A sequence will do the same with contained 
-   * sequences but not with contained groups or batches. A group will do the 
+   * flattened out based on its type. For example, a batch will flattened out
+   * all included batches recursively. A sequence will do the same with contained
+   * sequences but not with contained groups or batches. A group will do the
    * same with contained groups but not with contained sequences or batches.
    *
    * @author paouelle
@@ -1099,35 +1099,38 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @param query the query of the statement being executed
    */
   private void debugExecution(String query) {
-    if (logger.isDebugEnabled() && isTracing()) {
+    if (logger.isDebugEnabled()
+        && (isTracing() || mgr.areAllStatementsTracesEnabled())) {
+      final String prefix = StringUtils.defaultString(tracePrefix);
+
       if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
-        logger.log(Level.DEBUG, "%sCQL -> %s", tracePrefix, query);
+        logger.log(Level.DEBUG, "%sCQL -> %s", prefix, query);
       } else if (this instanceof Batch) {
         logger.log(
           Level.DEBUG,
           "%sCQL -> %s ... APPLY BATCH",
-          tracePrefix,
+          prefix,
           query.substring(0, 2032)
         );
       } else if (this instanceof Sequence) {
         logger.log(
           Level.DEBUG,
           "%sCQL -> %s ... APPLY SEQUENCE",
-          tracePrefix,
+          prefix,
           query.substring(0, 2029)
         );
       } else if (this instanceof Group) {
         logger.log(
           Level.DEBUG,
           "%sCQL -> %s ... APPLY GROUP",
-          tracePrefix,
+          prefix,
           query.substring(0, 2032)
         );
       } else {
         logger.log(
           Level.DEBUG,
           "%sCQL -> %s ...",
-          tracePrefix,
+          prefix,
           query.substring(0, 2044)
         );
       }
@@ -1144,76 +1147,82 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    */
   private void errorExecution(String query, Throwable e) {
     // try as an error log first
-    if (logger.isErrorEnabled() && isErrorTracing()) {
+    if (logger.isErrorEnabled()
+        && (isErrorTracing() || mgr.areAllStatementsTracesEnabled())) {
+      final String prefix = StringUtils.defaultString(errorTracePrefix);
+
       if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
         logger.log(
-          Level.ERROR, "%sCQL ERROR -> %s", errorTracePrefix, query
+          Level.ERROR, "%sCQL ERROR -> %s", prefix, query
          );
       } else if (StatementImpl.this instanceof Batch) {
         logger.log(
           Level.ERROR,
           "%sCQL ERROR -> %s ... APPLY BATCH",
-          errorTracePrefix,
+          prefix,
           query.substring(0, 2032)
         );
       } else if (StatementImpl.this instanceof Sequence) {
         logger.log(
           Level.ERROR,
           "%sCQL ERROR -> %s ... APPLY SEQUENCE",
-          errorTracePrefix,
+          prefix,
           query.substring(0, 2029)
         );
       } else if (StatementImpl.this instanceof Group) {
         logger.log(
           Level.ERROR,
           "%sCQL ERROR -> %s ... APPLY GROUP",
-          errorTracePrefix,
+          prefix,
           query.substring(0, 2032)
         );
       } else {
         logger.log(
           Level.ERROR,
           "%sCQL ERROR -> %s ...",
-          errorTracePrefix,
+          prefix,
           query.substring(0, 2044)
         );
       }
       logger.log(Level.ERROR, "%sCQL ERROR -> ", errorTracePrefix, e);
-    } else if (logger.isDebugEnabled() && isTracing()) { // fallback to tracing
+    } else if (logger.isDebugEnabled()
+               && (isTracing() || mgr.areAllStatementsTracesEnabled())) { // fallback to tracing
+      final String prefix = StringUtils.defaultString(tracePrefix);
+
       if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
         logger.log(
-          Level.DEBUG, "%sCQL ERROR -> %s", tracePrefix, query
+          Level.DEBUG, "%sCQL ERROR -> %s", prefix, query
         );
       } else if (StatementImpl.this instanceof Batch) {
         logger.log(
           Level.DEBUG,
-          "%sCQL -> %s ... APPLY BATCH",
-          tracePrefix,
+          "%sCQL ERROR -> %s ... APPLY BATCH",
+          prefix,
           query.substring(0, 2032)
         );
       } else if (StatementImpl.this instanceof Sequence) {
         logger.log(
           Level.DEBUG,
-          "%sCQL -> %s ... APPLY SEQUENCE",
-          tracePrefix,
+          "%sCQL ERROR -> %s ... APPLY SEQUENCE",
+          prefix,
           query.substring(0, 2029)
         );
       } else if (StatementImpl.this instanceof Group) {
         logger.log(
           Level.DEBUG,
-          "%sCQL -> %s ... APPLY GROUP",
-          tracePrefix,
+          "%sCQL ERROR -> %s ... APPLY GROUP",
+          prefix,
           query.substring(0, 2032)
         );
       } else {
         logger.log(
           Level.DEBUG,
-          "%sCQL -> %s ...",
-          tracePrefix,
+          "%sCQL ERROR -> %s ...",
+          prefix,
           query.substring(0, 2044)
         );
       }
-      logger.log(Level.DEBUG, "%sCQL ERROR -> ", tracePrefix, e);
+      logger.log(Level.DEBUG, "%sCQL ERROR -> ", prefix, e);
     }
   }
 

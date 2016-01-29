@@ -61,7 +61,7 @@ import org.reflections.Reflections;
  * @since 1.0
  */
 public class AlterSchemasImpl
-  extends SequenceStatementImpl<Void, VoidFuture, Void>
+  extends GroupStatementImpl<Void, VoidFuture, Void>
   implements AlterSchemas {
   /**
    * Holds the packages for all POJO classes for which to alter schemas.
@@ -370,10 +370,10 @@ public class AlterSchemasImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+  protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
     final List<ClassInfoImpl<?>.Context> contexts = getContexts();
     // we do not want to alter the same keyspace or table so many times for nothing
     final Set<Keyspace> keyspaces = new HashSet<>(contexts.size() * 3);
@@ -389,7 +389,7 @@ public class AlterSchemasImpl
         @SuppressWarnings({"rawtypes", "unchecked"})
         final AlterSchemaImpl<?> as = init(new AlterSchemaImpl(c, mgr, bridge));
 
-        return as.buildSequencedStatements(keyspaces, tables, group).stream()
+        return as.buildGroupedStatements(keyspaces, tables, group).stream()
           .sequential();
       })
       .sequential()

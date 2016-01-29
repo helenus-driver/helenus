@@ -46,7 +46,7 @@ import org.helenus.driver.persistence.Ordering;
  * @since 1.0
  */
 public class CreateTableImpl<T>
-  extends SequenceStatementImpl<Void, VoidFuture, T>
+  extends GroupStatementImpl<Void, VoidFuture, T>
   implements CreateTable<T> {
   /**
    * List of tables to be created.
@@ -243,10 +243,10 @@ public class CreateTableImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+  protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
     return tables.stream()
       .map(t -> buildQueryStrings(t))
       .filter(bs -> bs != null)

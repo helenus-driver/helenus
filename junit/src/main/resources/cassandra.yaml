@@ -132,9 +132,10 @@ partitioner: org.apache.cassandra.dht.Murmur3Partitioner
 # will spread data evenly across them, subject to the granularity of
 # the configured compaction strategy.
 # If not set, the default directory is $CASSANDRA_HOME/data/data.
-data_file_directories:
+# data_file_directories:
 #     - /var/lib/cassandra/data
 # for JUnit, we want to store that under target
+data_file_directories:
     - target/helenus-junit/data
 
 # commit log.  when running on magnetic HDD, this should be a
@@ -142,7 +143,7 @@ data_file_directories:
 # If not set, the default directory is $CASSANDRA_HOME/data/commitlog.
 # commitlog_directory: /var/lib/cassandra/commitlog
 # for JUnit, we want to store that under target
- commitlog_directory: target/helenus-junit/commitlog
+commitlog_directory: target/helenus-junit/commitlog
 
 # policy for data disk failures:
 # die: shut down gossip and client transports and kill the JVM for any fs errors or

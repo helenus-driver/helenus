@@ -51,7 +51,7 @@ import org.helenus.driver.persistence.Table;
  * @since 1.0
  */
 public class AlterSchemaImpl<T>
-  extends SequenceStatementImpl<Void, VoidFuture, T>
+  extends GroupStatementImpl<Void, VoidFuture, T>
   implements AlterSchema<T> {
   /**
    * Holds the where statement part.
@@ -96,7 +96,7 @@ public class AlterSchemaImpl<T>
    * @return a non-<code>null</code> list of all underlying statements from this
    *         statement
    */
-  List<StatementImpl<?, ?, ?>> buildSequencedStatements(
+  List<StatementImpl<?, ?, ?>> buildGroupedStatements(
     Set<Keyspace> keyspaces, Map<Keyspace, Set<Table>> tables, GroupImpl group
   ) {
     if (!isEnabled()) {
@@ -229,11 +229,11 @@ public class AlterSchemaImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
-    return buildSequencedStatements(null, null, null);
+  protected List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
+    return buildGroupedStatements(null, null, null);
   }
 
   /**

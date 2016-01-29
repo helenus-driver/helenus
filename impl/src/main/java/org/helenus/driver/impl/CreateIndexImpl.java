@@ -43,7 +43,7 @@ import org.helenus.driver.persistence.Index;
  * @since 1.0
  */
 public class CreateIndexImpl<T>
-  extends SequenceStatementImpl<Void, VoidFuture, T>
+  extends GroupStatementImpl<Void, VoidFuture, T>
   implements CreateIndex<T> {
   /**
    * Holds the custom class to use for the index.
@@ -207,10 +207,10 @@ public class CreateIndexImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+  protected List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
     return tables.stream()
       .map(t -> buildQueryStrings(t))
       .filter(bs -> bs != null)

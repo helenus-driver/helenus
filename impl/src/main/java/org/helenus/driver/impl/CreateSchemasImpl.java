@@ -31,6 +31,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.helenus.commons.collections.DirectedGraph;
 import org.helenus.commons.collections.GraphUtils;
 import org.helenus.commons.collections.graph.ConcurrentHashDirectedGraph;
@@ -60,7 +62,7 @@ import org.reflections.Reflections;
  * @since 1.0
  */
 public class CreateSchemasImpl
-  extends SequenceStatementImpl<Void, VoidFuture, Void>
+  extends GroupStatementImpl<Void, VoidFuture, Void>
   implements CreateSchemas {
   /**
    * Holds the packages for all POJO classes for which to create schemas.
@@ -377,15 +379,21 @@ public class CreateSchemasImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+  protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
     final List<ClassInfoImpl<?>.Context> contexts = getContexts();
     // we do not want to create the same keyspace or table so many times for nothing
-    final Set<Keyspace> keyspaces = new HashSet<>(contexts.size() * 3);
-    final Map<Keyspace, Set<Table>> tables = new HashMap<>(contexts.size() * 3);
-    // create one group to aggregate all initial objects
+    final Set<Pair<String, Keyspace>> keyspaces = new HashSet<>(contexts.size() * 3);
+    final Map<Pair<String, Keyspace>, Set<Table>> tables = new HashMap<>(contexts.size() * 3);
+    // create one group to aggregate all create table, create index, and initial objects
+    final GroupImpl tgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl igroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
     final GroupImpl group = init(new GroupImpl(
       Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
     ));
@@ -398,12 +406,19 @@ public class CreateSchemasImpl
         if (ifNotExists) {
           cs.ifNotExists();
         }
-        return cs.buildSequencedStatements(keyspaces, tables, group).stream()
+        // cannot group types together because of inter-dependencies
+        return cs.buildSequencedStatements(keyspaces, tables, tgroup, igroup, null, group).stream()
           .sequential();
       })
       .sequential()
       .collect(Collectors.toList());
 
+    if (!tgroup.isEmpty()) {
+      statements.add(tgroup);
+    }
+    if (!igroup.isEmpty()) {
+      statements.add(igroup);
+    }
     if (!group.isEmpty()) {
       statements.add(group);
     }

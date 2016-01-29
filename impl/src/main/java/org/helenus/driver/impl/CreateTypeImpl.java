@@ -41,7 +41,7 @@ import org.helenus.driver.VoidFuture;
  * @since 1.0
  */
 public class CreateTypeImpl<T>
-  extends SequenceStatementImpl<Void, VoidFuture, T>
+  extends GroupStatementImpl<Void, VoidFuture, T>
   implements CreateType<T> {
   /**
    * Holds the where statement part.
@@ -123,10 +123,10 @@ public class CreateTypeImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+  protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
     // by design, there should only be one table!!!
     return ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
       .map(t -> buildQueryStrings(t))

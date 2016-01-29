@@ -361,30 +361,24 @@ public class BatchImpl
       if (cacheList == null) {
         this.cacheSB = null;
       } else {
-        this.cacheSB = slist.stream()
-          .map(StatementImpl::getQueryString)
-          .filter(s -> s != null)
-          .map(s -> {
-            final StringBuilder sb = new StringBuilder(s);
-            // Use the same test that String#trim() uses to determine
-            // if a character is a whitespace character.
-            int l = sb.length();
+        final List<StringBuilder> builders = new ArrayList<>(slist.size());
 
-            while (l > 0 && sb.charAt(l - 1) <= ' ') {
-              l -= 1;
+        for (final StatementImpl<?, ?, ?> statement: slist) {
+          // recurse into the batch statement in case it is also batching stuff
+          final StringBuilder[] sbs = statement.buildQueryStrings();
+
+          if (sbs != null) {
+            for (final StringBuilder sb: sbs) {
+              if (sb != null) {
+                builders.add(sb);
+              }
             }
-            if (l != sb.length()) {
-              sb.setLength(l);
-            }
-            if (l == 0 || sb.charAt(l - 1) != ';') {
-              sb.append(';');
-            }
-            return sb;
-          })
-          .toArray(StringBuilder[]::new);
+          }
+        }
+        this.cacheSB = builders.toArray(new StringBuilder[builders.size()]);
       }
     }
-    return cacheSB;
+    return ((cacheSB != null) && (cacheSB.length > 0)) ? cacheSB : null;
   }
 
   /**

@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
 import org.helenus.driver.ExcludedSuffixKeyException;
@@ -84,118 +86,6 @@ public class CreateSchemaImpl<T>
   }
 
   /**
-   * Gets all underlying sequenced statements for this create schemas with the
-   * ability to optionally tracked and skipped already created keyspaces and/or
-   * tables.
-   *
-   * @author paouelle
-   *
-   * @param  keyspaces an optional set of keyspaces already created when
-   *         used as part of a create schemas statement or <code>null</code>
-   * @param  tables an optional map of tables already for given keyspaces created
-   *         when used as part of a create schemas statement or <code>null</code>
-   * @param  group a group where to place all insert statements for initial
-   *         objects or <code>null</code> if a separate one should be created
-   *         and returned as part of the list
-   * @return a non-<code>null</code> list of all underlying statements from this
-   *         statement
-   */
-  List<StatementImpl<?, ?, ?>> buildSequencedStatements(
-    Set<Keyspace> keyspaces, Map<Keyspace, Set<Table>> tables, GroupImpl group
-  ) {
-    if (!isEnabled()) {
-      return Collections.emptyList();
-    }
-    // make sure we have a valid keyspace (handling suffix exclusions if any)
-    try {
-      getKeyspace();
-    } catch (ExcludedSuffixKeyException e) { // skip it
-      return Collections.emptyList();
-    }
-    final List<StatementImpl<?, ?, ?>> statements = new ArrayList<>(32);
-    final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
-
-    // start by generating the keyspace
-    // --- do not attempt to create the same keyspace twice when a set of keyspaces
-    // --- is provided in the method calls (used by create schemas)
-    if ((keyspaces == null) || !keyspaces.contains(keyspace)) {
-      final CreateKeyspaceImpl<T> ck = init(new CreateKeyspaceImpl<>(
-        getContext(), mgr, bridge
-      ));
-
-      if (ifNotExists) {
-        ck.ifNotExists();
-      }
-      statements.add(ck);
-      if (keyspaces != null) { // keep track of created keyspaces if requested
-        keyspaces.add(keyspace);
-      }
-    }
-    if (getClassInfo().supportsTablesAndIndexes()) {
-      boolean createTable = true;
-
-      if (tables != null) {
-        createTable = false; // until proven otherwise
-        for (final TableInfoImpl<T> table: getContext().getClassInfo().getTablesImpl()) {
-          Set<Table> stables = tables.get(keyspace);
-
-          if (stables == null) {
-            stables = new HashSet<>(8);
-            tables.put(keyspace,  stables);
-          }
-          if (stables.add(table.getTable())) {
-            createTable = true;
-          }
-        }
-      }
-      if (createTable) {
-        final CreateTableImpl<T> ct = init(new CreateTableImpl<>(getContext(), null, mgr, bridge));
-        final CreateIndexImpl<T> ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
-
-        if (ifNotExists) {
-          ct.ifNotExists();
-          ci.ifNotExists();
-        }
-        statements.add(ct);
-        statements.add(ci);
-      }
-    } else {
-      final CreateTypeImpl<T> ct = init(new CreateTypeImpl<>(getContext(), mgr, bridge));
-
-      if (ifNotExists) {
-        ct.ifNotExists();
-      }
-      statements.add(ct);
-    }
-    // finish with initial objects
-    final Collection<T> objs = getContext().getInitialObjects();
-
-    if (!objs.isEmpty()) {
-      final GroupImpl g;
-
-      if (group != null) {
-        g = group;
-      } else {
-        g = init(new GroupImpl(
-          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
-        ));
-      }
-      for (final T io: objs) {
-        g.add(init(new InsertImpl<>(
-          getContext().getClassInfo().newContext(io),
-          (String[])null,
-          mgr,
-          bridge
-        )));
-      }
-      if (group == null) {
-        statements.add(g);
-      }
-    }
-    return statements;
-  }
-
-  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -228,7 +118,172 @@ public class CreateSchemaImpl<T>
    */
   @Override
   protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
-    return buildSequencedStatements(null, null, null);
+    return buildSequencedStatements(null, null, null, null, null, null);
+  }
+
+  /**
+   * Gets all underlying sequenced statements for this create schemas with the
+   * ability to optionally tracked and skipped already created keyspaces and/or
+   * tables.
+   *
+   * @author paouelle
+   *
+   * @param  keyspaces an optional set of keyspaces already created when
+   *         used as part of a create schemas statement or <code>null</code>
+   * @param  tables an optional map of tables already for given keyspaces created
+   *         when used as part of a create schemas statement or <code>null</code>
+   * @param  tgroup a group where to place all create table statements
+   *         recursively expanded or <code>null</code> if a separate
+   *         one should be created and returned as part of the list
+   * @param  igroup a group where to place all create index statements
+   *         recursively expanded or <code>null</code> if a separate
+   *         one should be created and returned as part of the list
+   * @param  ygroup a group where to place all create type statements
+   *         recursively expanded or <code>null</code> if a separate
+   *         one should be created and returned as part of the list
+   * @param  group a group where to place all insert statements for initial
+   *         objects or <code>null</code> if a separate one should be created
+   *         and returned as part of the list
+   * @return a non-<code>null</code> list of all underlying statements from this
+   *         statement
+   */
+  public List<StatementImpl<?, ?, ?>> buildSequencedStatements(
+    Set<Pair<String, Keyspace>> keyspaces,
+    Map<Pair<String, Keyspace>, Set<Table>> tables,
+    GroupImpl tgroup,
+    GroupImpl igroup,
+    GroupImpl ygroup,
+    GroupImpl group
+  ) {
+    if (!isEnabled()) {
+      return Collections.emptyList();
+    }
+    // make sure we have a valid keyspace (handling suffix exclusions if any)
+    final String ks;
+
+    try {
+      ks = getKeyspace();
+    } catch (ExcludedSuffixKeyException e) { // skip it
+      return Collections.emptyList();
+    }
+    final List<StatementImpl<?, ?, ?>> statements = new ArrayList<>(32);
+    final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
+    final Pair<String, Keyspace> pk = Pair.of(ks, keyspace);
+
+    // start by generating the keyspace
+    // --- do not attempt to create the same keyspace twice when a set of keyspaces
+    // --- is provided in the method calls (used by create schemas)
+    if ((keyspaces == null) || !keyspaces.contains(pk)) {
+      final CreateKeyspaceImpl<T> ck = init(new CreateKeyspaceImpl<>(
+        getContext(), mgr, bridge
+      ));
+
+      if (ifNotExists) {
+        ck.ifNotExists();
+      }
+      statements.add(ck);
+      if (keyspaces != null) { // keep track of created keyspaces if requested
+        keyspaces.add(pk);
+      }
+    }
+    if (getClassInfo().supportsTablesAndIndexes()) {
+      boolean createTable = true;
+
+      if (tables != null) {
+        createTable = false; // until proven otherwise
+        for (final TableInfoImpl<T> table: getContext().getClassInfo().getTablesImpl()) {
+          Set<Table> stables = tables.get(pk);
+
+          if (stables == null) {
+            stables = new HashSet<>(8);
+            tables.put(pk, stables);
+          }
+          if (stables.add(table.getTable())) {
+            createTable = true;
+          }
+        }
+      }
+      if (createTable) {
+        final CreateTableImpl<T> ct = init(new CreateTableImpl<>(getContext(), null, mgr, bridge));
+        final CreateIndexImpl<T> ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
+
+        if (ifNotExists) {
+          ct.ifNotExists();
+          ci.ifNotExists();
+        }
+        final GroupImpl tg;
+
+        if (tgroup != null) {
+          tg = tgroup;
+        } else {
+          tg = init(new GroupImpl(
+            Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+          ));
+        }
+        ct.buildGroupedStatements().forEach(s -> tg.addInternal(s));
+        if ((tgroup == null) && !tg.isEmpty()) {
+          statements.add(tg);
+        }
+        final GroupImpl ig;
+
+        if (igroup != null) {
+          ig = igroup;
+        } else {
+          ig = init(new GroupImpl(
+            Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+          ));
+        }
+        ci.buildGroupedStatements().forEach(s -> ig.addInternal(s));
+        if ((igroup == null) && !ig.isEmpty()) {
+          statements.add(ig);
+        }
+      }
+    } else {
+      final CreateTypeImpl<T> ct = init(new CreateTypeImpl<>(getContext(), mgr, bridge));
+
+      if (ifNotExists) {
+        ct.ifNotExists();
+      }
+      final GroupImpl yg;
+
+      if (ygroup != null) {
+        yg = ygroup;
+      } else {
+        yg = init(new GroupImpl(
+          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+        ));
+      }
+      ct.buildGroupedStatements().forEach(s -> yg.addInternal(s));
+      if ((ygroup == null) && !yg.isEmpty()) {
+        statements.add(yg);
+      }
+    }
+    // finish with initial objects
+    final Collection<T> objs = getContext().getInitialObjects();
+
+    if (!objs.isEmpty()) {
+      final GroupImpl g;
+
+      if (group != null) {
+        g = group;
+      } else {
+        g = init(new GroupImpl(
+          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+        ));
+      }
+      for (final T io: objs) {
+        g.add(init(new InsertImpl<>(
+          getContext().getClassInfo().newContext(io),
+          (String[])null,
+          mgr,
+          bridge
+        )));
+      }
+      if ((group == null) && !g.isEmpty()) {
+        statements.add(g);
+      }
+    }
+    return statements;
   }
 
   /**

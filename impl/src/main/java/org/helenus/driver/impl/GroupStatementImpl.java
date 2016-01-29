@@ -19,21 +19,22 @@ import java.util.Collections;
 import java.util.List;
 
 import com.datastax.driver.core.EmptyResultSetFuture;
-import com.datastax.driver.core.LastResultSequentialSetFuture;
+import com.datastax.driver.core.LastResultParallelSetFuture;
+import com.datastax.driver.core.MetadataBridge;
 import com.datastax.driver.core.ResultSetFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.driver.StatementBridge;
 
 /**
- * The <code>SequenceStatementImpl</code> abstract class extends the {@link StatementImpl}
- * class to provide support for a statement that represents a sequence (not a
- * batch) of statements that must be executed one after the other.
+ * The <code>GroupStatementImpl</code> abstract class extends the {@link StatementImpl}
+ * class to provide support for a statement that represents a group (not a
+ * batch) of statements that can be executed in parallel.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 19, 2015 - paouelle - Creation
+ * @version 1 - Jan 28, 2016 - paouelle - Creation
  *
  * @param <R> The type of result returned when executing this statement
  * @param <F> The type of future result returned when executing this statement
@@ -41,24 +42,37 @@ import org.helenus.driver.StatementBridge;
  *
  * @since 1.0
  */
-public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
+public abstract class GroupStatementImpl<R, F extends ListenableFuture<R>, T>
   extends StatementImpl<R, F, T> {
   /**
-   * Holds the cached sequenced statements.
+   * Holds the number of simultaneous statements to send to the Cassandra cluster
+   * at the same time before starting to wait for all responses before proceeding
+   * to the next set (assuming a sequence is not reached before that).
+   * <p>
+   * By default, the parallel factor will be based on the number of nodes in the
+   * Cassandra cluster multiplied by 32 (default number of threads in the write
+   * pool of a Cassandra node).
+   *
+   * @author paouelle
+   */
+  private int parallelFactor;
+
+  /**
+   * Holds the cached grouped statements.
    *
    * @author paouelle
    */
   private volatile List<StatementImpl<?, ?, ?>> cacheList = null;
 
   /**
-   * Holds the cached query strings for the sequenced statements.
+   * Holds the cached query strings for the grouped statements.
    *
    * @author paouelle
    */
   private volatile StringBuilder[] cacheSB = null;
 
   /**
-   * Instantiates a new <code>SequenceStatementImpl</code> object.
+   * Instantiates a new <code>GroupStatementImpl</code> object.
    *
    * @author paouelle
    *
@@ -71,17 +85,18 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
    * @throws NullPointerException if <code>resultClass</code> is <code>null</code>
    * @throws IllegalArgumentException if the result class is not a supported one
    */
-  protected SequenceStatementImpl(
+  protected GroupStatementImpl(
     Class<R> resultClass,
     ClassInfoImpl<T>.Context context,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
     super(resultClass, context, mgr, bridge);
+    initParallelFactor();
   }
 
   /**
-   * Instantiates a new <code>SequenceStatementImpl</code> object.
+   * Instantiates a new <code>GroupStatementImpl</code> object.
    *
    * @author paouelle
    *
@@ -92,31 +107,48 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
    * @throws NullPointerException if <code>resultClass</code> is <code>null</code>
    * @throws IllegalArgumentException if the result class is not a supported one
    */
-  protected SequenceStatementImpl(
+  protected GroupStatementImpl(
     Class<R> resultClass,
     String keyspace,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
     super(resultClass, keyspace, mgr, bridge);
+    initParallelFactor();
   }
 
   /**
-   * Instantiates a new <code>SequenceStatementImpl</code> object.
+   * Instantiates a new <code>GroupStatementImpl</code> object.
    *
    * @author paouelle
    *
-   * @param sequence the non-<code>null</code> statement being copied or
+   * @param group the non-<code>null</code> statement being copied or
    *        wrapped
    */
-  protected SequenceStatementImpl(SequenceStatementImpl<R, F, T> sequence) {
-    super(sequence);
-    this.cacheList = sequence.cacheList;
-    this.cacheSB = sequence.cacheSB;
+  protected GroupStatementImpl(GroupStatementImpl<R, F, T> group) {
+    super(group);
+    this.cacheList = group.cacheList;
+    this.cacheSB = group.cacheSB;
+    this.parallelFactor = group.parallelFactor;
   }
 
   /**
-   * Gets all underlying sequenced statements recursively in the proper order
+   * Initializes the parallel factor to its default value.
+   *
+   * @author paouelle
+   */
+  private void initParallelFactor() {
+    try {
+      this.parallelFactor = (
+        Math.max(1, MetadataBridge.getNumHosts(mgr.getCluster().getMetadata())) * 32
+      );
+    } catch (Exception e) { // defaults to 32 if we cannot get  the info from the cluster
+      this.parallelFactor = 32;
+    }
+  }
+
+  /**
+   * Gets all underlying grouped statements recursively in the proper order
    * for this statement.
    *
    * @author paouelle
@@ -124,7 +156,7 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
    * @return a non-<code>null</code> list of all underlying statements from this
    *         statement
    */
-  protected abstract List<StatementImpl<?, ?, ?>> buildSequencedStatements();
+  protected abstract List<StatementImpl<?, ?, ?>> buildGroupedStatements();
 
   /**
    * {@inheritDoc}
@@ -135,7 +167,7 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
    */
   @Override
   protected void appendGroupType(StringBuilder builder) {
-    builder.append("SEQUENCE");
+    builder.append("GROUP");
   }
 
   /**
@@ -152,7 +184,7 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
       this.cacheSB = null;
       super.simpleSize = 0;
     } else if (isDirty() || (cacheList == null)) {
-      this.cacheList = buildSequencedStatements();
+      this.cacheList = buildGroupedStatements();
       this.cacheSB = null;
       super.simpleSize = cacheList.stream()
         .mapToInt(StatementImpl::simpleSize)
@@ -256,12 +288,55 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
       } else if (slist.size() == 1) { // only one so execute it directly
         return mgr.sent(this, slist.get(0).executeAsyncRaw());
       }
-      return mgr.sent(this, new LastResultSequentialSetFuture(slist, mgr));
+      return mgr.sent(this, new LastResultParallelSetFuture(this, slist, mgr));
     } finally {
       // let's recursively clear the query string that gets cache to reduce
       // the memory impact chance are now that it got executed, it won't be
       // needed anymore
       setDirty(true);
     }
+  }
+
+  /**
+   * Gets the number of simultaneous statements to send to the Cassandra cluster
+   * at the same time before starting to wait for all responses before proceeding
+   * to the next set (assuming a sequence is not reached before that).
+   * <p>
+   * By default, the parallel factor will be based on the number of nodes in the
+   * Cassandra cluster multiplied by 32 (default number of threads in the write
+   * pool of a Cassandra node).
+   *
+   * @author paouelle
+   *
+   * @return the parallel factor to use when sending simultaneous statements
+   */
+  public int getParallelFactor() {
+    return parallelFactor;
+  }
+
+  /**
+   * Sets the number of simultaneous statements to send to the Cassandra cluster
+   * at the same time before starting to wait for all responses before proceeding
+   * to the next set (assuming a sequence is not reached before that).
+   * <p>
+   * By default, the parallel factor will be based on the number of nodes in the
+   * Cassandra cluster multiplied by 32 (default number of threads in the write
+   * pool of a Cassandra node).
+   *
+   * @author paouelle
+   *
+   * @param <H> the type of "this" to be returned
+   *
+   * @param  factor the new parallel factor to use when sending simultaneous
+   *         statements
+   * @return this group statement
+   */
+  @SuppressWarnings("unchecked")
+  public <H> H setParallelFactor(int factor) {
+    if (factor != this.parallelFactor) {
+      this.parallelFactor = Math.max(32, factor);
+      setDirty();
+    }
+    return (H)this;
   }
 }

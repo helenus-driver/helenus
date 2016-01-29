@@ -22,12 +22,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -74,6 +74,7 @@ import org.helenus.driver.RegularStatement;
 import org.helenus.driver.Select;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.SequenceableStatement;
+import org.helenus.driver.Statement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.StatementManager;
 import org.helenus.driver.Truncate;
@@ -154,7 +155,8 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author vasu
    */
-  protected final Map<Class<?>, ClassInfoImpl<?>> classInfoCache = new LinkedHashMap<>(64);
+  protected final Map<Class<?>, ClassInfoImpl<?>> classInfoCache
+    = new ConcurrentHashMap<>(64);
 
   /**
    * Holds the registered filters to be used when introspecting entities.
@@ -188,7 +190,15 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    */
-  private boolean fullTraces = false;
+  private volatile boolean fullTraces = false;
+
+  /**
+   * Holds a flag indicating if all statements should be traced regardless of
+   * the statement tracing setting (see {@link Statement#isTracing}).
+   *
+   * @author paouelle
+   */
+  private volatile boolean allStatementTraces = false;
 
   /**
    * Instantiates a new <code>StatementManagerImpl</code> object.
@@ -1753,6 +1763,25 @@ public class StatementManagerImpl extends StatementManager {
   }
 
   /**
+   * Caches the specified class info unless one is already present in the cache.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the non-<code>null</code> class info to cache
+   * @return an already cached version of the class info or <code>cinfo</code>
+   *         if none were cached already
+   */
+  protected <T> ClassInfoImpl<T> cacheClassInfoIfAbsent(ClassInfoImpl<T> cinfo) {
+    @SuppressWarnings("unchecked")
+    final ClassInfoImpl<T> old = (ClassInfoImpl<T>)classInfoCache.putIfAbsent(
+      cinfo.getObjectClass(), cinfo
+    );
+
+    // if someone beat us to it then keep that first one
+    return (old != null) ? old : cinfo;
+  }
+
+  /**
    * Connects to Cassandra if not already connected.
    *
    * @author paouelle
@@ -1794,9 +1823,7 @@ public class StatementManagerImpl extends StatementManager {
    * @return a stream of all cached class info structures
    */
   public Stream<ClassInfoImpl<?>> classInfoImpls() {
-    synchronized (classInfoCache) {
-      return classInfoCache.values().stream();
-    }
+    return classInfoCache.values().stream();
   }
 
   /**
@@ -1812,9 +1839,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @SuppressWarnings("unchecked")
   public <T> ClassInfoImpl<T> findClassInfoImpl(Class<T> clazz) {
-    synchronized (classInfoCache) {
-      return (ClassInfoImpl<T>)classInfoCache.get(clazz);
-    }
+    return (ClassInfoImpl<T>)classInfoCache.get(clazz);
   }
 
   /**
@@ -1833,66 +1858,64 @@ public class StatementManagerImpl extends StatementManager {
    */
   @SuppressWarnings("unchecked")
   public <T> ClassInfoImpl<T> getClassInfoImpl(Class<T> clazz) {
-    synchronized (classInfoCache) {
-      ClassInfoImpl<T> classInfo = (ClassInfoImpl<T>)classInfoCache.get(clazz);
+    ClassInfoImpl<T> classInfo = (ClassInfoImpl<T>)classInfoCache.get(clazz);
 
-      if (classInfo == null) {
-        final Class<? super T> rclazz
-          = ReflectionUtils.findFirstClassAnnotatedWith(clazz, RootEntity.class);
+    if (classInfo == null) {
+      final Class<? super T> rclazz
+        = ReflectionUtils.findFirstClassAnnotatedWith(clazz, RootEntity.class);
 
-        if (rclazz != null) {
+      if (rclazz != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !clazz.isAnnotationPresent(Entity.class),
+          "class '%s' cannot be annotated with both @RootEntity and @Entity",
+          clazz.getSimpleName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !clazz.isAnnotationPresent(UDTEntity.class),
+          "class '%s' cannot be annotated with both @RootEntity and @UDTEntity",
+          clazz.getSimpleName()
+        );
+        if (rclazz == clazz) { // this is the root element class
           org.apache.commons.lang3.Validate.isTrue(
-            !clazz.isAnnotationPresent(Entity.class),
-            "class '%s' cannot be annotated with both @RootEntity and @Entity",
+            !clazz.isAnnotationPresent(TypeEntity.class),
+            "class '%s' cannot be annotated with both @RootEntity and @TypeEntity",
             clazz.getSimpleName()
           );
-          org.apache.commons.lang3.Validate.isTrue(
-            !clazz.isAnnotationPresent(UDTEntity.class),
-            "class '%s' cannot be annotated with both @RootEntity and @UDTEntity",
-            clazz.getSimpleName()
-          );
-          if (rclazz == clazz) { // this is the root element class
-            org.apache.commons.lang3.Validate.isTrue(
-              !clazz.isAnnotationPresent(TypeEntity.class),
-              "class '%s' cannot be annotated with both @RootEntity and @TypeEntity",
-              clazz.getSimpleName()
-            );
-            classInfo = new RootClassInfoImpl<>(this, clazz);
-          } else {
-            if (clazz.isAnnotationPresent(TypeEntity.class)) {
-              // for types, we get it from the root
-              final RootClassInfoImpl<? super T> rcinfo
-                = (RootClassInfoImpl<? super T>)getClassInfoImpl(rclazz);
-
-              classInfo = rcinfo.getType(clazz);
-              if (classInfo == null) { // was not listed in @RootEntity annotation
-                // so attempt to load it by itself
-                classInfo = (ClassInfoImpl<T>)rcinfo.addType(this, clazz);
-              }
-            } else {
-              throw new IllegalArgumentException(
-                "class '" + clazz.getSimpleName() + "' is not annotated with @TypeEntity"
-              );
-            }
-          }
-        } else if (clazz.isAnnotationPresent(UDTEntity.class)) {
-          org.apache.commons.lang3.Validate.isTrue(
-            !clazz.isAnnotationPresent(Entity.class),
-            "class '%s' cannot be annotated with both @UDTEntity and @Entity",
-            clazz.getSimpleName()
-          );
-          classInfo = new UDTClassInfoImpl<>(this, clazz);
-        } else if (clazz.isAnnotationPresent(Entity.class)) {
-          classInfo = new ClassInfoImpl<>(this, clazz);
+          classInfo = new RootClassInfoImpl<>(this, clazz);
         } else {
-          throw new IllegalArgumentException(
-            "class '" + clazz.getSimpleName() + "' is not annotated with @Entity"
-          );
+          if (clazz.isAnnotationPresent(TypeEntity.class)) {
+            // for types, we get it from the root
+            final RootClassInfoImpl<? super T> rcinfo
+              = (RootClassInfoImpl<? super T>)getClassInfoImpl(rclazz);
+
+            classInfo = rcinfo.getType(clazz);
+            if (classInfo == null) { // was not listed in @RootEntity annotation
+              // so attempt to load it by itself
+              classInfo = (ClassInfoImpl<T>)rcinfo.addType(this, clazz);
+            }
+          } else {
+            throw new IllegalArgumentException(
+              "class '" + clazz.getSimpleName() + "' is not annotated with @TypeEntity"
+            );
+          }
         }
-        classInfoCache.put(clazz, classInfo);
+      } else if (clazz.isAnnotationPresent(UDTEntity.class)) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !clazz.isAnnotationPresent(Entity.class),
+          "class '%s' cannot be annotated with both @UDTEntity and @Entity",
+          clazz.getSimpleName()
+        );
+        classInfo = new UDTClassInfoImpl<>(this, clazz);
+      } else if (clazz.isAnnotationPresent(Entity.class)) {
+        classInfo = new ClassInfoImpl<>(this, clazz);
+      } else {
+        throw new IllegalArgumentException(
+          "class '" + clazz.getSimpleName() + "' is not annotated with @Entity"
+        );
       }
-      return classInfo;
+      classInfo = cacheClassInfoIfAbsent(classInfo);
     }
+    return classInfo;
   }
 
   /**
@@ -2047,6 +2070,39 @@ public class StatementManagerImpl extends StatementManager {
    */
   public void disableFullTraces() {
     this.fullTraces = false;
+  }
+
+  /**
+   * Checks if all statements should be traced regardless of the statement tracing
+   * setting (see {@link Statement#isTracing}).
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if all statements should be traced;
+   *         <code>false</code> to trace them only if requested
+   */
+  public boolean areAllStatementsTracesEnabled() {
+    return allStatementTraces;
+  }
+
+  /**
+   * Enables all statements to be traced regardless of the statement tracing
+   * setting (see {@link Statement#isTracing}).
+   *
+   * @author paouelle
+   */
+  public void enableAllStatementsTraces() {
+    this.allStatementTraces = true;
+  }
+
+  /**
+   * Disables all statements to be traced automatically regardless of the
+   * statement tracing setting (see {@link Statement#isTracing}).
+   *
+   * @author paouelle
+   */
+  public void disableAllStatementsTraces() {
+    this.allStatementTraces = false;
   }
 
   /**
