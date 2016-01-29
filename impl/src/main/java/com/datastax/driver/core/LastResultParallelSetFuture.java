@@ -238,7 +238,7 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
    *         <code>null</code>
    */
   public LastResultParallelSetFuture(
-    GroupStatementImpl group,
+    GroupStatementImpl<?, ?, ?> group,
     List<StatementImpl<?, ?, ?>> statements,
     StatementManagerImpl mgr
   ) {
