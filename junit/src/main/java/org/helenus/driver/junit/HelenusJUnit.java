@@ -1161,7 +1161,7 @@ public class HelenusJUnit implements MethodRule {
    */
   static <T> ClassInfoImpl<T> createSchema0(ClassInfoImpl<T> cinfo) {
     org.apache.commons.lang3.Validate.notNull(cinfo, "invalid null class info");
-    final Class<?> clazz = cinfo.getObjectClass();
+    final Class<T> clazz = cinfo.getObjectClass();
     // check whether the schema for this pojo has already been loaded
     final SchemaFuture result = new SchemaFuture(true, clazz);
     final SchemaFuture future = HelenusJUnit.schemas.putIfAbsent(cinfo.getObjectClass(), result);
@@ -1276,16 +1276,12 @@ public class HelenusJUnit implements MethodRule {
       // make sure to remove cached schema indicator
       HelenusJUnit.schemas.remove(clazz);
       HelenusJUnit.initials.remove(clazz);
-      result.failed(e); // failed creating the schema
-      throw e;
+      throw result.failed(e); // failed creating the schema
     } catch (Throwable t) {
       // make sure to remove cached schema indicator
       HelenusJUnit.schemas.remove(clazz);
       HelenusJUnit.initials.remove(clazz);
-      result.failed(t); // failed creating the schema
-      throw new AssertionError(
-        "failed to create schema for " + clazz.getSimpleName(), t
-      );
+      throw result.failed(t); // failed creating the schema
     } finally {
       HelenusJUnit.capturing.decrementAndGet(); // restore previous capturing setting
     }
@@ -1301,14 +1297,18 @@ public class HelenusJUnit implements MethodRule {
    * @param  cinfo the class info to reset the schema
    * @param  result the result where to record the completion or <code>null</code>
    *         to check if it is in progress and update our own result
+   * @throws NullPointerException if <code>cinfo</code> is <code>null</code>
    * @throws AssertionError if a failure occurs while reseting the schema
    */
   @SuppressWarnings("unchecked")
   static <T> void resetSchema0(
     ClassInfoImpl<T> cinfo, SchemaFuture result
   ) {
+    org.apache.commons.lang3.Validate.notNull(cinfo, "invalid null class info");
+    final Class<T> clazz = cinfo.getObjectClass();
+
     if (result == null) {
-      final SchemaFuture myresult = new SchemaFuture(false, cinfo.getObjectClass());
+      final SchemaFuture myresult = new SchemaFuture(false, clazz);
       final SchemaFuture future = HelenusJUnit.schemas.putIfAbsent(
         cinfo.getObjectClass(), myresult
       );
@@ -1317,12 +1317,12 @@ public class HelenusJUnit implements MethodRule {
         future.waitForCompletion();
         return; // done
       } // else - we are in charge of resetting the schema!!!
-      logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
+      logger.debug("Resetting schema for %s", clazz.getSimpleName());
       result = myresult; // continue with our results
     } // else - we are in charge of resetting the schema!!!
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
-      final MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(cinfo.getObjectClass());
+      final MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(clazz);
       final Group group;
 
       if (p.getRight() != null) {
@@ -1340,11 +1340,11 @@ public class HelenusJUnit implements MethodRule {
       result.completed(); // done with resetting the schema
     } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
       // make sure to remove cached schema indicator
-      HelenusJUnit.schemas.remove(cinfo.getObjectClass());
+      HelenusJUnit.schemas.remove(clazz);
       throw result.failed(e); // failed resetting the schema
     } catch (Throwable t) {
       // make sure to remove cached schema indicator
-      HelenusJUnit.schemas.remove(cinfo.getObjectClass());
+      HelenusJUnit.schemas.remove(clazz);
       throw result.failed(t); // failed resetting the schema
     } finally {
       HelenusJUnit.capturing.decrementAndGet(); // restore previous capturing setting
