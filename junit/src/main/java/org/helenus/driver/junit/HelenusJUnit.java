@@ -68,10 +68,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.WriteType;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.policies.LoggingRetryPolicy;
+import com.datastax.driver.core.policies.RetryPolicy;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.commitlog.CommitLog;
@@ -239,6 +243,24 @@ public class HelenusJUnit implements MethodRule {
   private static StatementManagerUnitImpl manager = null;
 
   /**
+   * Holds the number of times to retry a read operation that timed out.
+   * <p>
+   * <i>Note:</i> Defaults to none.
+   *
+   * @author paouelle
+   */
+  static volatile int numReadRetries = 0;
+
+  /**
+   * Holds the number of times to retry a write operation that timed out.
+   * <p>
+   * <i>Note:</i> Defaults to none.
+   *
+   * @author paouelle
+   */
+  static volatile int numWriteRetries = 0;
+
+  /**
    * Holds a flag to control whether to trace the full statement or part of it
    * when it exceeds 2K in size.
    *
@@ -274,11 +296,12 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Hold a set of pojo class for which we have loaded the schema definition
    * onto the embedded cassandra database along with the complete set of initial
-   * objects to re-insert when resetting the schema.
+   * objects to re-insert when resetting the schema. The value corresponds to a
+   * future's representation of the schema creation for the corresponding class.
    *
    * @author paouelle
    */
-  static final Set<Class<?>> schemas = ConcurrentHashMap.newKeySet();
+  static final Map<Class<?>, SchemaFuture> schemas = new ConcurrentHashMap<>();
 
   /**
    * Hold the complete set of initial objects to re-insert when resetting the
@@ -863,6 +886,46 @@ public class HelenusJUnit implements MethodRule {
           Cluster
             .builder()
             .withPort(port)
+            .withRetryPolicy(new LoggingRetryPolicy(new RetryPolicy() {
+              @Override
+              public RetryDecision onReadTimeout(
+                com.datastax.driver.core.Statement statement,
+                ConsistencyLevel cl,
+                int requiredResponses,
+                int receivedResponses,
+                boolean dataRetrieved,
+                int nbRetry
+              ) {
+                if (nbRetry < HelenusJUnit.numReadRetries) {
+                  return RetryDecision.rethrow();
+                }
+                return RetryDecision.retry(cl);
+              }
+              @Override
+              public RetryDecision onWriteTimeout(
+                com.datastax.driver.core.Statement statement,
+                ConsistencyLevel cl,
+                WriteType writeType,
+                int requiredAcks,
+                int receivedAcks,
+                int nbRetry
+              ) {
+                if (nbRetry < HelenusJUnit.numWriteRetries) {
+                  return RetryDecision.rethrow();
+                }
+                return RetryDecision.retry(cl);
+              }
+              @Override
+              public RetryDecision onUnavailable(
+                com.datastax.driver.core.Statement statement,
+                ConsistencyLevel cl,
+                int requiredReplica,
+                int aliveReplica,
+                int nbRetry
+              ) {
+                return RetryDecision.rethrow();
+              }
+            }))
             .addContactPoint(host)
             .withQueryOptions(null)
         );
@@ -1090,19 +1153,24 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    *
-   * @param  clazz the pojo class for which to create the schema
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @param  <T> the class of POJO to have the schema created
+   * @param  cinfo the class info already defined by the manager
+   * @return <code>cinfo</code>
+   * @throws NullPointerException if <code>cinfo</code> is <code>null</code>
    * @throws AssertionError if a failure occurs while creating the schema
    */
-  static void createSchema0(Class<?> clazz) {
-    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+  static <T> ClassInfoImpl<T> createSchema0(ClassInfoImpl<T> cinfo) {
+    org.apache.commons.lang3.Validate.notNull(cinfo, "invalid null class info");
+    final Class<?> clazz = cinfo.getObjectClass();
     // check whether the schema for this pojo has already been loaded
-    if (!HelenusJUnit.schemas.add(clazz)) {
-      return; // nothing to do more
-    }
-    try {
-      final ClassInfoImpl<?> cinfo = manager.getClassInfoImpl(clazz);
+    final SchemaFuture result = new SchemaFuture(true, clazz);
+    final SchemaFuture future = HelenusJUnit.schemas.putIfAbsent(cinfo.getObjectClass(), result);
 
+    if (future != null) { // another thread is creating this schema so wait for it to complete
+      future.waitForCompletion();
+      return cinfo; // done
+    } // else - we are in charge of creating the schema!!!
+    try {
       logger.debug("Creating schema for %s", clazz.getSimpleName());
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
       // find all suffixes that are defined for this classes
@@ -1186,7 +1254,7 @@ public class HelenusJUnit implements MethodRule {
         // by the root, we only need to insert initial objects now that we have
         // cached the set of initial objects, reset the schema to get them
         // inserted which is done for Type POJOs only
-        resetSchema0(cinfo, false);
+        resetSchema0(cinfo, result);
       } else {
         if (!ygroup.isEmpty()) {
           sequence.add(ygroup);
@@ -1202,15 +1270,19 @@ public class HelenusJUnit implements MethodRule {
         }
         sequence.execute();
       }
+      result.completed(); // done with creating the schema
+      return cinfo;
     } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
       // make sure to remove cached schema indicator
       HelenusJUnit.schemas.remove(clazz);
       HelenusJUnit.initials.remove(clazz);
+      result.failed(e); // failed creating the schema
       throw e;
     } catch (Throwable t) {
       // make sure to remove cached schema indicator
       HelenusJUnit.schemas.remove(clazz);
       HelenusJUnit.initials.remove(clazz);
+      result.failed(t); // failed creating the schema
       throw new AssertionError(
         "failed to create schema for " + clazz.getSimpleName(), t
       );
@@ -1227,15 +1299,27 @@ public class HelenusJUnit implements MethodRule {
    * @param <T> the type of pojo being reset
    *
    * @param  cinfo the class info to reset the schema
-   * @param  trace <code>true</code> to trace the reset
+   * @param  result the result where to record the completion or <code>null</code>
+   *         to check if it is in progress and update our own result
    * @throws AssertionError if a failure occurs while reseting the schema
    */
   @SuppressWarnings("unchecked")
-  static <T> void resetSchema0(ClassInfoImpl<T> cinfo, boolean trace) {
-    HelenusJUnit.schemas.add(cinfo.getObjectClass());
-    if (trace) {
+  static <T> void resetSchema0(
+    ClassInfoImpl<T> cinfo, SchemaFuture result
+  ) {
+    if (result == null) {
+      final SchemaFuture myresult = new SchemaFuture(false, cinfo.getObjectClass());
+      final SchemaFuture future = HelenusJUnit.schemas.putIfAbsent(
+        cinfo.getObjectClass(), myresult
+      );
+
+      if (future != null) { // another thread is resetting this schema so wait for it to complete
+        future.waitForCompletion();
+        return; // done
+      } // else - we are in charge of resetting the schema!!!
       logger.debug("Resetting schema for %s", cinfo.getObjectClass().getSimpleName());
-    }
+      result = myresult; // continue with our results
+    } // else - we are in charge of resetting the schema!!!
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
       final MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(cinfo.getObjectClass());
@@ -1253,18 +1337,15 @@ public class HelenusJUnit implements MethodRule {
         p.setRight(group); // cache the group for next time
       }
       group.execute();
+      result.completed(); // done with resetting the schema
     } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
       // make sure to remove cached schema indicator
       HelenusJUnit.schemas.remove(cinfo.getObjectClass());
-      throw e;
+      throw result.failed(e); // failed resetting the schema
     } catch (Throwable t) {
       // make sure to remove cached schema indicator
       HelenusJUnit.schemas.remove(cinfo.getObjectClass());
-      throw new AssertionError(
-        "failed to reset schema for "
-        + cinfo.getObjectClass().getSimpleName(),
-        t
-      );
+      throw result.failed(t); // failed resetting the schema
     } finally {
       HelenusJUnit.capturing.decrementAndGet(); // restore previous capturing setting
     }
@@ -1457,6 +1538,47 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
+   * Sets the number of times to retry a read or write operation that timed out.
+   * <p>
+   * <i>Note:</i> Defaults to none.
+   *
+   * @author paouelle
+   *
+   * @param retries the number of times to retry a read or write operation that
+   *        timed out
+   */
+  public void setNumberRetries(int retries) {
+    HelenusJUnit.numReadRetries = retries;
+    HelenusJUnit.numWriteRetries = retries;
+  }
+
+  /**
+   * Sets the number of times to retry a read operation that timed out.
+   * <p>
+   * <i>Note:</i> Defaults to none.
+   *
+   * @author paouelle
+   *
+   * @param retries the number of times to retry a read operation that timed out
+   */
+  public void setNumberReadRetries(int retries) {
+    HelenusJUnit.numReadRetries = retries;
+  }
+
+  /**
+   * Sets the number of times to retry a write operation that timed out.
+   * <p>
+   * <i>Note:</i> Defaults to none.
+   *
+   * @author paouelle
+   *
+   * @param retries the number of times to retry a write operation that timed out
+   */
+  public void setNumberWriteRetries(int retries) {
+    HelenusJUnit.numWriteRetries = retries;
+  }
+
+  /**
    * Enables internal CQL statements tracing.
    *
    * @author paouelle
@@ -1574,7 +1696,7 @@ public class HelenusJUnit implements MethodRule {
    * @throws AssertionError if a failure occurs while creating the schema
    */
   public HelenusJUnit createSchema(Class<?> clazz) {
-    HelenusJUnit.createSchema0(clazz);
+    HelenusJUnit.manager.getClassInfoImpl(clazz);
     return this;
   }
 
@@ -2682,10 +2804,10 @@ public class HelenusJUnit implements MethodRule {
           // force root to be re-cached first
           getClassInfoImpl(((TypeClassInfoImpl<T>)cinfo).getRoot().getObjectClass());
         }
-        super.cacheClassInfoIfAbsent(cinfo);
         // first truncate all loaded pojo tables and re-insert any schema defined
         // initial objects
-        HelenusJUnit.resetSchema0(cinfo, true);
+        HelenusJUnit.resetSchema0(cinfo, null);
+        super.cacheClassInfoIfAbsent(cinfo);
         return cinfo;
       } // else - check if it is already cached
       cinfo = (ClassInfoImpl<T>)super.classInfoCache.get(clazz);
@@ -2698,11 +2820,165 @@ public class HelenusJUnit implements MethodRule {
       // if we get here then the cinfo was not loaded in previous tests
       // go to the super's implementation which will take care of calling back
       // this method for the root if this is for a type entity
-      final ClassInfoImpl<T> classInfo = super.getClassInfoImpl(clazz); // force generation of the class info
-
       // load the schemas for the pojo if required
-      HelenusJUnit.createSchema0(clazz);
-      return classInfo;
+      return HelenusJUnit.createSchema0(
+        super.getClassInfoImpl(clazz) // force generation of the class info if needed
+      );
     }
+  }
+}
+
+/**
+ * The <code>SchemaFuture</code> class defines a specific future used when
+ * creating or resetting schemas. It is reentrant from the owner's thread.
+ *
+  * @copyright 2016-2016 The Helenus Driver Project Authors
+ *
+ * @author  The Helenus Driver Project Authors
+ * @version 1 - Feb 1, 2016 - paouelle - Creation
+ *
+ * @since 1.0
+ */
+class SchemaFuture {
+  /**
+   * Holds the the reference to the thread that owns this future.
+   *
+   * @author paouelle
+   */
+  private final Thread owner;
+
+  /**
+   * Holds a flag indicating if we are creating or reseting the schema.
+   *
+   * @author paouelle
+   */
+  private final boolean creating;
+
+  /**
+   * Holds the class of the POJO we are creating or reseting the schema for.
+   *
+   * @author paouelle
+   */
+  private final Class<?> clazz;
+
+  /**
+   * Holds a flag indicating if the schema was created or reseted.
+   *
+   * @author paouelle
+   */
+  private volatile boolean done = false;
+
+  /**
+   * Holds the error that occurred if the schema creation/reset failed.
+   *
+   * @author paouelle
+   */
+  private Throwable error = null;
+
+  /**
+   * Instantiates a new <code>SchemaFuture</code> object.
+   *
+   * @author paouelle
+   *
+   * @param creating <code>true</code> if we are creating the schema;
+   *        <code>false</code> if we are reseting it
+   * @param clazz the non-<code>null</code> POJO class we are creating or
+   *        reseting the schema for
+   */
+  SchemaFuture(boolean creating, Class<?> clazz) {
+    this.owner = Thread.currentThread();
+    this.creating = creating;
+    this.clazz = clazz;
+  }
+
+  /**
+   * Waits for the completion of this task.
+   * <p>
+   * <i>Note:</i> This method will return right away before the completion of
+   * the schema creation/reset if the current thread is the owner of this future.
+   * This allows recursive calls to succeed knowing the schema will be properly
+   * created/reset upon finishing the recursion.
+   *
+   * @author paouelle
+   *
+   * @throws Error if the schema creation/reset failed
+   */
+  public void waitForCompletion() {
+    if (owner != Thread.currentThread()) {
+      synchronized (this) {
+        boolean interrupted = false;
+
+        try {
+          while (!done) {
+            try {
+              this.wait();
+            } catch (InterruptedException e) {
+              interrupted = true;
+            }
+          }
+        } finally {
+          if (interrupted) { // propagate interruptions
+            Thread.currentThread().interrupt();
+          }
+        }
+        if (error instanceof Error) {
+          throw (Error)error;
+        } else if (error instanceof RuntimeException) {
+          throw (RuntimeException)error;
+        } else {
+          throw new AssertionError(
+            "failed to "
+            + (creating ? "create" : "reset")
+            + " for "
+            + clazz.getSimpleName(),
+            error
+          );
+        }
+      }
+    } // else - the current thread is the owner, therefore assumes it is done!
+  }
+
+  /**
+   * Notifies of the completion of the schema creation or reset.
+   *
+   * @author paouelle
+   */
+  public void completed() {
+    if (!done) {
+      synchronized (this) {
+        this.done = true;
+        this.notifyAll(); // wake everybody!
+      }
+    }
+  }
+
+  /**
+   * Notifies of the completion of the schema creation or reset with error.
+   *
+   * @author paouelle
+   *
+   * @param  t the error that occurred
+   * @return never returns anything
+   * @throws Error <code>t</code> if it is an error otherwise AssertionError
+   *         with <code>t</code> as the cause
+   */
+  public Error failed(Throwable t) throws Error {
+    if (!done) {
+      synchronized (this) {
+        this.done = true;
+        this.error = t;
+        this.notifyAll(); // wake everybody!
+      }
+    }
+    if (t instanceof Error) {
+      throw (Error)t;
+    }
+    throw new AssertionError(
+      "failed to "
+      + (creating ? "create" : "reset")
+      + " for "
+      + clazz.getSimpleName(),
+      t
+    );
   }
 }

@@ -38,7 +38,7 @@ import org.helenus.driver.VoidFuture;
  * @since 1.0
  */
 public class TruncateImpl<T>
-  extends SequenceStatementImpl<Void, VoidFuture, T>
+  extends GroupStatementImpl<Void, VoidFuture, T>
   implements Truncate<T> {
   /**
    * List of tables to be truncated.
@@ -137,10 +137,10 @@ public class TruncateImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
+   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
    */
   @Override
-  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+  protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
     return tables.stream()
       .map(t -> buildQueryString(t))
       .filter(b -> (b != null) && (b.length() != 0))

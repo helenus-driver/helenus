@@ -82,46 +82,46 @@ public interface CreateType<T>
    */
   public Where<T> where();
 
-  /**
-   * The <code>Options</code> class defines an in-statement construct for
-   * CREATE TYPE options.
-   *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
-   *
-   * @author  The Helenus Driver Project Authors
-   * @version 1 - Mar 3, 2015 - paouelle - Creation
-   *
-   * @param <T> The type of POJO associated with this statement.
-   *
-   * @since 1.0
-   */
-  public interface Options<T>
-    extends Statement<T>, SequenceableStatement<Void, VoidFuture> {
-    /**
-     * Adds a WHERE clause to this statement used to specify suffixes when required.
-     *
-     * This is a shorter/more readable version for {@code where().and(clauses)}.
-     *
-     * @author paouelle
-     *
-     * @param  clause the clause to add
-     * @return the where clause of this query to which more clause can be added.
-     * @throws IllegalArgumentException if the clause doesn't reference a
-     *         suffix key defined in the POJO
-     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
-     *         and the specified value is marked as excluded
-     */
-    public Where<T> where(Clause clause);
-
-    /**
-     * Returns a WHERE in-construct for this statement without adding clause.
-     *
-     * @author paouelle
-     *
-     * @return the where clause of this query to which more clause can be added.
-     */
-    public Where<T> where();
-  }
+//  /**
+//   * The <code>Options</code> class defines an in-statement construct for
+//   * CREATE TYPE options.
+//   *
+//   * @copyright 2015-2015 The Helenus Driver Project Authors
+//   *
+//   * @author  The Helenus Driver Project Authors
+//   * @version 1 - Mar 3, 2015 - paouelle - Creation
+//   *
+//   * @param <T> The type of POJO associated with this statement.
+//   *
+//   * @since 1.0
+//   */
+//  public interface Options<T>
+//    extends Statement<T>, SequenceableStatement<Void, VoidFuture> {
+//    /**
+//     * Adds a WHERE clause to this statement used to specify suffixes when required.
+//     *
+//     * This is a shorter/more readable version for {@code where().and(clauses)}.
+//     *
+//     * @author paouelle
+//     *
+//     * @param  clause the clause to add
+//     * @return the where clause of this query to which more clause can be added.
+//     * @throws IllegalArgumentException if the clause doesn't reference a
+//     *         suffix key defined in the POJO
+//     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+//     *         and the specified value is marked as excluded
+//     */
+//    public Where<T> where(Clause clause);
+//
+//    /**
+//     * Returns a WHERE in-construct for this statement without adding clause.
+//     *
+//     * @author paouelle
+//     *
+//     * @return the where clause of this query to which more clause can be added.
+//     */
+//    public Where<T> where();
+//  }
 
   /**
    * The <code>Where</code> interface defines a WHERE clause for the CREATE
