@@ -372,7 +372,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  static volatile boolean traceInternalCQL = true;
+  static volatile boolean traceInternalCQL = false;
 
   /**
    * Initializes tracing for the specified statement.
