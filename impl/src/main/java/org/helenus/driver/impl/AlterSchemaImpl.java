@@ -15,9 +15,7 @@
  */
 package org.helenus.driver.impl;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,6 +23,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.Row;
 
@@ -32,6 +33,7 @@ import org.helenus.driver.AlterSchema;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.GroupableStatement;
+import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -51,7 +53,7 @@ import org.helenus.driver.persistence.Table;
  * @since 1.0
  */
 public class AlterSchemaImpl<T>
-  extends GroupStatementImpl<Void, VoidFuture, T>
+  extends SequenceStatementImpl<Void, VoidFuture, T>
   implements AlterSchema<T> {
   /**
    * Holds the where statement part.
@@ -80,7 +82,7 @@ public class AlterSchemaImpl<T>
   }
 
   /**
-   * Gets all underlying sequenced statements for this create schemas with the
+   * Gets all underlying sequenced statements for this alter schemas with the
    * ability to optionally tracked and skipped already created keyspaces and/or
    * tables.
    *
@@ -90,26 +92,42 @@ public class AlterSchemaImpl<T>
    *         used as part of a create schemas statement or <code>null</code>
    * @param  tables an optional map of tables already for given keyspaces created
    *         when used as part of a create schemas statement or <code>null</code>
-   * @param  group a group where to place all insert statements for initial
-   *         objects or <code>null</code> if a separate one should be created
-   *         and returned as part of the list
-   * @return a non-<code>null</code> list of all underlying statements from this
-   *         statement
+   * @param kgroup a group where to place all create keyspace statements
+   *        recursively expanded
+   * @param tgroup a group where to place all create table statements
+   *        recursively expanded
+   *        one should be created and returned as part of the list
+   * @param igroup a group where to place all create index statements
+   *        recursively expanded
+   *        one should be created and returned as part of the list
+   * @param yseq a sequence where to place all create type statements
+   *        recursively expanded
+   *        one should be created and returned as part of the list
+   * @param group a group where to place all insert statements for initial
+   *        objects
    */
-  List<StatementImpl<?, ?, ?>> buildGroupedStatements(
-    Set<Keyspace> keyspaces, Map<Keyspace, Set<Table>> tables, GroupImpl group
+  protected void buildSequencedStatements(
+    Set<Pair<String, Keyspace>> keyspaces,
+    Map<Pair<String, Keyspace>, Set<Table>> tables,
+    GroupImpl kgroup,
+    GroupImpl tgroup,
+    GroupImpl igroup,
+    SequenceImpl yseq,
+    GroupImpl group
   ) {
     if (!isEnabled()) {
-      return Collections.emptyList();
+      return;
     }
     // make sure we have a valid keyspace (handling suffix exclusions if any)
+    final String ks;
+
     try {
-      getKeyspace();
+      ks = getKeyspace();
     } catch (ExcludedSuffixKeyException e) { // skip it
-      return Collections.emptyList();
+      return;
     }
-    final List<StatementImpl<?, ?, ?>> statements = new ArrayList<>(32);
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
+    final Pair<String, Keyspace> pk = Pair.of(ks, keyspace);
 
     // start by generating the keyspace
     // --- do not attempt to create or alter the same keyspace twice when a set
@@ -119,9 +137,9 @@ public class AlterSchemaImpl<T>
         getContext(), mgr, bridge
       ));
 
-      statements.add(ak);
+      kgroup.add(ak);
       if (keyspaces != null) { // keep track of created keyspaces if requested
-        keyspaces.add(keyspace);
+        keyspaces.add(pk);
       }
     }
     if (getClassInfo().supportsTablesAndIndexes()) {
@@ -134,7 +152,7 @@ public class AlterSchemaImpl<T>
 
           if (stables == null) {
             stables = new HashSet<>(8);
-            tables.put(keyspace,  stables);
+            tables.put(pk, stables);
           }
           if (stables.add(table.getTable())) {
             alterTable = true;
@@ -145,8 +163,7 @@ public class AlterSchemaImpl<T>
         final AlterCreateTableImpl<T> at = init(
           new AlterCreateTableImpl<>(getContext(), mgr, bridge)
         );
-
-        statements.add(at);
+        at.buildGroupedStatements().forEach(s -> tgroup.addInternal(s));
         // for indexes, we blindly drop all of them and re-create them
         for (final Map.Entry<String, List<Row>> e: at.getTableInfos().entrySet()) {
           e.getValue().stream()
@@ -161,43 +178,33 @@ public class AlterSchemaImpl<T>
               }
               Utils.appendName(i, builder);
               builder.append(';');
-              statements.add(new SimpleStatementImpl(builder.toString(), mgr, bridge));
+              // add to the table group
+              tgroup.add(new SimpleStatementImpl(builder.toString(), mgr, bridge));
             });
         }
-        statements.add(
+        igroup.add(
           init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge))
         );
       }
     } else {
-      statements.add(init(new AlterCreateTypeImpl<>(getContext(), mgr, bridge)));
+      final AlterCreateTypeImpl<T> at = init(
+        new AlterCreateTypeImpl<>(getContext(), mgr, bridge)
+      );
+      yseq.add(at);
     }
     // finish with initial objects
     final Collection<T> objs = getContext().getInitialObjects();
 
     if (!objs.isEmpty()) {
-      final GroupImpl g;
-
-      if (group != null) {
-        g = group;
-      } else {
-        g = init(new GroupImpl(
-          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
-        ));
-      }
-
       for (final T io: objs) {
-        g.add(init(new InsertImpl<>(
+        group.add(init(new InsertImpl<>(
           getContext().getClassInfo().newContext(io),
           (String[])null,
           mgr,
           bridge
         )));
       }
-      if (group == null) {
-        statements.add(g);
-      }
     }
-    return statements;
   }
 
   /**
@@ -229,11 +236,30 @@ public class AlterSchemaImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
    */
   @Override
-  protected List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
-    return buildGroupedStatements(null, null, null);
+  protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
+    final GroupImpl kgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl tgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl igroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final SequenceImpl yseq = init(new SequenceImpl(
+      Optional.empty(), new SequenceableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl group = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+
+    buildSequencedStatements(null, null, kgroup, tgroup, igroup, yseq, group);
+    return Stream.of(kgroup, yseq, tgroup, igroup, group)
+      .filter(g -> !g.isEmpty())
+      .collect(Collectors.toList());
   }
 
   /**

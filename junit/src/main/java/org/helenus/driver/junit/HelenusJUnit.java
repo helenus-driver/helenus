@@ -97,7 +97,6 @@ import org.helenus.driver.Group;
 import org.helenus.driver.Insert;
 import org.helenus.driver.Select;
 import org.helenus.driver.Sequence;
-import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.StatementManager;
 import org.helenus.driver.Truncate;
@@ -106,6 +105,7 @@ import org.helenus.driver.impl.ClassInfoImpl;
 import org.helenus.driver.impl.CreateSchemaImpl;
 import org.helenus.driver.impl.GroupImpl;
 import org.helenus.driver.impl.RootClassInfoImpl;
+import org.helenus.driver.impl.SequenceImpl;
 import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.impl.TypeClassInfoImpl;
@@ -1196,9 +1196,11 @@ public class HelenusJUnit implements MethodRule {
       final List<Object> initials = new ArrayList<>();
       final Sequence sequence = StatementBuilder.sequence();
       // create one group to aggregate all create table, index, type, and initial objects
+      // create groups to aggregate all create keyspaces, table, create index, and initial objects
+      final GroupImpl kgroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
       final GroupImpl tgroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
       final GroupImpl igroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
-      final GroupImpl ygroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
+      final SequenceImpl yseq = HelenusJUnit.initTrace((SequenceImpl)StatementBuilder.sequence());
       final GroupImpl group = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
 
       if (CollectionUtils.isEmpty(suffixes)) {
@@ -1217,8 +1219,8 @@ public class HelenusJUnit implements MethodRule {
           if (!initialsOnly) {
             // safe to combine types since we are creating only one type anyway
             cs.buildSequencedStatements(
-              HelenusJUnit.keyspaces, HelenusJUnit.tables, tgroup, igroup, ygroup, group
-            ).forEach(s -> sequence.add((SequenceableStatement<?, ?>)s));
+              HelenusJUnit.keyspaces, HelenusJUnit.tables, kgroup, tgroup, igroup, yseq, group
+            );
           }
         }
       } else {
@@ -1243,8 +1245,8 @@ public class HelenusJUnit implements MethodRule {
             // safe to combine types since we are creating only one type anyway
             // for multiple keyspaces
             cs.buildSequencedStatements(
-              HelenusJUnit.keyspaces, HelenusJUnit.tables, tgroup, igroup, ygroup, group
-            ).forEach(s -> sequence.add((SequenceableStatement<?, ?>)s));
+              HelenusJUnit.keyspaces, HelenusJUnit.tables, kgroup, tgroup, igroup, yseq, group
+            );
           }
         }
       }
@@ -1256,8 +1258,11 @@ public class HelenusJUnit implements MethodRule {
         // inserted which is done for Type POJOs only
         resetSchema0(cinfo, result);
       } else {
-        if (!ygroup.isEmpty()) {
-          sequence.add(ygroup);
+        if (!kgroup.isEmpty()) {
+          sequence.add(kgroup);
+        }
+        if (!yseq.isEmpty()) {
+          sequence.add(yseq);
         }
         if (!tgroup.isEmpty()) {
           sequence.add(tgroup);

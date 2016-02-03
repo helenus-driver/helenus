@@ -15,15 +15,14 @@
  */
 package org.helenus.driver.impl;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -31,6 +30,7 @@ import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
 import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.GroupableStatement;
+import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -118,7 +118,26 @@ public class CreateSchemaImpl<T>
    */
   @Override
   protected List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
-    return buildSequencedStatements(null, null, null, null, null, null);
+    final GroupImpl kgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl tgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl igroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final SequenceImpl yseq = init(new SequenceImpl(
+      Optional.empty(), new SequenceableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl group = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+
+    buildSequencedStatements(null, null, kgroup, tgroup, igroup, yseq, group);
+    return Stream.of(kgroup, yseq, tgroup, igroup, group)
+      .filter(g -> !g.isEmpty())
+      .collect(Collectors.toList());
   }
 
   /**
@@ -128,35 +147,35 @@ public class CreateSchemaImpl<T>
    *
    * @author paouelle
    *
-   * @param  keyspaces an optional set of keyspaces already created when
-   *         used as part of a create schemas statement or <code>null</code>
-   * @param  tables an optional map of tables already for given keyspaces created
-   *         when used as part of a create schemas statement or <code>null</code>
-   * @param  tgroup a group where to place all create table statements
-   *         recursively expanded or <code>null</code> if a separate
-   *         one should be created and returned as part of the list
-   * @param  igroup a group where to place all create index statements
-   *         recursively expanded or <code>null</code> if a separate
-   *         one should be created and returned as part of the list
-   * @param  ygroup a group where to place all create type statements
-   *         recursively expanded or <code>null</code> if a separate
-   *         one should be created and returned as part of the list
-   * @param  group a group where to place all insert statements for initial
-   *         objects or <code>null</code> if a separate one should be created
-   *         and returned as part of the list
-   * @return a non-<code>null</code> list of all underlying statements from this
-   *         statement
+   * @param keyspaces an optional set of keyspaces already created when
+   *        used as part of a create schemas statement or <code>null</code>
+   * @param tables an optional map of tables already for given keyspaces created
+   *        when used as part of a create schemas statement or <code>null</code>
+   * @param kgroup a group where to place all create keyspace statements
+   *        recursively expanded
+   * @param tgroup a group where to place all create table statements
+   *        recursively expanded
+   *        one should be created and returned as part of the list
+   * @param igroup a group where to place all create index statements
+   *        recursively expanded
+   *        one should be created and returned as part of the list
+   * @param yseq a sequence where to place all create type statements
+   *        recursively expanded
+   *        one should be created and returned as part of the list
+   * @param group a group where to place all insert statements for initial
+   *        objects
    */
-  public List<StatementImpl<?, ?, ?>> buildSequencedStatements(
+  public void buildSequencedStatements(
     Set<Pair<String, Keyspace>> keyspaces,
     Map<Pair<String, Keyspace>, Set<Table>> tables,
+    GroupImpl kgroup,
     GroupImpl tgroup,
     GroupImpl igroup,
-    GroupImpl ygroup,
+    SequenceImpl yseq,
     GroupImpl group
   ) {
     if (!isEnabled()) {
-      return Collections.emptyList();
+      return;
     }
     // make sure we have a valid keyspace (handling suffix exclusions if any)
     final String ks;
@@ -164,9 +183,8 @@ public class CreateSchemaImpl<T>
     try {
       ks = getKeyspace();
     } catch (ExcludedSuffixKeyException e) { // skip it
-      return Collections.emptyList();
+      return;
     }
-    final List<StatementImpl<?, ?, ?>> statements = new ArrayList<>(32);
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
     final Pair<String, Keyspace> pk = Pair.of(ks, keyspace);
 
@@ -181,7 +199,7 @@ public class CreateSchemaImpl<T>
       if (ifNotExists) {
         ck.ifNotExists();
       }
-      statements.add(ck);
+      kgroup.add(ck);
       if (keyspaces != null) { // keep track of created keyspaces if requested
         keyspaces.add(pk);
       }
@@ -204,86 +222,43 @@ public class CreateSchemaImpl<T>
         }
       }
       if (createTable) {
-        final CreateTableImpl<T> ct = init(new CreateTableImpl<>(getContext(), null, mgr, bridge));
-        final CreateIndexImpl<T> ci = init(new CreateIndexImpl<>(getContext(), null, null, mgr, bridge));
+        final CreateTableImpl<T> ct = init(
+          new CreateTableImpl<>(getContext(), null, mgr, bridge)
+        );
+        final CreateIndexImpl<T> ci = init(
+          new CreateIndexImpl<>(getContext(), null, null, mgr, bridge)
+        );
 
         if (ifNotExists) {
           ct.ifNotExists();
           ci.ifNotExists();
         }
-        final GroupImpl tg;
-
-        if (tgroup != null) {
-          tg = tgroup;
-        } else {
-          tg = init(new GroupImpl(
-            Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
-          ));
-        }
-        ct.buildGroupedStatements().forEach(s -> tg.addInternal(s));
-        if ((tgroup == null) && !tg.isEmpty()) {
-          statements.add(tg);
-        }
-        final GroupImpl ig;
-
-        if (igroup != null) {
-          ig = igroup;
-        } else {
-          ig = init(new GroupImpl(
-            Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
-          ));
-        }
-        ci.buildGroupedStatements().forEach(s -> ig.addInternal(s));
-        if ((igroup == null) && !ig.isEmpty()) {
-          statements.add(ig);
-        }
+        ct.buildGroupedStatements().forEach(s -> tgroup.addInternal(s));
+        ci.buildGroupedStatements().forEach(s -> igroup.addInternal(s));
       }
     } else {
-      final CreateTypeImpl<T> ct = init(new CreateTypeImpl<>(getContext(), mgr, bridge));
+      final CreateTypeImpl<T> ct = init(
+        new CreateTypeImpl<>(getContext(), mgr, bridge)
+      );
 
       if (ifNotExists) {
         ct.ifNotExists();
       }
-      final GroupImpl yg;
-
-      if (ygroup != null) {
-        yg = ygroup;
-      } else {
-        yg = init(new GroupImpl(
-          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
-        ));
-      }
-      ct.buildGroupedStatements().forEach(s -> yg.addInternal(s));
-      if ((ygroup == null) && !yg.isEmpty()) {
-        statements.add(yg);
-      }
+      yseq.add(ct);
     }
     // finish with initial objects
     final Collection<T> objs = getContext().getInitialObjects();
 
     if (!objs.isEmpty()) {
-      final GroupImpl g;
-
-      if (group != null) {
-        g = group;
-      } else {
-        g = init(new GroupImpl(
-          Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
-        ));
-      }
       for (final T io: objs) {
-        g.add(init(new InsertImpl<>(
+        group.add(init(new InsertImpl<>(
           getContext().getClassInfo().newContext(io),
           (String[])null,
           mgr,
           bridge
         )));
       }
-      if ((group == null) && !g.isEmpty()) {
-        statements.add(g);
-      }
     }
-    return statements;
   }
 
   /**

@@ -31,6 +31,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.helenus.commons.collections.DirectedGraph;
 import org.helenus.commons.collections.GraphUtils;
 import org.helenus.commons.collections.graph.ConcurrentHashDirectedGraph;
@@ -39,6 +41,7 @@ import org.helenus.driver.AlterSchemas;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.GroupableStatement;
+import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
@@ -61,7 +64,7 @@ import org.reflections.Reflections;
  * @since 1.0
  */
 public class AlterSchemasImpl
-  extends GroupStatementImpl<Void, VoidFuture, Void>
+  extends SequenceStatementImpl<Void, VoidFuture, Void>
   implements AlterSchemas {
   /**
    * Holds the packages for all POJO classes for which to alter schemas.
@@ -370,35 +373,42 @@ public class AlterSchemasImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.GroupStatementImpl#buildGroupedStatements()
+   * @see org.helenus.driver.impl.SequenceStatementImpl#buildSequencedStatements()
    */
   @Override
-  protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
+  protected final List<StatementImpl<?, ?, ?>> buildSequencedStatements() {
     final List<ClassInfoImpl<?>.Context> contexts = getContexts();
     // we do not want to alter the same keyspace or table so many times for nothing
-    final Set<Keyspace> keyspaces = new HashSet<>(contexts.size() * 3);
-    final Map<Keyspace, Set<Table>> tables = new HashMap<>(contexts.size() * 3);
-    // create one group to aggregate all initial objects
+    final Set<Pair<String, Keyspace>> keyspaces = new HashSet<>(contexts.size() * 3);
+    final Map<Pair<String, Keyspace>, Set<Table>> tables = new HashMap<>(contexts.size() * 3);
+    // create groups to aggregate all alter keyspaces, table, create index, and initial objects
+    final GroupImpl kgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl tgroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final GroupImpl igroup = init(new GroupImpl(
+      Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
+    ));
+    final SequenceImpl yseq = init(new SequenceImpl(
+      Optional.empty(), new SequenceableStatement<?, ?>[0], mgr, bridge
+    ));
     final GroupImpl group = init(new GroupImpl(
       Optional.empty(), new GroupableStatement<?, ?>[0], mgr, bridge
     ));
 
-    final List<StatementImpl<?, ?, ?>> statements = contexts.stream()
-      .sequential()
-      .flatMap(c -> {
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        final AlterSchemaImpl<?> as = init(new AlterSchemaImpl(c, mgr, bridge));
+    contexts.forEach(c -> {
+      @SuppressWarnings({"rawtypes", "unchecked"})
+      final AlterSchemaImpl<?> as = init(new AlterSchemaImpl(c, mgr, bridge));
 
-        return as.buildGroupedStatements(keyspaces, tables, group).stream()
-          .sequential();
-      })
-      .sequential()
+      as.buildSequencedStatements(
+        keyspaces, tables, kgroup, tgroup, igroup, yseq, group
+      );
+    });
+    return Stream.of(kgroup, yseq, tgroup, igroup, group)
+      .filter(g -> !g.isEmpty())
       .collect(Collectors.toList());
-
-    if (!group.isEmpty()) {
-      statements.add(group);
-    }
-    return statements;
   }
 
   /**
