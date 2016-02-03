@@ -136,12 +136,22 @@ public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
               );
             } catch (ThreadDeath|OutOfMemoryError|StackOverflowError|AssertionError e) {
               // hum! we need to propagate this one into an error result future
-              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(mgr, e);
+              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(
+                mgr, e
+              );
               execute = true; // notify our listeners
               throw e;
-            } catch (Error|Exception e) {
+            } catch (Error e) {
               // hum! we need to propagate this one into an error result future
-              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(mgr, e);
+              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(
+                mgr, e
+              );
+              execute = true; // notify our listeners
+            } catch (Exception e) {
+              // hum! we need to propagate this one into an error result future
+              LastResultSequentialSetFuture.this.future = new ErrorResultSetFuture(
+                mgr, new ExecutionException(e)
+              );
               execute = true; // notify our listeners
             }
           } else { // that was the last statement in the sequence

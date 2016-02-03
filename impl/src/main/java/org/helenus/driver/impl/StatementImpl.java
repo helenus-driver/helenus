@@ -99,6 +99,32 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   public final static String UDT_C_PREFIX = "c_";
 
   /**
+   * Extracts the cause from a given execution exception and throws back a
+   * corresponding driver exception.
+   *
+   * @author paouelle
+   *
+   * @param  e the execution exception to handle
+   * @return nothing
+   * @throws DriverException a driver exception based on the cause of the
+   *         provided execution exception
+   */
+  static DriverException propagateCause(ExecutionException e)
+    throws DriverException {
+    // extracted from com.datastax.driver.core.DriverThrowables.propagateCause()
+    // --------------------------------------------------------------------
+    // We could just rethrow e.getCause(). However, the cause of the ExecutionException has likely been
+    // created on the I/O thread receiving the response. Which means that the stacktrace associated
+    // with said cause will make no mention of the current thread. This is painful for say, finding
+    // out which execute() statement actually raised the exception. So instead, we re-create the
+    // exception.
+    if (e.getCause() instanceof DriverException) {
+      throw ((DriverException)e.getCause()).copy();
+    }
+    throw new DriverInternalError("Unexpected exception thrown", e.getCause());
+  }
+
+  /**
    * Holds the statement manager.
    *
    * @author paouelle
@@ -1332,30 +1358,20 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   public R execute() {
     final ListenableFuture<R> future = executeAsync();
 
-    if (future instanceof ObjectSetFuture) {
-      return (R)((ObjectSetFuture<?>)future).getUninterruptibly();
-    }
-    if (future instanceof VoidFuture) {
-      return (R)((VoidFuture)future).getUninterruptibly();
-    }
-    if (future instanceof ResultSetFuture) {
-      return (R)((ResultSetFuture)future).getUninterruptibly();
-    }
-    // should not get here though! but in case ...
     try {
+      if (future instanceof ObjectSetFuture) {
+        return (R)((ObjectSetFuture<?>)future).getUninterruptibly();
+      }
+      if (future instanceof VoidFuture) {
+        return (R)((VoidFuture)future).getUninterruptibly();
+      }
+      if (future instanceof ResultSetFuture) {
+        return (R)((ResultSetFuture)future).getUninterruptibly();
+      }
+      // should not get here though! but in case ...
       return Uninterruptibles.getUninterruptibly(future);
     } catch (ExecutionException e) {
-      // extracted from DefaultResultSet.extractCauseFromExecutionException()
-      // --------------------------------------------------------------------
-      // We could just rethrow e.getCause(). However, the cause of the ExecutionException has likely been
-      // created on the I/O thread receiving the response. Which means that the stacktrace associated
-      // with said cause will make no mention of the current thread. This is painful for say, finding
-      // out which execute() statement actually raised the exception. So instead, we re-create the
-      // exception.
-      if (e.getCause() instanceof DriverException) {
-        throw ((DriverException)e.getCause()).copy();
-      }
-      throw new DriverInternalError("Unexpected exception thrown", e.getCause());
+      throw StatementImpl.propagateCause(e);
     }
   }
 

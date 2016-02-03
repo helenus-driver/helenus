@@ -86,24 +86,32 @@ public class ErrorResultSetFuture extends DefaultResultSetFuture {
    *
    * @author paouelle
    *
+   * @param  unwrapExecutionError <code>true</code> to unwrap the cause if the
+   *         error is an {@link ExecutionException}; <code>false</code> to
+   *         re-throw as is
    * @return nothing as an exception is always thrown
    * @throws Error if an error occurred
    * @throws DriverException if a driver exception occurred
    * @throws DriverInternalError if any other error occurred
    */
-  RuntimeException propagateError() {
-    if (error instanceof Error) {
-      throw ((Error)error);
+  RuntimeException propagateError(boolean unwrapExecutionError) {
+    Throwable t = error;
+
+    if (unwrapExecutionError && (t instanceof ExecutionException)) {
+      t = ((ExecutionException)t).getCause();
+    }
+    if (t instanceof Error) {
+      throw ((Error)t);
     }
     // We could just rethrow error. However, the cause of the ExecutionException has likely been
     // created on the I/O thread receiving the response. Which means that the stacktrace associated
     // with said cause will make no mention of the current thread. This is painful for say, finding
     // out which execute() statement actually raised the exception. So instead, we re-create the
     // exception.
-    if (error instanceof DriverException) {
-      throw ((DriverException)error).copy();
+    if (t instanceof DriverException) {
+      throw ((DriverException)t).copy();
     }
-    throw new DriverInternalError("Unexpected exception thrown", error);
+    throw new DriverInternalError("Unexpected exception thrown", t);
   }
 
   /**
@@ -115,7 +123,7 @@ public class ErrorResultSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public ResultSet getUninterruptibly() {
-    throw propagateError();
+    throw propagateError(true);
   }
 
   /**
@@ -128,7 +136,7 @@ public class ErrorResultSetFuture extends DefaultResultSetFuture {
   @Override
   public ResultSet getUninterruptibly(long timeout, TimeUnit unit)
     throws TimeoutException {
-    throw propagateError();
+    throw propagateError(true);
   }
 
   /**
@@ -153,7 +161,7 @@ public class ErrorResultSetFuture extends DefaultResultSetFuture {
   @Override
   public ResultSet get(long timeout, TimeUnit unit)
     throws InterruptedException, TimeoutException, ExecutionException {
-    throw propagateError();
+    throw propagateError(false);
   }
 
   /**
@@ -165,7 +173,7 @@ public class ErrorResultSetFuture extends DefaultResultSetFuture {
    */
   @Override
   public ResultSet get() throws InterruptedException, ExecutionException {
-    throw propagateError();
+    throw propagateError(false);
   }
 
   /**

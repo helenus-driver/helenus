@@ -198,14 +198,26 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
                   ));
               } catch (ThreadDeath|OutOfMemoryError|StackOverflowError|AssertionError e) {
                 // hum! we need to propagate this one into an error result future
-                LastResultParallelSetFuture.this.error = new ErrorResultSetFuture(mgr, e);
+                LastResultParallelSetFuture.this.error = new ErrorResultSetFuture(
+                  mgr, e
+                );
                 LastResultParallelSetFuture.this.success = null;
                 execute = true; // notify our listeners
                 statements.notifyAll(); // wake up anything in case
                 throw e;
-              } catch (Error|Exception e) {
+              } catch (Error e) {
                 // hum! we need to propagate this one into an error result future
-                LastResultParallelSetFuture.this.error = new ErrorResultSetFuture(mgr, e);
+                LastResultParallelSetFuture.this.error = new ErrorResultSetFuture(
+                  mgr, e
+                );
+                LastResultParallelSetFuture.this.success = null;
+                execute = true; // notify our listeners
+                statements.notifyAll(); // wake up anything in case
+              } catch (Exception e) {
+                // hum! we need to propagate this one into an error result future
+                LastResultParallelSetFuture.this.error = new ErrorResultSetFuture(
+                  mgr, new ExecutionException(e)
+                );
                 LastResultParallelSetFuture.this.success = null;
                 execute = true; // notify our listeners
                 statements.notifyAll(); // wake up anything in case
