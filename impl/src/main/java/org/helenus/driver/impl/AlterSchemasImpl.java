@@ -488,7 +488,8 @@ public class AlterSchemasImpl
   @Override
   public Stream<Class<?>> objectClasses() {
     return (Stream<Class<?>>)(Stream)getContexts().stream()
-      .flatMap(c -> c.getClassInfo().objectClasses());
+      .flatMap(c -> c.getClassInfo().objectClasses())
+      .distinct();
   }
 
   /**
@@ -502,7 +503,8 @@ public class AlterSchemasImpl
   @Override
   public Stream<ClassInfo<?>> classInfos() {
     return (Stream<ClassInfo<?>>)(Stream)getContexts().stream()
-      .flatMap(c -> c.getClassInfo().classInfos());
+      .flatMap(c -> c.getClassInfo().classInfos())
+      .distinct();
   }
 
   /**
@@ -517,7 +519,8 @@ public class AlterSchemasImpl
   public Stream<ClassInfo<?>> definedClassInfos() {
     return (Stream<ClassInfo<?>>)(Stream)keyspaces.values().stream()
       .flatMap(cl -> cl.stream())
-      .flatMap(cl -> cl.classInfos());
+      .flatMap(cl -> cl.classInfos())
+      .distinct();
   }
 
   /**
