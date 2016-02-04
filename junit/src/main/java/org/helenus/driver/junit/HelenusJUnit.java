@@ -105,7 +105,6 @@ import org.helenus.driver.impl.ClassInfoImpl;
 import org.helenus.driver.impl.CreateSchemaImpl;
 import org.helenus.driver.impl.GroupImpl;
 import org.helenus.driver.impl.RootClassInfoImpl;
-import org.helenus.driver.impl.SequenceImpl;
 import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.impl.TypeClassInfoImpl;
@@ -1200,7 +1199,7 @@ public class HelenusJUnit implements MethodRule {
       final GroupImpl kgroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
       final GroupImpl tgroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
       final GroupImpl igroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
-      final SequenceImpl yseq = HelenusJUnit.initTrace((SequenceImpl)StatementBuilder.sequence());
+      final GroupImpl ygroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
       final GroupImpl group = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
 
       if (CollectionUtils.isEmpty(suffixes)) {
@@ -1219,7 +1218,7 @@ public class HelenusJUnit implements MethodRule {
           if (!initialsOnly) {
             // safe to combine types since we are creating only one type anyway
             cs.buildSequencedStatements(
-              HelenusJUnit.keyspaces, HelenusJUnit.tables, kgroup, tgroup, igroup, yseq, group
+              HelenusJUnit.keyspaces, HelenusJUnit.tables, kgroup, tgroup, igroup, ygroup, group
             );
           }
         }
@@ -1245,7 +1244,7 @@ public class HelenusJUnit implements MethodRule {
             // safe to combine types since we are creating only one type anyway
             // for multiple keyspaces
             cs.buildSequencedStatements(
-              HelenusJUnit.keyspaces, HelenusJUnit.tables, kgroup, tgroup, igroup, yseq, group
+              HelenusJUnit.keyspaces, HelenusJUnit.tables, kgroup, tgroup, igroup, ygroup, group
             );
           }
         }
@@ -1261,8 +1260,8 @@ public class HelenusJUnit implements MethodRule {
         if (!kgroup.isEmpty()) {
           sequence.add(kgroup);
         }
-        if (!yseq.isEmpty()) {
-          sequence.add(yseq);
+        if (!ygroup.isEmpty()) {
+          sequence.add(ygroup);
         }
         if (!tgroup.isEmpty()) {
           sequence.add(tgroup);

@@ -159,7 +159,7 @@ public class CreateSchemaImpl<T>
    * @param igroup a group where to place all create index statements
    *        recursively expanded
    *        one should be created and returned as part of the list
-   * @param yseq a sequence where to place all create type statements
+   * @param yparent a sequence or group where to place all create type statements
    *        recursively expanded
    *        one should be created and returned as part of the list
    * @param group a group where to place all insert statements for initial
@@ -171,7 +171,7 @@ public class CreateSchemaImpl<T>
     GroupImpl kgroup,
     GroupImpl tgroup,
     GroupImpl igroup,
-    SequenceImpl yseq,
+    ParentStatementImpl yparent,
     GroupImpl group
   ) {
     if (!isEnabled()) {
@@ -244,7 +244,16 @@ public class CreateSchemaImpl<T>
       if (ifNotExists) {
         ct.ifNotExists();
       }
-      yseq.add(ct);
+      if (yparent instanceof SequenceImpl) {
+        ((SequenceImpl)yparent).add(ct);
+      } else if (yparent instanceof GroupImpl) {
+        ((GroupImpl)yparent).add(ct);
+      } else {
+        throw new IllegalStateException(
+          "invalid parent statement passed for types: "
+          + yparent.getClass().getSimpleName()
+        );
+      }
     }
     // finish with initial objects
     final Collection<T> objs = getContext().getInitialObjects();
