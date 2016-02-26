@@ -17,10 +17,14 @@ package org.helenus.driver;
 
 import java.security.acl.Group;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.helenus.lang.CloneUtils;
 import org.helenus.util.function.ERunnable;
 
 /**
@@ -129,6 +133,58 @@ public interface ParentStatement extends GenericStatement<Void, VoidFuture> {
    * @throws NullPointerException if <code>run</code> is <code>null</code>
    */
   public ParentStatement addErrorHandler(ERunnable<?> run);
+
+  /**
+   * Register an error handler to restore to the specified original value in
+   * case of statement errors.
+   * <p>
+   * <i>Note:</i> The original value will be automatically cloned if it
+   * corresponds to a collection or a map.
+   *
+   * @author paouelle
+   *
+   * @param  <T> the type of collection to assign
+   *
+   * @param  val the value to restore in case of errors
+   * @param  assigner the assignment logic
+   * @return <code>val</code>
+   * @throws NullPointerException if <code>assigner</code> is <code>null</code>
+   */
+  public default <T> T resetIfErrors(T val, Consumer<T> assigner) {
+    final T fval;
+
+    if ((val instanceof Collection) || (val instanceof Map)) {
+      fval = CloneUtils.clone(val);
+    } else {
+      fval = val;
+    }
+    addErrorHandler(() -> assigner.accept(fval));
+    return val;
+  }
+
+  /**
+   * Assigns a new value by invoking the provided consumer and automatically
+   * register an error handler to restore to the specified original value in
+   * case of statement errors.
+   * <p>
+   * <i>Note:</i> The original value will be automatically cloned if it
+   * corresponds to a collection or a map.
+   *
+   * @author paouelle
+   *
+   * @param  <T> the type of value to assign
+   *
+   * @param  oval the original value to restore in case of errors
+   * @param  nval the new value to assign
+   * @param  assigner the assignment logic
+   * @return <code>nval</code>
+   * @throws NullPointerException if <code>assigner</code> is <code>null</code>
+   */
+  public default <T> T setAndResetIfErrors(T oval, T nval, Consumer<T> assigner) {
+    resetIfErrors(oval, assigner);
+    assigner.accept(nval);
+    return nval;
+  }
 
   /**
    * Runs all registered error handlers in sequence from the current thread. This

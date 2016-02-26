@@ -70,6 +70,7 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.KeyspaceMetadata;
+import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.WriteType;
@@ -885,6 +886,7 @@ public class HelenusJUnit implements MethodRule {
           Cluster
             .builder()
             .withPort(port)
+            .withQueryOptions(new QueryOptions().setRefreshSchemaIntervalMillis(0)) // disable debouncing schema updates since we are unit testing!
             .withRetryPolicy(new LoggingRetryPolicy(new RetryPolicy() {
               @Override
               public RetryDecision onReadTimeout(
