@@ -74,7 +74,7 @@ public class CloneUtils {
         throw (IllegalAccessError)new IllegalAccessError(e.getMessage()).initCause(e);
       }
     }
-    throw new IllegalArgumentException("clone not supported");
+    throw new IllegalArgumentException("clone not supported: " + obj.getClass().getName());
   }
 
   /**
