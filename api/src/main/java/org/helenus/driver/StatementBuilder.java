@@ -96,6 +96,28 @@ public final class StatementBuilder {
   }
 
   /**
+   * Gets a root class info structure that defines the specified POJO class. The
+   * standard class info is returned if the specified class does not represent
+   * a type entity.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with this statement
+   *
+   * @param  clazz the class of POJO for which to get a class info object for
+   * @return the non-<code>null</code> class info object representing the given
+   *         POJO class or its root class info if <Code>clazz</code> represents
+   *         a type entity
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
+   *         a valid POJO class
+   */
+  public static <T> ClassInfo<? super T> getRootClassInfo(Class<T> clazz) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null POJO class");
+    return StatementManager.getManager().getRootClassInfo(clazz);
+  }
+
+  /**
    * Start building a new SELECT statement that selects the provided names.
    * <p>
    * <i>Note:</i> that {@code select(clazz, c1, c2)} is just a shortcut for

@@ -149,6 +149,25 @@ public abstract class StatementManager {
   protected abstract <T> ClassInfo<T> getClassInfo(Class<T> clazz);
 
   /**
+   * Gets a root class info structure that defines the specified POJO class. The
+   * standard class info is returned if the specified class does not represent
+   * a type entity.
+   *
+   * @author paouelle
+   *
+   * @param <T> The type of POJO associated with this statement
+   *
+   * @param  clazz the non-<code>null</code> class of POJO for which to get a
+   *         class info object for
+   * @return the non-<code>null</code> class info object representing the given
+   *         POJO class or its root class info if <Code>clazz</code> represents
+   *         a type entity
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
+   *         a valid POJO class
+   */
+  protected abstract <T> ClassInfo<? super T> getRootClassInfo(Class<T> clazz);
+
+  /**
    * Start building a new SELECT statement that selects the provided names.
    * <p>
    * <i>Note:</i> that {@code select(clazz, c1, c2)} is just a shortcut for

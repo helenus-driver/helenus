@@ -387,6 +387,23 @@ public class StatementManagerImpl extends StatementManager {
   /**
    * {@inheritDoc}
    *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @see org.helenus.driver.StatementManager#getRootClassInfo(java.lang.Class)
+   */
+  @Override
+  protected <T> ClassInfo<? super T> getRootClassInfo(Class<T> clazz) {
+    final ClassInfoImpl<T> cinfo = getClassInfoImpl(clazz);
+
+    if (cinfo instanceof TypeClassInfoImpl) {
+      return ((TypeClassInfoImpl<T>)cinfo).getRoot();
+    }
+    return cinfo;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
    * @author paouelle
    *
    * @see org.helenus.driver.StatementManager#select(java.lang.Class, java.lang.CharSequence[])
