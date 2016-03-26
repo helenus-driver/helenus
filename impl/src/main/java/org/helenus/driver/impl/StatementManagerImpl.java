@@ -1911,9 +1911,17 @@ public class StatementManagerImpl extends StatementManager {
               classInfo = (ClassInfoImpl<T>)rcinfo.addType(this, clazz);
             }
           } else {
-            throw new IllegalArgumentException(
-              "class '" + clazz.getSimpleName() + "' is not annotated with @TypeEntity"
-            );
+            // it has a root class but it is not a type entity one, so return
+            // a subclass for now
+            // by doing this we can support an abstract class extending the root
+            // which can have subclasses that themselves will be annotated as
+            // type elements
+            // for subclasses, we get it from the root
+            final RootClassInfoImpl<? super T> rcinfo
+              = (RootClassInfoImpl<? super T>)getClassInfoImpl(rclazz);
+
+            // attempt to load it by itself as we know it is not a type
+            classInfo = (ClassInfoImpl<T>)rcinfo.newSubClass(this, clazz);
           }
         }
       } else if (clazz.isAnnotationPresent(UDTEntity.class)) {

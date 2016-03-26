@@ -690,7 +690,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  private final Map<String, TableInfoImpl<T>> tables = new LinkedHashMap<>(12);
+  private final Map<String, TableInfoImpl<T>> tables;
 
   /**
    * Holds the primary table for the POJO.
@@ -704,7 +704,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  private final Set<String> columns = new LinkedHashSet<>(25);
+  private final Set<String> columns;
 
   /**
    * Holds a map of all fields annotated as suffixes keyed by the
@@ -712,7 +712,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  protected final Map<String, FieldInfoImpl<T>> suffixesByName = new LinkedHashMap<>(8);
+  protected final Map<String, FieldInfoImpl<T>> suffixesByName;
 
   /**
    * Holds a map of all fields annotated as suffixes keyed by the
@@ -720,7 +720,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    */
-  protected final Map<String, FieldInfoImpl<T>> suffixesByType = new LinkedHashMap<>(8);
+  protected final Map<String, FieldInfoImpl<T>> suffixesByType;
 
   /**
    * Instantiates a new <code>ClassInfo</code> object.
@@ -741,6 +741,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     Class<? extends Annotation> entityAnnotationClass
   ) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null POJO class");
+    this.columns = new LinkedHashSet<>(25);
+    this.tables = new LinkedHashMap<>(12);
+    this.suffixesByName = new LinkedHashMap<>(8);
+    this.suffixesByType = new LinkedHashMap<>(8);
     this.entityAnnotationClass = entityAnnotationClass;
     this.clazz = clazz;
     this.constructor = findDefaultCtor(entityAnnotationClass);
@@ -769,6 +773,31 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       !Modifier.isAbstract(clazz.getModifiers()),
       "entity class '%s', cannot be abstract", clazz.getSimpleName()
     );
+  }
+
+  /**
+   * Instantiates a new <code>ClassInfo</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the non-<code>null</code> class info to link to
+   * @param  clazz the class of POJO for which to get a class info object for
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
+   *         a valid POJO class
+   */
+  ClassInfoImpl(ClassInfoImpl<T> cinfo, Class<T> clazz) {
+    this.entityAnnotationClass = cinfo.entityAnnotationClass;
+    this.clazz = clazz;
+    this.constructor = cinfo.constructor;
+    this.finalFields = cinfo.finalFields;
+    this.keyspace = cinfo.keyspace;
+    this.primary = cinfo.primary;
+    this.columns = cinfo.columns;
+    this.initials = cinfo.initials;
+    this.tables = cinfo.tables;
+    this.suffixesByName = cinfo.suffixesByName;
+    this.suffixesByType = cinfo.suffixesByType;
   }
 
   /**

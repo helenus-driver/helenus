@@ -439,6 +439,30 @@ public class RootClassInfoImpl<T>
   }
 
   /**
+   * Instantiates a new <code>RootClassInfoImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  rinfo the class info for the root entity this POJO is a subvlass
+   *         and for which we will be linking to
+   * @param  clazz the subclass of POJO for which to link the root class info object for
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> or any of its type
+   *         classes don't represent valid POJO classes
+   */
+  @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+  RootClassInfoImpl(RootClassInfoImpl<? super T> rinfo, Class<T> clazz) {
+    super((ClassInfoImpl<T>)rinfo, clazz);
+    // first make sure the class is abstract
+    org.apache.commons.lang3.Validate.isTrue(
+      Modifier.isAbstract(clazz.getModifiers()),
+      "root entity class '%s', must be abstract", clazz.getSimpleName()
+    );
+    this.ctypes = (Map<Class<? extends T>, TypeClassInfoImpl<? extends T>>)(Map)rinfo.ctypes; // reference the same map
+    this.ntypes = (Map<String, TypeClassInfoImpl<? extends T>>)(Map)rinfo.ntypes; // reference the same map
+  }
+
+  /**
    * Validates this root entity class and complement its schema with the
    * additional columns defined by the type entities.
    *
@@ -525,6 +549,74 @@ public class RootClassInfoImpl<T>
         org.apache.commons.lang3.Validate.isTrue(
           rc.getDataType().getType() == c.getDataType().getType(),
           "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
+          c.getDeclaringClass().getSimpleName(),
+          c.getName(),
+          c.getDataType().getType(),
+          rc.getDeclaringClass().getSimpleName(),
+          rc.getName(),
+          rc.getDataType().getType(),
+          t.getName(),
+          type.getSimpleName()
+        );
+      });
+    });
+    return tcinfo;
+  }
+
+  /**
+   * Creates a new POJO subclass to this root entity.
+   *
+   * @author paouelle
+   *
+   * @param  mgr the non-<code>null</code> statement manager
+   * @param  type the POJO subclass
+   * @return the non-<code>null</code> class info for the specified subclass
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if the subclass is invalid
+   */
+  SubClassInfoImpl<? extends T> newSubClass(
+    StatementManagerImpl mgr, Class<?> type
+  ) {
+    org.apache.commons.lang3.Validate.isTrue(
+      clazz.isAssignableFrom(type),
+      "subclass '%s' must extends root element class: %s",
+      type.getName(), clazz.getName()
+    );
+    @SuppressWarnings("unchecked") // tested above!
+    final SubClassInfoImpl<? extends T> tcinfo
+      = new SubClassInfoImpl<>(this, (Class<? extends T>)type);
+
+    org.apache.commons.lang3.Validate.isTrue(
+      !ctypes.containsKey(tcinfo.getObjectClass()),
+      "a type element class '%s' is already defined for root element class '%s'",
+      type.getSimpleName(), clazz.getSimpleName()
+    );
+    // make sure this type doesn't define any new columns or different type of columns
+    tcinfo.getTablesImpl().forEach(t -> {
+      // make sure the table is defined in root
+      final TableInfoImpl<? extends T> rt = getTableImpl(t.getName());
+
+      // make sure there are no new non-primary columns and make sure that for
+      // those defined they are of the same type
+      t.getNonPrimaryKeys().stream().forEach(c -> {
+        final FieldInfoImpl<? extends T> rc = rt.getColumnImpl(c.getColumnName());
+
+        org.apache.commons.lang3.Validate.isTrue(
+          rc != null,
+          "root element '%s' doesn't define column '%s' in pojo '%s'",
+          clazz.getSimpleName(),
+          c.getColumnName(),
+          type.getSimpleName()
+        );
+        // already defined so skip it but not before making sure it is compatible
+        if (rc.getDeclaringClass().equals(c.getDeclaringClass())) {
+          // same exact field so we are good
+          return;
+        }
+        // check data type
+        org.apache.commons.lang3.Validate.isTrue(
+          rc.getDataType().getType() == c.getDataType().getType(),
+          "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in subclass '%s'",
           c.getDeclaringClass().getSimpleName(),
           c.getName(),
           c.getDataType().getType(),
