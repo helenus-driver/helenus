@@ -217,7 +217,7 @@ public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
+   * @see org.helenus.driver.impl.RootClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
    */
   @Override
   public T getObject(Row row, Map<String, Object> suffixes) {
@@ -246,7 +246,7 @@ public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.impl.RootClassInfoImpl#getType(java.lang.Class)
    */
@@ -261,7 +261,7 @@ public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.impl.RootClassInfoImpl#getType(java.lang.String)
    */
@@ -278,7 +278,7 @@ public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.impl.RootClassInfoImpl#types()
    */
@@ -291,7 +291,7 @@ public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.impl.RootClassInfoImpl#typeImpls()
    */
@@ -304,7 +304,7 @@ public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.impl.RootClassInfoImpl#getNumTypes()
    */

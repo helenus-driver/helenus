@@ -2360,22 +2360,31 @@ public class HelenusJUnit implements MethodRule {
     }
 
     /**
-     * Handles requests to the root entity by forcing all sub-types to be cached
-     * properly so that all required initial objects be inserted in the DB prior
-     * to processing a request to the root.
+     * Handles requests to a root or type entity defined as a base class for
+     * other type entities by forcing all sub-types to be cached properly so
+     * that all required initial objects be inserted in the DB prior to
+     * processing a request to the root.
      *
      * @author paouelle
      *
      * @param cinfo the non-<code>null</code> class info to check if it is
-     *        represents a root entity
+     *        represents a base class of type entities
      */
-    private <T> void handleRootClassInfo(ClassInfo<T> cinfo) {
+    private <T> void handleBaseClassInfo(ClassInfo<T> cinfo) {
       if (HelenusJUnit.capturing.get() > 0) {
         // don't bother if we are recursing from within HelenusJUnit
         return;
       }
       if (cinfo instanceof RootClassInfoImpl) {
         ((RootClassInfoImpl<T>)cinfo).types()
+          .forEachOrdered(t -> getClassInfoImpl(t.getObjectClass()));
+      } else if (cinfo instanceof TypeClassInfoImpl) {
+        // make sure to cache all sub-types if any
+        final TypeClassInfoImpl<T> tcinfo = (TypeClassInfoImpl<T>)cinfo;
+
+        tcinfo.getRoot().types()
+          .filter(t -> !cinfo.getObjectClass().equals(t.getObjectClass())) // skip us
+          .filter(t -> cinfo.getObjectClass().isAssignableFrom(t.getObjectClass()))
           .forEachOrdered(t -> getClassInfoImpl(t.getObjectClass()));
       }
     }
@@ -2434,7 +2443,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Insert.Builder<T> insert(T object) {
       final Insert.Builder<T> b = super.insert(object);
 
-      handleRootClassInfo(b.getClassInfo());
+      handleBaseClassInfo(b.getClassInfo());
       return b;
     }
 
@@ -2449,7 +2458,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Update<T> update(T object) {
       final Update<T> u = super.update(object);
 
-      handleRootClassInfo(u.getClassInfo());
+      handleBaseClassInfo(u.getClassInfo());
       return u;
     }
 
@@ -2464,7 +2473,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Update<T> update(T object, String... tables) {
       final Update<T> u = super.update(object, tables);
 
-      handleRootClassInfo(u.getClassInfo());
+      handleBaseClassInfo(u.getClassInfo());
       return u;
     }
 
@@ -2481,7 +2490,7 @@ public class HelenusJUnit implements MethodRule {
     ) {
       final Delete.Builder<T> b = super.delete(object, columns);
 
-      handleRootClassInfo(b.getClassInfo());
+      handleBaseClassInfo(b.getClassInfo());
       return b;
     }
 
@@ -2496,7 +2505,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Delete.Selection<T> delete(T object) {
       final Delete.Selection<T> s = super.delete(object);
 
-      handleRootClassInfo(s.getClassInfo());
+      handleBaseClassInfo(s.getClassInfo());
       return s;
     }
 
@@ -2513,7 +2522,7 @@ public class HelenusJUnit implements MethodRule {
     ) {
       final Delete.Builder<T> b = super.delete(clazz, columns);
 
-      handleRootClassInfo(b.getClassInfo());
+      handleBaseClassInfo(b.getClassInfo());
       return b;
     }
 
@@ -2528,7 +2537,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Delete.Selection<T> delete(Class<T> clazz) {
       final Delete.Selection<T> s = super.delete(clazz);
 
-      handleRootClassInfo(s.getClassInfo());
+      handleBaseClassInfo(s.getClassInfo());
       return s;
     }
 
@@ -2543,7 +2552,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> CreateKeyspace<T> createKeyspace(Class<T> clazz) {
       final CreateKeyspace<T> c = super.createKeyspace(clazz);
 
-      handleRootClassInfo(c.getClassInfo());
+      handleBaseClassInfo(c.getClassInfo());
       return c;
     }
 
@@ -2558,7 +2567,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> CreateType<T> createType(Class<T> clazz) {
       final CreateType<T> c = super.createType(clazz);
 
-      handleRootClassInfo(c.getClassInfo());
+      handleBaseClassInfo(c.getClassInfo());
       return c;
     }
 
@@ -2573,7 +2582,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> CreateTable<T> createTable(Class<T> clazz) {
       final CreateTable<T> c = super.createTable(clazz);
 
-      handleRootClassInfo(c.getClassInfo());
+      handleBaseClassInfo(c.getClassInfo());
       return c;
     }
 
@@ -2588,7 +2597,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> CreateTable<T> createTable(Class<T> clazz, String... tables) {
       final CreateTable<T> c = super.createTable(clazz, tables);
 
-      handleRootClassInfo(c.getClassInfo());
+      handleBaseClassInfo(c.getClassInfo());
       return c;
     }
 
@@ -2603,7 +2612,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> CreateIndex.Builder<T> createIndex(Class<T> clazz) {
       final CreateIndex.Builder<T> b = super.createIndex(clazz);
 
-      handleRootClassInfo(b.getClassInfo());
+      handleBaseClassInfo(b.getClassInfo());
       return b;
     }
 
@@ -2618,7 +2627,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> CreateSchema<T> createSchema(Class<T> clazz) {
       final CreateSchema<T> c = super.createSchema(clazz);
 
-      handleRootClassInfo(c.getClassInfo());
+      handleBaseClassInfo(c.getClassInfo());
       return c;
     }
 
@@ -2633,7 +2642,7 @@ public class HelenusJUnit implements MethodRule {
     protected CreateSchemas createSchemas(String[] pkgs) {
       final CreateSchemas c = super.createSchemas(pkgs);
 
-      c.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      c.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return c;
     }
 
@@ -2648,7 +2657,7 @@ public class HelenusJUnit implements MethodRule {
     protected CreateSchemas createMatchingSchemas(String[] pkgs) {
       final CreateSchemas c = super.createMatchingSchemas(pkgs);
 
-      c.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      c.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return c;
     }
 
@@ -2663,7 +2672,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> AlterSchema<T> alterSchema(Class<T> clazz) {
       final AlterSchema<T> a = super.alterSchema(clazz);
 
-      handleRootClassInfo(a.getClassInfo());
+      handleBaseClassInfo(a.getClassInfo());
       return a;
     }
 
@@ -2678,7 +2687,7 @@ public class HelenusJUnit implements MethodRule {
     protected AlterSchemas alterSchemas(String[] pkgs) {
       final AlterSchemas a = super.alterSchemas(pkgs);
 
-      a.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      a.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return a;
     }
 
@@ -2693,7 +2702,7 @@ public class HelenusJUnit implements MethodRule {
     protected AlterSchemas alterMatchingSchemas(String[] pkgs) {
       final AlterSchemas a = super.alterMatchingSchemas(pkgs);
 
-      a.classInfos().forEachOrdered(cinfo -> handleRootClassInfo(cinfo));
+      a.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return a;
     }
 
@@ -2708,7 +2717,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Truncate<T> truncate(Class<T> clazz) {
       final Truncate<T> t = super.truncate(clazz);
 
-      handleRootClassInfo(t.getClassInfo());
+      handleBaseClassInfo(t.getClassInfo());
       return t;
     }
 
@@ -2723,7 +2732,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Truncate<T> truncate(Class<T> clazz, String... tables) {
       final Truncate<T> t = super.truncate(clazz, tables);
 
-      handleRootClassInfo(t.getClassInfo());
+      handleBaseClassInfo(t.getClassInfo());
       return t;
     }
 
@@ -2738,7 +2747,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Select.Builder<T> select(Class<T> clazz, CharSequence... columns) {
       final Select.Builder<T> b = super.select(clazz, columns);
 
-      handleRootClassInfo(b.getClassInfo());
+      handleBaseClassInfo(b.getClassInfo());
       return b;
     }
 
@@ -2753,7 +2762,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Select.Selection<T> select(Class<T> clazz) {
       final Select.Selection<T> s = super.select(clazz);
 
-      handleRootClassInfo(s.getClassInfo());
+      handleBaseClassInfo(s.getClassInfo());
       return s;
     }
 
@@ -2770,7 +2779,7 @@ public class HelenusJUnit implements MethodRule {
     ) {
       final Select<T> s = super.selectFrom(table, columns);
 
-      handleRootClassInfo(s.getClassInfo());
+      handleBaseClassInfo(s.getClassInfo());
       return s;
     }
 
@@ -2785,7 +2794,7 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Select.TableSelection<T> selectFrom(TableInfo<T> table) {
       final Select.TableSelection<T> s = super.selectFrom(table);
 
-      handleRootClassInfo(s.getClassInfo());
+      handleBaseClassInfo(s.getClassInfo());
       return s;
     }
 
@@ -2838,7 +2847,7 @@ public class HelenusJUnit implements MethodRule {
  * The <code>SchemaFuture</code> class defines a specific future used when
  * creating or resetting schemas. It is reentrant from the owner's thread.
  *
-  * @copyright 2016-2016 The Helenus Driver Project Authors
+ * @copyright 2016-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Feb 1, 2016 - paouelle - Creation
