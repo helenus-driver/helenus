@@ -53,53 +53,6 @@ public class RootClassInfoImpl<T>
   extends ClassInfoImpl<T>
   implements RootClassInfo<T> {
   /**
-   * Finds the class info for all type classes for this root element class.
-   *
-   * @author paouelle
-   *
-   * @param <T> The type of POJO represented by this root element class
-   *
-   * @param  mgr the non-<code>null</code> statement manager
-   * @param  clazz the root POJO class
-   * @return the non-<code>null</code> map of class info for all types
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
-   * @throws IllegalArgumentException if any of the type classes are invalid
-   */
-  private static <T> Map<Class<? extends T>, TypeClassInfoImpl<? extends T>> findTypeInfos(
-    StatementManagerImpl mgr, Class<T> clazz
-  ) {
-    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null root POJO class");
-    final RootEntity re = clazz.getAnnotation(RootEntity.class);
-    final int hsize = re.types().length * 3 / 2;
-    final Map<Class<? extends T>, TypeClassInfoImpl<? extends T>> types
-      = new HashMap<>(hsize);
-    final Set<String> names = new HashSet<>(hsize);
-
-    for (final Class<?> type: re.types()) {
-      org.apache.commons.lang3.Validate.isTrue(
-        clazz.isAssignableFrom(type),
-        "type class '%s' must extends root element class: %s",
-        type.getName(), clazz.getName()
-      );
-      @SuppressWarnings("unchecked") // tested above!
-      final TypeClassInfoImpl<? extends T> tcinfo
-        = new TypeClassInfoImpl<>(mgr, clazz, (Class<? extends T>)type, false);
-
-      org.apache.commons.lang3.Validate.isTrue(
-        types.put(tcinfo.getObjectClass(), tcinfo) == null,
-        "duplicate type element class '%s' defined for root element class '%s'",
-        type.getSimpleName(), clazz.getSimpleName()
-      );
-      org.apache.commons.lang3.Validate.isTrue(
-        names.add(tcinfo.getType()),
-        "duplicate type name '%s' defined by class '%s' for root element class '%s'",
-        tcinfo.getType(), type.getSimpleName(), clazz.getSimpleName()
-      );
-    }
-    return types;
-  }
-
-  /**
    * The <code>Context</code> class extends the {@link ClassInfoImpl.Context}.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
@@ -401,41 +354,21 @@ public class RootClassInfoImpl<T>
    *
    * @param  mgr the non-<code>null</code> statement manager
    * @param  clazz the root class of POJO for which to get a class info object for
-   * @param  types the non-<code>null</code> map of all type class infos
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>clazz</code> or any of its type
    *         classes don't represent valid POJO classes
    */
-  private RootClassInfoImpl(
-    StatementManagerImpl mgr,
-    Class<T> clazz,
-    Map<Class<? extends T>, TypeClassInfoImpl<? extends T>> types
-  ) {
+  RootClassInfoImpl(StatementManagerImpl mgr, Class<T> clazz) {
     super(mgr, clazz, RootEntity.class);
     // first make sure the class is abstract
     org.apache.commons.lang3.Validate.isTrue(
       Modifier.isAbstract(clazz.getModifiers()),
       "root entity class '%s', must be abstract", clazz.getSimpleName()
     );
-    this.ctypes = types;
-    this.ntypes = types.values().stream()
+    this.ctypes = findTypeInfos(mgr);
+    this.ntypes = ctypes.values().stream()
       .collect(Collectors.toMap(tcinfo -> tcinfo.getType(), tcinfo -> tcinfo));
     validateAndComplementSchema();
-  }
-
-  /**
-   * Instantiates a new <code>RootClassInfoImpl</code> object.
-   *
-   * @author paouelle
-   *
-   * @param  mgr the non-<code>null</code> statement manager
-   * @param  clazz the root class of POJO for which to get a class info object for
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
-   * @throws IllegalArgumentException if <code>clazz</code> or any of its type
-   *         classes don't represent valid POJO classes
-   */
-  RootClassInfoImpl(StatementManagerImpl mgr, Class<T> clazz) {
-    this(mgr, clazz, RootClassInfoImpl.findTypeInfos(mgr, clazz));
   }
 
   /**
@@ -460,6 +393,50 @@ public class RootClassInfoImpl<T>
     );
     this.ctypes = (Map<Class<? extends T>, TypeClassInfoImpl<? extends T>>)(Map)rinfo.ctypes; // reference the same map
     this.ntypes = (Map<String, TypeClassInfoImpl<? extends T>>)(Map)rinfo.ntypes; // reference the same map
+  }
+
+  /**
+   * Finds the class info for all type classes for this root element class.
+   *
+   * @author paouelle
+   *
+   * @param  mgr the non-<code>null</code> statement manager
+   * @return the non-<code>null</code> map of class info for all types
+   * @throws IllegalArgumentException if any of the type classes are invalid
+   */
+  private Map<Class<? extends T>, TypeClassInfoImpl<? extends T>> findTypeInfos(
+    StatementManagerImpl mgr
+  ) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null root POJO class");
+    final RootEntity re = clazz.getAnnotation(RootEntity.class);
+    final int hsize = re.types().length * 3 / 2;
+    final Map<Class<? extends T>, TypeClassInfoImpl<? extends T>> types
+      = new HashMap<>(hsize);
+    final Set<String> names = new HashSet<>(hsize);
+
+    for (final Class<?> type: re.types()) {
+      org.apache.commons.lang3.Validate.isTrue(
+        clazz.isAssignableFrom(type),
+        "type class '%s' must extends root element class: %s",
+        type.getName(), clazz.getName()
+      );
+      @SuppressWarnings("unchecked") // tested above!
+      final TypeClassInfoImpl<? extends T> tcinfo = new TypeClassInfoImpl<>(
+        mgr, (RootClassInfoImpl<? super T>)this, (Class<? extends T>)type, false
+       );
+
+      org.apache.commons.lang3.Validate.isTrue(
+        types.put(tcinfo.getObjectClass(), tcinfo) == null,
+        "duplicate type element class '%s' defined for root element class '%s'",
+        type.getSimpleName(), clazz.getSimpleName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        names.add(tcinfo.getType()),
+        "duplicate type name '%s' defined by class '%s' for root element class '%s'",
+        tcinfo.getType(), type.getSimpleName(), clazz.getSimpleName()
+      );
+    }
+    return types;
   }
 
   /**
@@ -511,7 +488,7 @@ public class RootClassInfoImpl<T>
     );
     @SuppressWarnings("unchecked") // tested above!
     final TypeClassInfoImpl<? extends T> tcinfo
-      = new TypeClassInfoImpl<>(mgr, clazz, (Class<? extends T>)type, true);
+      = new TypeClassInfoImpl<>(mgr, this, (Class<? extends T>)type, true);
 
     org.apache.commons.lang3.Validate.isTrue(
       ctypes.put(tcinfo.getObjectClass(), tcinfo) == null,

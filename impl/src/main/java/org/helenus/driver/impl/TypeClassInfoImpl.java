@@ -25,7 +25,6 @@ import com.datastax.driver.core.Row;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ObjectConversionException;
-import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.TypeClassInfo;
 import org.helenus.driver.persistence.Keyspace;
 import org.helenus.driver.persistence.RootEntity;
@@ -46,16 +45,16 @@ import org.helenus.driver.persistence.TypeEntity;
  * @since 2.0
  */
 @lombok.ToString(callSuper=true)
-@lombok.EqualsAndHashCode(callSuper=true)
+@lombok.EqualsAndHashCode(callSuper=true, exclude="rinfo")
 public class TypeClassInfoImpl<T>
   extends ClassInfoImpl<T>
   implements TypeClassInfo<T> {
   /**
-   * Holds the class of POJO for the root entity this POJO is a type.
+   * Holds the class info for the root entity this POJO is a type.
    *
    * @author paouelle
    */
-  private final Class<? super T> rclazz;
+  private final RootClassInfoImpl<? super T> rinfo;
 
   /**
    * Holds the type for this POJO class.
@@ -78,17 +77,20 @@ public class TypeClassInfoImpl<T>
    * @author paouelle
    *
    * @param  mgr the non-<code>null</code> statement manager
-   * @param  rclazz the class of POJO for the root entity this POJO is a type
+   * @param  rinfo the class info for the root entity this POJO is a type
    * @param  clazz the class of POJO for which to get a class info object for
    * @param  dynamic <code>true</code> if this type is dynamically being added
    *         to the root; <code>false</code> if it was known to the root via
    *         the @RootEnitty annotation
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws NullPointerException if <code>rinfo</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
    *         a valid POJO class
    */
   TypeClassInfoImpl(
-    StatementManagerImpl mgr, Class<? super T> rclazz, Class<T> clazz, boolean dynamic
+    StatementManagerImpl mgr,
+    RootClassInfoImpl<? super T> rinfo,
+    Class<T> clazz,
+    boolean dynamic
   ) {
     super(mgr, clazz, RootEntity.class); // search for ctor starting at root
     org.apache.commons.lang3.Validate.isTrue(
@@ -96,10 +98,10 @@ public class TypeClassInfoImpl<T>
       "type entity class '%s', cannot be abstract", clazz.getSimpleName()
     );
     this.type = findType();
-    this.rclazz = rclazz;
+    this.rinfo = rinfo;
     this.dynamic = dynamic;
     // validate the type entity POJO class
-    validate(rclazz);
+    validate(rinfo.getObjectClass());
   }
 
   /**
@@ -212,7 +214,7 @@ public class TypeClassInfoImpl<T>
   @Override
   @SuppressWarnings("unchecked")
   public RootClassInfoImpl<? super T> getRoot() {
-    return (RootClassInfoImpl<? super T>)StatementBuilder.getClassInfo(rclazz);
+    return rinfo;
   }
 
   /**
@@ -275,10 +277,12 @@ public class TypeClassInfoImpl<T>
    * @throws ObjectConversionException if unable to convert to a POJO
    */
   public T getObject(Row row, String type, Map<String, Object> suffixes) {
-    if ((row == null) || !this.type.equals(type)) {
-      return null;
+    if ((row != null)
+        && (this.type.equals(type)
+            || clazz.isAssignableFrom(rinfo.getType(type).getObjectClass()))) {
+      return super.getObject(row, suffixes);
     }
-    return super.getObject(row, suffixes);
+    return null;
   }
 
   /**
