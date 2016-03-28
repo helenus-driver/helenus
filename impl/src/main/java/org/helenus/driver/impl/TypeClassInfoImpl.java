@@ -276,11 +276,18 @@ public class TypeClassInfoImpl<T>
    *         is <code>null</code>
    * @throws ObjectConversionException if unable to convert to a POJO
    */
+  @SuppressWarnings("unchecked")
   public T getObject(Row row, String type, Map<String, Object> suffixes) {
-    if ((row != null)
-        && (this.type.equals(type)
-            || clazz.isAssignableFrom(rinfo.getType(type).getObjectClass()))) {
-      return super.getObject(row, suffixes);
+    if (row != null) {
+      if (this.type.equals(type)) { // it is our kind
+        return super.getObject(row, suffixes);
+      }
+      final TypeClassInfoImpl<?> tinfo = rinfo.getType(type);
+
+      if (clazz.isAssignableFrom(tinfo.getObjectClass())) {
+        // delegate to this sub type info class
+        return (T)tinfo.getObject(row, type, suffixes);
+      }
     }
     return null;
   }
