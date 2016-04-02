@@ -844,6 +844,13 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    */
   private Map<Field, Object> findFinalFields() {
     final Map<Field, Object> ffields = new HashMap<>(8);
+
+    // if this class is abstract then we know we won't be instantiating it
+    // anyway, so we can just skip this as any derived class would hit its
+    // default ctor and thus; properly initialize its final fields if any
+    if (Modifier.isAbstract(clazz.getModifiers())) {
+      return ffields;
+    }
     MutableObject<Object> obj = null; // lazy evaluated
 
     // go up the hierarchy until we hit the class for which we have a default
