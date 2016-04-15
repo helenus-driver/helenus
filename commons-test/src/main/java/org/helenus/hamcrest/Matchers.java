@@ -16,6 +16,7 @@
 package org.helenus.hamcrest;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 
 import mockit.Deencapsulation;
@@ -23,6 +24,7 @@ import mockit.Deencapsulation;
 import org.hamcrest.Description;
 import org.hamcrest.DiagnosingMatcher;
 import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
 
 /**
  * The <code>Matchers</code> class provides a factory for matchers.
@@ -53,7 +55,7 @@ public class Matchers {
     return new DiagnosingMatcher<T>() {
       @SuppressWarnings("unchecked")
       @Override
-      public boolean matches(java.lang.Object obj, Description mismatch) {
+      public boolean matches(Object obj, Description mismatch) {
         final S s = function.apply((T)obj);
 
         if (!matcher.matches(s)) {
@@ -95,7 +97,7 @@ public class Matchers {
     return new DiagnosingMatcher<T>() {
       @SuppressWarnings("unchecked")
       @Override
-      public boolean matches(java.lang.Object obj, Description mismatch) {
+      public boolean matches(Object obj, Description mismatch) {
         final S s = function.apply((T)obj);
 
         if (!Objects.deepEquals(os, s)) {
@@ -144,7 +146,7 @@ public class Matchers {
     return new DiagnosingMatcher<T>() {
       @SuppressWarnings("unchecked")
       @Override
-      public boolean matches(java.lang.Object obj, Description mismatch) {
+      public boolean matches(Object obj, Description mismatch) {
         final S s = function.apply((T)obj);
 
         if (!org.helenus.util.Objects.deepEquals(os, s, epsilon)) {
@@ -187,7 +189,7 @@ public class Matchers {
     return new DiagnosingMatcher<T>() {
       @SuppressWarnings("unchecked")
       @Override
-      public boolean matches(java.lang.Object obj, Description mismatch) {
+      public boolean matches(Object obj, Description mismatch) {
         final S s = Deencapsulation.getField(obj,  field);
 
         if (!matcher.matches(s)) {
@@ -203,6 +205,119 @@ public class Matchers {
           .appendText(field)
           .appendText("' ")
           .appendDescriptionOf(matcher);
+      }
+    };
+  }
+
+  /**
+   * Creates a matcher for {@link Optional}s matching examined optionals whose
+   * value is present.
+   *
+   * @param <E> the type of the value
+   *
+   * @author paouelle
+   *
+   * @return a corresponding matcher
+   */
+  public static <E> Matcher<Optional<E>> isPresent() {
+    return new TypeSafeMatcher<Optional<E>>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("is present");
+      }
+      @Override
+      protected boolean matchesSafely(Optional<E> item) {
+        return item.isPresent();
+      }
+      @Override
+      protected void describeMismatchSafely(
+        Optional<E> item, Description mismatchDescription
+      ) {
+        mismatchDescription.appendText("was empty");
+      }
+    };
+  }
+
+  /**
+   * Creates a matcher for {@link Optional}s matching examined optionals whose
+   * value is not present.
+   *
+   * @param <E> the type of the value
+   *
+   * @author paouelle
+   *
+   * @return a corresponding matcher
+   */
+  public static <E> Matcher<Optional<E>> isEmpty() {
+    return new TypeSafeMatcher<Optional<E>>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("is empty");
+      }
+      @Override
+      protected boolean matchesSafely(Optional<E> item) {
+        return !item.isPresent();
+      }
+      @Override
+      protected void describeMismatchSafely(
+        Optional<E> item, Description mismatchDescription
+      ) {
+        mismatchDescription.appendText("had value ").appendValue(item.get());
+      }
+    };
+  }
+
+  /**
+   * Creates a matcher for {@link Optional}s matching examined optionals whose
+   * value is equal to the provided one.
+   *
+   * @param <E> the type of the value
+   *
+   * @author paouelle
+   *
+   * @param  value the object to compare the optional's value with
+   * @return a corresponding matcher
+   */
+  public static <E> Matcher<Optional<E>> hasValue(E value) {
+    return Matchers.hasValue(org.hamcrest.core.IsEqual.equalTo(value));
+  }
+
+  /**
+   * Creates a matcher for {@link Optional}s matching examined optionals whose
+   * value matches the provided matcher.
+   *
+   * @param <E> the type of the value
+   *
+   * @author paouelle
+   *
+   * @param  matcher a matcher for the optional's value to match against
+   * @return a corresponding matcher
+   */
+  public static <E> Matcher<Optional<E>> hasValue(
+    final Matcher<? super E> matcher
+  ) {
+    return new TypeSafeMatcher<Optional<E>>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("has a value that is ");
+        matcher.describeTo(description);
+      }
+      @Override
+      protected boolean matchesSafely(Optional<E> item) {
+        return item.map(v -> matcher.matches(v)).orElse(false);
+      }
+      @Override
+      protected void describeMismatchSafely(
+        Optional<E> item, Description mismatchDescription
+      ) {
+        final Object v = item.orElse(null);
+
+        if (v != null) {
+          mismatchDescription.appendText("value ");
+          matcher.describeMismatch(v, mismatchDescription);
+        } else {
+          mismatchDescription.appendText("was empty");
+        }
       }
     };
   }
