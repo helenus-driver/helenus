@@ -15,6 +15,7 @@
  */
 package org.helenus.driver;
 
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.helenus.driver.info.ClassInfo;
@@ -25,7 +26,7 @@ import org.helenus.driver.info.TableInfo;
  * {@link com.datastax.driver.core.querybuilder.Insert} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -128,7 +129,29 @@ public interface Insert<T>
    * @param  using the option to add.
    * @return the options of this INSERT statement.
    */
-  public Options<T> using(Using using);
+  public Options<T> using(Using<?> using);
+
+  /**
+   * Gets all options registered with this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> stream of all options registered with this
+   *         statement
+   */
+  public Stream<Using<?>> usings();
+
+  /**
+   * Gets an option registered with this statement given its name
+   *
+   * @author paouelle
+   *
+   * @param <U> the type of the option
+   *
+   * @param  name the name of the option to retrieve
+   * @return the registered option with the given name or empty if none registered
+   */
+  public <U> Optional<Using<U>> getUsing(String name);
 
   /**
    * Sets the 'IF NOT EXISTS' option for this INSERT statement.
@@ -245,7 +268,7 @@ public interface Insert<T>
      * @param  using an INSERT option
      * @return this {@code Options} object
      */
-    public Options<T> and(Using using);
+    public Options<T> and(Using<?> using);
 
     /**
      * Adds a column/value pair to the values inserted by this INSERT statement.

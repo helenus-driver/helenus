@@ -15,6 +15,8 @@
  */
 package org.helenus.driver.impl;
 
+import java.util.Objects;
+
 import org.helenus.driver.Using;
 
 /**
@@ -22,16 +24,26 @@ import org.helenus.driver.Using;
  * {@link com.datastax.driver.core.querybuilder.Using} to provide support for
  * POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
  *
+ * @param <T> the type of the option
+ *
  * @since 1.0
  */
-public class UsingImpl
+public class UsingImpl<T>
   extends Utils.Appendeable
-  implements Using {
+  implements Using<T> {
+  /**
+   * Holds the statement this option applies to. The value is set at the time
+   * the option is added to a statement
+   *
+   * @author paouelle
+   */
+  private volatile StatementImpl<?, ?, ?> statement = null;
+
   /**
    * Holds the option name.
    *
@@ -44,7 +56,7 @@ public class UsingImpl
    *
    * @author paouelle
    */
-  private final long value;
+  private T value;
 
   /**
    * Instantiates a new <code>UsingImpl</code> object.
@@ -54,9 +66,41 @@ public class UsingImpl
    * @param optionName the option name
    * @param value the option's value
    */
-  UsingImpl(String optionName, long value) {
+  UsingImpl(String optionName, T value) {
     this.optionName = optionName;
     this.value = value;
+  }
+
+  /**
+   * Instantiates a new <code>UsingImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param using the option we are copying
+   * @param statement the statement we are assigning this new option to
+   */
+  UsingImpl(UsingImpl<T> using, StatementImpl<?, ?, ?> statement) {
+    this.optionName = using.optionName;
+    this.value = using.value;
+    this.statement = statement;
+  }
+
+  /**
+   * Associate this option to a statement if not already associated.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  statement the statement to associate with this option
+   * @return this option if it was not already associate with a statement or a
+   *         copy if it was
+   */
+  UsingImpl<T> setStatement(StatementImpl<?, ?, ?> statement) {
+    if (this.statement == null) {
+      this.statement = statement;
+      return this;
+    }
+    // clone these options since they are already assigned to another statement
+    return new UsingImpl<>(this, statement);
   }
 
   /**
@@ -69,5 +113,93 @@ public class UsingImpl
   @Override
   void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
     sb.append(optionName).append(" ").append(value);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Using#getName()
+   */
+  @Override
+  public String getName() {
+    return optionName;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Using#getValue()
+   */
+  @Override
+  public T getValue() {
+    return value;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Using#setValue(java.lang.Object)
+   */
+  @Override
+  public void setValue(T value) {
+    org.apache.commons.lang3.Validate.notNull(value, "invalid null value");
+    if (!Objects.equals(this.value, value)) {
+      this.value = value;
+      final StatementImpl<?, ?, ?> s = statement;
+
+      if (s != null) { // dirty the statement now that we changed an option
+        s.setDirty();
+      }
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#hashCode()
+   */
+  @Override
+  public int hashCode() {
+    return 31 ^ optionName.hashCode() ^ value.hashCode();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#equals(java.lang.Object)
+   */
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (obj instanceof UsingImpl) {
+      final UsingImpl<?> u = (UsingImpl<?>)obj;
+
+      return value.equals(u.getValue()) && optionName.equals(u.getName());
+    }
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return optionName + "=" + value;
   }
 }

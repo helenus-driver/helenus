@@ -147,7 +147,12 @@ public class StatementCaptureList<T extends GenericStatement> {
       }
       s.forEachOrdered(os -> {
         if (clazz.isInstance(os)) {
-          // first intercept
+          // first check if we already received this statement in which case we
+          // want to skip processing it a second time
+          if (list.stream().anyMatch(ls -> ls == os)) { // identity check
+            return;
+          }
+          // now intercept
           for (final Iterator<MutablePair<Consumer<? extends GenericStatement>, Integer>> i = interceptors.iterator(); i.hasNext(); ) {
             final MutablePair<Consumer<? extends GenericStatement>, Integer> m = i.next();
             final int num = m.getRight().intValue() - 1;
@@ -244,9 +249,7 @@ public class StatementCaptureList<T extends GenericStatement> {
    * @return this for chaining
    * @throws NullPointerException if <code>consumer</code> is <code>null</code>
    */
-  public StatementCaptureList<T> intercept(
-    Consumer<? extends GenericStatement> consumer
-  ) {
+  public StatementCaptureList<T> intercept(Consumer<T> consumer) {
     return intercept(Integer.MAX_VALUE, consumer);
   }
 
@@ -264,9 +267,7 @@ public class StatementCaptureList<T extends GenericStatement> {
    * @throws NullPointerException if <code>consumer</code> is <code>null</code>
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public StatementCaptureList<T> intercept(
-    int num, Consumer<? extends GenericStatement> consumer
-  ) {
+  public StatementCaptureList<T> intercept(int num, Consumer<T> consumer) {
     org.apache.commons.lang3.Validate.notNull(consumer, "invalid null consumer");
     if (num > 0) {
       ((List)interceptors).add(MutablePair.of(consumer, num));

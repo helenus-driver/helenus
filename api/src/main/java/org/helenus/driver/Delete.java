@@ -15,6 +15,7 @@
  */
 package org.helenus.driver;
 
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.helenus.driver.info.ClassInfo;
@@ -25,7 +26,7 @@ import org.helenus.driver.info.TableInfo;
  * {@link com.datastax.driver.core.querybuilder.Delete} class to provide
  * support for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -79,7 +80,29 @@ public interface Delete<T>
    * @param  using the option to add.
    * @return the options of this DELETE statement.
    */
-  public Options<T> using(Using using);
+  public Options<T> using(Using<?> using);
+
+  /**
+   * Gets all options registered with this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> stream of all options registered with this
+   *         statement
+   */
+  public Stream<Using<?>> usings();
+
+  /**
+   * Gets an option registered with this statement given its name
+   *
+   * @author paouelle
+   *
+   * @param <U> the type of the option
+   *
+   * @param  name the name of the option to retrieve
+   * @return the registered option with the given name or empty if none registered
+   */
+  public <U> Optional<Using<U>> getUsing(String name);
 
   /**
    * Sets the 'IF EXISTS' option for this DELETE statement.
@@ -101,7 +124,7 @@ public interface Delete<T>
   /**
    * The <code>Where</code> interface defines WHERE clause for a DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -134,7 +157,7 @@ public interface Delete<T>
      * @param  using the using clause to add.
      * @return the options of the DELETE statement this WHERE clause is part of.
      */
-    public Options<T> using(Using using);
+    public Options<T> using(Using<?> using);
 
     /**
      * Sets the 'IF EXISTS' option for the DELETE statement this WHERE clause
@@ -158,7 +181,7 @@ public interface Delete<T>
   /**
    * The <code>Options</code> interface defines the options of a DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -177,7 +200,7 @@ public interface Delete<T>
      * @param  using a DELETE option.
      * @return this {@code Options} object.
      */
-    public Options<T> and(Using using);
+    public Options<T> and(Using<?> using);
 
     /**
      * Adds a where clause to the DELETE statement these options are part of.
@@ -197,7 +220,7 @@ public interface Delete<T>
   /**
    * The <code>Builder</code> interface defines an in-construction DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -279,7 +302,7 @@ public interface Delete<T>
    * The <code>Selection</code> interface defines a selection clause for an
    * in-construction DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation

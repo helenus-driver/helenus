@@ -1322,12 +1322,12 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#timestamp(long)
    */
   @Override
-  protected Using timestamp(long timestamp) {
+  protected Using<Long> timestamp(long timestamp) {
     org.apache.commons.lang3.Validate.isTrue(
       timestamp >= 0L,
       "invalid timestamp, must be positive: %s", timestamp
     );
-    return new UsingImpl("TIMESTAMP", timestamp);
+    return new UsingImpl<>(Using.TIMESTAMP, timestamp);
   }
 
   /**
@@ -1338,12 +1338,12 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#ttl(int)
    */
   @Override
-  protected Using ttl(int ttl) {
+  protected Using<Integer> ttl(int ttl) {
     org.apache.commons.lang3.Validate.isTrue(
       ttl >= 0,
       "invalid ttl, must be positive: %s", ttl
     );
-    return new UsingImpl("TTL", ttl);
+    return new UsingImpl<>(Using.TTL, ttl);
   }
 
   /**

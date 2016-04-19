@@ -38,7 +38,7 @@ import org.helenus.driver.persistence.Column;
  * The <code>StatementManager</code> abstract class is used to maintain and
  * manage Cassandra statements defined in the system.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -1196,7 +1196,7 @@ public abstract class StatementManager {
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>timestamp</code> is negative
    */
-  protected abstract Using timestamp(long timestamp);
+  protected abstract Using<Long> timestamp(long timestamp);
 
   /**
    * Option to set the ttl for a modification statement (insert, update or delete).
@@ -1207,7 +1207,7 @@ public abstract class StatementManager {
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>ttl</code> is negative
    */
-  protected abstract Using ttl(int ttl);
+  protected abstract Using<Integer> ttl(int ttl);
 
   /**
    * Appends the specified string as a CQL name to the given string builder.

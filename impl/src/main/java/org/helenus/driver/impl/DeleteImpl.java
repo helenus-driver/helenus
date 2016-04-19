@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -43,7 +44,7 @@ import org.helenus.driver.persistence.Table;
  * {@link com.datastax.driver.core.querybuilder.Delete} class to provide
  * support for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -569,8 +570,35 @@ public class DeleteImpl<T>
    * @see org.helenus.driver.Delete#using(org.helenus.driver.Using)
    */
   @Override
-  public Options<T> using(Using using) {
+  public Options<T> using(Using<?> using) {
     return usings.and(using);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Insert#usings()
+   */
+  @SuppressWarnings({"rawtypes", "cast", "unchecked", "synthetic-access"})
+  @Override
+  public Stream<Using<?>> usings() {
+    return (Stream<Using<?>>)(Stream)usings.usings.stream();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Insert#getUsing(java.lang.String)
+   */
+  @SuppressWarnings({"rawtypes", "cast", "unchecked"})
+  @Override
+  public <U> Optional<Using<U>> getUsing(String name) {
+    return (Optional<Using<U>>)(Optional)usings()
+      .filter(u -> u.getName().equals(name)).findAny();
   }
 
   /**
@@ -593,7 +621,7 @@ public class DeleteImpl<T>
    * The <code>WhereImpl</code> class defines WHERE clause for a DELETE
    * statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -698,7 +726,7 @@ public class DeleteImpl<T>
      * @return the options of the DELETE statement this WHERE clause is part of.
      */
     @Override
-    public Options<T> using(Using using) {
+    public Options<T> using(Using<?> using) {
       return statement.using(using);
     }
 
@@ -718,7 +746,7 @@ public class DeleteImpl<T>
   /**
    * The <code>OptionsImpl</code> class defines the options of a DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -735,7 +763,7 @@ public class DeleteImpl<T>
      *
      * @author paouelle
      */
-    private final List<UsingImpl> usings = new ArrayList<>(5);
+    private final List<UsingImpl<?>> usings = new ArrayList<>(5);
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -757,14 +785,14 @@ public class DeleteImpl<T>
      * @see org.helenus.driver.Delete.Options#and(org.helenus.driver.Using)
      */
     @Override
-    public Options<T> and(Using using) {
+    public Options<T> and(Using<?> using) {
       org.apache.commons.lang3.Validate.notNull(using, "invalid null using");
       org.apache.commons.lang3.Validate.isTrue(
         using instanceof UsingImpl,
         "unsupported class of usings: %s",
         using.getClass().getName()
       );
-      usings.add((UsingImpl)using);
+      usings.add(((UsingImpl<?>)using).setStatement(statement));
       setDirty();
       return this;
     }
@@ -785,7 +813,7 @@ public class DeleteImpl<T>
   /**
    * The <code>BuilderImpl</code> class defines an in-construction DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -959,7 +987,7 @@ public class DeleteImpl<T>
    * The <code>SelectionImpl</code> class defines a selection clause for an
    * in-construction DELETE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation

@@ -48,7 +48,7 @@ import org.helenus.util.function.ERunnable;
  * {@link com.datastax.driver.core.querybuilder.Batch} class to provide
  * support for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -717,8 +717,35 @@ public class BatchImpl
    * @return the options of this BATCH statement
    */
   @Override
-  public Options using(Using using) {
+  public Options using(Using<?> using) {
     return usings.and(using);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Insert#usings()
+   */
+  @SuppressWarnings({"rawtypes", "cast", "unchecked", "synthetic-access"})
+  @Override
+  public Stream<Using<?>> usings() {
+    return (Stream<Using<?>>)(Stream)usings.usings.stream();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Insert#getUsing(java.lang.String)
+   */
+  @SuppressWarnings({"rawtypes", "cast", "unchecked"})
+  @Override
+  public <U> Optional<Using<U>> getUsing(String name) {
+    return (Optional<Using<U>>)(Optional)usings()
+      .filter(u -> u.getName().equals(name)).findAny();
   }
 
   /**
@@ -748,7 +775,7 @@ public class BatchImpl
   /**
    * The <code>OptionsImpl</code> class defines the options of a BATCH statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -763,7 +790,7 @@ public class BatchImpl
      *
      * @author paouelle
      */
-    private final List<UsingImpl> usings = new ArrayList<>(5);
+    private final List<UsingImpl<?>> usings = new ArrayList<>(5);
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -788,7 +815,7 @@ public class BatchImpl
      */
     OptionsImpl(BatchImpl statement, OptionsImpl os) {
       super(statement);
-      usings.addAll(os.usings);
+      os.usings.forEach(o -> usings.add(new UsingImpl<>(o, statement)));
     }
 
     /**
@@ -799,14 +826,14 @@ public class BatchImpl
      * @see org.helenus.driver.Batch.Options#and(org.helenus.driver.Using)
      */
     @Override
-    public Options and(Using using) {
+    public Options and(Using<?> using) {
       org.apache.commons.lang3.Validate.notNull(using, "invalid null using");
       org.apache.commons.lang3.Validate.isTrue(
         using instanceof UsingImpl,
         "unsupported class of usings: %s",
         using.getClass().getName()
       );
-      usings.add((UsingImpl)using);
+      usings.add(((UsingImpl<?>)using).setStatement(statement));
       setDirty();
       return this;
     }

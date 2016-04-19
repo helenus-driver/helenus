@@ -15,6 +15,7 @@
  */
 package org.helenus.driver;
 
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.helenus.driver.info.TableInfo;
@@ -24,7 +25,7 @@ import org.helenus.driver.info.TableInfo;
  * {@link com.datastax.driver.core.querybuilder.Update} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -135,7 +136,29 @@ public interface Update<T>
    * @param  using the option to add.
    * @return the options of this UPDATE statement.
    */
-  public Options<T> using(Using using);
+  public Options<T> using(Using<?> using);
+
+  /**
+   * Gets all options registered with this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> stream of all options registered with this
+   *         statement
+   */
+  public Stream<Using<?>> usings();
+
+  /**
+   * Gets an option registered with this statement given its name
+   *
+   * @author paouelle
+   *
+   * @param <U> the type of the option
+   *
+   * @param  name the name of the option to retrieve
+   * @return the registered option with the given name or empty if none registered
+   */
+  public <U> Optional<Using<U>> getUsing(String name);
 
   /**
    * The <code>Assignments</code> interface defines the assignments of an UPDATE
@@ -211,7 +234,7 @@ public interface Update<T>
      * @return the options of the UPDATE statement those assignments are part
      *         of.
      */
-    public Options<T> using(Using using);
+    public Options<T> using(Using<?> using);
 
     /**
      * Adds a condition to the UPDATE statement those assignments are part of.
@@ -275,7 +298,7 @@ public interface Update<T>
      * @param  using the using clause to add.
      * @return the options of the UPDATE statement this WHERE clause is part of.
      */
-    public Options<T> using(Using using);
+    public Options<T> using(Using<?> using);
 
     /**
      * Adds a condition to the UPDATE statement this WHERE clause is part of.
@@ -314,7 +337,7 @@ public interface Update<T>
      * @param  using an UPDATE option.
      * @return this {@code Options} object.
      */
-    public Options<T> and(Using using);
+    public Options<T> and(Using<?> using);
 
     /**
      * Adds an assignment to the UPDATE statement those options are part of.
@@ -409,6 +432,6 @@ public interface Update<T>
      * @param  using the using clause to add.
      * @return the options of the UPDATE statement these conditions are part of.
      */
-    public Options<T> using(Using using);
+    public Options<T> using(Using<?> using);
   }
 }

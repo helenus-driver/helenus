@@ -1481,7 +1481,7 @@ public final class StatementBuilder {
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>timestamp</code> is negative
    */
-  public static Using timestamp(long timestamp) {
+  public static Using<Long> timestamp(long timestamp) {
     return StatementManager.getManager().timestamp(timestamp);
   }
 
@@ -1495,7 +1495,7 @@ public final class StatementBuilder {
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>timestamp</code> is negative
    */
-  public static Using timestampInMS(long timestamp) {
+  public static Using<Long> timestampInMS(long timestamp) {
     return StatementManager.getManager().timestamp(timestamp * 1000L);
   }
 
@@ -1508,7 +1508,7 @@ public final class StatementBuilder {
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>ttl</code> is negative
    */
-  public static Using ttl(int ttl) {
+  public static Using<Integer> ttl(int ttl) {
     return StatementManager.getManager().ttl(ttl);
   }
 

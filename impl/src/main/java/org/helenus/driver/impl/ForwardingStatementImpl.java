@@ -501,6 +501,30 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#getUserData()
+   */
+  @Override
+  public <U> U getUserData() {
+    return statement.getUserData();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#setUserData(java.lang.Object)
+   */
+  @Override
+  public <U> void setUserData(U data) {
+    statement.setUserData(data);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#execute()
    */
   @Override

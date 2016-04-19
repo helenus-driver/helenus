@@ -15,6 +15,9 @@
  */
 package org.helenus.driver;
 
+import java.util.Optional;
+import java.util.stream.Stream;
+
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.helenus.driver.info.ClassInfo;
@@ -25,7 +28,7 @@ import org.helenus.util.function.ERunnable;
  * {@link com.datastax.driver.core.querybuilder.Batch} class to provide
  * support for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -148,7 +151,29 @@ public interface Batch
    * @param  using the option to add
    * @return the options of this BATCH statement
    */
-  public Options using(Using using);
+  public Options using(Using<?> using);
+
+  /**
+   * Gets all options registered with this statement.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> stream of all options registered with this
+   *         statement
+   */
+  public Stream<Using<?>> usings();
+
+  /**
+   * Gets an option registered with this statement given its name
+   *
+   * @author paouelle
+   *
+   * @param <U> the type of the option
+   *
+   * @param  name the name of the option to retrieve
+   * @return the registered option with the given name or empty if none registered
+   */
+  public <U> Optional<Using<U>> getUsing(String name);
 
   /**
    * Duplicates this batch statement.
@@ -176,7 +201,7 @@ public interface Batch
   /**
    * The <code>Options</code> interface defines the options of a BATCH statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -193,7 +218,7 @@ public interface Batch
      * @param  using a BATCH option
      * @return this {@code Options} object
      */
-    public Options and(Using using);
+    public Options and(Using<?> using);
 
     /**
      * Adds a new statement to the BATCH statement these options are part of.

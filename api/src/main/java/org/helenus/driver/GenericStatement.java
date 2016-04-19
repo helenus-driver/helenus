@@ -322,6 +322,25 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
   public int getFetchSize();
 
   /**
+   * Gets user-defined data attached to this statement.
+   *
+   * @author paouelle
+   *
+   * @return the user-defined data attached to this statement or <code>null</code>
+   *         if none
+   */
+  public <U> U getUserData();
+
+  /**
+   * Attaches user-defined data to this statement.
+   *
+   * @author paouelle
+   *
+   * @param data the user-defined data to attach to this statement
+   */
+  public <U> void setUserData(U data);
+
+  /**
    * Gets the query string for this statement.
    *
    * @author paouelle

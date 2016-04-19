@@ -259,6 +259,13 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   protected volatile Boolean isCounterOp;
 
   /**
+   * Holds user-data associated with this statement.
+   *
+   * @author paouelle
+   */
+  private volatile Object data = null;
+
+  /**
    * Instantiates a new <code>StatementImpl</code> object.
    *
    * @author paouelle
@@ -370,6 +377,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.dirty = statement.dirty;
     this.cache = statement.cache;
     this.isCounterOp = statement.isCounterOp;
+    this.data = statement.data;
   }
 
   /**
@@ -403,6 +411,142 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.dirty = statement.dirty;
     this.cache = statement.cache;
     this.isCounterOp = statement.isCounterOp;
+    this.data = statement.data;
+  }
+
+  /**
+   * Log to the debug level the execution of the specified simple statement.
+   *
+   * @author paouelle
+   *
+   * @param query the query of the statement being executed
+   */
+  private void debugExecution(String query) {
+    if (logger.isDebugEnabled()
+        && (isTracing() || mgr.areAllStatementsTracesEnabled())) {
+      final String prefix = StringUtils.defaultString(tracePrefix);
+
+      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+        logger.log(Level.DEBUG, "%sCQL -> %s", prefix, query);
+      } else if (this instanceof Batch) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY BATCH",
+          prefix,
+          query.substring(0, 2032)
+        );
+      } else if (this instanceof Sequence) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY SEQUENCE",
+          prefix,
+          query.substring(0, 2029)
+        );
+      } else if (this instanceof Group) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ... APPLY GROUP",
+          prefix,
+          query.substring(0, 2032)
+        );
+      } else {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL -> %s ...",
+          prefix,
+          query.substring(0, 2044)
+        );
+      }
+    }
+  }
+
+  /**
+   * Log the execution exception.
+   *
+   * @author paouelle
+   *
+   * @param query the query string of the statement that failed
+   * @param e the exception
+   */
+  private void errorExecution(String query, Throwable e) {
+    // try as an error log first
+    if (logger.isErrorEnabled()
+        && (isErrorTracing() || mgr.areAllStatementsTracesEnabled())) {
+      final String prefix = StringUtils.defaultString(errorTracePrefix);
+
+      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+        logger.log(
+          Level.ERROR, "%sCQL ERROR -> %s", prefix, query
+         );
+      } else if (StatementImpl.this instanceof Batch) {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ... APPLY BATCH",
+          prefix,
+          query.substring(0, 2032)
+        );
+      } else if (StatementImpl.this instanceof Sequence) {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ... APPLY SEQUENCE",
+          prefix,
+          query.substring(0, 2029)
+        );
+      } else if (StatementImpl.this instanceof Group) {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ... APPLY GROUP",
+          prefix,
+          query.substring(0, 2032)
+        );
+      } else {
+        logger.log(
+          Level.ERROR,
+          "%sCQL ERROR -> %s ...",
+          prefix,
+          query.substring(0, 2044)
+        );
+      }
+      logger.log(Level.ERROR, "%sCQL ERROR -> ", errorTracePrefix, e);
+    } else if (logger.isDebugEnabled()
+               && (isTracing() || mgr.areAllStatementsTracesEnabled())) { // fallback to tracing
+      final String prefix = StringUtils.defaultString(tracePrefix);
+
+      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
+        logger.log(
+          Level.DEBUG, "%sCQL ERROR -> %s", prefix, query
+        );
+      } else if (StatementImpl.this instanceof Batch) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL ERROR -> %s ... APPLY BATCH",
+          prefix,
+          query.substring(0, 2032)
+        );
+      } else if (StatementImpl.this instanceof Sequence) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL ERROR -> %s ... APPLY SEQUENCE",
+          prefix,
+          query.substring(0, 2029)
+        );
+      } else if (StatementImpl.this instanceof Group) {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL ERROR -> %s ... APPLY GROUP",
+          prefix,
+          query.substring(0, 2032)
+        );
+      } else {
+        logger.log(
+          Level.DEBUG,
+          "%sCQL ERROR -> %s ...",
+          prefix,
+          query.substring(0, 2044)
+        );
+      }
+      logger.log(Level.DEBUG, "%sCQL ERROR -> ", prefix, e);
+    }
   }
 
   /**
@@ -433,6 +577,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
      s.setRetryPolicy(getRetryPolicy());
     }
     s.setFetchSize(getFetchSize());
+    s.setUserData(data);
     return s;
   }
 
@@ -1118,141 +1263,6 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   }
 
   /**
-   * Log to the debug level the execution of the specified simple statement.
-   *
-   * @author paouelle
-   *
-   * @param query the query of the statement being executed
-   */
-  private void debugExecution(String query) {
-    if (logger.isDebugEnabled()
-        && (isTracing() || mgr.areAllStatementsTracesEnabled())) {
-      final String prefix = StringUtils.defaultString(tracePrefix);
-
-      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
-        logger.log(Level.DEBUG, "%sCQL -> %s", prefix, query);
-      } else if (this instanceof Batch) {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL -> %s ... APPLY BATCH",
-          prefix,
-          query.substring(0, 2032)
-        );
-      } else if (this instanceof Sequence) {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL -> %s ... APPLY SEQUENCE",
-          prefix,
-          query.substring(0, 2029)
-        );
-      } else if (this instanceof Group) {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL -> %s ... APPLY GROUP",
-          prefix,
-          query.substring(0, 2032)
-        );
-      } else {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL -> %s ...",
-          prefix,
-          query.substring(0, 2044)
-        );
-      }
-    }
-  }
-
-  /**
-   * Log the execution exception.
-   *
-   * @author paouelle
-   *
-   * @param query the query string of the statement that failed
-   * @param e the exception
-   */
-  private void errorExecution(String query, Throwable e) {
-    // try as an error log first
-    if (logger.isErrorEnabled()
-        && (isErrorTracing() || mgr.areAllStatementsTracesEnabled())) {
-      final String prefix = StringUtils.defaultString(errorTracePrefix);
-
-      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
-        logger.log(
-          Level.ERROR, "%sCQL ERROR -> %s", prefix, query
-         );
-      } else if (StatementImpl.this instanceof Batch) {
-        logger.log(
-          Level.ERROR,
-          "%sCQL ERROR -> %s ... APPLY BATCH",
-          prefix,
-          query.substring(0, 2032)
-        );
-      } else if (StatementImpl.this instanceof Sequence) {
-        logger.log(
-          Level.ERROR,
-          "%sCQL ERROR -> %s ... APPLY SEQUENCE",
-          prefix,
-          query.substring(0, 2029)
-        );
-      } else if (StatementImpl.this instanceof Group) {
-        logger.log(
-          Level.ERROR,
-          "%sCQL ERROR -> %s ... APPLY GROUP",
-          prefix,
-          query.substring(0, 2032)
-        );
-      } else {
-        logger.log(
-          Level.ERROR,
-          "%sCQL ERROR -> %s ...",
-          prefix,
-          query.substring(0, 2044)
-        );
-      }
-      logger.log(Level.ERROR, "%sCQL ERROR -> ", errorTracePrefix, e);
-    } else if (logger.isDebugEnabled()
-               && (isTracing() || mgr.areAllStatementsTracesEnabled())) { // fallback to tracing
-      final String prefix = StringUtils.defaultString(tracePrefix);
-
-      if (mgr.isFullTracesEnabled() || (query.length() < 2048)) {
-        logger.log(
-          Level.DEBUG, "%sCQL ERROR -> %s", prefix, query
-        );
-      } else if (StatementImpl.this instanceof Batch) {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL ERROR -> %s ... APPLY BATCH",
-          prefix,
-          query.substring(0, 2032)
-        );
-      } else if (StatementImpl.this instanceof Sequence) {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL ERROR -> %s ... APPLY SEQUENCE",
-          prefix,
-          query.substring(0, 2029)
-        );
-      } else if (StatementImpl.this instanceof Group) {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL ERROR -> %s ... APPLY GROUP",
-          prefix,
-          query.substring(0, 2032)
-        );
-      } else {
-        logger.log(
-          Level.DEBUG,
-          "%sCQL ERROR -> %s ...",
-          prefix,
-          query.substring(0, 2044)
-        );
-      }
-      logger.log(Level.DEBUG, "%sCQL ERROR -> ", prefix, e);
-    }
-  }
-
-  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -1306,6 +1316,31 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   @Override
   public int getFetchSize() {
     return fetchSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#getUserData()
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  public <U> U getUserData() {
+    return (U)data;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#setUserData(java.lang.Object)
+   */
+  @Override
+  public <U> void setUserData(U data) {
+    this.data = data;
   }
 
   /**
