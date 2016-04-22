@@ -1504,6 +1504,8 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.captures.clear();
       }
       try {
+        HelenusJUnit.capturing.set(0);
+        HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing (also used for recursion detection)
         // Process all @BeforeObjects methods found
         HelenusJUnit.processBeforeObjects();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {

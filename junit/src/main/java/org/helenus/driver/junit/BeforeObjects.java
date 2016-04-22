@@ -42,7 +42,7 @@ import java.util.stream.Stream;
  * of suffix key values. The suffix key values are computed from the
  * {@link SuffixKeyValues} annotation provided for the test method and class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  *
@@ -62,7 +62,7 @@ public @interface BeforeObjects {
    *
    * @author paouelle
    *
-   * @return the names of optianal test methods for which to call the annotated
+   * @return the names of optional test methods for which to call the annotated
    *         method
    */
   String[] value() default {};
