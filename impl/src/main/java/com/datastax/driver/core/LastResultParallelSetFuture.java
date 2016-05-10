@@ -28,6 +28,10 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.util.concurrent.ExecutionList;
 
+import org.helenus.driver.impl.CreateIndexImpl;
+import org.helenus.driver.impl.CreateKeyspaceImpl;
+import org.helenus.driver.impl.CreateTableImpl;
+import org.helenus.driver.impl.CreateTypeImpl;
 import org.helenus.driver.impl.GroupStatementImpl;
 import org.helenus.driver.impl.SequenceStatementImpl;
 import org.helenus.driver.impl.StatementImpl;
@@ -266,14 +270,48 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
     // statement
     final List<List<StatementImpl<?, ?, ?>>> slist = new LinkedList<>();
     final int factor = group.getParallelFactor();
+    int cmax_rfactor = 1;
+    int cfactor = factor; // current factor based on replication factor - start assuming it is 1
     List<StatementImpl<?, ?, ?>> cslist = new ArrayList<>(factor);
+    boolean foundSchema = false;
 
     for (final StatementImpl<?, ?, ?> s: statements) {
       org.apache.commons.lang3.Validate.notNull(s, "invalid null statement");
-      cslist.add(s);
-      if ((cslist.size() == factor) || (s instanceof SequenceStatementImpl)) {
+      if (!foundSchema
+          && (s instanceof CreateIndexImpl)
+          && (s instanceof CreateKeyspaceImpl)
+          && (s instanceof CreateTableImpl)
+          && (s instanceof CreateTypeImpl)) {
+        foundSchema = true;
+        cfactor = Math.min(cfactor, 32); // limit to 32 for schema-based statements
+      } else {
+        final String keyspace = s.getKeyspace();
+
+        if (keyspace != null) {
+          final int max_rfactor = mgr.getMaximumKeyspaceReplicationFactor(keyspace);
+
+          if (cmax_rfactor < max_rfactor) {
+            cmax_rfactor = max_rfactor; // update the current maximum
+            cfactor = factor / max_rfactor; // reduce the factor
+          }
+        }
+      }
+      if (s instanceof SequenceStatementImpl) { // we need to terminate the current block with this sequence
+        cslist.add(s);
         slist.add(cslist);
         cslist = new ArrayList<>(factor);
+        foundSchema = false; // reset it too
+        cfactor = factor; // reset it too
+        cmax_rfactor = 1; // reset it too
+      } else if (cslist.size() >= cfactor) { // switch to a new block
+        slist.add(cslist);
+        cslist = new ArrayList<>(factor);
+        foundSchema = false; // reset it too
+        cfactor = factor; // reset it too
+        cmax_rfactor = 1; // reset it too
+        cslist.add(s); // add current statement to the next block
+      } else { // add statement to the current block
+        cslist.add(s);
       }
     }
     if (!cslist.isEmpty()) {

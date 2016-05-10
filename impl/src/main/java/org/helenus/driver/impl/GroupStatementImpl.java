@@ -142,7 +142,7 @@ public abstract class GroupStatementImpl<R, F extends ListenableFuture<R>, T>
       this.parallelFactor = (
         Math.max(1, MetadataBridge.getNumHosts(mgr.getCluster().getMetadata())) * 32
       );
-    } catch (Exception e) { // defaults to 32 if we cannot get  the info from the cluster
+    } catch (Exception e) { // defaults to 32 if we cannot get the info from the cluster
       this.parallelFactor = 32;
     }
   }
@@ -305,6 +305,11 @@ public abstract class GroupStatementImpl<R, F extends ListenableFuture<R>, T>
    * By default, the parallel factor will be based on the number of nodes in the
    * Cassandra cluster multiplied by 32 (default number of threads in the write
    * pool of a Cassandra node).
+   * <p>
+   * <i>Note:</i> This value will be adjusted based on the maximum replication
+   * factor used by any of the statements. It will also be automatically limited
+   * to 32 if any of the statements affects all nodes such as schema, table, type,
+   * or index creation or alteration statements.
    *
    * @author paouelle
    *
@@ -322,6 +327,11 @@ public abstract class GroupStatementImpl<R, F extends ListenableFuture<R>, T>
    * By default, the parallel factor will be based on the number of nodes in the
    * Cassandra cluster multiplied by 32 (default number of threads in the write
    * pool of a Cassandra node).
+   * <p>
+   * <i>Note:</i> This value will be adjusted based on the maximum replication
+   * factor used by any of the statements. It will also be automatically limited
+   * to 32 if any of the statements affects all nodes such as schema, table, type,
+   * or index creation or alteration statements.
    *
    * @author paouelle
    *

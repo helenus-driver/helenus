@@ -43,6 +43,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.CloseFuture;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
@@ -1965,6 +1966,55 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   public Cluster getCluster() {
     return cluster;
+  }
+
+  /**
+   * Gets the maximum replication factor defined for the specified keyspace.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  keyspace the keyspace for which to get its minimum replication factor
+   * @return the maximum replication factor for the specified keyspace or <code>0</code>
+   *         if the keyspace doesn't exist
+   */
+  public int getMaximumKeyspaceReplicationFactor(String keyspace) {
+    final KeyspaceMetadata mdata = cluster.getMetadata().getKeyspace(keyspace);
+
+    if (mdata == null) {
+      return 0;
+    }
+    final Map<String, String> options = mdata.getReplication();
+    final String strategyClass = options.get("class");
+
+    if (strategyClass == null) {
+      return 0;
+    }
+    try {
+      if (strategyClass.contains("SimpleStrategy")) {
+        final String repFactorString = options.get("replication_factor");
+
+        return (repFactorString == null) ? 0 : Integer.parseInt(repFactorString);
+      } else if (strategyClass.contains("NetworkTopologyStrategy")) {
+        int max_rfactor = 0;
+
+        for (Map.Entry<String, String> e: options.entrySet()) {
+          if (e.getKey().equals("class")) {
+            continue;
+          }
+          final int rfactor = Integer.parseInt(e.getValue());
+
+          if (max_rfactor < rfactor) {
+            max_rfactor = rfactor;
+          }
+        }
+        return max_rfactor;
+      } else { // this would be the old network topology so who knows!
+        return 1;
+      }
+    } catch (NumberFormatException e) {
+      // Cassandra wouldn't let that pass in the first place so this really should never happen
+      return 0;
+    }
   }
 
   /**
