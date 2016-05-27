@@ -368,6 +368,14 @@ public class HelenusJUnit implements MethodRule {
   static final AtomicInteger capturing = new AtomicInteger(0);
 
   /**
+   * Holds a depth counter indicating if we are recursing within helenus-junit
+   * or not when greater than 0.
+   *
+   * @author paouelle
+   */
+  static final AtomicInteger recursing = new AtomicInteger(0);
+
+  /**
    * Holds a flag indicating if internal CQL statements should be traced or not.
    *
    * @author paouelle
@@ -1024,6 +1032,7 @@ public class HelenusJUnit implements MethodRule {
     }
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
+      HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
       // find all suffixes that are defined for this classes
       final Collection<Collection<Strings>> suffixes = ((target != null)
         ? HelenusJUnit.getSuffixKeyValues(cinfo)
@@ -1065,6 +1074,7 @@ public class HelenusJUnit implements MethodRule {
         t
       );
     } finally {
+      HelenusJUnit.recursing.decrementAndGet(); // restore previous recursing setting
       HelenusJUnit.capturing.decrementAndGet(); // restore previous capturing setting
     }
   }
@@ -1174,6 +1184,7 @@ public class HelenusJUnit implements MethodRule {
     try {
       logger.debug("Creating schema for %s", clazz.getSimpleName());
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
+      HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
       // find all suffixes that are defined for this classes
       final Collection<Collection<Strings>> suffixes = ((target != null)
         ? HelenusJUnit.getSuffixKeyValues(cinfo)
@@ -1289,6 +1300,7 @@ public class HelenusJUnit implements MethodRule {
       HelenusJUnit.initials.remove(clazz);
       throw result.failed(t); // failed creating the schema
     } finally {
+      HelenusJUnit.recursing.decrementAndGet(); // restore previous recursing setting
       HelenusJUnit.capturing.decrementAndGet(); // restore previous capturing setting
     }
   }
@@ -1328,6 +1340,7 @@ public class HelenusJUnit implements MethodRule {
     } // else - we are in charge of resetting the schema!!!
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
+      HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
       final MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(clazz);
       final Group group;
 
@@ -1353,6 +1366,7 @@ public class HelenusJUnit implements MethodRule {
       HelenusJUnit.schemas.remove(clazz);
       throw result.failed(t); // failed resetting the schema
     } finally {
+      HelenusJUnit.recursing.decrementAndGet(); // restore previous recursing setting
       HelenusJUnit.capturing.decrementAndGet(); // restore previous capturing setting
     }
   }
@@ -1506,6 +1520,8 @@ public class HelenusJUnit implements MethodRule {
       try {
         HelenusJUnit.capturing.set(0);
         HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing (also used for recursion detection)
+        HelenusJUnit.recursing.set(0);
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
         // Process all @BeforeObjects methods found
         HelenusJUnit.processBeforeObjects();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
@@ -1521,6 +1537,7 @@ public class HelenusJUnit implements MethodRule {
       } finally {
         HelenusJUnit.captures.clear();
       }
+      HelenusJUnit.recursing.set(0);
       HelenusJUnit.capturing.set(0);
     }
   }
@@ -2374,7 +2391,7 @@ public class HelenusJUnit implements MethodRule {
      *        represents a base class of type entities
      */
     private <T> void handleBaseClassInfo(ClassInfo<T> cinfo) {
-      if (HelenusJUnit.capturing.get() > 0) {
+      if (HelenusJUnit.recursing.get() > 0) {
         // don't bother if we are recursing from within HelenusJUnit
         return;
       }
@@ -2444,10 +2461,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Insert.Builder<T> insert(T object) {
-      final Insert.Builder<T> b = super.insert(object);
-
-      handleBaseClassInfo(b.getClassInfo());
-      return b;
+      if (object != null) {
+        handleBaseClassInfo(getClassInfo(object.getClass()));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.insert(object);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2459,10 +2481,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Update<T> update(T object) {
-      final Update<T> u = super.update(object);
-
-      handleBaseClassInfo(u.getClassInfo());
-      return u;
+      if (object != null) {
+        handleBaseClassInfo(getClassInfo(object.getClass()));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.update(object);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2474,10 +2501,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Update<T> update(T object, String... tables) {
-      final Update<T> u = super.update(object, tables);
-
-      handleBaseClassInfo(u.getClassInfo());
-      return u;
+      if (object != null) {
+        handleBaseClassInfo(getClassInfo(object.getClass()));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.update(object, tables);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2491,10 +2523,15 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Delete.Builder<T> delete(
       T object, String... columns
     ) {
-      final Delete.Builder<T> b = super.delete(object, columns);
-
-      handleBaseClassInfo(b.getClassInfo());
-      return b;
+      if (object != null) {
+        handleBaseClassInfo(getClassInfo(object.getClass()));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.delete(object, columns);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2506,10 +2543,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Delete.Selection<T> delete(T object) {
-      final Delete.Selection<T> s = super.delete(object);
-
-      handleBaseClassInfo(s.getClassInfo());
-      return s;
+      if (object != null) {
+        handleBaseClassInfo(getClassInfo(object.getClass()));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.delete(object);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2523,10 +2565,15 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Delete.Builder<T> delete(
       Class<T> clazz, String... columns
     ) {
-      final Delete.Builder<T> b = super.delete(clazz, columns);
-
-      handleBaseClassInfo(b.getClassInfo());
-      return b;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.delete(clazz, columns);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2538,10 +2585,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Delete.Selection<T> delete(Class<T> clazz) {
-      final Delete.Selection<T> s = super.delete(clazz);
-
-      handleBaseClassInfo(s.getClassInfo());
-      return s;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.delete(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2553,10 +2605,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> CreateKeyspace<T> createKeyspace(Class<T> clazz) {
-      final CreateKeyspace<T> c = super.createKeyspace(clazz);
-
-      handleBaseClassInfo(c.getClassInfo());
-      return c;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.createKeyspace(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2568,10 +2625,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> CreateType<T> createType(Class<T> clazz) {
-      final CreateType<T> c = super.createType(clazz);
-
-      handleBaseClassInfo(c.getClassInfo());
-      return c;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.createType(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2583,10 +2645,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> CreateTable<T> createTable(Class<T> clazz) {
-      final CreateTable<T> c = super.createTable(clazz);
-
-      handleBaseClassInfo(c.getClassInfo());
-      return c;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.createTable(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2598,10 +2665,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> CreateTable<T> createTable(Class<T> clazz, String... tables) {
-      final CreateTable<T> c = super.createTable(clazz, tables);
-
-      handleBaseClassInfo(c.getClassInfo());
-      return c;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.createTable(clazz, tables);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2613,10 +2685,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> CreateIndex.Builder<T> createIndex(Class<T> clazz) {
-      final CreateIndex.Builder<T> b = super.createIndex(clazz);
-
-      handleBaseClassInfo(b.getClassInfo());
-      return b;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.createIndex(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2628,10 +2705,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> CreateSchema<T> createSchema(Class<T> clazz) {
-      final CreateSchema<T> c = super.createSchema(clazz);
-
-      handleBaseClassInfo(c.getClassInfo());
-      return c;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.createSchema(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2643,8 +2725,14 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected CreateSchemas createSchemas(String[] pkgs) {
-      final CreateSchemas c = super.createSchemas(pkgs);
+      final CreateSchemas c;
 
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        c = super.createSchemas(pkgs);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
       c.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return c;
     }
@@ -2658,8 +2746,14 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected CreateSchemas createMatchingSchemas(String[] pkgs) {
-      final CreateSchemas c = super.createMatchingSchemas(pkgs);
+      final CreateSchemas c;
 
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        c = super.createMatchingSchemas(pkgs);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
       c.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return c;
     }
@@ -2673,10 +2767,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> AlterSchema<T> alterSchema(Class<T> clazz) {
-      final AlterSchema<T> a = super.alterSchema(clazz);
-
-      handleBaseClassInfo(a.getClassInfo());
-      return a;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.alterSchema(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2688,8 +2787,14 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected AlterSchemas alterSchemas(String[] pkgs) {
-      final AlterSchemas a = super.alterSchemas(pkgs);
+      final AlterSchemas a;
 
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        a = super.alterSchemas(pkgs);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
       a.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return a;
     }
@@ -2703,8 +2808,14 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected AlterSchemas alterMatchingSchemas(String[] pkgs) {
-      final AlterSchemas a = super.alterMatchingSchemas(pkgs);
+      final AlterSchemas a;
 
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        a = super.alterMatchingSchemas(pkgs);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
       a.classInfos().forEachOrdered(cinfo -> handleBaseClassInfo(cinfo));
       return a;
     }
@@ -2718,10 +2829,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Truncate<T> truncate(Class<T> clazz) {
-      final Truncate<T> t = super.truncate(clazz);
-
-      handleBaseClassInfo(t.getClassInfo());
-      return t;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.truncate(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2733,10 +2849,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Truncate<T> truncate(Class<T> clazz, String... tables) {
-      final Truncate<T> t = super.truncate(clazz, tables);
-
-      handleBaseClassInfo(t.getClassInfo());
-      return t;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.truncate(clazz, tables);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2748,10 +2869,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Select.Builder<T> select(Class<T> clazz, CharSequence... columns) {
-      final Select.Builder<T> b = super.select(clazz, columns);
-
-      handleBaseClassInfo(b.getClassInfo());
-      return b;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.select(clazz, columns);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2763,10 +2889,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Select.Selection<T> select(Class<T> clazz) {
-      final Select.Selection<T> s = super.select(clazz);
-
-      handleBaseClassInfo(s.getClassInfo());
-      return s;
+      if (clazz != null) {
+        handleBaseClassInfo(getClassInfo(clazz));
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.select(clazz);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2780,10 +2911,15 @@ public class HelenusJUnit implements MethodRule {
     protected <T> Select<T> selectFrom(
       TableInfo<T> table, CharSequence... columns
     ) {
-      final Select<T> s = super.selectFrom(table, columns);
-
-      handleBaseClassInfo(s.getClassInfo());
-      return s;
+      if (table != null) {
+        handleBaseClassInfo(table.getClassInfo());
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.selectFrom(table, columns);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2795,10 +2931,15 @@ public class HelenusJUnit implements MethodRule {
      */
     @Override
     protected <T> Select.TableSelection<T> selectFrom(TableInfo<T> table) {
-      final Select.TableSelection<T> s = super.selectFrom(table);
-
-      handleBaseClassInfo(s.getClassInfo());
-      return s;
+      if (table != null) {
+        handleBaseClassInfo(table.getClassInfo());
+      }
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        return super.selectFrom(table);
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
+      }
     }
 
     /**
@@ -2813,35 +2954,40 @@ public class HelenusJUnit implements MethodRule {
     @SuppressWarnings("unchecked")
     @Override
     public <T> ClassInfoImpl<T> getClassInfoImpl(Class<T> clazz) {
-      // first check if we have already loaded it in previous test cases and if so, reset the schema for it
-      ClassInfoImpl<T> cinfo
-        = (ClassInfoImpl<T>)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
+      try {
+        HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
+        // first check if we have already loaded it in previous test cases and if so, reset the schema for it
+        ClassInfoImpl<T> cinfo
+          = (ClassInfoImpl<T>)HelenusJUnit.fromPreviousTestsCacheInfoCache.remove(clazz);
 
-      if (cinfo != null) {
-        if (cinfo instanceof TypeClassInfoImpl) {
-          // force root to be re-cached first
-          getClassInfoImpl(((TypeClassInfoImpl<T>)cinfo).getRoot().getObjectClass());
+        if (cinfo != null) {
+          if (cinfo instanceof TypeClassInfoImpl) {
+            // force root to be re-cached first
+            getClassInfoImpl(((TypeClassInfoImpl<T>)cinfo).getRoot().getObjectClass());
+          }
+          // first truncate all loaded pojo tables and re-insert any schema defined
+          // initial objects
+          HelenusJUnit.resetSchema0(cinfo, null);
+          super.cacheClassInfoIfAbsent(cinfo);
+          return cinfo;
+        } // else - check if it is already cached
+        cinfo = (ClassInfoImpl<T>)super.classInfoCache.get(clazz);
+        if (cinfo != null) {
+          // this will be the case if we already retrieved another sub-type for
+          // a root in which case we would have already retrieved the root and
+          // removed it from the previous tests cache
+          return cinfo;
         }
-        // first truncate all loaded pojo tables and re-insert any schema defined
-        // initial objects
-        HelenusJUnit.resetSchema0(cinfo, null);
-        super.cacheClassInfoIfAbsent(cinfo);
-        return cinfo;
-      } // else - check if it is already cached
-      cinfo = (ClassInfoImpl<T>)super.classInfoCache.get(clazz);
-      if (cinfo != null) {
-        // this will be the case if we already retrieved another sub-type for
-        // a root in which case we would have already retrieved the root and
-        // removed it from the previous tests cache
-        return cinfo;
+        // if we get here then the cinfo was not loaded in previous tests
+        // go to the super's implementation which will take care of calling back
+        // this method for the root if this is for a type entity
+        // load the schemas for the pojo if required
+        return HelenusJUnit.createSchema0(
+          super.getClassInfoImpl(clazz) // force generation of the class info if needed
+        );
+      } finally {
+        HelenusJUnit.recursing.decrementAndGet(); // restore recursing previous setting
       }
-      // if we get here then the cinfo was not loaded in previous tests
-      // go to the super's implementation which will take care of calling back
-      // this method for the root if this is for a type entity
-      // load the schemas for the pojo if required
-      return HelenusJUnit.createSchema0(
-        super.getClassInfoImpl(clazz) // force generation of the class info if needed
-      );
     }
   }
 }
