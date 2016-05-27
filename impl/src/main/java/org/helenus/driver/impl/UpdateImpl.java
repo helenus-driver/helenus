@@ -302,9 +302,35 @@ public class UpdateImpl<T>
         // we are about to add more delayed set for each multi keys
         assignments.hasAllFromObject = false;
         for (final FieldInfoImpl<T> finfo: multiKeys) {
-          assignments.assignments.add(new AssignmentImpl.DelayedSetAssignmentImpl(
-            finfo.getColumnName())
-          );
+          final String cname = finfo.getColumnName();
+          final AssignmentImpl.WithOldValue old = this.assignments.previous.get(cname);
+
+          if (old != null) {
+            assignments.assignments.add(
+              new AssignmentImpl.DelayedReplaceAssignmentImpl(cname, old.getOldValue())
+            );
+          } else {
+            assignments.assignments.add(
+              new AssignmentImpl.DelayedSetAssignmentImpl(cname)
+            );
+          }
+        }
+      }
+      // we need to add the key set for each old values in the assignments as
+      // it would not have been added by the DelayedSetAll since it is marked as
+      // a key. We can skip multi-keys as they would be added above.
+      // make sure not to report we are adding them all from that point on since
+      // we are about to add more delayed set for each old key values
+      for (final AssignmentImpl.WithOldValue a: this.assignments.previous.values()) {
+        final CharSequence cname = ((AssignmentImpl)a).getColumnName();
+
+        if (table.getPrimaryKey(cname) != null) { // old value for a primary key
+          if (multiKeys.isEmpty() || !table.isMultiKey(cname)) {
+            assignments.hasAllFromObject = false;
+            assignments.assignments.add(
+              new AssignmentImpl.DelayedReplaceAssignmentImpl(cname, a.getOldValue())
+            );
+          } // else - already handled above
         }
       }
     }

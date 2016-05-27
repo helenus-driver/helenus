@@ -388,7 +388,8 @@ public abstract class AssignmentImpl
    * @since 1.0
    */
   @lombok.ToString(callSuper=true)
-  static class DelayedSetAssignmentImpl extends SetAssignmentImpl implements DelayedWithObject {
+  static class DelayedSetAssignmentImpl
+    extends SetAssignmentImpl implements DelayedWithObject {
     /**
      * Holds the POJO from which to get the non-primary column value or
      * <code>null</code> if this assignment is used as part of a POJO-based
@@ -465,6 +466,116 @@ public abstract class AssignmentImpl
     @Override
     void validate(TableInfoImpl<?> table) {
       throw new IllegalStateException("should not be called");
+    }
+  }
+
+  /**
+   * The <code>DelayedReplaceAssignmentImpl</code> class defines a "SET" assignment
+   * specifying a column name of the POJO, an old value to be replaced with a value
+   * extracted from the POJO in play.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - May 26, 2016 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  @lombok.ToString(callSuper=true)
+  static class DelayedReplaceAssignmentImpl
+    extends DelayedSetAssignmentImpl implements WithOldValue {
+    /**
+     * Holds the old value to replace for the column name.
+     *
+     * @author paouelle
+     */
+    protected volatile Object old;
+
+    /**
+     * Instantiates a new <code>DelayedReplaceAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this assignment
+     * @param  old the old value to replace for this assignment
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    DelayedReplaceAssignmentImpl(CharSequence name, Object old) {
+      super(name);
+      if (old instanceof Optional) {
+        old = ((Optional<?>)old).orElse(null);
+      }
+      this.old = old;
+    }
+
+    /**
+     * Instantiates a new <code>DelayedReplaceAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  object the POJO from which to extract the non-primary column
+     *         value
+     * @param  name the column name for this assignment
+     * @param  old the old value to replace for this assignment
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    DelayedReplaceAssignmentImpl(Object object, CharSequence name, Object old) {
+      super(object, name);
+      if (old instanceof Optional) {
+        old = ((Optional<?>)old).orElse(null);
+      }
+      this.old = old;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl.DelayedWithObject#processWith(org.helenus.driver.impl.TableInfoImpl, org.helenus.driver.impl.ClassInfoImpl.POJOContext)
+     */
+    @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+    @Override
+    public <T> List<AssignmentImpl> processWith(
+      TableInfoImpl<?> table, ClassInfoImpl<T>.POJOContext context
+    ) {
+      if (object != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          context.getObjectClass().isInstance(object),
+          "setAll() object class '%s' is not compatible with POJO class '%s'",
+          object.getClass().getName(),
+          context.getObjectClass().getName()
+        );
+        // get a POJO context for the POJO passed on the setFrom()
+        context = context.getClassInfo().newContext((T)object);
+      }
+      if (table.getColumnImpl(name) == null) { // column not defined in the table
+        return Collections.emptyList();
+      }
+      Object neval;
+
+      try {
+        neval = context.getColumnNonEncodedValue(table.getName(), name);
+      } catch (EmptyOptionalPrimaryKeyException e) {
+        // special case where we still want to let the assignment go through
+        // as we will at least generate a delete for the previous value
+        neval = null;
+      }
+      return (List<AssignmentImpl>)(List)Arrays.asList(
+        new ReplaceAssignmentImpl(name, neval, old)
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl.WithOldValue#getOldValue()
+     */
+    @Override
+    public Object getOldValue() {
+      return old;
     }
   }
 

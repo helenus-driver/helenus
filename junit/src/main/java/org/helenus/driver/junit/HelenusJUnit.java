@@ -1992,6 +1992,7 @@ public class HelenusJUnit implements MethodRule {
           ? HelenusJUnit.getSuffixKeyValues(cinfo)
           : null
         );
+
         // since we already created the schema, we should have the right number of suffixes
         // now generate as many insert statements for each initial object as
         // required by the combination of all suffix values
