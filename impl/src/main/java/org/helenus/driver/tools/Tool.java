@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -739,37 +740,44 @@ public class Tool {
     Map<Class<?>, JsonSchema> schemas,
     Class<?> view
   ) throws IOException {
-    Set<Class<?>> classes;
+    final Set<Class<?>> classes = new LinkedHashSet<>();
 
-    try {
-      final CreateSchemas cs
-        = (matching
-           ? StatementBuilder.createMatchingSchemas(pkgs)
-           : StatementBuilder.createSchemas(pkgs));
+    for (final String pkg: pkgs) {
+      try {
+        final CreateSchemas cs
+          = (matching
+             ? StatementBuilder.createMatchingSchemas(pkg)
+             : StatementBuilder.createSchemas(pkg));
 
-      // pass all suffixes
-      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-        // register the suffix value with the corresponding suffix type
-        cs.where(
-          StatementBuilder.eq(e.getKey(), e.getValue())
-        );
+        // pass all suffixes
+        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+          // register the suffix value with the corresponding suffix type
+          cs.where(
+            StatementBuilder.eq(e.getKey(), e.getValue())
+          );
+        }
+        final Set<Class<?>> csclasses = cs.getObjectClasses();
+
+        if (csclasses.isEmpty()) { // fall into exception handling
+          throw new IllegalArgumentException("nothing found via helenus");
+        }
+        classes.addAll(csclasses);
+      } catch (IllegalArgumentException e) { // ignore and continue with package only
+        final Reflections reflections = new Reflections(pkgs, new SubTypesScanner(false));
+
+        reflections.getAllTypes().stream()
+          .map(n -> {
+            try {
+              return Class.forName(n);
+            } catch (LinkageError|ClassNotFoundException ee) { // ignore
+              return null;
+            }
+          })
+          .filter(c -> c != null)
+          .forEach(c -> classes.add(c));
+        // make sure to also cover enums
+        classes.addAll(reflections.getSubTypesOf(Enum.class));
       }
-      classes = cs.getObjectClasses();
-    } catch (IllegalArgumentException e) { // ignore and continue with package only
-      final Reflections reflections = new Reflections(pkgs, new SubTypesScanner(false));
-
-      classes = reflections.getAllTypes().stream()
-        .map(n -> {
-          try {
-            return Class.forName(n);
-          } catch (LinkageError|ClassNotFoundException ee) { // ignore
-            return null;
-          }
-        })
-        .filter(c -> c != null)
-        .collect(Collectors.toSet());
-      // make sure to also cover enums
-      classes.addAll(reflections.getSubTypesOf(Enum.class));
     }
     for (final Class<?> c: classes) {
       System.out.println(
