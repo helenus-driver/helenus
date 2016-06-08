@@ -792,7 +792,7 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
    *         with different options or an entity class doesn't represent
-   *         a valid POJO class or if no entities are found
+   *         a valid POJO class
    */
   public static CreateSchemas createSchemas(String... pkgs) {
     return StatementManager.getManager().createSchemas(pkgs);
@@ -822,8 +822,8 @@ public final class StatementBuilder {
    * @return a new CREATE SCHEMAS statement
    * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
-   *         with different options or an @Entitiy annotated class doesn't represent
-   *         a valid POJO class or if no entities are found
+   *         with different options or an @Entity annotated class doesn't represent
+   *         a valid POJO class
    */
   public static CreateSchemas createMatchingSchemas(String... pkgs) {
     return StatementManager.getManager().createMatchingSchemas(pkgs);
@@ -884,7 +884,7 @@ public final class StatementBuilder {
    * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
    *         with different options or an entity class doesn't represent
-   *         a valid POJO class or if no entities are found
+   *         a valid POJO class
    */
   public static AlterSchemas alterSchemas(String... pkgs) {
     return StatementManager.getManager().alterSchemas(pkgs);
@@ -916,8 +916,8 @@ public final class StatementBuilder {
    * @return a new ALTER SCHEMAS statement
    * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
    * @throws IllegalArgumentException if two entities defines the same keyspace
-   *         with different options or an @Entitiy annotated class doesn't represent
-   *         a valid POJO class or if no entities are found
+   *         with different options or an @Entity annotated class doesn't represent
+   *         a valid POJO class
    */
   public static AlterSchemas alterMatchingSchemas(String... pkgs) {
     return StatementManager.getManager().alterMatchingSchemas(pkgs);

@@ -110,6 +110,8 @@ import org.helenus.driver.impl.StatementImpl;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.impl.TypeClassInfoImpl;
 import org.helenus.driver.impl.UDTClassInfoImpl;
+import org.helenus.driver.impl.UDTRootClassInfoImpl;
+import org.helenus.driver.impl.UDTTypeClassInfoImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.info.TableInfo;
@@ -2401,6 +2403,17 @@ public class HelenusJUnit implements MethodRule {
       } else if (cinfo instanceof TypeClassInfoImpl) {
         // make sure to cache all sub-types if any
         final TypeClassInfoImpl<T> tcinfo = (TypeClassInfoImpl<T>)cinfo;
+
+        tcinfo.getRoot().types()
+          .filter(t -> !cinfo.getObjectClass().equals(t.getObjectClass())) // skip us
+          .filter(t -> cinfo.getObjectClass().isAssignableFrom(t.getObjectClass()))
+          .forEachOrdered(t -> getClassInfoImpl(t.getObjectClass()));
+      } else if (cinfo instanceof UDTRootClassInfoImpl) {
+        ((UDTRootClassInfoImpl<T>)cinfo).types()
+          .forEachOrdered(t -> getClassInfoImpl(t.getObjectClass()));
+      } else if (cinfo instanceof UDTTypeClassInfoImpl) {
+        // make sure to cache all sub-types if any
+        final UDTTypeClassInfoImpl<T> tcinfo = (UDTTypeClassInfoImpl<T>)cinfo;
 
         tcinfo.getRoot().types()
           .filter(t -> !cinfo.getObjectClass().equals(t.getObjectClass())) // skip us

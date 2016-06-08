@@ -743,26 +743,21 @@ public class Tool {
     final Set<Class<?>> classes = new LinkedHashSet<>();
 
     for (final String pkg: pkgs) {
-      try {
-        final CreateSchemas cs
-          = (matching
-             ? StatementBuilder.createMatchingSchemas(pkg)
-             : StatementBuilder.createSchemas(pkg));
+      final CreateSchemas cs
+        = (matching
+           ? StatementBuilder.createMatchingSchemas(pkg)
+           : StatementBuilder.createSchemas(pkg));
 
-        // pass all suffixes
-        for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-          // register the suffix value with the corresponding suffix type
-          cs.where(
-            StatementBuilder.eq(e.getKey(), e.getValue())
-          );
-        }
-        final Set<Class<?>> csclasses = cs.getObjectClasses();
+      // pass all suffixes
+      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+        // register the suffix value with the corresponding suffix type
+        cs.where(
+          StatementBuilder.eq(e.getKey(), e.getValue())
+        );
+      }
+      final Set<Class<?>> csclasses = cs.getObjectClasses();
 
-        if (csclasses.isEmpty()) { // fall into exception handling
-          throw new IllegalArgumentException("nothing found via helenus");
-        }
-        classes.addAll(csclasses);
-      } catch (IllegalArgumentException e) { // ignore and continue with package only
+      if (csclasses.isEmpty()) { // nothing found in helenus, fallback to reflection
         final Reflections reflections = new Reflections(pkgs, new SubTypesScanner(false));
 
         reflections.getAllTypes().stream()
@@ -777,6 +772,8 @@ public class Tool {
           .forEach(c -> classes.add(c));
         // make sure to also cover enums
         classes.addAll(reflections.getSubTypesOf(Enum.class));
+      } else {
+        classes.addAll(csclasses);
       }
     }
     for (final Class<?> c: classes) {

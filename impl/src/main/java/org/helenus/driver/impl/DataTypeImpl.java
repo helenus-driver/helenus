@@ -56,6 +56,7 @@ import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
 import org.helenus.driver.persistence.UDTEntity;
+import org.helenus.driver.persistence.UDTRootEntity;
 
 /**
  * The <code>DataTypeImpl</code> class provides definition for Cassandra data types
@@ -858,7 +859,10 @@ public class DataTypeImpl {
   ) {
     // check if the class is annotated as a UDT in which case we kind of allow
     // collections of collections since clazz is actually a udt
-    final boolean isUDT = clazz.getAnnotation(UDTEntity.class) != null;
+    final boolean isUDT = (
+      (clazz.getAnnotation(UDTEntity.class) != null)
+      || (ReflectionUtils.findFirstClassAnnotatedWith(clazz, UDTRootEntity.class) != null)
+    );
 
     if (Optional.class.isAssignableFrom(clazz)) {
       org.apache.commons.lang3.Validate.isTrue(

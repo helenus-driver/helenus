@@ -27,6 +27,7 @@ import java.lang.reflect.Type;
 import java.io.IOException;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -243,23 +244,25 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final Object finalValue;
 
   /**
-   * Holds the consumer used to update the value for this field for an instance.
+   * Holds the consumers used to update the value for this field for an instance
+   * keyed by the class (used when subclasses are involved and have different setters).
    * <p>
    * The first argument is the instance where to update the value of the field
    * and the second one is the value to set.
    *
    * @author paouelle
    */
-  private final BiConsumer<Object, Object> setter;
+  final Map<Class<? extends T>, BiConsumer<Object, Object>> setters;
 
   /**
-   * Holds the function used to retrieve the value of the field from an instance.
+   * Holds the functions used to retrieve the value of the field from an instance
+   * keyed by the class (used when subclasses are involved and have different getters).
    * <p>
    * The argument is the instance from which to retrieve the value for this field.
    *
    * @author paouelle
    */
-  private final Function<Object, Object> getter;
+  final Map<Class<? extends T>, Function<Object, Object>> getters;
 
   /**
    * Flag indicating if this is the last key in the partition or the cluster.
@@ -279,9 +282,30 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @param field the non-<code>null</code> field to copy
    */
   FieldInfoImpl(
-    RootClassInfoImpl<T> cinfo,
+    ClassInfoImpl<T> cinfo,
     TableInfoImpl<T> tinfo,
     FieldInfoImpl<? extends T> field
+  ) {
+    this(cinfo, tinfo, field, field.mandatory);
+  }
+
+  /**
+   * Instantiates a new <code>FieldInfoImpl</code> object for a root element pojo
+   * class.
+   *
+   * @author paouelle
+   *
+   * @param cinfo the non-<code>null</code> class info for the POJO root element
+   * @param tinfo the non-<code>null</code> table info from the POJO root element
+   * @param field the non-<code>null</code> field to copy
+   * @param mandatory <code>true</code> to set the field has a mandatory one;
+   *        <code>false</code> otherwise
+   */
+  FieldInfoImpl(
+    ClassInfoImpl<T> cinfo,
+    TableInfoImpl<T> tinfo,
+    FieldInfoImpl<? extends T> field,
+    boolean mandatory
   ) {
     this.clazz = cinfo.getObjectClass();
     this.cinfo = cinfo;
@@ -295,7 +319,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.persisted = field.persisted;
     this.persister = field.persister;
     this.suffix = field.suffix;
-    this.mandatory = field.mandatory;
+    this.mandatory = mandatory;
     this.index = field.index;
     this.partitionKey = field.partitionKey;
     this.clusteringKey = field.clusteringKey;
@@ -305,8 +329,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.decoder = field.decoder;
     this.isFinal = field.isFinal;
     this.finalValue = field.finalValue;
-    this.setter = field.setter;
-    this.getter = field.getter;
+    this.setters = new HashMap<>(field.setters);
+    this.getters = new HashMap<>(field.getters);
     this.isLast = field.isLast;
   }
 
@@ -346,8 +370,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.multiKeyType = null; // we don't care about this for keyspace suffixes
     this.definition = null; // we don't care about this for keyspace suffixes
     this.decoder = null; // we don't care about this for keyspace suffixes
-    this.getter = findGetter(declaringClass);
-    this.setter = findSetter(declaringClass);
+    this.getters = new HashMap<>(6);
+    this.setters = new HashMap<>(6);
+    findGetter(declaringClass);
+    findSetter(declaringClass);
     this.finalValue = findFinalValue();
   }
 
@@ -489,12 +515,15 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         declaringClass.getName(),
         field.getName()
       );
-      org.apache.commons.lang3.Validate.isTrue(
-        !isTypeKey(),
-        "field cannot be annotated with @TypeKey: %s.%s",
-        declaringClass.getName(),
-        field.getName()
-      );
+      if (!(cinfo instanceof UDTRootClassInfoImpl)
+          && !(cinfo instanceof UDTTypeClassInfoImpl)) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !isTypeKey(),
+          "field cannot be annotated with @TypeKey: %s.%s",
+          declaringClass.getName(),
+          field.getName()
+        );
+      }
     }
     if (isColumn()) {
       this.definition = DataTypeImpl.inferDataTypeFrom(field);
@@ -530,8 +559,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       this.decoder = null;
       this.multiKeyType = null;
     }
-    this.getter = findGetter(declaringClass);
-    this.setter = findSetter(declaringClass);
+    this.getters = new HashMap<>(6);
+    this.setters = new HashMap<>(6);
+    findGetter(declaringClass);
+    findSetter(declaringClass);
     this.finalValue = findFinalValue();
     // validate some stuff
     if (isInTable) {
@@ -594,7 +625,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       org.apache.commons.lang3.Validate.isTrue(
         !(isTypeKey()
           && !(cinfo instanceof RootClassInfoImpl)
-          && !(cinfo instanceof TypeClassInfoImpl)),
+          && !(cinfo instanceof TypeClassInfoImpl)
+          && !(cinfo instanceof UDTRootClassInfoImpl)
+          && !(cinfo instanceof UDTTypeClassInfoImpl)),
         "field in table '%s' must not be annotated with @TypeKey if class is annotated with @Entity: %s.%s",
         tname,
         declaringClass.getName(),
@@ -644,8 +677,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.multiKeyType = null; // we don't care about this for keyspace suffixes
     this.definition = null; // we don't care about this for keyspace suffixes
     this.decoder = null; // we don't care about this for keyspace suffixes
-    this.getter = null;
-    this.setter = null;
+    this.getters = null;
+    this.setters = null;
     this.finalValue = null;
   }
 
@@ -701,8 +734,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.multiKeyType = null;
     this.definition = DataTypeImpl.inferDataTypeFrom(type, clazz);
     this.decoder = definition.getDecoder(clazz);
-    this.getter = obj -> obj; // return the instance itself as the value for the field
-    this.setter = setter;
+    this.getters = new HashMap<>(6);
+    this.setters = new HashMap<>(6);
+    getters.put(cinfo.getObjectClass(), obj -> obj); // return the instance itself as the value for the field
+    setters.put(cinfo.getObjectClass(), setter);
     this.finalValue = null;
   }
 
@@ -769,10 +804,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @author paouelle
    *
    * @param  declaringClass the non-<code>null</code> class declaring the field
-   * @return the function to use for retrieving the field value
    * @throws IllegalArgumentException if unable to find a suitable getter
    */
-  private Function<Object, Object> findGetter(Class<?> declaringClass) {
+  private void findGetter(Class<?> declaringClass) {
     Method getter = findGetterMethod(declaringClass, "get");
 
     if ((getter == null) && (type == Boolean.class) || (type == Boolean.TYPE)) {
@@ -782,7 +816,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     if (getter != null) {
       final Method g = getter;
 
-      return obj -> {
+      getters.put(cinfo.getObjectClass(), obj -> {
         try {
           return g.invoke(obj);
         } catch (IllegalAccessException e) { // should not happen
@@ -798,15 +832,16 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
             throw new IllegalStateException(declaringClass.getName(), t);
           }
         }
-      };
+      });
+    } else {
+      getters.put(cinfo.getObjectClass(), obj -> {
+        try {
+          return field.get(obj);
+        } catch (IllegalAccessException e) { // should not happen
+          throw new IllegalStateException(declaringClass.getName(), e);
+        }
+      });
     }
-    return obj -> {
-      try {
-        return field.get(obj);
-      } catch (IllegalAccessException e) { // should not happen
-        throw new IllegalStateException(declaringClass.getName(), e);
-      }
-    };
   }
 
   /**
@@ -855,11 +890,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @author paouelle
    *
    * @param  declaringClass the non-<code>null</code> class declaring the field
-   * @return the consumer to use for setting the value of the field or
-   *         <code>null</code> if none found
    * @throws IllegalArgumentException if unable to find a suitable setter
    */
-  private BiConsumer<Object, Object> findSetter(Class<?> declaringClass) {
+  private void findSetter(Class<?> declaringClass) {
     final String mname = "set" + WordUtils.capitalize(name, '_', '-');
 
     try {
@@ -867,7 +900,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       final int mods = m.getModifiers();
 
       if (Modifier.isAbstract(mods) || Modifier.isStatic(mods)) {
-        return null;
+        return;
       }
       org.apache.commons.lang3.Validate.isTrue(
         m.getParameterCount() == 1,
@@ -895,7 +928,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         );
       }
       m.setAccessible(true);
-      return (obj, val) -> {
+      setters.put(cinfo.getObjectClass(), (obj, val) -> {
         try {
           m.invoke(obj, val);
         } catch (IllegalAccessException e) { // should not happen
@@ -911,19 +944,18 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
             throw new IllegalStateException(t);
           }
         }
-      };
+      });
     } catch (NoSuchMethodException e) {
       // fallback to the field itself unless it is marked final
-      if (isFinal) {
-        return null;
+      if (!isFinal) {
+        setters.put(cinfo.getObjectClass(), (obj, val) -> {
+          try {
+            field.set(obj, val);
+          } catch (IllegalAccessException iae) { // should not happen
+            throw new IllegalStateException(iae);
+          }
+        });
       }
-      return (obj, val) -> {
-        try {
-          field.set(obj, val);
-        } catch (IllegalAccessException iae) { // should not happen
-          throw new IllegalStateException(iae);
-        }
-      };
     }
   }
 
@@ -993,6 +1025,46 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         }
       }
       return val;
+    }
+    return null;
+  }
+
+  /**
+   * Gets a registered getter for the specified class or one of its base class.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class for which to get a getter
+   * @return the corresponding getter or <code>null</code> if none found
+   */
+  private Function<Object, Object> getGetter(Class<?> clazz) {
+    while (clazz != null) {
+      final Function<Object, Object> getter = getters.get(clazz);
+
+      if (getter != null) {
+        return getter;
+      }
+      clazz = clazz.getSuperclass();
+    }
+    return null;
+  }
+
+  /**
+   * Gets a registered getter for the specified class or one of its base class.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class for which to get a getter
+   * @return the corresponding getter or <code>null</code> if none found
+   */
+  private BiConsumer<Object, Object> getSetter(Class<?> clazz) {
+    while (clazz != null) {
+      final BiConsumer<Object, Object> setter = setters.get(clazz);
+
+      if (setter != null) {
+        return setter;
+      }
+      clazz = clazz.getSuperclass();
     }
     return null;
   }
@@ -1584,9 +1656,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws ClassCastException if the field value from the given object
    *         cannot be type casted to the specified class
    */
+  @SuppressWarnings("unchecked")
   public Object getNonEncodedValue(Class<?> clazz, T object) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
-    Object val = getter.apply(object);
+    final Function<Object, Object> getter = getGetter(object.getClass());
+    Object val = (getter != null) ? getter.apply(object) : null;
 
     if (val instanceof Optional) {
       val = ((Optional<?>)val).orElse(null);
@@ -1598,8 +1672,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       // the value is fixed by the schema so get it from the type class info
       if (cinfo instanceof TypeClassInfoImpl) {
         type = ((TypeClassInfoImpl<T>)cinfo).getType();
-      } else { // must be a RootClassInfoImpl
-        type = ((RootClassInfoImpl<T>)cinfo).getType(cinfo.getObjectClass()).getType();
+      } else if (cinfo instanceof RootClassInfoImpl) {
+        type = ((RootClassInfoImpl<T>)cinfo).getType((Class<? extends T>)object.getClass()).getType();
+      } else if (cinfo instanceof UDTTypeClassInfoImpl) {
+        type = ((UDTTypeClassInfoImpl<T>)cinfo).getType();
+      } else {
+        type = ((UDTRootClassInfoImpl<T>)cinfo).getType((Class<? extends T>)object.getClass()).getType();
       }
       if (!type.equals(val)) { // force value to the type and re-update in pojo
         setValue(object, type);
@@ -1711,6 +1789,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   public void setValue(T object, Object value) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    final BiConsumer<Object, Object> setter = getSetter(object.getClass());
+
     // nothing to update if no setter was defined
     if (setter == null) {
       return;
@@ -1995,6 +2075,90 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
+   * Decodes the field's value based on the given UDT value.
+   *
+   * @author paouelle
+   *
+   * @param  uval the UDT value where the column encoded value is defined
+   * @return the decoded value for this field from the given UDT value
+   * @throws NullPointerException if <code>uval</code> is  <code>null</code>
+   * @throws ObjectConversionException if unable to decode the column or if the
+   *         column is not defined in the given UDT value
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public Object decodeValue(UDTValue uval) {
+    org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
+    // check if the column is defined in the row
+    if (!uval.getType().contains(getColumnName())) {
+      if (isMandatory()) {
+        throw new ObjectConversionException(
+          clazz,
+          uval,
+          "missing mandatory column '"
+          + getColumnName()
+          + "' from UDT value for field '"
+          + declaringClass.getName()
+          + "."
+          + name
+          + "'"
+        );
+      }
+      throw new ObjectConversionException(
+        clazz,
+        uval,
+        "missing column '"
+        + getColumnName()
+        + "' from UDT value for field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "'"
+      );
+    }
+    Object val;
+
+    try {
+      // if we have a persister then we need to decode to persisted.as() first
+      val = decoder.decode(
+        uval,
+        getColumnName(),
+        (persister != null) ? (Class)persisted.as().CLASS : (Class)this.type
+      );
+    } catch (IllegalArgumentException|InvalidTypeException e) {
+      throw new ObjectConversionException(
+        clazz,
+        uval,
+        "unable to decode value for field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "'",
+        e
+      );
+    }
+    if (persister != null) { // must decode it using the persister
+      final String fname = declaringClass.getName() + "." + name;
+
+      try {
+        val = definition.decode(val, persisted, persister, fname);
+      } catch (Exception e) {
+        throw new ObjectConversionException(
+          clazz,
+          uval,
+          "unable to decode persisted "
+          + persisted.as().CQL
+          + " for field '"
+          + fname
+          + "' with persister: "
+          + persister.getClass().getName(),
+          e
+        );
+      }
+    }
+    return val;
+  }
+
+  /**
    * Decodes and sets the field's value in the specified POJO based on the given
    * UDT value.
    *
@@ -2027,7 +2191,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
           + "'"
         );
       }
-      // not defined in the row so skip it
+      // not defined in the UDT value so skip it
       return;
     }
     Object val;

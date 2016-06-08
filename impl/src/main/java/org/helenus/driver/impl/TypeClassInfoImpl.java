@@ -44,7 +44,7 @@ import org.helenus.driver.persistence.TypeEntity;
  *
  * @since 2.0
  */
-@lombok.ToString(callSuper=true)
+@lombok.ToString(callSuper=true, exclude="rinfo")
 @lombok.EqualsAndHashCode(callSuper=true, exclude="rinfo")
 public class TypeClassInfoImpl<T>
   extends ClassInfoImpl<T>
@@ -136,8 +136,11 @@ public class TypeClassInfoImpl<T>
       (n, f) -> {
         org.apache.commons.lang3.Validate.isTrue(
           rclazz.equals(f.getDeclaringClass()),
-          "@SuffixKey annotation with name '%s' is not defined in root element class '%s' for type class: ",
-          n, rclazz.getSimpleName(), clazz.getSimpleName()
+          "@SuffixKey annotation with name '%s' is not defined in root element class '%s' for type class: %s; found in class: %s",
+          n,
+          rclazz.getSimpleName(),
+          clazz.getSimpleName(),
+          f.getDeclaringClass().getSimpleName()
         );
       }
     );
@@ -150,7 +153,8 @@ public class TypeClassInfoImpl<T>
            clazz, Keyspace.class
          ).isAssignableFrom(rclazz),
          "@Keyspace annotation is not defined in root element class '%s' for type class: %s",
-         rclazz.getSimpleName(), clazz.getSimpleName()
+         rclazz.getSimpleName(),
+         clazz.getSimpleName()
        );
        // check table
        org.apache.commons.lang3.Validate.isTrue(
@@ -158,7 +162,8 @@ public class TypeClassInfoImpl<T>
            clazz, Table.class
          ).isAssignableFrom(rclazz),
          "@Table annotation is not defined in root element class '%s' for type class: %s",
-         rclazz.getSimpleName(), clazz.getSimpleName()
+         rclazz.getSimpleName(),
+         clazz.getSimpleName()
        );
        // check partition keys
        t.getPartitionKeys().forEach(
@@ -166,7 +171,9 @@ public class TypeClassInfoImpl<T>
            org.apache.commons.lang3.Validate.isTrue(
              f.getDeclaringClass().isAssignableFrom(rclazz),
              "@PartitionKey annotation with name '%s' is not defined in root element class '%s' for type class: %s",
-             f.getColumnName(), rclazz.getSimpleName(), clazz.getSimpleName()
+             f.getColumnName(),
+             rclazz.getSimpleName(),
+             clazz.getSimpleName()
            );
          }
        );
@@ -176,7 +183,9 @@ public class TypeClassInfoImpl<T>
            org.apache.commons.lang3.Validate.isTrue(
              f.getDeclaringClass().isAssignableFrom(rclazz),
              "@ClusteringKey annotation with name '%s' is not defined in root element class '%s' for type class: %s",
-             f.getColumnName(), rclazz.getSimpleName(), clazz.getSimpleName()
+             f.getColumnName(),
+             rclazz.getSimpleName(),
+             clazz.getSimpleName()
            );
          }
        );
@@ -186,7 +195,9 @@ public class TypeClassInfoImpl<T>
            org.apache.commons.lang3.Validate.isTrue(
              f.getDeclaringClass().isAssignableFrom(rclazz),
              "@TypeKey annotation with name '%s' is not defined in root element class '%s' for type class: %s",
-             f.getColumnName(), rclazz.getSimpleName(), clazz.getSimpleName()
+             f.getColumnName(),
+             rclazz.getSimpleName(),
+             clazz.getSimpleName()
            );
          }
        );
@@ -196,7 +207,9 @@ public class TypeClassInfoImpl<T>
            org.apache.commons.lang3.Validate.isTrue(
              f.getDeclaringClass().isAssignableFrom(rclazz),
              "@Index annotation with name '%s' is not defined in root element class '%s' for type class: %s",
-             f.getColumnName(), rclazz.getSimpleName(), clazz.getSimpleName()
+             f.getColumnName(),
+             rclazz.getSimpleName(),
+             clazz.getSimpleName()
            );
          }
        );
@@ -308,15 +321,18 @@ public class TypeClassInfoImpl<T>
 
     // extract the type so we know which object we are creating
     for (final TableInfoImpl<T> table: getTablesImpl()) {
-      final FieldInfoImpl<T> type = table.getTypeKey().orElse(null);
+      final FieldInfoImpl<T> field = table.getTypeKey().orElse(null);
 
-      if (type != null) {
-        final int i = cdefs.getIndexOf(type.getColumnName());
+      if (field != null) {
+        final int i = cdefs.getIndexOf(field.getColumnName());
 
         if ((i != -1) && table.getName().equals(cdefs.getTable(i))) {
-          return getObject(
-            row, Objects.toString(type.decodeValue(row), null), suffixes
-          );
+          final String type = Objects.toString(field.decodeValue(row), null);
+
+          if (type != null) {
+            return getObject(row, type, suffixes);
+          }
+          break;
         }
       }
     }

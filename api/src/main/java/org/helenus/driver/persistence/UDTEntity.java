@@ -59,7 +59,7 @@ public @interface UDTEntity {
    *
    * @author paouelle
    *
-   * @return the name for the table
+   * @return the name for the user-defined type
    */
   String name();
 

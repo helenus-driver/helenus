@@ -236,13 +236,13 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @author paouelle
    *
    * @param  mgr the non-<code>null</code> statement manager
-   * @param  cinfo the non-<code>null</code> class info for the POJO
+   * @param  cinfo the non-<code>null</code> UDT class info for the POJO
    * @param  name the non-<code>null</code> table name
    * @throws IllegalArgumentException if unable to find getter or setter
    *         methods for fields of if improperly annotated
    */
   public TableInfoImpl(
-    StatementManagerImpl mgr, ClassInfoImpl<T> cinfo, String name
+    StatementManagerImpl mgr, UDTClassInfoImpl<T> cinfo, String name
   ) {
     this.clazz = cinfo.getObjectClass();
     this.cinfo = cinfo;
@@ -279,6 +279,37 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         }
         fields.put(pf, field);
       }
+      if (field.isTypeKey()) { // by design will be false if no table is defined
+        final FieldInfoImpl<T> oldk = typeKeyColumn.getValue();
+
+        if (oldk != null) {
+          throw new IllegalArgumentException(
+            clazz.getSimpleName()
+            + " cannot annotate more than one field as a type key for table '"
+            + table.name()
+            + "': found '"
+            + oldk.getDeclaringClass().getSimpleName()
+            + "."
+            + oldk.getName()
+            + "' and '"
+            + field.getDeclaringClass().getSimpleName()
+            + "."
+            + field.getName()
+            + "'"
+          );
+        }
+        if (cinfo instanceof UDTTypeClassInfoImpl) {
+          // skip it if it shouldn't be persisted for UDT type entities,
+          // only for UDT root entities and other non-UDT entities
+          fields.remove(pf);
+          continue;
+        }
+        typeKeyColumn.setValue(field);
+        mandatoryAndPrimaryKeyColumns.put(field.getColumnName(), field);
+        if (field.isIndex()) {
+          indexColumns.put(field.getColumnName(), field);
+        }
+      }
       final FieldInfoImpl<T> oldc = columns.put(field.getColumnName(), field);
 
       if (oldc != null) {
@@ -300,31 +331,6 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       }
       if (field.getDataType().isCollection()) {
         this.hasCollectionColumns = true;
-      }
-      if (field.isTypeKey()) { // by design will be false if no table is defined
-        final FieldInfoImpl<T> oldk = typeKeyColumn.getValue();
-
-        if (oldk != null) {
-          throw new IllegalArgumentException(
-            clazz.getSimpleName()
-            + " cannot annotate more than one field as a type key for table '"
-            + table.name()
-            + "': found '"
-            + oldk.getDeclaringClass().getSimpleName()
-            + "."
-            + oldk.getName()
-            + "' and '"
-            + field.getDeclaringClass().getSimpleName()
-            + "."
-            + field.getName()
-            + "'"
-          );
-        }
-        typeKeyColumn.setValue(field);
-        mandatoryAndPrimaryKeyColumns.put(field.getColumnName(), field);
-        if (field.isIndex()) {
-          indexColumns.put(field.getColumnName(), field);
-        }
       }
       if (field.isPartitionKey()) {
         lastPartitionKey = field;
@@ -511,6 +517,35 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
+   * Forces the specified column to not be mandatory.
+   *
+   * @author paouelle
+   *
+   * @param  col the non-<code>null</code> column to force to not be mandatory
+   * @return a new updated column
+   */
+  FieldInfoImpl<T> forceNonPrimaryColumnToNotBeMandatory(FieldInfoImpl<T> col) {
+    if (col.isMandatory()) {
+      // we need to downgrade to column to a non-mandatory one
+      // so start by cloning the original one and force it to non-mandatory
+      col = new FieldInfoImpl<>(cinfo, this, col, false);
+      // now replace it in all collections
+      fields.put(Pair.of(col.getName(), col.getDeclaringClass()), col);
+      columns.put(col.getColumnName(), col);
+      if (col.isIndex()) {
+        indexColumns.put(col.getColumnName(), col);
+      }
+      if (col.isMandatory()) {
+        mandatoryAndPrimaryKeyColumns.put(col.getColumnName(), col);
+        nonPrimaryKeyColumns.put(col.getColumnName(), col);
+      } else {
+        nonPrimaryKeyColumns.put(col.getColumnName(), col);
+      }
+    }
+    return col;
+  }
+
+  /**
    * Adds the specified non-primary column field to this table.
    * <p>
    * This method will be called by the root entity when it is adding non-primary
@@ -535,34 +570,56 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       (cinfo instanceof RootClassInfoImpl) || (cinfo instanceof UDTClassInfoImpl),
       "should not have been called for class '%s'", cinfo.getClass().getName()
     );
-    final FieldInfoImpl<T> old = columns.get(col.getColumnName());
+    FieldInfoImpl<T> old = columns.get(col.getColumnName());
 
     if (old != null) {
-      // already defined so skip it but not before making sure it is compatible
-      if (old.getDeclaringClass().equals(col.getDeclaringClass())) {
-        // same exact field so bail!!!
-        return;
+      // already defined so simply add this field's getter & setter to it but not before making sure it is compatible
+      if (!old.getDeclaringClass().equals(col.getDeclaringClass())) {
+        // check data type
+        org.apache.commons.lang3.Validate.isTrue(
+          old.getDataType().getType() == col.getDataType().getType(),
+          "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
+          old.getDeclaringClass().getSimpleName(),
+          old.getName(),
+          old.getDataType().getType(),
+          col.getDeclaringClass().getSimpleName(),
+          col.getName(),
+          col.getDataType().getType(),
+          name,
+          clazz.getSimpleName()
+        );
+      } // else - same type, so check if the mandatory setting has changed!!!
+      if (old.isMandatory() != col.isMandatory()) {
+        // check if the old one was mandatory and defined at the root level in
+        // which case we have to fail since everybody underneath must also be mandatory
+        if (old.isMandatory()) {
+          org.apache.commons.lang3.Validate.isTrue(
+            !cinfo.getObjectClass().equals(col.getDeclaringClass()),
+            "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
+            old.getDeclaringClass().getSimpleName(),
+            old.getName(),
+            old.getDataType().getType(),
+            col.getDeclaringClass().getSimpleName(),
+            col.getName(),
+            col.getDataType().getType(),
+            name,
+            clazz.getSimpleName()
+          );
+        }
+        if (cinfo instanceof UDTRootClassInfoImpl) {
+          old = forceNonPrimaryColumnToNotBeMandatory(old);
+        }
       }
-      // check data type
-      org.apache.commons.lang3.Validate.isTrue(
-        old.getDataType().getType() == col.getDataType().getType(),
-        "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
-        old.getDeclaringClass().getSimpleName(),
-        old.getName(),
-        old.getDataType().getType(),
-        col.getDeclaringClass().getSimpleName(),
-        col.getName(),
-        col.getDataType().getType(),
-        name,
-        clazz.getSimpleName()
-      );
+      old.getters.putAll(col.getters);
+      old.setters.putAll(col.setters);
       return;
     }
     final FieldInfoImpl<T> rcol;
 
-    if (cinfo instanceof RootClassInfoImpl) {
+    if ((cinfo instanceof RootClassInfoImpl)
+        || (cinfo instanceof UDTRootClassInfoImpl)) {
       // clone the type column so we have a brand new one in the root class info
-      rcol = new FieldInfoImpl<>((RootClassInfoImpl<T>)cinfo, this, col);
+      rcol = new FieldInfoImpl<>(cinfo, this, col);
     } else {
       rcol = (FieldInfoImpl<T>)col;
     }

@@ -64,6 +64,7 @@ import org.helenus.driver.persistence.Keyspace;
 import org.helenus.driver.persistence.SuffixKey;
 import org.helenus.driver.persistence.Table;
 import org.helenus.driver.persistence.UDTEntity;
+import org.helenus.driver.persistence.UDTRootEntity;
 
 /**
  * The <code>ClassInfo</code> class provides information about a particular
@@ -1127,11 +1128,15 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       // create a dummy table info
       final UDTEntity ue = clazz.getAnnotation(UDTEntity.class);
 
-      org.apache.commons.lang3.Validate.isTrue(
-        ue != null,
-        "class '%s' is not annotated with @UDTEntity", clazz.getSimpleName()
-      );
-      this.tables.put(ue.name(), new TableInfoImpl<>(mgr, this, ue.name()));
+      if (ue == null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          ReflectionUtils.findFirstClassAnnotatedWith(clazz, UDTRootEntity.class) != null,
+          "class '%s' is not annotated with @UDTEntity or @UDTRootEntity",
+          clazz.getSimpleName()
+        );
+      }
+      // create fake table with "udt" as the name
+      this.tables.put("udt", new TableInfoImpl<>(mgr, (UDTClassInfoImpl<T>)this, "udt"));
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         !tables.isEmpty(),
@@ -1198,13 +1203,13 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       for (final SuffixKey suffix: suffixes) {
         org.apache.commons.lang3.Validate.isTrue(
           !suffixesByType.containsKey(suffix.type()),
-          "multipe @SuffixKey annotations found with type '%s' for class: %s",
+          "multiple @SuffixKey annotations found with type '%s' for class: %s",
           suffix.type(),
           clazz.getSimpleName()
         );
         org.apache.commons.lang3.Validate.isTrue(
           !suffixesByName.containsKey(suffix.name()),
-          "multipe @SuffixKey annotations found with name '%s' for class: %s",
+          "multiple @SuffixKey annotations found with name '%s' for class: %s",
           suffix.name(),
           clazz.getSimpleName()
         );
@@ -1502,7 +1507,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> keysapce annotation for this POJO
+   * @return the non-<code>null</code> keyspace annotation for this POJO
    */
   @Override
   public Keyspace getKeyspace() {

@@ -17,6 +17,7 @@ package org.helenus.driver.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -81,7 +82,7 @@ public class CreateTypeImpl<T>
    *
    * @author paouelle
    *
-   * @param  table the non-<code>null</code> table for which to build a query
+   * @param  ucinfo the non-<code>null</code> UDT POJO class to build a query
    *         string
    * @return the string builders used to build the query strings for
    *         the specified table or <code>null</code> if there is none for the
@@ -94,10 +95,15 @@ public class CreateTypeImpl<T>
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
-  protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
+  protected StringBuilder[] buildQueryStrings(UDTClassInfoImpl<T> ucinfo) {
+    final TableInfoImpl<T> table = ucinfo.getTableImpl();
     final List<String> columns = new ArrayList<>(table.getColumns().size());
 
     for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
+      if (field.isTypeKey() && (ucinfo instanceof UDTTypeClassInfoImpl)) {
+        // don't persist type keys for those (only for UDT root entities)
+        continue;
+      }
       columns.add(field.getColumnName() + " " + field.getDataType().toCQL());
     }
     final StringBuilder builder = new StringBuilder();
@@ -109,7 +115,7 @@ public class CreateTypeImpl<T>
     if (getKeyspace() != null) {
       Utils.appendName(getKeyspace(), builder).append(".");
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(ucinfo.getName(), builder);
     builder
       .append(" (")
       .append(StringUtils.join(columns, ","))
@@ -127,14 +133,19 @@ public class CreateTypeImpl<T>
    */
   @Override
   protected final List<StatementImpl<?, ?, ?>> buildGroupedStatements() {
-    // by design, there should only be one table!!!
-    return ((ClassInfoImpl<T>)getClassInfo()).tablesImpl()
-      .map(t -> buildQueryStrings(t))
-      .filter(bs -> bs != null)
-      .flatMap(bs -> Arrays.stream(bs))
-      .filter(b -> (b != null) && (b.length() != 0))
-      .map(b -> init(new SimpleStatementImpl(b.toString(), mgr, bridge)))
-      .collect(Collectors.toList());
+    final ClassInfoImpl<T> cinfo = (ClassInfoImpl<T>)getClassInfo();
+
+    if (cinfo instanceof UDTClassInfoImpl) {
+      final StringBuilder[] bs = buildQueryStrings((UDTClassInfoImpl<T>)cinfo);
+
+      if (bs != null) {
+        return Arrays.stream(bs)
+          .filter(b -> (b != null) && (b.length() != 0))
+          .map(b -> init(new SimpleStatementImpl(b.toString(), mgr, bridge)))
+          .collect(Collectors.toList());
+      }
+    }
+    return Collections.emptyList();
   }
 
   /**

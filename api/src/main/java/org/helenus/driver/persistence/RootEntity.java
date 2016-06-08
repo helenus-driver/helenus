@@ -34,14 +34,14 @@ import java.lang.annotation.Target;
  * order to indicate the specific type of this base class they represent.
  * <p>
  * The base class annotated with {@link RootEntity} must include a single column
- * as an attribute type {@link String} annotated with the @typeKey annotation.
+ * as an attribute type {@link String} annotated with the {@link TypeKey} annotation.
  * This attribute will be used to hold the entity type and used to identify the
  * class that will be re-created at the time an object is retrieved from Cassandra.
  * <p>
- * The root entity class must defined all partition and /or clustering keys and
- * must defined the keyspace and all tables.
+ * The root entity class must defined all partition and/or clustering keys and
+ * must defined the keyspace, and suffix keys, and all tables.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation

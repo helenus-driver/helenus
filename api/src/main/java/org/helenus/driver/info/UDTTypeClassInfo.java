@@ -16,31 +16,31 @@
 package org.helenus.driver.info;
 
 /**
- * The <code>TypeClassInfo</code> interface extends on the {@link ClassInfo}
- * interface to provide addition information for type entity POJO class.
+ * The <code>UDTTypeClassInfo</code> interface extends on the {@link UDTClassInfo}
+ * interface to provide addition information for UDT type entity POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Mar 11, 2015 - paouelle - Creation
+ * @version 1 - Jun 7, 2016 - paouelle - Creation
  *
  * @param <T> The type of POJO represented by this class
  *
  * @since 1.0
  */
-public interface TypeClassInfo<T> extends ClassInfo<T> {
+public interface UDTTypeClassInfo<T> extends UDTClassInfo<T> {
   /**
-   * Gets the class info for the root entity defined for this type entity.
+   * Gets the class info for the UDT root entity defined for this UDT type entity.
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> root entity POJO class info defined for
-   *         this type entity
+   * @return the non-<code>null</code> UDT root entity POJO class info defined for
+   *         this UDT type entity
    */
-  public RootClassInfo<? super T> getRoot();
+  public UDTRootClassInfo<? super T> getRoot();
 
   /**
-   * Gets the type of this POJO class.
+   * Gets the type of this POJO class (same as {@link UDTClassInfo#getName}).
    *
    * @author paouelle
    *
@@ -50,13 +50,13 @@ public interface TypeClassInfo<T> extends ClassInfo<T> {
 
   /**
    * Checks if this type was dynamically added to its root or if it was known
-   * to the root via its @RootEntity annotation.
+   * to the root via its @UDTRootEntity annotation.
    *
    * @author paouelle
    *
    * @return <code>true</code> if this type is dynamically being added
    *         to the root; <code>false</code> if it was known to the root via
-   *         the @RootEnitty annotation
+   *         the @UDTRootEnitty annotation
    */
   public boolean isDynamic();
 }

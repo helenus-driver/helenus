@@ -65,27 +65,33 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.CreateTypeImpl#buildQueryStrings(org.helenus.driver.impl.TableInfoImpl)
+   * @see org.helenus.driver.impl.CreateTypeImpl#buildQueryStrings(org.helenus.driver.impl.UDTClassInfoImpl)
    */
   @Override
-  protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
+  protected StringBuilder[] buildQueryStrings(UDTClassInfoImpl<T> ucinfo) {
+    final TableInfoImpl<T> table = ucinfo.getTableImpl();
+
     // start by querying Cassandra system table to figure out the existing schema
     // for the required type
     final Row row = mgr.getSession().executeAsync(new SimpleStatement(
       "SELECT field_names,field_types FROM system.schema_usertypes WHERE keyspace_name='"
       + getKeyspace()
       + "' and type_name='"
-      + table.getName()
+      + ucinfo.getName()
       + "' LIMIT 1"
     )).getUninterruptibly().one();
 
     if (row == null) {
       // that would mean the type doesn't exist, so just created it brand new
-      return super.buildQueryStrings(table);
+      return super.buildQueryStrings(ucinfo);
     }
     final Map<String, CQLDataType> columns = new HashMap<>(table.getColumns().size() * 3 / 2);
 
     for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
+      if (field.isTypeKey() && (ucinfo instanceof UDTTypeClassInfoImpl)) {
+        // don't persist type keys for those (only for UDT root entities)
+        continue;
+      }
       columns.put(field.getColumnName(), field.getDataType());
     }
     final List<String> names0 = row.getList(0, String.class);
@@ -123,7 +129,7 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
     if (getKeyspace() != null) {
       Utils.appendName(getKeyspace(), builder).append(".");
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(ucinfo.getName(), builder);
     builder.append(' ');
     return columns0.stream()
       .map(inst -> new StringBuilder(builder).append(inst))

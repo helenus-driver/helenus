@@ -18,7 +18,6 @@ package org.helenus.driver.impl;
 import java.lang.reflect.Modifier;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -142,8 +141,8 @@ public class AlterSchemasImpl
    *         associated with them
    * @throws IllegalArgumentException if an @Entity annotated class is missing the
    *         Keyspace annotation or two entities defines the same keyspace with
-   *         different options or an @Entitiy annotated class doesn't represent
-   *         a valid POJO class or if no entities are found
+   *         different options or an @Entity annotated class doesn't represent
+   *         a valid POJO class
    */
   private Map<Keyspace, List<ClassInfoImpl<?>>> findKeyspaces() {
     final Map<String, Keyspace> keyspaces = new LinkedHashMap<>(25);
@@ -184,6 +183,43 @@ public class AlterSchemasImpl
           + k
         );
       }
+    }
+    // search for all POJO annotated classes with @UDTRootEntity
+    for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
+      org.helenus.driver.persistence.UDTRootEntity.class, true
+    )) {
+      // skip classes that are not directly annotated
+      if (ReflectionUtils.findFirstClassAnnotatedWith(
+           clazz, org.helenus.driver.persistence.UDTRootEntity.class
+         ) != clazz) {
+        continue;
+      }
+      final UDTClassInfoImpl<?> cinfo = (UDTClassInfoImpl<?>)mgr.getClassInfoImpl(clazz);
+      final Keyspace k = cinfo.getKeyspace();
+      final Keyspace old = keyspaces.put(k.name(), k);
+      DirectedGraph<UDTClassInfoImpl<?>> cs = udtcinfos.get(k);
+
+      if (cs == null) {
+        cs = new ConcurrentHashDirectedGraph<>();
+        udtcinfos.put(k, cs);
+      }
+      cs.add(cinfo, cinfo.udts());
+      if ((old != null) && !k.equals(old)) {
+        // duplicate annotation found with different attribute
+        throw new IllegalArgumentException(
+          "two different @Keyspace annotations found with class '"
+          + clazz.getName()
+          + "': "
+          + old
+          + " and: "
+          + k
+        );
+      }
+      // now add all @UDTTypeEntity for this @UDTRootEntity
+      final DirectedGraph<UDTClassInfoImpl<?>> fcs = cs;
+
+      ((UDTRootClassInfoImpl<?>)cinfo).typeImpls()
+        .forEach(tcinfo -> fcs.add(tcinfo, tcinfo.udts()));
     }
     // now we are done with types, do a reverse topological sort of all keyspace
     // graphs such that we end up creating udts in the dependent order
@@ -272,11 +308,6 @@ public class AlterSchemasImpl
       ((RootClassInfoImpl<?>)cinfo).typeImpls()
         .forEach(tcinfo -> fcs.add(tcinfo));
     }
-    org.apache.commons.lang3.Validate.isTrue(
-      !cinfos.isEmpty(),
-      "no classes annotated with @Entity, @RootEntity, or @UDTEntity found in packages: %s",
-      Arrays.toString(pkgs)
-    );
     return cinfos;
   }
 

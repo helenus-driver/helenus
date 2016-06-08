@@ -90,6 +90,8 @@ import org.helenus.driver.persistence.Entity;
 import org.helenus.driver.persistence.RootEntity;
 import org.helenus.driver.persistence.TypeEntity;
 import org.helenus.driver.persistence.UDTEntity;
+import org.helenus.driver.persistence.UDTRootEntity;
+import org.helenus.driver.persistence.UDTTypeEntity;
 
 /**
  * The <code>StatementManagerImpl</code> class provides an implementation
@@ -398,6 +400,8 @@ public class StatementManagerImpl extends StatementManager {
 
     if (cinfo instanceof TypeClassInfoImpl) {
       return ((TypeClassInfoImpl<T>)cinfo).getRoot();
+    } else if (cinfo instanceof UDTTypeClassInfoImpl) {
+      return ((UDTTypeClassInfoImpl<T>)cinfo).getRoot();
     }
     return cinfo;
   }
@@ -1881,8 +1885,15 @@ public class StatementManagerImpl extends StatementManager {
     if (classInfo == null) {
       final Class<? super T> rclazz
         = ReflectionUtils.findFirstClassAnnotatedWith(clazz, RootEntity.class);
+      final Class<? super T> rudtclazz
+        = ReflectionUtils.findFirstClassAnnotatedWith(clazz, UDTRootEntity.class);
 
       if (rclazz != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          rudtclazz == null,
+          "class '%s' cannot be annotated with both @RootEntity and @UDTRootEntity",
+          clazz.getSimpleName()
+        );
         org.apache.commons.lang3.Validate.isTrue(
           !clazz.isAnnotationPresent(Entity.class),
           "class '%s' cannot be annotated with both @RootEntity and @Entity",
@@ -1893,7 +1904,12 @@ public class StatementManagerImpl extends StatementManager {
           "class '%s' cannot be annotated with both @RootEntity and @UDTEntity",
           clazz.getSimpleName()
         );
-        if (rclazz == clazz) { // this is the root element class
+        org.apache.commons.lang3.Validate.isTrue(
+          !clazz.isAnnotationPresent(UDTTypeEntity.class),
+          "class '%s' cannot be annotated with both @RootEntity and @UDTTypeEntity",
+          clazz.getSimpleName()
+        );
+        if (rclazz == clazz) { // this is the root entity class
           org.apache.commons.lang3.Validate.isTrue(
             !clazz.isAnnotationPresent(TypeEntity.class),
             "class '%s' cannot be annotated with both @RootEntity and @TypeEntity",
@@ -1925,13 +1941,51 @@ public class StatementManagerImpl extends StatementManager {
             classInfo = (ClassInfoImpl<T>)rcinfo.newSubClass(this, clazz);
           }
         }
+      } else if (rudtclazz != null) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !clazz.isAnnotationPresent(UDTEntity.class),
+          "class '%s' cannot be annotated with both @UDTRootEntity and @UDTEntity",
+          clazz.getSimpleName()
+        );
+        if (rudtclazz == clazz) { // this is the UDT root entity class
+          org.apache.commons.lang3.Validate.isTrue(
+            !clazz.isAnnotationPresent(UDTTypeEntity.class),
+            "class '%s' cannot be annotated with both @UDTRootEntity and @UDTTypeEntity",
+            clazz.getSimpleName()
+          );
+          classInfo = new UDTRootClassInfoImpl<>(this, clazz);
+        } else {
+          if (clazz.isAnnotationPresent(UDTTypeEntity.class)) {
+            // for types, we get it from the root
+            final UDTRootClassInfoImpl<? super T> rcinfo
+              = (UDTRootClassInfoImpl<? super T>)getClassInfoImpl(rudtclazz);
+
+            classInfo = rcinfo.getType(clazz);
+            if (classInfo == null) { // was not listed in @UDTRootEntity annotation
+              // so attempt to load it by itself
+              classInfo = (ClassInfoImpl<T>)rcinfo.addType(this, clazz);
+            }
+          } else {
+            // it has a root class but it is not a type entity one, so return
+            // a subclass for now
+            // by doing this we can support an abstract class extending the root
+            // which can have subclasses that themselves will be annotated as
+            // type elements
+            // for subclasses, we get it from the root
+            final UDTRootClassInfoImpl<? super T> rcinfo
+              = (UDTRootClassInfoImpl<? super T>)getClassInfoImpl(rclazz);
+
+            // attempt to load it by itself as we know it is not a type
+            classInfo = (ClassInfoImpl<T>)rcinfo.newSubClass(this, clazz);
+          }
+        }
       } else if (clazz.isAnnotationPresent(UDTEntity.class)) {
         org.apache.commons.lang3.Validate.isTrue(
           !clazz.isAnnotationPresent(Entity.class),
           "class '%s' cannot be annotated with both @UDTEntity and @Entity",
           clazz.getSimpleName()
         );
-        classInfo = new UDTClassInfoImpl<>(this, clazz);
+        classInfo = new UDTActualClassInfoImpl<>(this, clazz);
       } else if (clazz.isAnnotationPresent(Entity.class)) {
         classInfo = new ClassInfoImpl<>(this, clazz);
       } else {

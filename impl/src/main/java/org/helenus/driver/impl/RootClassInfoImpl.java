@@ -122,7 +122,7 @@ public class RootClassInfoImpl<T>
     private final TypeClassInfoImpl<? extends T>.POJOContext tcontext;
 
     /**
-     * Instantiates a new <code>POJORootContext</code> object.
+     * Instantiates a new <code>POJOContext</code> object.
      *
      * @author paouelle
      *
@@ -566,7 +566,8 @@ public class RootClassInfoImpl<T>
     org.apache.commons.lang3.Validate.isTrue(
       !ctypes.containsKey(tcinfo.getObjectClass()),
       "a type element class '%s' is already defined for root element class '%s'",
-      type.getSimpleName(), clazz.getSimpleName()
+      type.getSimpleName(),
+      clazz.getSimpleName()
     );
     // make sure this type doesn't define any new columns or different type of columns
     tcinfo.getTablesImpl().forEach(t -> {

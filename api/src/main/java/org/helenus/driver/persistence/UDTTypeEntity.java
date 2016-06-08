@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,37 +21,35 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import org.helenus.annotation.Keyable;
-
 /**
- * The <code>TypeKey</code> annotation indicates the column must be defined in
- * a root entity base class to hold the type of the pojo. It is used such that
- * it be persisted to Cassandra. Such a column can also be mark as a partition
- * or clustering key. However, the field annotated with {@link TypeKey} must be
- * of type {@link String} and annotated as {@link Mandatory}.
+ * The <code>UDTTypeEntity</code> annotation must be used on all subclasses of a
+ * base class annotated with {@link UDTRootEntity} in order to identify their
+ * specific type name. This type name is used to uniquely identify the specific
+ * type of the base class persisted to Cassandra. A type class cannot define
+ * any type keys.
  *
  * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 15, 2015 - paouelle - Creation
+ * @version 1 - Jun 6, 2015 - paouelle - Creation
  *
  * @since 1.0
  */
-@Target({ElementType.METHOD, ElementType.FIELD})
+@Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@Keyable("table")
 @Documented
-public @interface TypeKey {
+public @interface UDTTypeEntity {
   /**
-   * The name of the table as defined in {@link Table#name} this type key is
-   * associated with.
+   * The name for the user-defined type. The name must be unique within a given
+   * UDT root entity. Valid table names are strings of alpha-numeric characters
+   * and underscores, and must begin with a letter.
    * <p>
-   * By default, if none specified, the column will be considered a type
-   * key for all tables defined by the root entity.
+   * Reserved names such as byte, smallint, complex, enum, date, interval,
+   * macaddr, and bitstring are not allowed.
    *
    * @author paouelle
    *
-   * @return the name of the table this type key is associated with
+   * @return the name for the user-defined type
    */
-  String table() default Table.ALL;
+  String name();
 }

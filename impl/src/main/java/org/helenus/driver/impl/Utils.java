@@ -49,6 +49,7 @@ import org.helenus.driver.Keywords;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.UDTEntity;
+import org.helenus.driver.persistence.UDTTypeEntity;
 
 /**
  * The <code>Utils</code> class is a copy of the
@@ -420,8 +421,8 @@ public abstract class Utils {
       sb.append(((UDTValueWrapper<?>)value).toString());
       return true;
     } else if (value != null) {
-      // let's check if the value is annotated with @TypeEntity in which case it
-      // is a udt pojo
+      // let's check if the value is annotated with @UDTEntity
+      // in which case it is a udt pojo
       final Class<?> uclass = ReflectionUtils.findFirstClassAnnotatedWith(
         value.getClass(), UDTEntity.class
       );
@@ -433,6 +434,25 @@ public abstract class Utils {
           cinfo instanceof UDTClassInfoImpl,
           "unsupported element conversion from: %s to: %s; unknown user-defined type",
           uclass.getName(), UDTValue.class.getName()
+        );
+        sb.append(
+          new UDTValueWrapper<>((UDTClassInfoImpl<?>)cinfo, value).toString()
+        );
+        return true;
+      }
+      // let's check if the value is annotated with @UDTTypeEntity
+      // in which case it is a udt pojo
+      final Class<?> utclass = ReflectionUtils.findFirstClassAnnotatedWith(
+        value.getClass(), UDTTypeEntity.class
+      );
+
+      if (utclass != null) { // we have a UDT type
+        final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(utclass);
+
+        org.apache.commons.lang3.Validate.isTrue(
+          cinfo instanceof UDTClassInfoImpl,
+          "unsupported element conversion from: %s to: %s; unknown user-defined type",
+          utclass.getName(), UDTValue.class.getName()
         );
         sb.append(
           new UDTValueWrapper<>((UDTClassInfoImpl<?>)cinfo, value).toString()

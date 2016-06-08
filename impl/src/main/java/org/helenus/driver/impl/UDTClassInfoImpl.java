@@ -15,8 +15,8 @@
  */
 package org.helenus.driver.impl;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Modifier;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -32,12 +32,15 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
 
+import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.UDTEntity;
+import org.helenus.driver.persistence.UDTRootEntity;
+import org.helenus.driver.persistence.UDTTypeEntity;
 
 /**
  * The <code>UDTClassInfoImpl</code> class provides information about a
@@ -54,7 +57,8 @@ import org.helenus.driver.persistence.UDTEntity;
  */
 @lombok.ToString(callSuper=true)
 @lombok.EqualsAndHashCode(callSuper=true)
-public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType {
+public abstract class UDTClassInfoImpl<T>
+  extends ClassInfoImpl<T> implements CQLDataType {
   /**
    * Holds the reserved user-defined type names.
    *
@@ -105,8 +109,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#populateSuffixes(java.util.Map)
      */
     @Override
-    protected void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {
-    }
+    protected final void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {}
 
     /**
      * Retrieves all columns and their values from the POJO.
@@ -133,7 +136,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getColumnValues(String tname) {
+    public final Map<String, Object> getColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -145,7 +148,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getPartitionKeyColumnValues(String tname) {
+    public final Map<String, Object> getPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -157,7 +160,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getSuffixAndPartitionKeyColumnValues(String tname) {
+    public final Map<String, Object> getSuffixAndPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -169,7 +172,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Object> getPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -181,7 +184,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getSuffixAndPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Object> getSuffixAndPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -211,7 +214,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getMandatoryAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getMandatoryAndPrimaryKeyColumnValues(
+    public final Map<String, Object> getMandatoryAndPrimaryKeyColumnValues(
       String tname
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -225,7 +228,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
+    public final Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -256,7 +259,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
      */
     @Override
-    public Object getColumnValue(String tname, CharSequence name) {
+    public final Object getColumnValue(String tname, CharSequence name) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -288,7 +291,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.Iterable)
      */
     @Override
-    public Map<String, Object> getColumnValues(
+    public final Map<String, Object> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -322,7 +325,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.CharSequence[])
      */
     @Override
-    public Map<String, Object> getColumnValues(
+    public final Map<String, Object> getColumnValues(
       String tname, CharSequence... names
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -344,23 +347,25 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   private final TableInfoImpl<T> table;
 
   /**
-   * Instantiates a new <code>TypeClassInfoImpl</code> object.
+   * Instantiates a new <code>UDTClassInfoImpl</code> object.
    *
    * @author paouelle
    *
    * @param  mgr the non-<code>null</code> statement manager
    * @param  clazz the class of POJO for which to get a class info object for
+   * @param  entityAnnotationClass the non-<code>null</code> entity annotation
+   *         class to compute from
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
    * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
    *         a valid POJO class
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
-  UDTClassInfoImpl(StatementManagerImpl mgr, Class<T> clazz) {
-    super(mgr, clazz, UDTEntity.class);
-    org.apache.commons.lang3.Validate.isTrue(
-      !Modifier.isAbstract(clazz.getModifiers()),
-      "type entity class '%s', cannot be abstract", clazz.getSimpleName()
-    );
+  protected UDTClassInfoImpl(
+    StatementManagerImpl mgr,
+    Class<T> clazz,
+    Class<? extends Annotation> entityAnnotationClass
+  ) {
+    super(mgr, clazz, entityAnnotationClass);
     this.name = findName();
     this.table = tablesImpl().findFirst().get();
     // handle special UDT types that extends List, Set, or Map
@@ -399,6 +404,23 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   }
 
   /**
+   * Instantiates a new <code>UDTClassInfoImpl</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  cinfo the non-<code>null</code> class info to link to
+   * @param  clazz the class of POJO for which to get a class info object for
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws IllegalArgumentException if <code>clazz</code> doesn't represent
+   *         a valid POJO class
+   */
+  protected UDTClassInfoImpl(UDTClassInfoImpl<T> cinfo, Class<T> clazz) {
+    super(cinfo, clazz);
+    this.name = cinfo.name;
+    this.table = cinfo.table;
+  }
+
+  /**
    * Finds the annotated type name for this POJO class.
    *
    * @author paouelle
@@ -408,16 +430,34 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    */
   private String findName() {
     final UDTEntity ue = clazz.getAnnotation(UDTEntity.class);
+    final String name;
 
+    if (ue != null) {
+      name = ue.name();
+    } else {
+      final UDTTypeEntity ute = clazz.getAnnotation(UDTTypeEntity.class);
+
+      if (ute != null) {
+        name = ute.name();
+      } else {
+        final UDTRootEntity ure = ReflectionUtils.findFirstAnnotation(clazz, UDTRootEntity.class);
+
+        if (ure != null) {
+          name = ure.name();
+        } else {
+          name = null;
+        }
+      }
+    }
     org.apache.commons.lang3.Validate.isTrue(
-      ue != null,
-      "class '%s' is not annotated with @UDTEntity", clazz.getSimpleName()
+      name != null,
+      "class '%s' is not annotated with @UDTEntity or @UDTRootEntity", clazz.getSimpleName()
     );
     org.apache.commons.lang3.Validate.isTrue(
-      !ArrayUtils.contains(UDTClassInfoImpl.RESERVED_UDT_NAMES, ue.name()),
-      "user-defined type name cannot be a reserved type name: %s", ue.name()
+      !ArrayUtils.contains(UDTClassInfoImpl.RESERVED_UDT_NAMES, name),
+      "user-defined type name cannot be a reserved type name: %s", name
     );
-    return ue.name();
+    return name;
   }
 
   /**
@@ -432,11 +472,11 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    *         POJO
    */
   private void decodeAndSetColumnFields(T object, UDTValue uval) {
-    for (final UserType.Field coldef: uval.getType()) {
-      // find the table for this column
-      final TableInfoImpl<T> table = getTable();
+    // get the table for this UDT
+    final TableInfoImpl<T> table = getTableImpl();
 
-      if (table != null) {
+    if (table != null) {
+      for (final UserType.Field coldef: uval.getType()) {
         // find the field in the table for this column
         final FieldInfoImpl<T> field = table.getColumnImpl(coldef.getName());
 
@@ -473,6 +513,17 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   }
 
   /**
+   * Gets a name representation for this data type.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> name representation for this data type
+   */
+  public String getName() {
+    return name;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -499,7 +550,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
   /**
    * {@inheritDoc}
    *
-   * paouelle
+   * @author paouelle
    *
    * @see org.helenus.driver.persistence.CQLDataType#isAlterableTo(org.helenus.driver.persistence.CQLDataType)
    */
@@ -539,7 +590,7 @@ public class UDTClassInfoImpl<T> extends ClassInfoImpl<T> implements CQLDataType
    *
    * @return the fake table info defined by the POJO
    */
-  public TableInfoImpl<T> getTable() {
+  public TableInfoImpl<T> getTableImpl() {
     return table;
   }
 
