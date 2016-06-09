@@ -23,8 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.helenus.driver.Assignment;
 import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.DataType;
 
 /**
@@ -162,6 +165,13 @@ public abstract class AssignmentImpl
     protected volatile Object value;
 
     /**
+     * Holds the definition associated with the value if any.
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     */
+    private final CQLDataType definition;
+
+    /**
      * Instantiates a new <code>SetAssignmentImpl</code> object.
      * <p>
      * <i>Note:</i> This constructor is meant to be called by derived POJO
@@ -174,7 +184,7 @@ public abstract class AssignmentImpl
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
     SetAssignmentImpl(CharSequence name) {
-      this(name, null);
+      this(name, null, null);
     }
 
     /**
@@ -187,11 +197,51 @@ public abstract class AssignmentImpl
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
     SetAssignmentImpl(CharSequence name, Object value) {
+      this(name, value, null);
+    }
+
+    /**
+     * Instantiates a new <code>SetAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this assignment
+     * @param  pvalue the value and its associated definition for this assignment
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    SetAssignmentImpl(CharSequence name, Pair<Object, CQLDataType> pvalue) {
+      super(name);
+      if (pvalue != null) {
+        Object value = pvalue.getLeft();
+
+        if (value instanceof Optional) {
+          value = ((Optional<?>)value).orElse(null);
+        }
+        this.value = value;
+        this.definition = pvalue.getRight();
+      } else {
+        this.value = null;
+        this.definition = null;
+      }
+    }
+
+    /**
+     * Instantiates a new <code>SetAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this assignment
+     * @param  value the value for this assignment
+     * @param  definition the definition associated with the value if any
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    SetAssignmentImpl(CharSequence name, Object value, CQLDataType definition) {
       super(name);
       if (value instanceof Optional) {
         value = ((Optional<?>)value).orElse(null);
       }
       this.value = value;
+      this.definition = definition;
     }
 
     /**
@@ -207,7 +257,7 @@ public abstract class AssignmentImpl
       sb.append("=");
       final FieldInfoImpl<?> field = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(field.encodeValue(value), sb);
+      Utils.appendValue(field.encodeValue(value), (definition != null) ? definition : field.getDataType(), sb);
     }
 
     /**
@@ -268,6 +318,24 @@ public abstract class AssignmentImpl
      */
     ReplaceAssignmentImpl(CharSequence name, Object value, Object old) {
       super(name, value);
+      if (old instanceof Optional) {
+        old = ((Optional<?>)old).orElse(null);
+      }
+      this.old = old;
+    }
+
+    /**
+     * Instantiates a new <code>ReplaceAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this assignment
+     * @param  pvalue the value and its definition for this assignment
+     * @param  old the old value to replace for this assignment
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    ReplaceAssignmentImpl(CharSequence name, Pair<Object, CQLDataType> pvalue, Object old) {
+      super(name, pvalue);
       if (old instanceof Optional) {
         old = ((Optional<?>)old).orElse(null);
       }
@@ -552,7 +620,7 @@ public abstract class AssignmentImpl
       if (table.getColumnImpl(name) == null) { // column not defined in the table
         return Collections.emptyList();
       }
-      Object neval;
+      Pair<Object, CQLDataType> neval;
 
       try {
         neval = context.getColumnNonEncodedValue(table.getName(), name);
@@ -661,7 +729,7 @@ public abstract class AssignmentImpl
         // get a POJO context for the POJO passed on the setAllFrom()
         context = context.getClassInfo().newContext((T)object);
       }
-      for (final Map.Entry<String, Object> e: context.getNonPrimaryKeyColumnNonEncodedValues(
+      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: context.getNonPrimaryKeyColumnNonEncodedValues(
         table.getName()
       ).entrySet()) {
         assignments.add(new SetAssignmentImpl(e.getKey(), e.getValue()));
@@ -804,7 +872,7 @@ public abstract class AssignmentImpl
       Utils.appendName(name, sb).append("=");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendList((List<?>)finfo.encodeValue(value), sb);
+      Utils.appendList((List<?>)finfo.encodeValue(value), finfo.getDataType(), sb);
       sb.append("+");
       Utils.appendName(name, sb);
     }
@@ -877,7 +945,7 @@ public abstract class AssignmentImpl
       Utils.appendName(name, sb).append("[").append(idx).append("]=");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(finfo.encodeElementValue(value), sb);
+      Utils.appendValue(finfo.encodeElementValue(value), finfo.getDataType(), sb);
     }
 
     /**
@@ -963,7 +1031,7 @@ public abstract class AssignmentImpl
       Utils.appendName(name, sb).append(isAdd ? "+" : "-");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendCollection(finfo.encodeValue(collection), sb, null);
+      Utils.appendCollection(finfo.encodeValue(collection), finfo.getDataType(), sb, null);
     }
 
     /**
@@ -981,8 +1049,8 @@ public abstract class AssignmentImpl
         final FieldInfoImpl<?> finfo = table.getColumnImpl(name);
 
         if ((finfo != null)
-            && ((finfo.getDataType().getType() == DataType.MAP)
-                || (finfo.getDataType().getType() == DataType.SORTED_MAP))) {
+            && ((finfo.getDataType().getMainType() == DataType.MAP)
+                || (finfo.getDataType().getMainType() == DataType.SORTED_MAP))) {
           table.validateMapColumnAndKeys(name, (Collection<?>)collection);
         } else {
           table.validateCollectionColumnAndValues(
@@ -1046,16 +1114,16 @@ public abstract class AssignmentImpl
     @Override
     void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
       Utils.appendName(name, sb).append("[");
-      Utils.appendValue(key, sb);
-      sb.append("]=");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
+      Utils.appendValue(key, finfo.getDataType().getFirstArgumentType(), sb);
+      sb.append("]=");
       // paouelle: 03/06/15 - I think this is a bug, it should be encoded as an
       // element of the map and not the type of the map as such, it should be
       // using the encodeElementValue and we should make sure that the
       // encodeElementValue, properly support MAP in to the definition.encodeElement()
       // --> Utils.appendValue(finfo.encodeValue(value), sb);
-      Utils.appendValue(finfo.encodeElementValue(value), sb);
+      Utils.appendValue(finfo.encodeElementValue(value), finfo.getDataType().getElementType(), sb);
     }
 
     /**

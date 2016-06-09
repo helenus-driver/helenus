@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.Clause;
@@ -37,6 +38,7 @@ import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.Table;
 
 /**
@@ -392,7 +394,7 @@ public class DeleteImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", cs.values());
     } else {
       // add where clauses for all primary key columns
-      final Map<String, Object> pkeys;
+      final Map<String, Pair<Object, CQLDataType>> pkeys;
 
       try {
         if (pkeys_override == null) {
@@ -408,16 +410,20 @@ public class DeleteImpl<T>
         builder.append(" WHERE ");
         if (!multiKeys.isEmpty()) {
           // prepare all sets of values for all multi-keys present in the clause
-          final List<String> cnames = new ArrayList<>(multiKeys.size());
+          final List<FieldInfoImpl<T>> cfinfos = new ArrayList<>(multiKeys.size());
           final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
 
           for (final FieldInfoImpl<T> finfo: multiKeys) {
-            @SuppressWarnings("unchecked")
-            final Set<Object> set = (Set<Object>)pkeys.remove(finfo.getColumnName());
+            final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
 
-            if (set != null) { // we have keys for this multi-key column
-              cnames.add(finfo.getColumnName());
-              sets.add(set);
+            if (pset != null) {
+              @SuppressWarnings("unchecked")
+              final Set<Object> set = (Set<Object>)pset.getLeft();
+
+              if (set != null) { // we have keys for this multi-key column
+                cfinfos.add(finfo);
+                sets.add(set);
+              }
             }
           }
           if (!sets.isEmpty()) {
@@ -430,7 +436,9 @@ public class DeleteImpl<T>
               // add the multi-key clause values from this combination to the map of primary keys
               int j = -1;
               for (final Object k: i.next()) {
-                pkeys.put(StatementImpl.MK_PREFIX + cnames.get(++j), k);
+                final FieldInfoImpl<T> finfo = cfinfos.get(++j);
+
+                pkeys.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), Pair.of(k, finfo.getDataType().getElementType()));
               }
               final StringBuilder sb = new StringBuilder(builder);
 

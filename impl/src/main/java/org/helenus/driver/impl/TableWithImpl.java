@@ -72,7 +72,7 @@ public class TableWithImpl
   @Override
   void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
     sb.append(name).append("=");
-    Utils.appendValue(value, sb);
+    Utils.appendValue(value, null, sb);
   }
 
   /**

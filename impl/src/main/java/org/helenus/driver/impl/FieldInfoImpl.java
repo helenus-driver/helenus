@@ -532,7 +532,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       );
       if (isInTable
           && ((clusteringKey != null) || (partitionKey != null))
-          && (definition.getType() == DataType.SET)) {
+          && (definition.getMainType() == DataType.SET)) {
         final Type type = field.getGenericType();
 
         if (type instanceof ParameterizedType) {
@@ -1279,7 +1279,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   @Override
   public boolean isCounter() {
-    return (definition != null) ? definition.getType() == DataType.COUNTER : false;
+    return (definition != null) ? definition.getMainType() == DataType.COUNTER : false;
   }
 
   /**
@@ -1445,7 +1445,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     }
     if (isColumn()) {
       if (value != null) {
-        if (!((definition.getType() == DataType.BLOB) && !isPersisted() // persisted columns will be serialized later
+        if (!((definition.getMainType() == DataType.BLOB) && !isPersisted() // persisted columns will be serialized later
               ? byte[].class : type).isInstance(value)) {
           if (isMultiKey()) {
             // in such case, the value can also be an element of the set
@@ -1510,7 +1510,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     if (persister != null) { // will be persisted anyway so no need to check
       return;
     }
-    final CQLDataType dtype = definition.getType();
+    final CQLDataType dtype = definition.getMainType();
 
     org.apache.commons.lang3.Validate.isTrue(
       dtype.isCollection(),
@@ -1553,7 +1553,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         when the column is mandatory
    */
   public void validateMapKeyValue(Object key, Object value) {
-    validateCollectionValue(definition.getType(), value);
+    validateCollectionValue(definition.getMainType(), value);
     validateMapKey(key);
   }
 
@@ -1702,7 +1702,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     if ((val != null)
         && (definition != null)
         && definition.isUserDefined()) {
-      final UDTClassInfoImpl<?> udtcinfo = (UDTClassInfoImpl<?>)definition.getType();
+      final UDTClassInfoImpl<?> udtcinfo = (UDTClassInfoImpl<?>)definition.getMainType();
 
       if (udtcinfo.getObjectClass().isInstance(val)) {
         // if this field represents a UDT, then we need to convert its value to a

@@ -237,26 +237,25 @@ public class DataTypeImpl {
     }
 
     /**
-     * Gets the data type for this definition.
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return the non-<code>null</code> data type for this definition
+     * @see org.helenus.driver.persistence.CQLDataType#getMainType()
      */
-    public CQLDataType getType() {
+    @Override
+    public CQLDataType getMainType() {
       return type;
     }
 
-   /**
-     * Gets the data type for element values to the collection data type
-     * represented by this definition.
+    /**
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return the data type for the collection's element values or
-     *         <code>null</code> if this definition doesn't represent a
-     *         collection
+     * @see org.helenus.driver.persistence.CQLDataType#getElementType()
      */
+    @Override
     public CQLDataType getElementType() {
       if (arguments.size() == 0) {
         return null;
@@ -266,27 +265,25 @@ public class DataTypeImpl {
     }
 
     /**
-     * Gets the data type for all arguments of the collection data type
-     * represented by this definition.
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return a non-<code>null</code> list of all argument data types for the
-     *         collection
+     * @see org.helenus.driver.persistence.CQLDataType#getArgumentTypes()
      */
+    @Override
     public List<CQLDataType> getArgumentTypes() {
       return arguments;
     }
 
     /**
-     * Gets the data type for the first argument of the collection data type
-     * represented by this definition.
+     * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @return the first argument data type for the collection or <code>null</code>
-     *         if this definition doesn't represent a collection
+     * @see org.helenus.driver.persistence.CQLDataType#getFirstArgumentType()
      */
+    @Override
     public CQLDataType getFirstArgumentType() {
       return (arguments.isEmpty() ? null : arguments.get(0));
     }

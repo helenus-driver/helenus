@@ -26,6 +26,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Row;
@@ -38,6 +40,7 @@ import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.CQLDataType;
 
 /**
  * The <code>InsertImpl</code> class extends the functionality of Cassandra's
@@ -184,7 +187,7 @@ public class InsertImpl<T>
    */
   @SuppressWarnings({"cast", "unchecked", "rawtypes"})
   void buildQueryStrings(TableInfoImpl<T> table, List<StringBuilder> builders) {
-    final Map<String, Object> columns;
+    final Map<String, Pair<Object, CQLDataType>> columns;
 
     try {
       if (allValuesAdded || this.columns.isEmpty()) {
@@ -193,7 +196,7 @@ public class InsertImpl<T>
         columns = getPOJOContext().getColumnValues(table.getName());
       } else {
         // we need to make sure all primary and mandatory columns are in there first
-        final Map<String, Object> mpkcolumns
+        final Map<String, Pair<Object, CQLDataType>> mpkcolumns
           = getPOJOContext().getMandatoryAndPrimaryKeyColumnValues(table.getName());
 
         columns = new LinkedHashMap<>(mpkcolumns.size() + this.columns.size());
@@ -203,7 +206,11 @@ public class InsertImpl<T>
           table.getName(), (Collection<CharSequence>)(Collection)this.columns)
         );
         // finally add the specific values for this statement
-        columns.putAll(values);
+        values.forEach((n, v) -> {
+          final FieldInfoImpl finfo = table.getColumnImpl(n);
+
+          columns.put(n, Pair.of(v, (finfo != null) ? finfo.getDataType() : null));
+        });
       }
     } catch (EmptyOptionalPrimaryKeyException e) {
       // ignore and continue without updating this table
@@ -220,7 +227,13 @@ public class InsertImpl<T>
       int j = -1;
 
       for (final FieldInfoImpl<T> finfo: multiKeys) {
-        sets[++j] = (Set<Object>)columns.get(finfo.getColumnName());
+        final Pair<Object, CQLDataType> pset = columns.get(finfo.getColumnName());
+
+        if (pset != null) {
+          sets[++j] = (Set<Object>)pset.getLeft();
+        } else {
+          sets[++j] = null;
+        }
       }
       // now iterate all combination of these sets
       for (final Iterator<List<Object>> i = new CombinationIterator<>(Object.class, sets); i.hasNext(); ) {
@@ -229,7 +242,7 @@ public class InsertImpl<T>
         j = -1;
         // add all multi-key column values from this combination to the column map
         for (final FieldInfoImpl<T> finfo: multiKeys) {
-          columns.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), ckeys.get(++j));
+          columns.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), Pair.of(ckeys.get(++j), finfo.getDataType().getElementType()));
         }
         // finally build the query for this combination
         buildQueryString(table, columns, builders);
@@ -270,7 +283,7 @@ public class InsertImpl<T>
    */
   @SuppressWarnings("synthetic-access")
   private void buildQueryString(
-    TableInfoImpl<T> table, Map<String, Object> columns, List<StringBuilder> builders
+    TableInfoImpl<T> table, Map<String, Pair<Object, CQLDataType>> columns, List<StringBuilder> builders
   ) {
     final StringBuilder builder = new StringBuilder();
 

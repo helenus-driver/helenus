@@ -15,6 +15,8 @@
  */
 package org.helenus.driver.persistence;
 
+import java.util.List;
+
 
 /**
  * The <code>CQLDataType</code> interface is used to identify CQL data types.
@@ -55,6 +57,49 @@ public interface CQLDataType {
    *         type; <code>false</code> otherwise
    */
   public boolean isUserDefined();
+
+  /**
+   * Gets the main data type for this definition.
+   *
+   * @author paouelle
+   *
+   * @return the non-<code>null</code> data type for this definition
+   */
+  public CQLDataType getMainType();
+
+  /**
+   * Gets the data type for element values to the collection data type
+   * represented by this definition.
+   *
+   * @author paouelle
+   *
+   * @return the data type for the collection's element values or
+   *         <code>null</code> if this definition doesn't represent a
+   *         collection
+   */
+  public CQLDataType getElementType();
+
+  /**
+   * Gets the data type for all arguments of the collection data type
+   * represented by this definition.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> list of all argument data types for the
+   *         collection
+   */
+  public List<CQLDataType> getArgumentTypes();
+
+  /**
+   * Gets the data type for the first argument of the collection data type
+   * represented by this definition.
+   *
+   * @author paouelle
+   *
+   * @return the first argument data type for the collection or <code>null</code>
+   *         if this definition doesn't represent a collection
+   */
+  public CQLDataType getFirstArgumentType();
 
   /**
    * Checks if altering a column from this data type to a specified data

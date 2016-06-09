@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
@@ -34,6 +36,7 @@ import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.info.UDTRootClassInfo;
 import org.helenus.driver.info.UDTTypeClassInfo;
+import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.UDTRootEntity;
 
 /**
@@ -154,7 +157,7 @@ public class UDTRootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixKeyValues()
      */
     @Override
-    public Map<String, Object> getSuffixKeyValues() {
+    public Map<String, Pair<Object, CQLDataType>> getSuffixKeyValues() {
       return tcontext.getSuffixKeyValues();
     }
 
@@ -403,14 +406,14 @@ public class UDTRootClassInfoImpl<T>
       }
       // check data type
       org.apache.commons.lang3.Validate.isTrue(
-        rc.getDataType().getType() == c.getDataType().getType(),
+        rc.getDataType().getMainType() == c.getDataType().getMainType(),
         "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in pojo '%s'",
         c.getDeclaringClass().getSimpleName(),
         c.getName(),
-        c.getDataType().getType(),
+        c.getDataType().getMainType(),
         rc.getDeclaringClass().getSimpleName(),
         rc.getName(),
-        rc.getDataType().getType(),
+        rc.getDataType().getMainType(),
         type.getSimpleName()
       );
     });
@@ -469,14 +472,14 @@ public class UDTRootClassInfoImpl<T>
       }
       // check data type
       org.apache.commons.lang3.Validate.isTrue(
-        rc.getDataType().getType() == c.getDataType().getType(),
+        rc.getDataType().getMainType() == c.getDataType().getMainType(),
         "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in subclass '%s'",
         c.getDeclaringClass().getSimpleName(),
         c.getName(),
-        c.getDataType().getType(),
+        c.getDataType().getMainType(),
         rc.getDeclaringClass().getSimpleName(),
         rc.getName(),
-        rc.getDataType().getType(),
+        rc.getDataType().getMainType(),
         type.getSimpleName()
       );
     });

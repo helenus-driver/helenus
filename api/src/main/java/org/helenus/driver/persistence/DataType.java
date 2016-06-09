@@ -167,6 +167,54 @@ public enum DataType implements CQLDataType {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.persistence.CQLDataType#getMainType()
+   */
+  @Override
+  public CQLDataType getMainType() {
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getElementType()
+   */
+  @Override
+  public CQLDataType getElementType() {
+    return null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getArgumentTypes()
+   */
+  @Override
+  public List<CQLDataType> getArgumentTypes() {
+    return null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getFirstArgumentType()
+   */
+  @Override
+  public CQLDataType getFirstArgumentType() {
+    return null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.persistence.CQLDataType#isAlterableTo(org.helenus.driver.persistence.CQLDataType)
    */
   @Override

@@ -27,6 +27,7 @@ import java.util.SortedMap;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.UDTValue;
@@ -121,7 +122,7 @@ public abstract class UDTClassInfoImpl<T>
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Object> getColumnValues() {
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues() {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -136,7 +137,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -148,7 +149,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getPartitionKeyColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -160,7 +161,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getSuffixAndPartitionKeyColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -172,7 +173,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -184,7 +185,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getSuffixAndPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -199,7 +200,7 @@ public abstract class UDTClassInfoImpl<T>
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Object> getMandatoryColumnValues() {
+    public Map<String, Pair<Object, CQLDataType>> getMandatoryColumnValues() {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -214,7 +215,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getMandatoryAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getMandatoryAndPrimaryKeyColumnValues(
+    public final Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(
       String tname
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -228,7 +229,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
      */
     @Override
-    public final Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -244,9 +245,9 @@ public abstract class UDTClassInfoImpl<T>
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Object getColumnValue(CharSequence name) {
+    public Pair<Object, CQLDataType> getColumnValue(CharSequence name) {
       if (table == null) { // table not defined so nothing to return; should not happen
-        return Collections.emptyMap();
+        return Pair.of(null, null);
       }
       return table.getColumnValue(object, name);
     }
@@ -259,7 +260,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
      */
     @Override
-    public final Object getColumnValue(String tname, CharSequence name) {
+    public final Pair<Object, CQLDataType> getColumnValue(String tname, CharSequence name) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -276,7 +277,7 @@ public abstract class UDTClassInfoImpl<T>
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Object> getColumnValues(Iterable<CharSequence> names) {
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(Iterable<CharSequence> names) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -291,7 +292,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.Iterable)
      */
     @Override
-    public final Map<String, Object> getColumnValues(
+    public final Map<String, Pair<Object, CQLDataType>> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -310,7 +311,7 @@ public abstract class UDTClassInfoImpl<T>
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Object> getColumnValues(CharSequence... names) {
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(CharSequence... names) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -325,7 +326,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.CharSequence[])
      */
     @Override
-    public final Map<String, Object> getColumnValues(
+    public final Map<String, Pair<Object, CQLDataType>> getColumnValues(
       String tname, CharSequence... names
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -545,6 +546,54 @@ public abstract class UDTClassInfoImpl<T>
   @Override
   public boolean isUserDefined() {
     return true;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getMainType()
+   */
+  @Override
+  public CQLDataType getMainType() {
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getElementType()
+   */
+  @Override
+  public CQLDataType getElementType() {
+    return null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getArgumentTypes()
+   */
+  @Override
+  public List<CQLDataType> getArgumentTypes() {
+    return null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getFirstArgumentType()
+   */
+  @Override
+  public CQLDataType getFirstArgumentType() {
+    return null;
   }
 
   /**

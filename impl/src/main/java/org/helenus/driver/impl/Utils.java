@@ -38,6 +38,7 @@ import java.time.ZoneId;
 import javax.json.JsonObject;
 
 import org.apache.commons.collections4.iterators.ObjectArrayIterator;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.TupleValue;
 import com.datastax.driver.core.UDTValue;
@@ -48,6 +49,7 @@ import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.Keywords;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.ClassInfo;
+import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.UDTEntity;
 import org.helenus.driver.persistence.UDTTypeEntity;
 
@@ -72,18 +74,18 @@ public abstract class Utils {
     StringBuilder sb,
     String separator,
     String keySeparator,
-    Map<?, ?> mappings
+    Map<String, Pair<Object, CQLDataType>> mappings
   ) {
     boolean first = true;
 
-    for (final Map.Entry<?, ?> e: mappings.entrySet()) {
+    for (final Map.Entry<String, Pair<Object, CQLDataType>> e: mappings.entrySet()) {
       if (!first) {
         sb.append(separator);
       } else {
         first = false;
       }
       Utils.appendName(e.getKey(), sb).append(keySeparator);
-      Utils.appendValue(e.getValue(), sb);
+      Utils.appendValue(e.getValue().getLeft(), e.getValue().getRight(), sb);
     }
     return sb;
   }
@@ -155,7 +157,26 @@ public abstract class Utils {
   public static StringBuilder joinAndAppendValues(
     StringBuilder sb,
     String separator,
-    Iterable<?> values
+    Iterable<Pair<Object, CQLDataType>> values
+  ) {
+    boolean first = true;
+
+    for (final Pair<Object, CQLDataType> value: values) {
+      if (!first) {
+        sb.append(separator);
+      } else {
+        first = false;
+      }
+      appendValue(value.getLeft(), value.getRight(), sb);
+    }
+    return sb;
+  }
+
+  public static StringBuilder joinAndAppendValues(
+    StringBuilder sb,
+    String separator,
+    Iterable<?> values,
+    CQLDataType definition
   ) {
     boolean first = true;
 
@@ -165,7 +186,7 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      appendValue(value, sb);
+      appendValue(value, definition, sb);
     }
     return sb;
   }
@@ -187,16 +208,20 @@ public abstract class Utils {
     return true;
   }
 
-  static StringBuilder appendValue(Object value, StringBuilder sb, List<Object> variables) {
+  static StringBuilder appendValue(
+    Object value, CQLDataType definition, StringBuilder sb, List<Object> variables
+  ) {
     if (variables == null || !isSerializable(value)) {
-      return appendValue(value, sb);
+      return appendValue(value, definition, sb);
     }
     sb.append('?');
     variables.add(value);
     return sb;
   }
 
-  public static StringBuilder appendValue(Object value, StringBuilder sb) {
+  public static StringBuilder appendValue(
+    Object value, CQLDataType definition, StringBuilder sb
+  ) {
     if (value instanceof PersistedValue) {
       value = ((PersistedValue<?,?>)value).getEncodedValue();
     }
@@ -204,30 +229,34 @@ public abstract class Utils {
     if (appendValueIfLiteral(value, sb)) {
       return sb;
     }
-    if (appendValueIfCollection(value, sb)) {
+    if (appendValueIfCollection(value, definition, sb)) {
       return sb;
     }
-    if (appendValueIfUdt(value, sb)) {
+    if (appendValueIfUdt(value, definition, sb)) {
       return sb;
     }
-    if (appendValueIfTuple(value, sb)) {
+    if (appendValueIfTuple(value, definition, sb)) {
       return sb;
     }
     appendStringIfValid(value, sb);
     return sb;
   }
 
-  public static StringBuilder appendFlatValue(Object value, StringBuilder sb) {
+  public static StringBuilder appendFlatValue(
+    Object value,
+    CQLDataType definition,
+    StringBuilder sb
+  ) {
     if (value instanceof PersistedValue) {
       value = ((PersistedValue<?,?>)value).getEncodedValue();
     }
     if (appendValueIfLiteral(value, sb)) {
       return sb;
     }
-    if (appendValueIfUdt(value, sb)) {
+    if (appendValueIfUdt(value, definition, sb)) {
       return sb;
     }
-    if (appendValueIfTuple(value, sb)) {
+    if (appendValueIfTuple(value, definition, sb)) {
       return sb;
     }
     appendStringIfValid(value, sb);
@@ -293,7 +322,7 @@ public abstract class Utils {
         if (i > 0) {
           sb.append(",");
         }
-        appendValue(fcall.parameters[i], sb);
+        appendValue(fcall.parameters[i], null, sb);
       }
       sb.append(")");
       return true;
@@ -319,24 +348,33 @@ public abstract class Utils {
   }
 
   @SuppressWarnings("rawtypes")
-  private static boolean appendValueIfCollection(Object value, StringBuilder sb) {
+  private static boolean appendValueIfCollection(
+    Object value,
+    CQLDataType definition,
+    StringBuilder sb
+  ) {
     if (value instanceof List) {
-      appendList((List)value, sb);
+      appendList((List)value, definition, sb);
       return true;
     } else if (value instanceof Set) {
-      appendSet((Set)value, sb);
+      appendSet((Set)value, definition, sb);
       return true;
     } else if (value instanceof Map) {
-      appendMap((Map)value, sb);
+      appendMap((Map)value, definition, sb);
       return true;
     } else {
       return false;
     }
   }
 
-  static StringBuilder appendCollection(Object value, StringBuilder sb, List<Object> variables) {
+  static StringBuilder appendCollection(
+    Object value,
+    CQLDataType definition,
+    StringBuilder sb,
+    List<Object> variables
+  ) {
     if (variables == null || !isSerializable(value)) {
-      boolean wasCollection = appendValueIfCollection(value, sb);
+      boolean wasCollection = appendValueIfCollection(value, definition, sb);
       assert wasCollection;
     } else {
       sb.append('?');
@@ -345,7 +383,13 @@ public abstract class Utils {
     return sb;
   }
 
-  static StringBuilder appendList(List<?> l, StringBuilder sb) {
+  static StringBuilder appendList(
+    List<?> l,
+    CQLDataType definition,
+    StringBuilder sb
+  ) {
+    final CQLDataType vdef = definition.getElementType();
+
     sb.append('[');
     if (l instanceof PersistedList) {
       l = ((PersistedList<?,?>)l).getPersistedList();
@@ -359,13 +403,19 @@ public abstract class Utils {
       if (i > 0) {
         sb.append(',');
       }
-      appendFlatValue(elt, sb);
+      appendFlatValue(elt, vdef, sb);
     }
     sb.append(']');
     return sb;
   }
 
-  static StringBuilder appendSet(Set<?> s, StringBuilder sb) {
+  static StringBuilder appendSet(
+    Set<?> s,
+    CQLDataType definition,
+    StringBuilder sb
+  ) {
+    final CQLDataType vdef = definition.getElementType();
+
     sb.append('{');
     boolean first = true;
 
@@ -381,13 +431,20 @@ public abstract class Utils {
       } else {
         sb.append(',');
       }
-      appendFlatValue(elt, sb);
+      appendFlatValue(elt, vdef, sb);
     }
     sb.append('}');
     return sb;
   }
 
-  static StringBuilder appendMap(Map<?, ?> m, StringBuilder sb) {
+  static StringBuilder appendMap(
+    Map<?, ?> m,
+    CQLDataType definition,
+    StringBuilder sb
+  ) {
+    final CQLDataType kdef = definition.getFirstArgumentType();
+    final CQLDataType vdef = definition.getElementType();
+
     sb.append('{');
     boolean first = true;
 
@@ -405,15 +462,17 @@ public abstract class Utils {
       } else {
         sb.append(',');
       }
-      appendFlatValue(entry.getKey(), sb);
+      appendFlatValue(entry.getKey(), kdef, sb);
       sb.append(':');
-      appendFlatValue(eval, sb);
+      appendFlatValue(eval, vdef, sb);
     }
     sb.append('}');
     return sb;
   }
 
-  private static boolean appendValueIfUdt(Object value, StringBuilder sb) {
+  private static boolean appendValueIfUdt(
+    Object value, CQLDataType definition, StringBuilder sb
+  ) {
     if (value instanceof UDTValue) {
       sb.append(((UDTValue)value).toString());
       return true;
@@ -428,7 +487,7 @@ public abstract class Utils {
       );
 
       if (uclass != null) { // we have a UDT type
-        final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(uclass);
+        final ClassInfo<?> cinfo = (definition instanceof ClassInfo) ? (ClassInfo<?>)definition : StatementBuilder.getClassInfo(uclass);
 
         org.apache.commons.lang3.Validate.isTrue(
           cinfo instanceof UDTClassInfoImpl,
@@ -447,7 +506,7 @@ public abstract class Utils {
       );
 
       if (utclass != null) { // we have a UDT type
-        final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(utclass);
+        final ClassInfo<?> cinfo = (definition instanceof ClassInfo) ? (ClassInfo<?>)definition : StatementBuilder.getClassInfo(utclass);
 
         org.apache.commons.lang3.Validate.isTrue(
           cinfo instanceof UDTClassInfoImpl,
@@ -463,7 +522,11 @@ public abstract class Utils {
     return false;
   }
 
-  private static boolean appendValueIfTuple(Object value, StringBuilder sb) {
+  private static boolean appendValueIfTuple(
+    Object value,
+    @SuppressWarnings("unused") CQLDataType definition,
+    StringBuilder sb
+  ) {
     if (value instanceof TupleValue) {
       sb.append(((TupleValue)value).toString());
       return true;
@@ -513,7 +576,7 @@ public abstract class Utils {
         if (i > 0) {
           sb.append(",");
         }
-        appendValue(fcall.parameters[i], sb);
+        appendValue(fcall.parameters[i], null, sb);
       }
       sb.append(")");
     } else {
@@ -669,7 +732,7 @@ public abstract class Utils {
 
       Utils.appendName(getColumnName(), sb);
       sb.append('[');
-      Utils.appendFlatValue(key, sb);
+      Utils.appendFlatValue(key, null, sb);
       return sb.append(']').toString();
     }
   }

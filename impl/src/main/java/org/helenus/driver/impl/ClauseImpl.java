@@ -22,10 +22,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import org.helenus.driver.BindMarker;
 import org.helenus.driver.Clause;
 import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.persistence.CQLDataType;
 
 /**
  * The <code>ClauseImpl</code> class extends Cassandra's
@@ -219,6 +221,13 @@ public abstract class ClauseImpl
     protected final Object value;
 
     /**
+     * Holds the definition associated with the value if any.
+     *
+     * @author paouelle
+     */
+    protected final CQLDataType definition;
+
+    /**
      * Instantiates a new <code>SimpleClauseImpl</code> object.
      *
      * @author paouelle
@@ -230,11 +239,53 @@ public abstract class ClauseImpl
      *         is <code>null</code>
      */
     SimpleClauseImpl(CharSequence name, String op, Object value) {
+      this(name, op, value, null);
+    }
+
+    /**
+     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this clause
+     * @param  op the operator for this clause
+     * @param  pvalue the value and its associated definition for this clause
+     * @throws NullPointerException if <code>name</code> or <code>op</code>
+     *         is <code>null</code>
+     */
+    SimpleClauseImpl(CharSequence name, String op, Pair<Object, CQLDataType> pvalue) {
+      super(name);
+      org.apache.commons.lang3.Validate.notNull(op, "invalid null operation");
+      this.op = op;
+      if (pvalue != null) {
+        this.value = pvalue.getLeft();
+        this.definition = pvalue.getRight();
+      } else {
+        this.value = null;
+        this.definition = null;
+      }
+    }
+
+    /**
+     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this clause
+     * @param  op the operator for this clause
+     * @param  value the value for this clause
+     * @param  definition the definition associated with the value if any
+     * @throws NullPointerException if <code>name</code> or <code>op</code>
+     *         is <code>null</code>
+     */
+    SimpleClauseImpl(CharSequence name, String op, Object value, CQLDataType definition) {
       super(name);
       org.apache.commons.lang3.Validate.notNull(op, "invalid null operation");
       this.op = op;
       this.value = value;
+      this.definition = definition;
     }
+
 
     /**
      * {@inheritDoc}
@@ -255,13 +306,13 @@ public abstract class ClauseImpl
           sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
-            Utils.appendValue(finfo.encodeElementValue(value), sb);
+            Utils.appendValue(finfo.encodeElementValue(value), (definition != null) ? definition : finfo.getDataType().getElementType(), sb);
             return;
           }
         }
         throw new IllegalStateException("unknown column '" + name + "'");
       }
-      Utils.appendValue(finfo.encodeValue(value), sb);
+      Utils.appendValue(finfo.encodeValue(value), (definition != null) ? definition : finfo.getDataType(), sb);
     }
 
     /**
@@ -339,6 +390,33 @@ public abstract class ClauseImpl
      */
     EqClauseImpl(CharSequence name, Object value) {
       super(name, "=", value);
+    }
+
+    /**
+     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this clause
+     * @param  pvalue the value and its associated definition for this clause
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    EqClauseImpl(CharSequence name, Pair<Object, CQLDataType> pvalue) {
+      super(name, "=", pvalue);
+    }
+
+    /**
+     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the column name for this clause
+     * @param  value the value for this clause
+     * @param  definition the definition associated with the value if any
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    EqClauseImpl(CharSequence name, Object value, CQLDataType definition) {
+      super(name, "=", value, definition);
     }
 
     /**
@@ -433,9 +511,9 @@ public abstract class ClauseImpl
               for (final Object val: values) {
                 pvals.add(finfo.encodeElementValue(val));
               }
-              Utils.joinAndAppendValues(sb, ",", pvals).append(")");
+              Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType().getElementType()).append(")");
             } else {
-              Utils.joinAndAppendValues(sb, ",", values).append(")");
+              Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType().getElementType()).append(")");
             }
             return;
           }
@@ -448,9 +526,9 @@ public abstract class ClauseImpl
         for (final Object val: values) {
           pvals.add(finfo.encodeValue(val));
         }
-        Utils.joinAndAppendValues(sb, ",", pvals).append(")");
+        Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType().getElementType()).append(")");
       } else {
-        Utils.joinAndAppendValues(sb, ",", values).append(")");
+        Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType().getElementType()).append(")");
       }
     }
 
@@ -795,10 +873,10 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Object> pkeys = context.getSuffixAndPrimaryKeyColumnValues(table.getName());
+      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getSuffixAndPrimaryKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
-      for (final Map.Entry<String, Object> e: pkeys.entrySet()) {
+      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
         clauses.add(new ClauseImpl.EqClauseImpl(e.getKey(), e.getValue()));
       }
       return clauses;
@@ -872,10 +950,10 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Object> pkeys = context.getSuffixAndPartitionKeyColumnValues(table.getName());
+      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getSuffixAndPartitionKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
-      for (final Map.Entry<String, Object> e: pkeys.entrySet()) {
+      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
         clauses.add(new ClauseImpl.EqClauseImpl(e.getKey(), e.getValue()));
       }
       return clauses;
@@ -949,10 +1027,10 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Object> pkeys = context.getSuffixKeyValues();
+      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getSuffixKeyValues();
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
-      for (final Map.Entry<String, Object> e: pkeys.entrySet()) {
+      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
         clauses.add(new ClauseImpl.EqClauseImpl(e.getKey(), e.getValue()));
       }
       return clauses;

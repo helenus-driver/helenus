@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
@@ -57,6 +58,7 @@ import org.helenus.driver.StatementManager;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.Column;
 import org.helenus.driver.persistence.Entity;
 import org.helenus.driver.persistence.InitialObjects;
@@ -355,7 +357,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a mandatory column is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -376,7 +378,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a column is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getPartitionKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -398,7 +400,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getSuffixAndPartitionKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so return suffixes only
@@ -419,7 +421,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a column is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getPrimaryKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -443,7 +445,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a column is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getPrimaryKeyColumnValues(
+    public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(
       String tname, Map<String, Object> pkeys_override
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -464,8 +466,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a suffix is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a suffix key's value
      */
-    public Map<String, Object> getSuffixKeyValues() {
-      final Map<String, Object> values = new LinkedHashMap<>(suffixes.size());
+    public Map<String, Pair<Object, CQLDataType>> getSuffixKeyValues() {
+      final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(suffixes.size());
 
       for (final Map.Entry<String, FieldInfoImpl<T>> e: getSuffixKeys().entrySet()) {
         final String name = e.getKey();
@@ -477,7 +479,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           "missing suffix key '%s'",
           name
         );
-        values.put(name, value);
+        values.put(name, Pair.of(value, field.getDataType()));
       }
       return values;
     }
@@ -495,7 +497,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getSuffixAndPrimaryKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so return suffixes only
@@ -516,7 +518,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a column is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getMandatoryAndPrimaryKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -539,7 +541,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a mandatory column is missing from
      *         the POJO
      */
-    public Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -561,11 +563,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         POJO or is mandatory and missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Object getColumnNonEncodedValue(String tname, CharSequence name) {
+    public Pair<Object, CQLDataType> getColumnNonEncodedValue(String tname, CharSequence name) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
-        return Collections.emptyMap();
+        return Pair.of(null, null);
       }
       return table.getColumnNonEncodedValue(object, name);
     }
@@ -583,11 +585,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         POJO or is mandatory and missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Object getColumnValue(String tname, CharSequence name) {
+    public Pair<Object, CQLDataType> getColumnValue(String tname, CharSequence name) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
-        return Collections.emptyMap();
+        return Pair.of(null, null);
       }
       return table.getColumnValue(object, name);
     }
@@ -606,7 +608,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         by the POJO or is mandatory and missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getColumnValues(
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -631,7 +633,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         by the POJO or is mandatory and missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Object> getColumnValues(
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
       String tname, CharSequence... names
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);

@@ -26,12 +26,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
 
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.RootClassInfo;
 import org.helenus.driver.info.TypeClassInfo;
+import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.RootEntity;
 
 /**
@@ -152,7 +155,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(String tname) {
       return tcontext.getColumnValues(tname);
     }
 
@@ -164,7 +167,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getPartitionKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(String tname) {
       return tcontext.getPartitionKeyColumnValues(tname);
     }
 
@@ -176,7 +179,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getSuffixAndPartitionKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(String tname) {
       return tcontext.getSuffixAndPartitionKeyColumnValues(tname);
     }
 
@@ -188,7 +191,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getPrimaryKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(String tname) {
       return tcontext.getPrimaryKeyColumnValues(tname);
     }
 
@@ -200,7 +203,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixKeyValues()
      */
     @Override
-    public Map<String, Object> getSuffixKeyValues() {
+    public Map<String, Pair<Object, CQLDataType>> getSuffixKeyValues() {
       return tcontext.getSuffixKeyValues();
     }
 
@@ -212,7 +215,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getSuffixAndPrimaryKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(String tname) {
       return tcontext.getSuffixAndPrimaryKeyColumnValues(tname);
     }
 
@@ -224,7 +227,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getMandatoryAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getMandatoryAndPrimaryKeyColumnValues(
+    public Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(
       String tname
     ) {
       return tcontext.getMandatoryAndPrimaryKeyColumnValues(tname);
@@ -238,7 +241,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
      */
     @Override
-    public Map<String, Object> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       return tcontext.getNonPrimaryKeyColumnNonEncodedValues(tname);
     }
 
@@ -250,7 +253,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
      */
     @Override
-    public Object getColumnValue(String tname, CharSequence name) {
+    public Pair<Object, CQLDataType> getColumnValue(String tname, CharSequence name) {
       return tcontext.getColumnValue(tname, name);
     }
 
@@ -262,7 +265,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.Iterable)
      */
     @Override
-    public Map<String, Object> getColumnValues(
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       return tcontext.getColumnValues(tname, names);
@@ -276,7 +279,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.CharSequence[])
      */
     @Override
-    public Map<String, Object> getColumnValues(
+    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
       String tname, CharSequence... names
     ) {
       return tcontext.getColumnValues(tname, names);
@@ -524,14 +527,14 @@ public class RootClassInfoImpl<T>
         }
         // check data type
         org.apache.commons.lang3.Validate.isTrue(
-          rc.getDataType().getType() == c.getDataType().getType(),
+          rc.getDataType().getMainType() == c.getDataType().getMainType(),
           "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in pojo '%s'",
           c.getDeclaringClass().getSimpleName(),
           c.getName(),
-          c.getDataType().getType(),
+          c.getDataType().getMainType(),
           rc.getDeclaringClass().getSimpleName(),
           rc.getName(),
-          rc.getDataType().getType(),
+          rc.getDataType().getMainType(),
           t.getName(),
           type.getSimpleName()
         );
@@ -593,14 +596,14 @@ public class RootClassInfoImpl<T>
         }
         // check data type
         org.apache.commons.lang3.Validate.isTrue(
-          rc.getDataType().getType() == c.getDataType().getType(),
+          rc.getDataType().getMainType() == c.getDataType().getMainType(),
           "incompatible type columns '%s.%s' of type '%s' and '%s.%s' of type '%s' in table '%s' in subclass '%s'",
           c.getDeclaringClass().getSimpleName(),
           c.getName(),
-          c.getDataType().getType(),
+          c.getDataType().getMainType(),
           rc.getDeclaringClass().getSimpleName(),
           rc.getName(),
-          rc.getDataType().getType(),
+          rc.getDataType().getMainType(),
           t.getName(),
           type.getSimpleName()
         );

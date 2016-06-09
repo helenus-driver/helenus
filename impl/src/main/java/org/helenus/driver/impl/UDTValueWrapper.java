@@ -18,6 +18,10 @@ package org.helenus.driver.impl;
 import java.util.Map;
 import java.util.Objects;
 
+import org.apache.commons.lang3.tuple.Pair;
+
+import org.helenus.driver.persistence.CQLDataType;
+
 /**
  * The <code>UDTValueWrapper</code> class is used to track a user-defined POJO
  * such that it be ready for encoding.
@@ -104,7 +108,7 @@ public class UDTValueWrapper<T> implements PersistedObject<T, T> {
    */
   @Override
   public String toString() {
-    final Map<String, Object> columns = cinfo.newContext(val).getColumnValues();
+    final Map<String, Pair<Object, CQLDataType>> columns = cinfo.newContext(val).getColumnValues();
     final StringBuilder sb = new StringBuilder();
 
     sb.append("{");

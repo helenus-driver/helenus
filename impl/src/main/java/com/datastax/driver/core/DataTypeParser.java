@@ -15,6 +15,7 @@
  */
 package com.datastax.driver.core;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.helenus.driver.impl.DataTypeImpl.Definition;
@@ -59,6 +60,22 @@ public class DataTypeParser extends CassandraTypeParser {
           return true;
         }
         @Override
+        public CQLDataType getMainType() {
+          return this;
+        }
+        @Override
+        public CQLDataType getElementType() {
+          return null;
+        }
+        @Override
+        public List<CQLDataType> getArgumentTypes() {
+          return null;
+        }
+        @Override
+        public CQLDataType getFirstArgumentType() {
+          return null;
+        }
+        @Override
         public boolean isAlterableTo(CQLDataType to) {
           return false; // never alterable
         }
@@ -82,6 +99,22 @@ public class DataTypeParser extends CassandraTypeParser {
         @Override
         public boolean isUserDefined() {
           return false;
+        }
+        @Override
+        public CQLDataType getMainType() {
+          return this;
+        }
+        @Override
+        public CQLDataType getElementType() {
+          return null;
+        }
+        @Override
+        public List<CQLDataType> getArgumentTypes() {
+          return null;
+        }
+        @Override
+        public CQLDataType getFirstArgumentType() {
+          return null;
         }
         @Override
         public boolean isAlterableTo(CQLDataType to) {
