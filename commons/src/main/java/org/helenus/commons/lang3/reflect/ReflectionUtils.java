@@ -1043,6 +1043,27 @@ public class ReflectionUtils {
   }
 
   /**
+   * Checks if the specified class is assignment compatible (i.e. is a subclass of)
+   * any of the classes provided.
+   *
+   * @author paouelle
+   *
+   * @param  classes the set of classes to check if <code>clazz</code> is
+   *         assignment compatible with
+   * @param  clazz the class to be checking
+   * @return <code>true</code> if <code>clazz</code> is a subclass of at least
+   *         one of the specified classes
+   */
+  public final static boolean isAssignableFrom(Class<?>[] classes, Class<?> clazz) {
+    for (final Class<?> c: classes) {
+      if (c.isAssignableFrom(clazz)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Prevents instantiation of a new <code>class</code> object.
    *
    * @author paouelle
