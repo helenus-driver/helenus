@@ -45,6 +45,11 @@ import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+
 import org.helenus.annotation.Keyable;
 
 /**
@@ -1061,6 +1066,57 @@ public class ReflectionUtils {
       }
     }
     return false;
+  }
+
+  /**
+   * Gets the <code>Class<?>[]</code> element value of the annotation associated
+   * with the specified element if any. If there is no annotation of the given
+   * type associated with the element, an empty array is returned.
+   * <p>
+   * This method is useful when dealing with annotations in a processing
+   * environment where Javac does not load classes in the normal manner. In fact
+   * it doesn’t at all for classes that are in the source – it’s all contained
+   * within a model.
+   *
+   * @author paouelle
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  annotatedElement the element to retrieve the annotation's element
+   *         value from
+   * @param  annotationClass the type of annotations to retrieve
+   * @param  element the name of the element to retrieve (a.k.a the annotation
+   *         class method name
+   * @return the array of classes for the annotation's element of the annotated
+   *         element
+   * @throws ClassNotFoundException if unable to locate a referenced class
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  public static Class<?>[] getAnnotationClassArrayElementValueByType(
+    Element annotatedElement,
+    Class<? extends Annotation> annotationClass,
+    String element
+  ) throws ClassNotFoundException {
+    final String aname = annotationClass.getName();
+
+    for (final AnnotationMirror am: annotatedElement.getAnnotationMirrors()) {
+      if (aname.equals(am.getAnnotationType().toString())) {
+        for (final Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> e: am.getElementValues().entrySet()) {
+          if (element.equals(e.getKey().getSimpleName().toString())) {
+            final List<AnnotationValue> list = List.class.cast(e.getValue().getValue());
+            final Class<?>[] classes = new Class<?>[list.size()];
+            int i = 0;
+
+            for (final AnnotationValue av: list) {
+              classes[i++] = Class.forName(av.getValue().toString());
+            }
+            return classes;
+          }
+        }
+      }
+    }
+    return new Class<?>[0];
   }
 
   /**
