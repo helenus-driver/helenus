@@ -79,6 +79,7 @@ import org.helenus.driver.ObjectClassStatement;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.Sequence;
 import org.helenus.driver.StatementBuilder;
+import org.helenus.driver.Truncate;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.persistence.InitialObjects;
 import org.helenus.jackson.jsonSchema.customProperties.JsonAnnotationSchemaFactoryWrapper;
@@ -167,6 +168,31 @@ public class Tool {
           Tool.insertObjects(line);
         }
       };
+
+    /**
+     * Holds the truncate creation action.
+     *
+     * @author paouelle
+     */
+    @SuppressWarnings("serial")
+    private final static RunnableOption truncate
+      = new RunnableOption(
+          "t",
+          "truncate",
+          false,
+          "to truncate schema tables for the specified pojo classes and/or packages (separated with :)"
+        ) {
+          {
+            setArgs(Option.UNLIMITED_VALUES);
+            setArgName("classes-packages");
+            setValueSeparator(':');
+          }
+          @SuppressWarnings("synthetic-access")
+          @Override
+          public void run(CommandLine line) throws Exception {
+            Tool.truncateSchemas(line);
+          }
+        };
 
   /**
    * Holds the json schemas creation action.
@@ -342,7 +368,7 @@ public class Tool {
    */
   @SuppressWarnings("serial")
   private final static RunnableOption trace
-    = new RunnableOption("t", "trace", false, "to enable trace output") {
+    = new RunnableOption(null, "trace", false, "to enable trace output") {
       @SuppressWarnings("synthetic-access")
       @Override
       public void run(CommandLine line) {
@@ -484,6 +510,7 @@ public class Tool {
    */
   private final static Options options
     = (new Options()
+       .addOption(Tool.truncate)
        .addOption(Tool.schemas)
        .addOption(Tool.objects)
        .addOption(Tool.jsons)
@@ -664,6 +691,53 @@ public class Tool {
   }
 
   /**
+   * Truncates all defined schema tables based on the provided set of package
+   * and/or class names and options and add the statements to the specified
+   * sequence.
+   *
+   * @author paouelle
+   *
+   * @param  pkgs the set of packages and/or classes to truncate schema tables for
+   * @param  suffixes the map of provided suffix values
+   * @param  matching whether or not to only truncate schema tables for keyspaces
+   *         that matches the specified set of suffixes
+   * @param  s the sequence where to add the generated statements
+   * @throws LinkageError if the linkage fails for one of the specified entity
+   *         class
+   * @throws ExceptionInInitializerError if the initialization provoked by one
+   *         of the specified entity class fails
+   * @throws IllegalArgumentException if no pojos are found in any of the
+   *         specified packages
+   */
+  private static void truncateSchemasFromPackagesOrClasses(
+    String[] pkgs,
+    Map<String, String> suffixes,
+    boolean matching,
+    Sequence s
+  ) {
+    final CreateSchemas cs
+      = (matching
+          ? StatementBuilder.createMatchingSchemas(pkgs)
+          : StatementBuilder.createSchemas(pkgs));
+
+    // pass all suffixes
+    for (final Map.Entry<String, String> e: suffixes.entrySet()) {
+      // register the suffix value with the corresponding suffix type
+      cs.where(StatementBuilder.eq(e.getKey(), e.getValue()));
+    }
+    cs.classInfos().forEachOrdered(cinfo -> {
+      System.out.println(
+        Tool.class.getSimpleName()
+        + ": truncating schema for "
+        + cinfo.getObjectClass().getName()
+      );
+      final Truncate<?> t = StatementBuilder.truncate(cinfo.getObjectClass());
+
+      s.add(t);
+    });
+  }
+
+  /**
    * Creates all defined schemas based on the provided command line information.
    *
    * @author paouelle
@@ -701,6 +775,54 @@ public class Tool {
     }
     System.out.println();
     Tool.createSchemasFromPackagesOrClasses(opts, suffixes, matching, alter, s);
+    if (s.isEmpty() || (s.getQueryString() == null)) {
+      System.out.println(
+        Tool.class.getSimpleName()
+        + ": no schemas found matching the specified criteria"
+      );
+    } else {
+      executeCQL(s);
+    }
+  }
+
+  /**
+   * Truncates all defined schema tables for based on the provided command line
+   * information.
+   *
+   * @author paouelle
+   *
+   * @param  line the command line information
+   * @throws Exception if an error occurs while truncate schema tables
+   * @throws LinkageError if the linkage fails for one of the specified entity
+   *         class
+   * @throws ExceptionInInitializerError if the initialization provoked by one
+   *         of the specified entity class fails
+   * @throws IllegalArgumentException if no pojos are found in any of the
+   *         specified packages
+   */
+  private static void truncateSchemas(CommandLine line) throws Exception {
+    final String[] opts = line.getOptionValues(Tool.truncate.getLongOpt());
+    @SuppressWarnings({"cast", "unchecked", "rawtypes"})
+    final Map<String, String> suffixes
+      = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
+    final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
+    final Sequence s = StatementBuilder.sequence();
+
+    System.out.print(
+      Tool.class.getSimpleName()
+      + ": searching for schema definitions in "
+      + Arrays.toString(opts)
+    );
+    if (!suffixes.isEmpty()) {
+      System.out.print(
+        " with "
+        + (matching ? "matching " : "")
+        + "suffixes "
+        + suffixes
+      );
+    }
+    System.out.println();
+    Tool.truncateSchemasFromPackagesOrClasses(opts, suffixes, matching, s);
     if (s.isEmpty() || (s.getQueryString() == null)) {
       System.out.println(
         Tool.class.getSimpleName()
@@ -1234,7 +1356,7 @@ public class Tool {
       if (line.hasOption(Tool.verbose.getOpt())) { // do this one first
         Tool.verbose.run(line);
       }
-      if (line.hasOption(Tool.trace.getOpt())) { // do this one next
+      if (line.hasOption(Tool.trace.getLongOpt())) { // do this one next
         Tool.trace.run(line);
       }
       for (final Option option: line.getOptions()) { // run these first
@@ -1252,6 +1374,7 @@ public class Tool {
       final boolean connect = (
         line.hasOption(Tool.objects.getLongOpt())
         || line.hasOption(Tool.schemas.getLongOpt())
+        || line.hasOption(Tool.truncate.getLongOpt())
       );
 
       Tool.mgr = new StatementManagerImpl(

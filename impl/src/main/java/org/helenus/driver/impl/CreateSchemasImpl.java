@@ -228,6 +228,42 @@ public class CreateSchemasImpl
       ((UDTRootClassInfoImpl<?>)cinfo).typeImpls()
         .forEach(tcinfo -> fcs.add(tcinfo, tcinfo.udts()));
     }
+    // search for all POJO annotated classes with @UDTTypeEntity
+    for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
+      org.helenus.driver.persistence.UDTTypeEntity.class, true
+    )) {
+      // skip classes that are not directly annotated
+      if (ReflectionUtils.findFirstClassAnnotatedWith(
+           clazz, org.helenus.driver.persistence.UDTTypeEntity.class
+         ) != clazz) {
+        continue;
+      }
+      final UDTClassInfoImpl<?> cinfo = (UDTClassInfoImpl<?>)mgr.getClassInfoImpl(clazz);
+      final Keyspace k = cinfo.getKeyspace();
+      final Keyspace old = keyspaces.put(k.name(), k);
+      DirectedGraph<UDTClassInfoImpl<?>> cs = udtcinfos.get(k);
+
+      if (cs == null) {
+        cs = new ConcurrentHashDirectedGraph<>();
+        udtcinfos.put(k, cs);
+      }
+      cs.add(cinfo, cinfo.udts());
+      if ((old != null) && !k.equals(old)) {
+        // duplicate annotation found with different attribute
+        throw new IllegalArgumentException(
+          "two different @Keyspace annotations found with class '"
+          + clazz.getName()
+          + "': "
+          + old
+          + " and: "
+          + k
+        );
+      }
+      // check if it is already in the list (added via UDTRootEntity) and skip
+      if (!cs.contains(cinfo)) {
+        cs.add(cinfo, cinfo.udts());
+      }
+    }
     // now we are done with types, do a reverse topological sort of all keyspace
     // graphs such that we end up creating udts in the dependent order
     // and populate the resulting cinfos map with that ssorted list
@@ -314,6 +350,42 @@ public class CreateSchemasImpl
 
       ((RootClassInfoImpl<?>)cinfo).typeImpls()
         .forEach(tcinfo -> fcs.add(tcinfo));
+    }
+    // search for all POJO annotated classes with @TypeEntity
+    for (final Class<?> clazz: reflections.getTypesAnnotatedWith(
+      org.helenus.driver.persistence.TypeEntity.class, true
+    )) {
+      // skip classes that are not directly annotated
+      if (ReflectionUtils.findFirstClassAnnotatedWith(
+           clazz, org.helenus.driver.persistence.TypeEntity.class
+         ) != clazz) {
+        continue;
+      }
+      final ClassInfoImpl<?> cinfo = mgr.getClassInfoImpl(clazz);
+      final Keyspace k = cinfo.getKeyspace();
+      final Keyspace old = keyspaces.put(k.name(), k);
+      List<ClassInfoImpl<?>> cs = cinfos.get(k);
+
+      if (cs == null) {
+        cs = new ArrayList<>(32);
+        cinfos.put(k, cs);
+      }
+      cs.add(cinfo);
+      if ((old != null) && !k.equals(old)) {
+        // duplicate annotation found with different attribute
+        throw new IllegalArgumentException(
+          "two different @Keyspace annotations found with class '"
+          + clazz.getName()
+          + "': "
+          + old
+          + " and: "
+          + k
+        );
+      }
+      // check if it is already in the list (added via RootEntity) and skip
+      if (!cs.contains(cinfo)) {
+        cs.add(cinfo);
+      }
     }
     return cinfos;
   }
