@@ -82,7 +82,7 @@ import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.Truncate;
 import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.persistence.InitialObjects;
-import org.helenus.jackson.jsonSchema.customProperties.JsonAnnotationSchemaFactoryWrapper;
+import org.helenus.jackson.jsonSchema.factories.JsonAnnotationSchemaFactoryWrapper;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 
