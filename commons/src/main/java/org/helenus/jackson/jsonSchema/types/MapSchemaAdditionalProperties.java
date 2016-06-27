@@ -17,6 +17,8 @@ package org.helenus.jackson.jsonSchema.types;
 
 import java.util.Objects;
 
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JavaType;
@@ -182,6 +184,19 @@ public class MapSchemaAdditionalProperties extends ObjectSchema.AdditionalProper
       && Objects.equals(keysSchema, ((MapSchemaAdditionalProperties)obj).keysSchema)
       && Objects.equals(valuesSchema, ((MapSchemaAdditionalProperties)obj).valuesSchema)
     );
+  }
+
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return ReflectionToStringBuilder.toString(this);
   }
 }
 
