@@ -114,6 +114,7 @@ import org.helenus.jackson.annotation.JsonPropertyValueFormat;
 import org.helenus.jackson.jsonSchema.types.MapTypesSchema;
 import org.helenus.jackson.jsonSchema.types.ObjectTypesSchema;
 import org.helenus.jackson.jsonSchema.types.ReferenceTypesSchema;
+import org.helenus.jackson.jsonSchema.types.StringTypesSchema;
 import org.helenus.util.function.EBiConsumer;
 
 /**
@@ -994,36 +995,49 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     final MapVisitor mvisitor = new MapVisitor(visitor.getProvider(), mschema, new JsonAnnotationSchemaFactoryWrapperFactory()) {
       final MapTypesSchema schema = mschema;
 
-      @Override
       protected JsonSchema propertySchema(
         JsonFormatVisitable handler,
-        JavaType propertyTypeHint
+        JavaType propertyTypeHint,
+        boolean key
       ) throws JsonMappingException {
-        final JsonSchema schema = super.propertySchema(handler, propertyTypeHint);
-
-        if (schema instanceof ReferenceSchema) {
-          return new ReferenceTypesSchema(((ReferenceSchema)schema).get$ref(), propertyTypeHint);
-        }
-        return schema;
-      }
-      @Override
-      public void keyFormat(JsonFormatVisitable handler, JavaType keyType)
-        throws JsonMappingException {
-        if (handler instanceof StdKeySerializers.StringKeySerializer) {
-          // special handling for keys such that they don't get their schema
-          // generated as an ANY schema
-          handler = new StringSerializer();
-        } else if (handler instanceof JsonValueSerializer) {
+        if (key && (handler instanceof JsonValueSerializer)) {
           final JsonValueSerializer jvhandler = (JsonValueSerializer)handler;
 
           if (jvhandler.handledType().equals(String.class)) {
             // special handling for keys that are not string but are of a class that
             // is annotated with @JsonValue which returns a string such that they
             // don't get their schema generated as an ANY schema
-            handler = new StringSerializer();
+            return new StringTypesSchema(propertyTypeHint);
           }
         }
-        final JsonSchema kschema = propertySchema(handler, keyType);
+        final JsonSchema schema = super.propertySchema(handler, propertyTypeHint);
+
+        if (schema instanceof ReferenceSchema) {
+          if (key) {
+            // oh well! we saw that type before but this is not good as we need a
+            // special string schema that references this type
+            // such type typically have a serializer defined so they can be serialized to strings
+            return new StringTypesSchema((ReferenceSchema)schema, propertyTypeHint);
+          }
+          // make sure we have a reference types schema
+          if (!(schema instanceof ReferenceTypesSchema)) {
+            return new ReferenceTypesSchema((ReferenceSchema)schema, propertyTypeHint);
+          }
+        }
+        return schema;
+      }
+      @Override
+      public void keyFormat(JsonFormatVisitable handler, JavaType keyType)
+        throws JsonMappingException {
+//        if (keyType.getRawClass().getSimpleName().equals("EMAC")) {
+//          System.out.println("HERE HERE HER HERE HERE HERE - handler: " + ReflectionToStringBuilder.toString(handler));
+//        }
+        if (handler instanceof StdKeySerializers.StringKeySerializer) {
+          // special handling for keys such that they don't get their schema
+          // generated as an ANY schema
+          handler = new StringSerializer();
+        }
+        final JsonSchema kschema = propertySchema(handler, keyType, true);
 
         schema.setKeysSchema(kschema);
         schema.setKeysType(keyType);
@@ -1036,7 +1050,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 //        } else if (valueType.getRawClass().getSimpleName().equals("RoleMap")) {
 //          System.out.println("**************** HERE HERE HERE 1: Restrictions - Container: " + schema);
 //        }
-        final JsonSchema vschema = propertySchema(handler, valueType);
+        final JsonSchema vschema = propertySchema(handler, valueType, false);
 
         schema.setValuesSchema(vschema);
         schema.setValuesType(valueType);
@@ -1192,7 +1206,7 @@ class JsonAnnotationSchemaFactoryProvider extends JsonSchemaFactory {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see com.fasterxml.jackson.module.jsonSchema.factories.JsonSchemaFactory#arraySchema()
    */

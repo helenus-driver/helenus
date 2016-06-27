@@ -19,53 +19,30 @@ import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.type.SimpleType;
 import com.fasterxml.jackson.module.jsonSchema.types.ReferenceSchema;
-
-import org.helenus.commons.lang3.reflect.ReflectionUtils;
+import com.fasterxml.jackson.module.jsonSchema.types.StringSchema;
 
 /**
- * The <code>ReferenceTypesSchema</code> class extends the {@link ReferenceSchema}
- * class to provide additional information about the Java type being referenced.
+ * The <code>StringTypesSchema</code> class extends the {@link StringSchema}
+ * class to provide additional information about the Java type being referenced
+ * as a string.
  *
  * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jun 24, 2016 - paouelle - Creation
+ * @version 1 - Jun 27, 2016 - paouelle - Creation
  *
  * @since 1.0
  */
-public class ReferenceTypesSchema extends ReferenceSchema {
+public class StringTypesSchema extends StringSchema {
   /**
-   * Gets Json sub types from the specified class annotated with {@link JsonSubTypes}.
-   *
-   * @author paouelle
-   *
-   * @param  clazz the class for which to find the sub types
-   * @return a stream of all sub type classes
-   */
-  @SuppressWarnings({"cast", "unchecked"})
-  static <T> Stream<Class<? extends T>> getJsonSubTypesFrom(Class<T> clazz) {
-    final JsonSubTypes jst = ReflectionUtils.findFirstAnnotation(clazz, JsonSubTypes.class);
-
-    if (jst != null) {
-      return Stream.of(jst.value())
-        .map(t -> t.value())
-        .filter(c -> clazz.isAssignableFrom(c))
-        .map(c -> (Class<? extends T>)c);
-    }
-    return Stream.empty();
-  }
-
-  /**
-   * Holds the type or base type associated with the referenced schema.
+   * Holds the type or base type associated with the string schema.
    *
    * @author paouelle
    */
@@ -73,7 +50,7 @@ public class ReferenceTypesSchema extends ReferenceSchema {
   private JavaType javaType;
 
   /**
-   * Holds the type or sub-types associated with the referenced schema.
+   * Holds the type or sub-types associated with the string schema.
    *
    * @author paouelle
    */
@@ -81,22 +58,20 @@ public class ReferenceTypesSchema extends ReferenceSchema {
   private final Set<JavaType> javaTypes;
 
   /**
-   * Instantiates a new <code>ReferenceTypesSchema</code> object.
+   * Instantiates a new <code>StringTypesSchema</code> object.
    *
    * @author paouelle
    *
-   * @param schema the reference schema to copy
+   * @param schema the reference schema for which to create a string one
    * @param jtype the corresponding Java type
    */
-  public ReferenceTypesSchema(ReferenceSchema schema, JavaType jtype) {
-    // ReferenceSchema
-    super(schema.get$ref());
+  public StringTypesSchema(ReferenceSchema schema, JavaType jtype) {
     Set<JavaType> jtypes = null;
 
     // ReferenceTypesSchema
     if (schema instanceof ReferenceTypesSchema) {
-      this.javaType = ((ReferenceTypesSchema)schema).javaType;
-      jtypes = ((ReferenceTypesSchema)schema).javaTypes;
+      this.javaType = ((ReferenceTypesSchema)schema).getJavaType();
+      jtypes = ((ReferenceTypesSchema)schema).getJavaTypes();
     }
     if (javaType == null) {
       if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
@@ -128,16 +103,23 @@ public class ReferenceTypesSchema extends ReferenceSchema {
   }
 
   /**
-   * Instantiates a new <code>ReferenceTypesSchema</code> object.
+   * Instantiates a new <code>StringTypesSchema</code> object.
    *
    * @author paouelle
    *
-   * @param schema the schema for which to create a reference one
+   * @param jtype the corresponding Java type
    */
-  public ReferenceTypesSchema(ObjectTypesSchema schema) {
-    super(schema.getId());
-    this.javaType = schema.getJavaType();
-    this.javaTypes = new LinkedHashSet<>(schema.getJavaTypes());
+  public StringTypesSchema(JavaType jtype) {
+    if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
+      jtype = jtype.getReferencedType();
+    }
+    this.javaType = jtype;
+    this.javaTypes = ReferenceTypesSchema.getJsonSubTypesFrom(jtype.getRawClass())
+      .map(c -> SimpleType.construct(c))
+      .collect(Collectors.toCollection(LinkedHashSet::new));
+    if (javaTypes.isEmpty()) {
+      javaTypes.add(jtype);
+    }
   }
 
   /**

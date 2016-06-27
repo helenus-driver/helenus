@@ -84,6 +84,7 @@ import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.persistence.InitialObjects;
 import org.helenus.jackson.jsonSchema.factories.JsonAnnotationSchemaFactoryWrapper;
 import org.reflections.Reflections;
+import org.reflections.ReflectionsException;
 import org.reflections.scanners.SubTypesScanner;
 
 /**
@@ -882,16 +883,26 @@ public class Tool {
       if (csclasses.isEmpty()) { // nothing found in helenus, fallback to reflection
         final Reflections reflections = new Reflections(pkgs, new SubTypesScanner(false));
 
-        reflections.getAllTypes().stream()
-          .map(n -> {
+        try {
+          reflections.getAllTypes().stream()
+            .map(n -> {
+              try {
+                return Class.forName(n);
+              } catch (LinkageError|ClassNotFoundException ee) { // ignore
+                return null;
+              }
+            })
+            .filter(c -> c != null)
+            .forEach(c -> classes.add(c));
+        } catch (ReflectionsException e) {
+          // fallback to iterating the pkgs and keep only the classes
+          for (final String c: pkgs) {
             try {
-              return Class.forName(n);
+              classes.add(Class.forName(c));
             } catch (LinkageError|ClassNotFoundException ee) { // ignore
-              return null;
             }
-          })
-          .filter(c -> c != null)
-          .forEach(c -> classes.add(c));
+          }
+        }
         // make sure to also cover enums
         classes.addAll(reflections.getSubTypesOf(Enum.class));
       } else {

@@ -101,7 +101,7 @@ public class ObjectTypesSchema extends ObjectSchema {
   /**
    * Set the type or sub-types defined by this schema.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param jtype the Java type defined by this schema
    */

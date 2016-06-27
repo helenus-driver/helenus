@@ -1080,8 +1080,6 @@ public class ReflectionUtils {
    *
    * @author paouelle
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
-   *
    * @param  annotatedElement the element to retrieve the annotation's element
    *         value from
    * @param  annotationClass the type of annotations to retrieve
