@@ -1069,7 +1069,7 @@ public class ReflectionUtils {
   }
 
   /**
-   * Gets the <code>Class<?>[]</code> element value of the annotation associated
+   * Gets the <code>Class&lt;?&gt;[]</code> element value of the annotation associated
    * with the specified element if any. If there is no annotation of the given
    * type associated with the element, an empty array is returned.
    * <p>

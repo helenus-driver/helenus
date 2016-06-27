@@ -35,7 +35,7 @@ import com.fasterxml.jackson.annotation.JacksonAnnotation;
  * If annotating a property of type corresponding to a Java enum which is
  * serialize as a Json object instead of the standard string schema and using
  * the {@link #valueAvailablesOf} or {@link #keyAvailablesOf} with a class that
- * provides a method annotated with {@JsonPropertyEnumValueProvider} which returns
+ * provides a method annotated with {@link JsonPropertyEnumValuesProvider} which returns
  * a subset of enum values of this enum class. That set will be used as a filtered
  * set of enum values that can be passed into the method annotated using the
  * {@link JsonPropertyEnumValuesProvider} or {@link JsonPropertyDefaultValuesProvider}

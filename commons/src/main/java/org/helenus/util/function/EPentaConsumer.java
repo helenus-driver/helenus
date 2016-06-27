@@ -63,6 +63,7 @@ public interface EPentaConsumer<T, U, V, X, Y, E extends Throwable> {
    * @return a composed {@code EPentaConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
+   * @throws E if an error occurs
    */
   public default EPentaConsumer<T, U, V, X, Y, E> andThen(
     EPentaConsumer<? super T, ? super U, ? super V, ? super X, ? super Y, E> after

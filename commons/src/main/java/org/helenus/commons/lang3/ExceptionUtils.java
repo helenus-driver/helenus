@@ -40,6 +40,8 @@ public class ExceptionUtils extends org.apache.commons.lang3.exception.Exception
    *
    * @author paouelle
    *
+   * @param <E> the type of exception to initialize
+   *
    * @param  e the exception to initialize its cause
    * @param  cause the cause to initialize the exception with
    * @return e the exception for chaining
@@ -58,6 +60,8 @@ public class ExceptionUtils extends org.apache.commons.lang3.exception.Exception
    * set of causes.
    *
    * @author paouelle
+   *
+   * @param <E> the type of exception to initialize
    *
    * @param  e the exception to initialize its route cause
    * @param  cause the cause to initialize the exception with

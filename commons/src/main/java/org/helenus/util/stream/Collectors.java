@@ -94,7 +94,7 @@ public class Collectors {
   }
 
   /**
-   * Returns a {@Link Collector} that accumulates elements into a
+   * Returns a {@link Collector} that accumulates elements into a
    * {@link LinkedHashMap} whose keys and values are the result of applying the
    * provided mapping functions to the input elements.
    * <p>
@@ -172,7 +172,7 @@ public class Collectors {
   }
 
   /**
-   * Returns a {@Link Collector} that accumulates elements into a
+   * Returns a {@link Collector} that accumulates elements into a
    * {@link TreeMap} whose keys and values are the result of applying the
    * provided mapping functions to the input elements.
    * <p>
@@ -249,7 +249,7 @@ public class Collectors {
   }
 
   /**
-   * Returns a {@Link Collector} that accumulates elements into a
+   * Returns a {@link Collector} that accumulates elements into a
    * {@link IdentityHashMap} whose keys and values are the result of applying the
    * provided mapping functions to the input elements.
    * <p>

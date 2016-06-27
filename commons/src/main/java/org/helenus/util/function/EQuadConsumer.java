@@ -61,6 +61,7 @@ public interface EQuadConsumer<T, U, V, X, E extends Throwable> {
    * @return a composed {@code EQuadConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
+   * @throws E if an error occurs
    */
   public default EQuadConsumer<T, U, V, X, E> andThen(
     EQuadConsumer<? super T, ? super U, ? super V, ? super X, E> after

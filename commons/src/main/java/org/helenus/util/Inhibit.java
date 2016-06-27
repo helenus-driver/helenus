@@ -290,7 +290,7 @@ public class Inhibit {
    * @throws NullPointerException if <code>cmd</code> or <code>handle</code> is
    *         <code>null</code>
    */
-  public static final <T, E extends Throwable> void interruptions(
+  public static final <E extends Throwable> void interruptions(
     E2Runnable<E, InterruptedException> cmd,
     EConsumer<InterruptedException, E> handle
   ) throws E {

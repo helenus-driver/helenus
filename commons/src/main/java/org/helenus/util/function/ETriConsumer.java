@@ -59,6 +59,7 @@ public interface ETriConsumer<T, U, V, E extends Throwable> {
    * @return a composed {@code ETriConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
+   * @throws E if an error occurs
    */
   public default ETriConsumer<T, U, V, E> andThen(
     ETriConsumer<? super T, ? super U, ? super V, E> after

@@ -45,7 +45,7 @@ import com.fasterxml.jackson.annotation.JacksonAnnotation;
  * that references this enum class with a {@link JsonPropertyEnumValues} annotation
  * that uses the {@link JsonPropertyEnumValues#valueAvailablesOf} or
  * {@link JsonPropertyEnumValues#keyAvailablesOf} with a class that provides a
- * method annotated with {@JsonPropertyEnumValueProvider} which returns
+ * method annotated with @{@link JsonPropertyEnumValuesProvider} which returns
  * a subset of enum values that would then be passed in argument here.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors

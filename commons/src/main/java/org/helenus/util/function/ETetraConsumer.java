@@ -61,6 +61,7 @@ public interface ETetraConsumer<T, U, V, X, E extends Throwable> {
    * @return a composed {@code ETetraConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
+   * @throws E if an error occurs
    */
   public default ETetraConsumer<T, U, V, X, E> andThen(
     ETetraConsumer<? super T, ? super U, ? super V, ? super X, E> after

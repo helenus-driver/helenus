@@ -58,6 +58,7 @@ public interface EBiConsumer<T, U, E extends Throwable> {
    * @return a composed {@code EBiConsumer} that performs in sequence this
    *         operation followed by the {@code after} operation
    * @throws NullPointerException if {@code after} is <code>null</code>
+   * @throws E if an error occurs
    */
   public default EBiConsumer<T, U, E> andThen(
     EBiConsumer<? super T, ? super U, E> after

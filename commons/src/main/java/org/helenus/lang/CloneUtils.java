@@ -37,6 +37,8 @@ public class CloneUtils {
    *
    * @author paouelle
    *
+   * @param <T> the type of the object to be cloned
+   *
    * @param  obj the object to be cloned
    * @return a cloned version of the object or <code>null</code> if
    *         <code>obj</code> was <code>null</code>
