@@ -65,12 +65,20 @@ public class ReferenceTypesSchema extends ReferenceSchema {
   }
 
   /**
+   * Holds the type or base type associated with the referenced schema.
+   *
+   * @author paouelle
+   */
+  @JsonIgnore
+  private JavaType javaType;
+
+  /**
    * Holds the type or sub-types associated with the referenced schema.
    *
    * @author paouelle
    */
   @JsonIgnore
-  private final Set<JavaType> types;
+  private final Set<JavaType> javaTypes;
 
   /**
    * Instantiates a new <code>ReferenceTypesSchema</code> object.
@@ -85,11 +93,12 @@ public class ReferenceTypesSchema extends ReferenceSchema {
     if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
       jtype = jtype.getReferencedType();
     }
-    this.types = ReferenceTypesSchema.getJsonSubTypesFrom(jtype.getRawClass())
+    this.javaType = jtype;
+    this.javaTypes = ReferenceTypesSchema.getJsonSubTypesFrom(jtype.getRawClass())
       .map(c -> SimpleType.construct(c))
       .collect(Collectors.toCollection(LinkedHashSet::new));
-    if (types.isEmpty()) {
-      types.add(jtype);
+    if (javaTypes.isEmpty()) {
+      javaTypes.add(jtype);
     }
   }
 
@@ -102,7 +111,19 @@ public class ReferenceTypesSchema extends ReferenceSchema {
    */
   public ReferenceTypesSchema(ObjectTypesSchema schema) {
     super(schema.getId());
-    this.types = new LinkedHashSet<>(schema.getTypes());
+    this.javaType = schema.getJavaType();
+    this.javaTypes = new LinkedHashSet<>(schema.getJavaTypes());
+  }
+
+  /**
+   * Gets the type or base type associated with the referenced schema.
+   *
+   * @author paouelle
+   *
+   * @return the type or base type associated with the referenced schema
+   */
+  public JavaType getJavaType() {
+    return javaType;
   }
 
   /**
@@ -112,8 +133,8 @@ public class ReferenceTypesSchema extends ReferenceSchema {
    *
    * @return the type or sub-types associated with the referenced schema
    */
-  public Set<JavaType> getTypes() {
-    return types;
+  public Set<JavaType> getJavaTypes() {
+    return javaTypes;
   }
 
   /**

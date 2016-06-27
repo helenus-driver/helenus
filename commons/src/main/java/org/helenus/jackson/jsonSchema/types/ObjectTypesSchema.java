@@ -39,12 +39,20 @@ import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
  */
 public class ObjectTypesSchema extends ObjectSchema {
   /**
+   * Holds the type or base type associated with the defined schema.
+   *
+   * @author paouelle
+   */
+  @JsonIgnore
+  private JavaType javaType;
+
+  /**
    * Holds the type or sub-types associated with the defined schema.
    *
    * @author paouelle
    */
   @JsonIgnore
-  private final Set<JavaType> types;
+  private final Set<JavaType> javaTypes;
 
   /**
    * Instantiates a new <code>ObjectTypesSchema</code> object.
@@ -55,7 +63,8 @@ public class ObjectTypesSchema extends ObjectSchema {
    */
   public ObjectTypesSchema(ObjectTypesSchema schema) {
     // ObjectTypesSchema
-    this.types = schema.types;
+    this.javaType = schema.javaType;
+    this.javaTypes = schema.javaTypes;
     // JsonSchema
     setId(schema.getId());
     set$ref(schema.get$ref());
@@ -86,7 +95,7 @@ public class ObjectTypesSchema extends ObjectSchema {
    * @author paouelle
    */
   public ObjectTypesSchema() {
-    this.types = new LinkedHashSet<>(16);
+    this.javaTypes = new LinkedHashSet<>(16);
   }
 
   /**
@@ -96,17 +105,29 @@ public class ObjectTypesSchema extends ObjectSchema {
    *
    * @param jtype the Java type defined by this schema
    */
-  public void setTypesFor(JavaType jtype) {
+  public void setJavaTypesFor(JavaType jtype) {
     if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
       jtype = jtype.getReferencedType();
     }
-    types.clear();
+    this.javaType = jtype;
+    javaTypes.clear();
     ReferenceTypesSchema.getJsonSubTypesFrom(jtype.getRawClass())
       .map(c -> SimpleType.construct(c))
-      .forEach(t -> types.add(t));
-    if (types.isEmpty()) {
-      types.add(jtype);
+      .forEach(t -> javaTypes.add(t));
+    if (javaTypes.isEmpty()) {
+      javaTypes.add(jtype);
     }
+  }
+
+  /**
+   * Gets the type or base type associated with the defined schema.
+   *
+   * @author paouelle
+   *
+   * @return the type or base type associated with the defined schema
+   */
+  public JavaType getJavaType() {
+    return javaType;
   }
 
   /**
@@ -116,8 +137,8 @@ public class ObjectTypesSchema extends ObjectSchema {
    *
    * @return the type or sub-types associated with the defined schema
    */
-  public Set<JavaType> getTypes() {
-    return types;
+  public Set<JavaType> getJavaTypes() {
+    return javaTypes;
   }
 
   /**

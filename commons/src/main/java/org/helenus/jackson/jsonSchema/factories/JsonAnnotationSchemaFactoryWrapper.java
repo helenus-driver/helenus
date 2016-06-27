@@ -693,8 +693,8 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     }
     final ObjectVisitor visitor = (ObjectVisitor)super.expectObjectFormat(type);
 
-    if (visitor.getSchema() instanceof ObjectTypesSchema) {
-      ((ObjectTypesSchema)visitor.getSchema()).setTypesFor(type);
+    if (visitor.getSchema() instanceof ObjectTypesSchema) { // should always be true
+      ((ObjectTypesSchema)visitor.getSchema()).setJavaTypesFor(type);
     }
     final SerializerProvider p = getProvider();
     final Class<?> view = (p != null) ? p.getActiveView() : null;
