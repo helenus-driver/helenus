@@ -77,6 +77,7 @@ import com.fasterxml.jackson.module.jsonSchema.factories.ObjectVisitor;
 import com.fasterxml.jackson.module.jsonSchema.factories.ObjectVisitorDecorator;
 import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 import com.fasterxml.jackson.module.jsonSchema.factories.StringVisitor;
+import com.fasterxml.jackson.module.jsonSchema.factories.Visitor;
 import com.fasterxml.jackson.module.jsonSchema.factories.VisitorContext;
 import com.fasterxml.jackson.module.jsonSchema.factories.WrapperFactory;
 import com.fasterxml.jackson.module.jsonSchema.types.ArraySchema;
@@ -675,7 +676,56 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     if (visitorContext == null) {
       super.visitorContext = new JsonAnnotationVisitorContext();
     }
-    return super.expectArrayFormat(type);
+    final ArrayVisitor visitor = (ArrayVisitor)super.expectArrayFormat(type);
+    final ArraySchema aschema = (ArraySchema)visitor.getSchema();
+
+    return new ArrayVisitor(visitor.getProvider(), aschema, visitor.getWrapperFactory()) {
+      @Override
+      public SerializerProvider getProvider() {
+        return visitor.getProvider();
+      }
+      @Override
+      public void setProvider(SerializerProvider provider) {
+        visitor.setProvider(provider);
+      }
+      @Override
+      public void itemsFormat(JsonFormatVisitable handler, JavaType elementType)
+        throws JsonMappingException {
+        visitor.itemsFormat(handler, elementType);
+        final ArraySchema.SingleItems items = (ArraySchema.SingleItems)aschema.getItems();
+        final JsonSchema ischema = items.getSchema();
+
+        if (ischema instanceof ReferenceSchema) {
+          // make sure we are always returning ref types schema
+          if (!(ischema instanceof ReferenceTypesSchema)) {
+            items.setSchema(
+              new ReferenceTypesSchema((ReferenceSchema)ischema, elementType)
+            );
+          }
+        }
+      }
+      @Override
+      public void itemsFormat(JsonFormatTypes format)
+        throws JsonMappingException {
+        visitor.itemsFormat(format);
+      }
+      @Override
+      public JsonSchema getSchema() {
+        return visitor.getSchema();
+      }
+      @Override
+      public WrapperFactory getWrapperFactory() {
+        return visitor.getWrapperFactory();
+      }
+      @Override
+      public void setWrapperFactory(WrapperFactory wrapperFactory) {
+        visitor.setWrapperFactory(wrapperFactory);
+      }
+      @Override
+      public Visitor setVisitorContext(VisitorContext rvc) {
+        return visitor.setVisitorContext(rvc);
+      }
+    };
   }
 
   /**
@@ -806,6 +856,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
                 );
               }
             }
+          }
+        }
+        if (schema instanceof ReferenceSchema) {
+          // make sure we are always returning ref types schema
+          if (!(schema instanceof ReferenceTypesSchema)) {
+            schema = new ReferenceTypesSchema((ReferenceSchema)schema, writer.getType());
+            properties.put(writer.getName(), schema);
           }
         }
         return schema;
