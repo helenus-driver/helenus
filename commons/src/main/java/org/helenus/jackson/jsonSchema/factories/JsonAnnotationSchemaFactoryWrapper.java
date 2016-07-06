@@ -688,21 +688,42 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
       public void setProvider(SerializerProvider provider) {
         visitor.setProvider(provider);
       }
+      @SuppressWarnings("synthetic-access")
       @Override
       public void itemsFormat(JsonFormatVisitable handler, JavaType elementType)
         throws JsonMappingException {
         visitor.itemsFormat(handler, elementType);
-        final ArraySchema.SingleItems items = (ArraySchema.SingleItems)aschema.getItems();
-        final JsonSchema ischema = items.getSchema();
+        final ArraySchema.Items items = aschema.getItems();
 
-        if (ischema instanceof ReferenceSchema) {
-          // make sure we are always returning ref types schema
-          if (!(ischema instanceof ReferenceTypesSchema)) {
-            items.setSchema(
-              new ReferenceTypesSchema((ReferenceSchema)ischema, elementType)
-            );
+        if (items instanceof ArraySchema.SingleItems) {
+          final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
+          final JsonSchema ischema = sitems.getSchema();
+
+          if (ischema instanceof ReferenceSchema) {
+            // make sure we are always returning ref types schema
+            if (!(ischema instanceof ReferenceTypesSchema)) {
+              sitems.setSchema(
+                new ReferenceTypesSchema((ReferenceSchema)ischema, elementType)
+              );
+            }
           }
-        }
+        } else if (items instanceof ArraySchema.ArrayItems) {
+          final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)aschema.getItems();
+          final JsonSchema[] ischemas = aitems.getJsonSchemas();
+
+          for (int i = 0; i < ischemas.length; i++) {
+            // make sure we are always returning ref types schema
+            if (!(ischemas[i] instanceof ReferenceTypesSchema)) {
+              ischemas[i] = new ReferenceTypesSchema(
+                (ReferenceSchema)ischemas[i], elementType
+              );
+            }
+          }
+        } // else (items == null) {
+        // for some stupid reason, the schema factory we are extending decided
+        // it would be a good idea to null instead of an any schema!!!!!
+        // so normally we should return an any schema
+        aschema.setItemsSchema(schemaProvider.anySchema());
       }
       @Override
       public void itemsFormat(JsonFormatTypes format)

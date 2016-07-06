@@ -100,6 +100,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @return the schema for the map keys
    */
+  @JsonIgnore
   public JsonSchema getKeysSchema() {
     return getAdditionalProperties().getKeysSchema();
   }
@@ -111,6 +112,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @param keys the schema for the map keys
    */
+  @JsonIgnore
   public void setKeysSchema(JsonSchema keys) {
     getAdditionalProperties().setKeysSchema(keys);
   }
@@ -122,6 +124,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @return the type for the map keys
    */
+  @JsonIgnore
   public JavaType getKeysType() {
     return getAdditionalProperties().getKeysType();
   }
@@ -133,6 +136,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @param keys the type for the map keys
    */
+  @JsonIgnore
   public void setKeysType(JavaType keys) {
     getAdditionalProperties().setKeysType(keys);
   }
@@ -144,6 +148,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @return the schema for the map values
    */
+  @JsonIgnore
   public JsonSchema getValuesSchema() {
     return getAdditionalProperties().getValuesSchema();
   }
@@ -155,6 +160,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @param values the schema for the map values
    */
+  @JsonIgnore
   public void setValuesSchema(JsonSchema values) {
     getAdditionalProperties().setValuesSchema(values);
   }
@@ -166,6 +172,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @return the type for the map values
    */
+  @JsonIgnore
   public JavaType getValuesType() {
     return getAdditionalProperties().getValuesType();
   }
@@ -177,6 +184,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
    *
    * @param values the type for the map values
    */
+  @JsonIgnore
   public void setValuesType(JavaType values) {
     getAdditionalProperties().setValuesType(values);
   }
@@ -233,6 +241,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @return the schema for the map keys
      */
+    @JsonIgnore
     public JsonSchema getKeysSchema() {
       return keysSchema;
     }
@@ -244,6 +253,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @param keys the schema for the map keys
      */
+    @JsonIgnore
     public void setKeysSchema(JsonSchema keys) {
       this.keysSchema = keys;
     }
@@ -255,6 +265,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @return the type for the map keys
      */
+    @JsonIgnore
     public JavaType getKeysType() {
       return keysType;
     }
@@ -266,6 +277,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @param keys the type for the map keys
      */
+    @JsonIgnore
     public void setKeysType(JavaType keys) {
       this.keysType = keys;
     }
@@ -277,6 +289,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @return the schema for the map values
      */
+    @JsonIgnore
     public JsonSchema getValuesSchema() {
       return valuesSchema;
     }
@@ -288,6 +301,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @param values the schema for the map values
      */
+    @JsonIgnore
     public void setValuesSchema(JsonSchema values) {
       this.valuesSchema = values;
     }
@@ -299,6 +313,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @return the type for the map values
      */
+    @JsonIgnore
     public JavaType getValuesType() {
       return valuesType;
     }
@@ -310,6 +325,7 @@ public class MapTypesSchema extends ObjectTypesSchema {
      *
      * @param values the type for the map values
      */
+    @JsonIgnore
     public void setValuesType(JavaType values) {
       this.valuesType = values;
     }
