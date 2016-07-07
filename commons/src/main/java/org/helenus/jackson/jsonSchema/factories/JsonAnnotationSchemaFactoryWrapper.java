@@ -719,11 +719,12 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
               );
             }
           }
-        } // else (items == null) {
-        // for some stupid reason, the schema factory we are extending decided
-        // it would be a good idea to null instead of an any schema!!!!!
-        // so normally we should return an any schema
-        aschema.setItemsSchema(schemaProvider.anySchema());
+        } else { // (items == null)
+          // for some stupid reason, the schema factory we are extending decided
+          // it would be a good idea to null instead of an any schema!!!!!
+          // so normally we should return an any schema
+          aschema.setItemsSchema(schemaProvider.anySchema());
+        }
       }
       @Override
       public void itemsFormat(JsonFormatTypes format)
