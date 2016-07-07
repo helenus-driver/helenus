@@ -26,7 +26,7 @@ import com.fasterxml.jackson.annotation.JacksonAnnotation;
 /**
  * The <code>JsonPropertyValueDescription</code> annotation is used to provide a
  * human readable description for the annotated property contained values inside
- * a map.
+ * a map or an array.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *

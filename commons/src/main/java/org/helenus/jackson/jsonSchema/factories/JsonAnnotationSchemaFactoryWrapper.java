@@ -315,7 +315,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
    * @param filteredEnumKeyValues the set of enum key values to use when filtering default
    *        and enum values for the various map keys of the schema
    * @param which <code>true</code> if we are updating the schema for keys;
-   *        <code>false</code> for map values and <code>null</code> for standard
+   *        <code>false</code> for map or array values and <code>null</code> for standard
    *        property
    */
   void updateSchema(
@@ -330,7 +330,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     JavaType jtype = prop.getType();
 
     if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
-      jtype = jtype.getReferencedType();
+      jtype = jtype.containedType(0); // jtype.getReferencedType() always return null :-(
     }
     if (cschema == null) { // not on keys/values; only on container
       final JsonPropertyReadOnly aro = prop.getAnnotation(JsonPropertyReadOnly.class);
@@ -546,13 +546,13 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
         final ArraySchema.ArrayItems aitems = (ArraySchema.ArrayItems)items;
 
         for (final JsonSchema ischema: aitems.getJsonSchemas()) {
-          updateSchema(schema, ischema, prop, filteredEnumValues, filteredEnumKeyValues, null);
+          updateSchema(schema, ischema, prop, filteredEnumValues, filteredEnumKeyValues, false);
         }
       } else if (items.isSingleItems()) {
         final ArraySchema.SingleItems sitems = (ArraySchema.SingleItems)items;
         final JsonSchema ischema = sitems.getSchema();
 
-        updateSchema(schema, ischema, prop, filteredEnumValues, filteredEnumKeyValues, null);
+        updateSchema(schema, ischema, prop, filteredEnumValues, filteredEnumKeyValues, false);
       }
     } else if (schema.isNumberSchema()) {
       final NumberSchema nschema = schema.asNumberSchema();
@@ -1002,6 +1002,9 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 //        if (type.getRawClass().getSimpleName().equals("RoleMap")) {
 //          System.out.println("**************** HERE HERE HERE OPROPS: " + writer.getName() + " RoleMap - " + schema);
 //        }
+//          if (writer.getName().equals("groups")) {
+//            System.out.println("*** GROUPS");
+//          }
         if (isIncluded(writer)) {
           ((JsonAnnotationVisitorContext)visitorContext).withEnumValuesDo(
             getPropertyEnumValues(schema, writer, false),
@@ -1023,6 +1026,9 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 //          System.out.println("**************** HERE HERE HERE PROPS 1: " + writer.getName() + " RoleMap - This: " + schema);
 //        } else if (type.getRawClass().getSimpleName().equals("Restrictions")) {
 //          System.out.println("**************** HERE HERE HERE PROPS 1: " + writer.getName() + " Restrictions - This: " + schema);
+//        }
+//        if (writer.getName().equals("groups")) {
+//          System.out.println("*** GROUPS");
 //        }
         if (isIncluded(writer)) {
           ((JsonAnnotationVisitorContext)visitorContext).withEnumValuesDo(
