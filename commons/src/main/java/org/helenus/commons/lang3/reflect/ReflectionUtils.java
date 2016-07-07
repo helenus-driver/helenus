@@ -18,8 +18,10 @@ package org.helenus.commons.lang3.reflect;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
+import java.util.stream.Stream;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
@@ -1069,9 +1072,87 @@ public class ReflectionUtils {
   }
 
   /**
-   * Gets the <code>Class&lt;?&gt;[]</code> element value of the annotation associated
-   * with the specified element if any. If there is no annotation of the given
-   * type associated with the element, an empty array is returned.
+   * Gets annotations of a specific that are <em>associated</em> with the element.
+   * <p>
+   * If there are no annotations <em>associated</em> with this element, the return
+   * value is an empty stream.
+   * <p>
+   * The difference between this method and
+   * {@link ReflectionUtils#getAnnotation(Element, Class)} is that this method
+   * detects if its argument is a <em>repeatable annotation type</em> (JLS 9.6),
+   * and if so, attempts to find one or more annotations of that type by
+   * "looking through" a container annotation.
+   * <p>
+   * The caller of this method is free to modify the returned array; it will
+   * have no effect on the arrays returned to other callers.
+   * <p>
+   *
+   * @param <T> the type of the annotation to query for and return if present
+   *
+   * @param  annotatedElement the element to retrieve the annotations from
+   * @param  annotationClass the type of annotations to retrieve
+   * @return a stream of the element's annotations for the specified annotation
+   *         type if present on this element, else an empty stream
+   * @throws NullPointerException if the given element or annotation class are
+   *         <code>null</code>
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  @SuppressWarnings("unchecked")
+  public static <T extends Annotation> Stream<T> annotationsByType(
+    Element annotatedElement, Class<T> annotationClass
+  ) {
+    final String aname = annotationClass.getName();
+
+    return annotatedElement.getAnnotationMirrors().stream()
+      .filter(am -> aname.equals(am.getAnnotationType().toString()))
+      .map(am -> (T)java.lang.reflect.Proxy.newProxyInstance(
+        annotationClass.getClassLoader(),
+        new Class<?>[] { annotationClass },
+        new AnnotationProxy(am)
+      ));
+  }
+
+  /**
+   * Gets annotations of a specific that are <em>associated</em> with the element.
+   * <p>
+   * If there are no annotations <em>associated</em> with this element, the return
+   * value is an array of length 0.
+   * <p>
+   * The difference between this method and
+   * {@link ReflectionUtils#getAnnotation(Element, Class)} is that this method
+   * detects if its argument is a <em>repeatable annotation type</em> (JLS 9.6),
+   * and if so, attempts to find one or more annotations of that type by
+   * "looking through" a container annotation.
+   * <p>
+   * The caller of this method is free to modify the returned array; it will
+   * have no effect on the arrays returned to other callers.
+   * <p>
+   *
+   * @param <T> the type of the annotation to query for and return if present
+   *
+   * @param  annotatedElement the element to retrieve the annotations from
+   * @param  annotationClass the type of annotations to retrieve
+   * @return an array of the element's annotations for the specified annotation
+   *         type if present on this element, else an empty array
+   * @throws NullPointerException if the given element or annotation class are
+   *         <code>null</code>
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  @SuppressWarnings("unchecked")
+  public static <T extends Annotation> T[] getAnnotationsByType(
+    Element annotatedElement, Class<T> annotationClass
+  ) {
+    return ReflectionUtils.annotationsByType(annotatedElement, annotationClass)
+      .toArray(size -> (T[])Array.newInstance(annotationClass, size));
+  }
+
+  /**
+   * Gets the specified element's annotation for the specified type if such an
+   * annotation is <em>present</em>, else <code>null</code> where classes
+   * referenced from the annotation are properly resolved and will not generate
+   * a compile-time mirror exception.
    * <p>
    * This method is useful when dealing with annotations in a processing
    * environment where Javac does not load classes in the normal manner. In fact
@@ -1080,41 +1161,23 @@ public class ReflectionUtils {
    *
    * @author paouelle
    *
-   * @param  annotatedElement the element to retrieve the annotation's element
-   *         value from
-   * @param  annotationClass the type of annotations to retrieve
-   * @param  element the name of the element to retrieve (a.k.a the annotation
-   *         class method name
-   * @return the array of classes for the annotation's element of the annotated
-   *         element
-   * @throws ClassNotFoundException if unable to locate a referenced class
+   * @param <T> the type of the annotation to query for and return if present
+   *
+   * @param  annotatedElement the element to retrieve the annotation from
+   * @param  annotationClass the type of annotation to retrieve
+   * @return the element's annotation for the specified annotation type if
+   *         present on this element, else <code>null</code>
+   * @throws NullPointerException if the given element or annotation class are
+   *         <code>null</code>
    *
    * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
    */
-  public static Class<?>[] getAnnotationClassArrayElementValueByType(
-    Element annotatedElement,
-    Class<? extends Annotation> annotationClass,
-    String element
-  ) throws ClassNotFoundException {
-    final String aname = annotationClass.getName();
-
-    for (final AnnotationMirror am: annotatedElement.getAnnotationMirrors()) {
-      if (aname.equals(am.getAnnotationType().toString())) {
-        for (final Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> e: am.getElementValues().entrySet()) {
-          if (element.equals(e.getKey().getSimpleName().toString())) {
-            final List<AnnotationValue> list = List.class.cast(e.getValue().getValue());
-            final Class<?>[] classes = new Class<?>[list.size()];
-            int i = 0;
-
-            for (final AnnotationValue av: list) {
-              classes[i++] = Class.forName(av.getValue().toString());
-            }
-            return classes;
-          }
-        }
-      }
-    }
-    return new Class<?>[0];
+  public static <T extends Annotation> T getAnnotation(
+    Element annotatedElement, Class<T> annotationClass
+  ) {
+    return ReflectionUtils.annotationsByType(annotatedElement, annotationClass)
+      .findFirst()
+      .orElse(null);
   }
 
   /**
@@ -1128,3 +1191,81 @@ public class ReflectionUtils {
     throw new IllegalStateException("invalid constructor called");
   }
 }
+
+/**
+ * The <code>AnnotationProxy</code> class provides a definition for a dynamic
+ * proxy used when dynamically creating annotation instances to go around the
+ * annotation processor issues with annotations that contains classes as returned
+ * types for its elements.
+ *
+ * @copyright 2015-2016 The Helenus Driver Project Authors
+ *
+ * @author  The Helenus Driver Project Authors
+ * @version 1 - Jul 7, 2016 - paouelle - Creation
+ *
+ * @since 1.0
+ */
+class AnnotationProxy implements InvocationHandler {
+  /**
+   * Holds the annotation mirror this object is a proxy for.
+   *
+   * @author paouelle
+   */
+  private final AnnotationMirror am;
+
+  /**
+   * Instantiates a new <code>AnnotationProxy</code> object.
+   *
+   * @author paouelle
+   *
+   * @param am the annotation mirror for which we are creating a proxy
+   */
+  AnnotationProxy(AnnotationMirror am) {
+    this.am = am;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.reflect.InvocationHandler#invoke(java.lang.Object, java.lang.reflect.Method, java.lang.Object[])
+   */
+  @Override
+  public java.lang.Object invoke(
+    java.lang.Object proxy,
+    Method method,
+    java.lang.Object[] args
+  ) throws Throwable {
+    final Class<?> rclass = method.getReturnType();
+    final String name = method.getName();
+
+    //System.err.print(">>> M: " + method.getDeclaringClass().getSimpleName() + "." + name);
+    for (final Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> e: am.getElementValues().entrySet()) {
+      if (name.equals(e.getKey().getSimpleName().toString())) {
+        final AnnotationValue eav = e.getValue();
+
+        if (Class.class.isAssignableFrom(rclass)) {
+          //System.err.println(" -> class, eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue().toString());
+          return Class.forName(eav.getValue().toString());
+        } else if (Class[].class.isAssignableFrom(rclass)) {
+          //System.err.println(" -> class[], eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue().toString());
+          final List<AnnotationValue> list = List.class.cast(eav.getValue());
+          final Class<?>[] classes = new Class<?>[list.size()];
+          int i = 0;
+
+          for (final AnnotationValue av: list) {
+            classes[i++] = Class.forName(av.getValue().toString());
+          }
+          return classes;
+        }
+        //System.err.println(" -> ?, eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue());
+        return eav.getValue();
+      }
+    }
+    // fallback to default defined in annotation class
+    //System.err.println(" -> default: " + method.getDefaultValue());
+    return method.getDefaultValue();
+  }
+}
+
