@@ -97,7 +97,7 @@
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
-
+    
     <dependency>
       <groupId>org.helenus</groupId>
       <artifactId>helenus-commons</artifactId>

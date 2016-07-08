@@ -656,7 +656,12 @@
 	<version>${servlet-api-version}</version>
 	<scope>provided</scope>
       </dependency>
-      
+      <dependency>
+	<groupId>org.javassist</groupId>
+	<artifactId>javassist</artifactId>
+	<version>${javassist-version}</version>
+      </dependency>      
+ 
       <!-- Static analysis -->
       <dependency>
 	<groupId>com.google.code.findbugs</groupId>
@@ -668,12 +673,7 @@
 	<artifactId>annotations</artifactId>
 	<version>${findbugs-version}</version>
       </dependency>
-      <dependency>
-	<groupId>org.javassist</groupId>
-	<artifactId>javassist</artifactId>
-	<version>${javassist-version}</version>
-      </dependency>      
-      
+    
       <!-- JUnit test and mock libraries -->
       <dependency>
 	<groupId>org.hamcrest</groupId>
