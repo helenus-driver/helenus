@@ -1072,20 +1072,11 @@ public class ReflectionUtils {
   }
 
   /**
-   * Gets annotations of a specific that are <em>associated</em> with the element.
+   * Gets annotations of a specific type that are <em>associated</em> with the
+   * element.
    * <p>
    * If there are no annotations <em>associated</em> with this element, the return
    * value is an empty stream.
-   * <p>
-   * The difference between this method and
-   * {@link ReflectionUtils#getAnnotation(Element, Class)} is that this method
-   * detects if its argument is a <em>repeatable annotation type</em> (JLS 9.6),
-   * and if so, attempts to find one or more annotations of that type by
-   * "looking through" a container annotation.
-   * <p>
-   * The caller of this method is free to modify the returned array; it will
-   * have no effect on the arrays returned to other callers.
-   * <p>
    *
    * @param <T> the type of the annotation to query for and return if present
    *
@@ -1111,6 +1102,163 @@ public class ReflectionUtils {
         new Class<?>[] { annotationClass },
         new AnnotationProxy(am)
       ));
+  }
+
+  /**
+   * Gets annotations which are themselves annotated with a given type of
+   * annotation that are <em>present</em> on the element.
+   * <p>
+   * If there are no annotations <em>present</em> on the element, the return
+   * value is an empty stream.
+   * <p>
+   * For example, one could find all annotations annotated with the &#64;Tag
+   * annotation, which in the following examples would return &#64;ThisOne and
+   * &#64;ThisOneToo annotations but not &#64;NotThisOne:
+   * <p><pre>
+   *   &#64;Tag
+   *   public &#64;interface ThisOne {
+   *      String value();
+   *   }
+   *
+   *   &#64;Tag
+   *   public &#64;interface ThisOneToo {
+   *      String value();
+   *   }
+   *
+   *   public &#64;interface NotThisOne {
+   *      String value();
+   *   }
+   * </pre>
+   *
+   * @param  annotatedElement the element to retrieve the annotations from
+   * @param  annotationClass the type of annotations to retrieve annotations
+   *         annotated with
+   * @return a stream of the element's annotations annotated with the specified
+   *         annotation type if present on this element, else an empty stream
+   * @throws NullPointerException if the given element or annotation class are
+   *         <code>null</code>
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  public static Stream<Annotation> annotationsAnnotatedWith(
+    Element annotatedElement, Class<? extends Annotation> annotationClass
+  ) {
+    return annotatedElement.getAnnotationMirrors().stream()
+      .map(am -> {
+        try {
+          final Class<?> aclass = Class.forName(am.getAnnotationType().toString());
+
+          if (!aclass.isAnnotationPresent(annotationClass)) {
+            return null;
+          }
+          return (Annotation)java.lang.reflect.Proxy.newProxyInstance(
+            aclass.getClassLoader(),
+            new Class<?>[] { aclass },
+            new AnnotationProxy(am)
+          );
+        } catch (ClassNotFoundException e) {
+          throw new IllegalStateException(
+            "annotation class not found: " + am.getAnnotationType(), e
+          );
+        }
+      })
+      .filter(a -> a != null);
+  }
+
+  /**
+   * Gets annotations that are <em>present</em> on the element.
+   * <p>
+   * If there are no annotations <em>present</em> on the element, the return
+   * value is an empty stream.
+   *
+   * @param  annotatedElement the element to retrieve the annotations from
+   * @return a stream of annotations present on the element
+   * @throws NullPointerException if the given element is <code>null</code>
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  public static Stream<Annotation> annotations(Element annotatedElement) {
+    return annotatedElement.getAnnotationMirrors().stream()
+      .map(am -> {
+        try {
+          final Class<?> aclass = Class.forName(am.getAnnotationType().toString());
+
+          return (Annotation)java.lang.reflect.Proxy.newProxyInstance(
+            aclass.getClassLoader(),
+            new Class<?>[] { aclass },
+            new AnnotationProxy(am)
+          );
+        } catch (ClassNotFoundException e) {
+          throw new IllegalStateException(
+            "annotation class not found: " + am.getAnnotationType(), e
+          );
+        }
+      });
+  }
+
+  /**
+   * Gets annotations which are themselves annotated with a given type of
+   * annotation that are <em>present</em> on the element.
+   * <p>
+   * If there are no annotations <em>present</em> on the element, the return
+   * value is an array of length 0.
+   * <p>
+   * For example, one could find all annotations annotated with the &#64;Tag
+   * annotation, which in the following examples would return &#64;ThisOne and
+   * &#64;ThisOneToo annotations but not &#64;NotThisOne:
+   * <p><pre>
+   *   &#64;Tag
+   *   public &#64;interface ThisOne {
+   *      String value();
+   *   }
+   *
+   *   &#64;Tag
+   *   public &#64;interface ThisOneToo {
+   *      String value();
+   *   }
+   *
+   *   public &#64;interface NotThisOne {
+   *      String value();
+   *   }
+   * </pre>
+   *
+   * @param  annotatedElement the element to retrieve the annotations from
+   * @param  annotationClass the type of annotations to retrieve annotations
+   *         annotated with
+   * @return an array of the element's annotations annotated with the specified
+   *         annotation type if present on this element, else an array of length
+   *         0
+   * @throws NullPointerException if the given element or annotation class are
+   *         <code>null</code>
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  public static Annotation[] getAnnotationsAnnotatedWith(
+    Element annotatedElement, Class<? extends Annotation> annotationClass
+  ) {
+    return ReflectionUtils.annotationsAnnotatedWith(annotatedElement, annotationClass)
+      .toArray(Annotation[]::new);
+  }
+
+  /**
+   * Gets annotations that are <em>present</em> on the element.
+   * <p>
+   * If there are no annotations <em>present</em> on the element, the return
+   * value is an array of length 0.
+   * <p>
+   * The caller of this method is free to modify the returned array; it will
+   * have no effect on the arrays returned to other callers.
+   *
+   * @param  annotatedElement the element to retrieve the annotations from
+   * @return an array of annotations present on the element, else an array of
+   *         length 0
+   * @throws NullPointerException if the given element is <code>null</code>
+   *
+   * @see <a href="https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/">https://blog.retep.org/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor/</a>
+   */
+  public static Annotation[] getAnnotations(Element annotatedElement) {
+    return ReflectionUtils.annotations(annotatedElement)
+        .toArray(Annotation[]::new);
   }
 
   /**
