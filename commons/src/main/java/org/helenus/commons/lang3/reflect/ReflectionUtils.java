@@ -1157,9 +1157,9 @@ public class ReflectionUtils {
             new AnnotationProxy(am)
           );
         } catch (ClassNotFoundException e) {
-          throw new IllegalStateException(
-            "annotation class not found: " + am.getAnnotationType(), e
-          );
+          // ignore it as it will most likely be an annotation defined within
+          // the current compilation unit which means we do not have a class for them anyway
+          return null;
         }
       })
       .filter(a -> a != null);
@@ -1189,11 +1189,12 @@ public class ReflectionUtils {
             new AnnotationProxy(am)
           );
         } catch (ClassNotFoundException e) {
-          throw new IllegalStateException(
-            "annotation class not found: " + am.getAnnotationType(), e
-          );
+          // ignore it as it will most likely be an annotation defined within
+          // the current compilation unit which means we do not have a class for them anyway
+          return null;
         }
-      });
+      })
+      .filter(a -> a != null);
   }
 
   /**
@@ -1396,16 +1397,23 @@ class AnnotationProxy implements InvocationHandler {
         if (Class.class.isAssignableFrom(rclass)) {
           //System.err.println(" -> class, eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue().toString());
           return Class.forName(eav.getValue().toString());
-        } else if (Class[].class.isAssignableFrom(rclass)) {
-          //System.err.println(" -> class[], eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue().toString());
+        } else if (rclass.isArray() && (eav.getValue() instanceof List)) {
+          // why couldn't the damn compiler just return arrays!!!!!
           final List<AnnotationValue> list = List.class.cast(eav.getValue());
-          final Class<?>[] classes = new Class<?>[list.size()];
+          final Object array = Array.newInstance(rclass.getComponentType(), list.size());
           int i = 0;
 
-          for (final AnnotationValue av: list) {
-            classes[i++] = Class.forName(av.getValue().toString());
+          for (final Object o: list) {
+            final Object av = ((AnnotationValue)o).getValue();
+
+            if (Class.class.isAssignableFrom(rclass.getComponentType())) {
+              // special case since classes are not returned here!!!!
+              Array.set(array, i++, Class.forName(av.toString()));
+            } else {
+              Array.set(array, i++, av);
+            }
           }
-          return classes;
+          return array;
         }
         //System.err.println(" -> ?, eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue());
         return eav.getValue();
