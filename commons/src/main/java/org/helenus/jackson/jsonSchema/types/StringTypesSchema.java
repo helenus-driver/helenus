@@ -15,10 +15,18 @@
  */
 package org.helenus.jackson.jsonSchema.types;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import java.time.ZoneId;
 
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
@@ -100,6 +108,80 @@ public class StringTypesSchema extends StringSchema {
     setTitle(schema.getTitle());
     setPathStart(schema.getPathStart());
     setLinks(schema.getLinks());
+  }
+
+  /**
+   * Instantiates a new <code>StringTypesSchema</code> object.
+   *
+   * @author paouelle
+   *
+   * @param schema the string schema for which to create a string one
+   * @param jtype the corresponding Java type
+   */
+  public StringTypesSchema(StringSchema schema, JavaType jtype) {
+    Set<JavaType> jtypes = null;
+
+    // ReferenceTypesSchema
+    if (schema instanceof StringTypesSchema) {
+      this.javaType = ((StringTypesSchema)schema).getJavaType();
+      jtypes = ((StringTypesSchema)schema).getJavaTypes();
+    }
+    if (javaType == null) {
+      if (jtype == null) {
+        jtypes = Collections.emptySet();
+      } else {
+        if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
+          jtype = jtype.getReferencedType();
+        }
+        this.javaType = jtype;
+        jtypes = ReferenceTypesSchema.getJsonSubTypesFrom(jtype.getRawClass())
+          .map(c -> SimpleType.construct(c))
+          .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (jtypes.isEmpty()) {
+          jtypes.add(jtype);
+        }
+      }
+    }
+    this.javaTypes = jtypes;
+    // JsonSchema
+    setId(schema.getId());
+    set$ref(schema.get$ref());
+    set$schema(schema.get$schema());
+    setDisallow(schema.getDisallow());
+    setExtends(schema.getExtends());
+    setRequired(schema.getRequired());
+    setReadonly(schema.getReadonly());
+    setDescription(schema.getDescription());
+    // SimpleTypeSchema
+    setDefault(schema.getDefault());
+    setTitle(schema.getTitle());
+    setPathStart(schema.getPathStart());
+    setLinks(schema.getLinks());
+    // ValuetypeSchema
+    getEnums().addAll(schema.getEnums());
+    setFormat(schema.getFormat());
+    // StringSchema
+    setMaxLength(schema.getMaxLength());
+    setMinLength(schema.getMinLength());
+    setPattern(schema.getPattern());
+    // ----
+    if (jtype != null) {
+      if (Locale.class.isAssignableFrom(jtype.getRawClass())) {
+        setPattern("^([a-zA-Z]{2,8}(_[a-zA-Z]{2}|[0-9]{3})?([-_]([0-9][0-9a-zA-Z]{3}|[0-9a-zA-Z]{5,8}))?)?$");
+      } else if (ZoneId.class.isAssignableFrom(jtype.getRawClass())) {
+        setEnums(
+          Stream.of(TimeZone.getAvailableIDs())
+            .collect(Collectors.toCollection(TreeSet::new))
+        );
+      } else if (UUID.class.isAssignableFrom(jtype.getRawClass())) {
+        setPattern("^(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
+      } else if (Class.class.isAssignableFrom(jtype.getRawClass())) {
+        setPattern("\\p{ASCII}+");
+      } else if (jtype.isArrayType()
+          && jtype.getContentType().getRawClass().equals(byte.class)) {
+        setPattern("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$");
+      }
+    }
   }
 
   /**

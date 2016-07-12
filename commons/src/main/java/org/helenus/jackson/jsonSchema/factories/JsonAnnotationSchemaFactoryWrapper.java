@@ -31,9 +31,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.TimeZone;
-import java.util.TreeSet;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -627,18 +624,6 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
             clazz = jtype.getContentType().getRawClass();
           }
         }
-        if (Locale.class.isAssignableFrom(clazz)) {
-          sschema.setPattern("^([a-zA-Z]{2,8}(_[a-zA-Z]{2}|[0-9]{3})?([-_]([0-9][0-9a-zA-Z]{3}|[0-9a-zA-Z]{5,8}))?)?$   # Java Locale");
-        } else if (ZoneId.class.isAssignableFrom(clazz)) {
-          sschema.setEnums(
-            Stream.of(TimeZone.getAvailableIDs())
-              .collect(Collectors.toCollection(TreeSet::new))
-          );
-        } else if (UUID.class.isAssignableFrom(clazz)) {
-          sschema.setPattern("^(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$   # UUID");
-        } else if (Class.class.isAssignableFrom(clazz)) {
-          sschema.setPattern("\\p{ASCII}+   # ascii");
-        }
       }
     }
   }
@@ -655,9 +640,9 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     this.type = type;
     if (type.getContentType().getRawClass().equals(byte.class)) {
       // special case to handle byte[] serialized as string and not string[]
-      final StringVisitor visitor = (StringVisitor)super.expectStringFormat(type);
+      final StringVisitor visitor = (StringVisitor)expectStringFormat(type);
 
-      visitor.getSchema().setPattern("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$   # Base64");
+      super.schema = visitor.getSchema();
       // :-( we still need to return a fake array visitor
       return new ArrayVisitor(null, null) {
         @Override
@@ -1161,6 +1146,29 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
   @Override
   public JsonAnyFormatVisitor expectAnyFormat(JavaType type) {
     this.type = type;
+//    Set<String> enums = null;
+//    String pattern = null;
+//
+//    // check for special case where we actually want to return a string schema and not an any
+//    if (Locale.class.isAssignableFrom(type.getRawClass())) {
+//      pattern = "^([a-zA-Z]{2,8}(_[a-zA-Z]{2}|[0-9]{3})?([-_]([0-9][0-9a-zA-Z]{3}|[0-9a-zA-Z]{5,8}))?)?$";
+//    } else if (ZoneId.class.isAssignableFrom(type.getRawClass())) {
+//      enums = Stream.of(TimeZone.getAvailableIDs())
+//        .collect(Collectors.toCollection(TreeSet::new));
+//    } else if (UUID.class.isAssignableFrom(type.getRawClass())) {
+//      pattern = "^(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+//    } else if (Class.class.isAssignableFrom(type.getRawClass())) {
+//      pattern = "\\p{ASCII}+";
+//    }
+//    if ((enums != null) || (pattern != null)) {
+//      // :-( we still need to return a fake any visitor
+//      return new AnyVisitor(null) {
+//        @Override
+//        public JsonSchema getSchema() {
+//          return visitor.getSchema();
+//        }
+//      };
+//    }
     return super.expectAnyFormat(type);
   }
 
@@ -1226,7 +1234,15 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
   @Override
   public JsonStringFormatVisitor expectStringFormat(JavaType type) {
     this.type = type;
-    return super.expectStringFormat(type);
+    final JsonStringFormatVisitor visitor = super.expectStringFormat(type);
+
+    if (schema instanceof StringSchema) {
+      final StringTypesSchema sschema = new StringTypesSchema((StringSchema)schema, type);
+
+      super.schema = sschema;
+      return new StringVisitor(sschema);
+    }
+    return visitor;
   }
 
   /**
