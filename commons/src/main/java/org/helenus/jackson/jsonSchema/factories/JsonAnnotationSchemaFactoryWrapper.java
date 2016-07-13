@@ -327,7 +327,7 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
     JavaType jtype = prop.getType();
 
     if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
-      jtype = jtype.containedType(0); // jtype.getReferencedType() always return null :-(
+      jtype = jtype.containedType(0);
     }
     if (cschema == null) { // not on keys/values; only on container
       final JsonPropertyReadOnly aro = prop.getAnnotation(JsonPropertyReadOnly.class);
