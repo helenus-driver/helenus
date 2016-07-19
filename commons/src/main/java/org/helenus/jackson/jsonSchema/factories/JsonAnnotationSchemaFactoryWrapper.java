@@ -1002,6 +1002,10 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
               updateForTypeId(schema, writer);
             }
           );
+          // keep track of underlying property if we can
+          if (getSchema() instanceof ObjectTypesSchema) {
+            ((ObjectTypesSchema)getSchema()).addBeanProperty(writer);
+          }
         }
       }
       @SuppressWarnings("synthetic-access")
@@ -1037,6 +1041,10 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 //              }
             }
           );
+          // keep track of underlying property if we can
+          if (getSchema() instanceof ObjectTypesSchema) {
+            ((ObjectTypesSchema)getSchema()).addBeanProperty(writer);
+          }
         }
       }
     };

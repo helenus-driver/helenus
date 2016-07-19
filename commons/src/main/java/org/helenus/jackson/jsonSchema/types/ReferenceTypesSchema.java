@@ -100,7 +100,7 @@ public class ReferenceTypesSchema extends ReferenceSchema {
     }
     if (javaType == null) {
       if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
-        jtype = jtype.getReferencedType();
+        jtype = jtype.containedType(0);
       }
       this.javaType = jtype;
       jtypes = ReferenceTypesSchema.getJsonSubTypesFrom(jtype.getRawClass())

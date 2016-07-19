@@ -824,7 +824,13 @@ public class HelenusJUnit implements MethodRule {
       System.setProperty("cassandra-foreground", "true");
       System.setProperty("cassandra.native.epoll.enabled", "false"); // JNA doesn't cope with relocated netty
       // create a thread group for all Cassandra threads to be able to detect them
-      HelenusJUnit.group = new ThreadGroup("Cassandra Daemon Group");
+      HelenusJUnit.group = new ThreadGroup("Cassandra Daemon Group") {
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+          logger.error("uncaught exception from cassandra daemon thread '" + t.getName() + "': ", e);
+          super.uncaughtException(t, e);
+        }
+      };
       // startup the cassandra daemon
       final CountDownLatch latch = new CountDownLatch(1);
       final AtomicReference<Throwable> failed = new AtomicReference<>(); // until proven otherwise

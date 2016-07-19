@@ -15,13 +15,16 @@
  */
 package org.helenus.jackson.jsonSchema.types;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.type.SimpleType;
 import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
@@ -55,6 +58,16 @@ public class ObjectTypesSchema extends ObjectSchema {
   private final Set<JavaType> javaTypes;
 
   /**
+   * Keeps track of the underlying annotated bean property for each defined properties
+   * of this object. Properties are considered unordered, the order of the
+   * instance properties may be in any order.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   */
+  @JsonIgnore
+  private final Map<String, BeanProperty> beans;
+
+  /**
    * Instantiates a new <code>ObjectTypesSchema</code> object.
    *
    * @author paouelle
@@ -65,6 +78,7 @@ public class ObjectTypesSchema extends ObjectSchema {
     // ObjectTypesSchema
     this.javaType = schema.javaType;
     this.javaTypes = schema.javaTypes;
+    this.beans = schema.beans;
     // JsonSchema
     setId(schema.getId());
     set$ref(schema.get$ref());
@@ -96,6 +110,7 @@ public class ObjectTypesSchema extends ObjectSchema {
    */
   public ObjectTypesSchema() {
     this.javaTypes = new LinkedHashSet<>(16);
+    this.beans = new LinkedHashMap<>();
   }
 
   /**
@@ -107,7 +122,7 @@ public class ObjectTypesSchema extends ObjectSchema {
    */
   public void setJavaTypesFor(JavaType jtype) {
     if (Optional.class.isAssignableFrom(jtype.getRawClass())) {
-      jtype = jtype.getReferencedType();
+      jtype = jtype.containedType(0);
     }
     this.javaType = jtype;
     javaTypes.clear();
@@ -139,6 +154,31 @@ public class ObjectTypesSchema extends ObjectSchema {
    */
   public Set<JavaType> getJavaTypes() {
     return javaTypes;
+  }
+
+  /**
+   * Gets the underlying bean property that corresponds to the given property name
+   * for this object.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  name the name of the property to retrieve its underlying bean property
+   * @return the corresponding bean property or <code>null</code> if none
+   *         defined or available
+   */
+  public BeanProperty getBeanProperty(String name) {
+    return beans.get(name);
+  }
+
+  /**
+   * Adds the specified bean property as one of this object's properties.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param prop the underlying property to add
+   */
+  public void addBeanProperty(BeanProperty prop) {
+    beans.put(prop.getName(), prop);
   }
 
   /**

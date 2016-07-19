@@ -36,7 +36,7 @@ import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
  *
  * @since 1.0
  */
-public class MapTypesSchema extends ObjectTypesSchema {
+public class MapTypesSchema extends ObjectSchema {
   /**
    * Instantiates a new <code>MapTypesSchema</code> object.
    *
@@ -45,12 +45,41 @@ public class MapTypesSchema extends ObjectTypesSchema {
    * @param  schema the object schema representing the map type to copy
    * @throws IllegalArgumentException if the schema doesn't represent a map
    */
-  public MapTypesSchema(ObjectTypesSchema schema) {
-    super(schema);
+  public MapTypesSchema(ObjectSchema schema) {
     org.apache.commons.lang3.Validate.isTrue(
       schema.getAdditionalProperties() instanceof AdditionalProperties,
       "schema doesn't represent a map"
     );
+    // JsonSchema
+    setId(schema.getId());
+    set$ref(schema.get$ref());
+    set$schema(schema.get$schema());
+    setDisallow(schema.getDisallow());
+    setExtends(schema.getExtends());
+    setRequired(schema.getRequired());
+    setReadonly(schema.getReadonly());
+    setDescription(schema.getDescription());
+    // SimpleTypeSchema
+    setDefault(schema.getDefault());
+    setTitle(schema.getTitle());
+    setPathStart(schema.getPathStart());
+    setLinks(schema.getLinks());
+    // ContainerTypeSchema
+    setEnums(schema.getEnums());
+    setOneOf(schema.getOneOf());
+    // ObjectSchema
+    setAdditionalProperties(schema.getAdditionalProperties());
+    setDependencies(schema.getDependencies());
+    setPatternProperties(schema.getPatternProperties());
+    setProperties(schema.getProperties());  }
+
+  /**
+   * Instantiates a new <code>MapTypesSchema</code> object.
+   *
+   * @author paouelle
+   */
+  public MapTypesSchema() {
+    super.setAdditionalProperties(new AdditionalProperties());
   }
 
   /**
@@ -82,15 +111,6 @@ public class MapTypesSchema extends ObjectTypesSchema {
       "schema doesn't represent map additional properties"
     );
     super.setAdditionalProperties(additionalProperties);
-  }
-
-  /**
-   * Instantiates a new <code>MapTypesSchema</code> object.
-   *
-   * @author paouelle
-   */
-  public MapTypesSchema() {
-    super.setAdditionalProperties(new AdditionalProperties());
   }
 
   /**

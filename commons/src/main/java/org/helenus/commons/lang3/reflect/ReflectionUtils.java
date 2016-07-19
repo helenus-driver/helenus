@@ -39,6 +39,7 @@ import java.security.AccessController;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -51,7 +52,13 @@ import java.util.stream.Stream;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 
 import org.helenus.annotation.Keyable;
 
@@ -1072,6 +1079,143 @@ public class ReflectionUtils {
   }
 
   /**
+   * Gets a class object corresponding to a given declared type.
+   *
+   * @author paouelle
+   *
+   * @param  type the declared type for which to get a class object
+   * @return the corresponding non-<code>null</code> class object
+   * @throws ClassNotFoundException if the class is not found
+   */
+  public static Class<?> classFor(DeclaredType type)
+    throws ClassNotFoundException {
+    // recurse the class hierarchy to build it manually
+    final StringBuilder sb = new StringBuilder(40);
+    final Deque<Element> es = new LinkedList<>();
+
+    for (Element e = type.asElement(); e != null; e = e.getEnclosingElement()) {
+      es.push(e);
+    }
+    Element previous = null;
+
+    for (final Element e: es) {
+      if (previous != null) {
+        if (previous.getKind().isClass() || previous.getKind().isInterface()) {
+          sb.append('$');
+        } else { // should be a package
+          sb.append('.');
+        }
+      }
+      if (e instanceof PackageElement) { // easy as well!
+        sb.append(((PackageElement)e).getQualifiedName());
+      } else if (e.getKind() == ElementKind.PACKAGE) { // oh well! rely on toString() :-(
+        sb.append(e);
+      } else { // anything else, deal with its simple name only
+        sb.append(e.getSimpleName());
+      }
+      previous = e;
+    }
+    return Class.forName(sb.toString());
+  }
+
+  /**
+   * Gets a primitive class for the specified primitive type kind.
+   *
+   * @author paouelle
+   *
+   * @param  kind the primitive type kind for which to get a class
+   * @return the corresponding non-<code>null</code> class
+   * @throws ClassNotFoundException if an invalid primitive kind is specified
+   */
+  private static Class<?> primitiveClassFor(TypeKind kind)
+    throws ClassNotFoundException {
+    switch (kind) {
+      case BYTE:
+        return Byte.TYPE;
+      case CHAR:
+        return Character.TYPE;
+      case SHORT:
+        return Short.TYPE;
+      case INT:
+        return Integer.TYPE;
+      case LONG:
+        return Long.TYPE;
+      case FLOAT:
+        return Float.TYPE;
+      case DOUBLE:
+        return Double.TYPE;
+      case BOOLEAN:
+        return Boolean.TYPE;
+      default:
+        throw new ClassNotFoundException("unknown primitive kind: " + kind);
+    }
+  }
+
+  /**
+   * Gets a primitive array class for the specified primitive component type kind.
+   *
+   * @author paouelle
+   *
+   * @param  kind the primitive component type kind for which to get a class
+   * @return the corresponding non-<code>null</code> class
+   * @throws ClassNotFoundException if an invalid primitive component kind is specified
+   */
+  private static Class<?> primitiveArrayClassFor(TypeKind kind)
+    throws ClassNotFoundException {
+    switch (kind) {
+      case BYTE:
+        return byte[].class;
+      case CHAR:
+        return char[].class;
+      case SHORT:
+        return short[].class;
+      case INT:
+        return int[].class;
+      case LONG:
+        return long[].class;
+      case FLOAT:
+        return float[].class;
+      case DOUBLE:
+        return double[].class;
+      case BOOLEAN:
+        return boolean[].class;
+      default:
+        throw new ClassNotFoundException("unknown primitive kind: " + kind);
+    }
+  }
+
+  /**
+   * Gets a class object corresponding to a given type mirror.
+   *
+   * @author paouelle
+   *
+   * @param  tm the type mirror for which to get a class object
+   * @return the corresponding non-<code>null</code> class object
+   * @throws ClassNotFoundException if the class is not found
+   */
+  public static Class<?> classFor(TypeMirror tm)
+    throws ClassNotFoundException {
+    if (tm instanceof ArrayType) {
+      final ArrayType array = (ArrayType)tm;
+      final TypeMirror compType = array.getComponentType();
+
+      if (compType.getKind().isPrimitive()) {
+        return ReflectionUtils.primitiveArrayClassFor(compType.getKind());
+      } else if (compType instanceof DeclaredType) {
+        return Array.newInstance(
+          ReflectionUtils.classFor((DeclaredType)compType), 0
+        ).getClass();
+      } // else - oh! well, rely on toString()
+      return Array.newInstance(Class.forName(compType.toString()), 0).getClass();
+    } else if (tm.getKind().isPrimitive()) {
+      return ReflectionUtils.primitiveClassFor(tm.getKind());
+    } else if (tm instanceof DeclaredType) {
+      return ReflectionUtils.classFor((DeclaredType)tm);
+    } // else - oh! well, rely on toString()
+    return Class.forName(tm.toString());
+  }
+
+  /**
    * Gets annotations of a specific type that are <em>associated</em> with the
    * element.
    * <p>
@@ -1146,7 +1290,7 @@ public class ReflectionUtils {
     return annotatedElement.getAnnotationMirrors().stream()
       .map(am -> {
         try {
-          final Class<?> aclass = Class.forName(am.getAnnotationType().toString());
+          final Class<?> aclass = ReflectionUtils.classFor(am.getAnnotationType());
 
           if (!aclass.isAnnotationPresent(annotationClass)) {
             return null;
@@ -1181,7 +1325,7 @@ public class ReflectionUtils {
     return annotatedElement.getAnnotationMirrors().stream()
       .map(am -> {
         try {
-          final Class<?> aclass = Class.forName(am.getAnnotationType().toString());
+          final Class<?> aclass = ReflectionUtils.classFor(am.getAnnotationType());
 
           return (Annotation)java.lang.reflect.Proxy.newProxyInstance(
             aclass.getClassLoader(),
@@ -1396,6 +1540,9 @@ class AnnotationProxy implements InvocationHandler {
 
         if (Class.class.isAssignableFrom(rclass)) {
           //System.err.println(" -> class, eav: " + eav.getValue().getClass() + ", eav str: " + eav.getValue().toString());
+          if (eav.getValue() instanceof DeclaredType) {
+            return ReflectionUtils.classFor((DeclaredType)eav.getValue());
+          } // oh well! really on toString and cross your fingers :-(
           return Class.forName(eav.getValue().toString());
         } else if (rclass.isArray() && (eav.getValue() instanceof List)) {
           // why couldn't the damn compiler just return arrays!!!!!
@@ -1408,7 +1555,11 @@ class AnnotationProxy implements InvocationHandler {
 
             if (Class.class.isAssignableFrom(rclass.getComponentType())) {
               // special case since classes are not returned here!!!!
-              Array.set(array, i++, Class.forName(av.toString()));
+              if (av instanceof DeclaredType) {
+                Array.set(array, i++, ReflectionUtils.classFor((DeclaredType)av));
+              } else { // oh well! really on toString and cross your fingers :-(
+                Array.set(array, i++, Class.forName(av.toString()));
+              }
             } else {
               Array.set(array, i++, av);
             }
