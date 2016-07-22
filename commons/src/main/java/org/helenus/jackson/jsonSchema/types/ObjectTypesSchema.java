@@ -64,7 +64,7 @@ public class ObjectTypesSchema extends ObjectSchema {
    * of this object. Properties are considered unordered, the order of the
    * instance properties may be in any order.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   @JsonIgnore
   private final Map<String, BeanProperty> beans;
@@ -162,7 +162,7 @@ public class ObjectTypesSchema extends ObjectSchema {
    * Gets the underlying bean property that corresponds to the given property name
    * for this object.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  name the name of the property to retrieve its underlying bean property
    * @return the corresponding bean property or <code>null</code> if none
@@ -177,7 +177,7 @@ public class ObjectTypesSchema extends ObjectSchema {
   /**
    * Adds the specified bean property as one of this object's properties.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param prop the underlying property to add
    */

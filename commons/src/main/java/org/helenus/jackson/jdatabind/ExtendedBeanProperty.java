@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.helenus.jackson.jdatabind;
 
 import java.lang.annotation.Annotation;
@@ -16,19 +31,15 @@ import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 
 /**
- * The <code>ExtendedBeanProperty</code> class defines
- * DOC: complete ExtendedBeanProperty class documentation
+ * The <code>ExtendedBeanProperty</code> class extends on Jackson's
+ * {@link BeanProperty} to provide support for querying repeatable annotations.
  *
- * @copyright Enlighted Inc. Confidential
- *            Copyright (c) 2015-2016 by Enlighted Inc.
- *            All Rights Reserved.
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
- * @author  <a href="mailto:paouelle@enlightedinc.com">Patrick Ouellet</a>
- * @version 1 - Jul 21, 2016
- *            - paouelle
- *            - Creation
+ * @author  The Helenus Driver Project Authors
+ * @version 1 - Jul 21, 2016 - paouelle - Creation
  *
- * @since CEM 1.0
+ * @since 1.0
  */
 public class ExtendedBeanProperty implements BeanProperty {
   /**
