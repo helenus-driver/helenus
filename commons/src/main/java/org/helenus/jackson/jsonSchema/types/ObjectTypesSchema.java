@@ -29,6 +29,8 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.type.SimpleType;
 import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
 
+import org.helenus.jackson.jdatabind.ExtendedBeanProperty;
+
 /**
  * The <code>ObjectTypesSchema</code> class extends the {@link ObjectSchema}
  * class to provide additional information about the Java type being defined.
@@ -166,8 +168,10 @@ public class ObjectTypesSchema extends ObjectSchema {
    * @return the corresponding bean property or <code>null</code> if none
    *         defined or available
    */
-  public BeanProperty getBeanProperty(String name) {
-    return beans.get(name);
+  public ExtendedBeanProperty getBeanProperty(String name) {
+    final BeanProperty bean = beans.get(name);
+
+    return (bean != null) ? new ExtendedBeanProperty(bean) : null;
   }
 
   /**
@@ -178,6 +182,9 @@ public class ObjectTypesSchema extends ObjectSchema {
    * @param prop the underlying property to add
    */
   public void addBeanProperty(BeanProperty prop) {
+    if (prop instanceof ExtendedBeanProperty) {
+      prop = ((ExtendedBeanProperty)prop).getBean();
+    }
     beans.put(prop.getName(), prop);
   }
 

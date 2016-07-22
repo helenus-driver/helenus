@@ -86,39 +86,6 @@ public class ReflectionUtils {
       );
 
   /**
-   * Finds the first class from a given class' hierarchy that is annotated
-   * with the specified annotation.
-   *
-   * @author paouelle
-   *
-   * @param <T> the type of the class to start searching from
-   *
-   * @param  clazz the class from which to search
-   * @param  annotationClass the annotation to search for
-   * @return the first class in <code>clazz</code>'s hierarchy annotated with
-   *         the specified annotation or <code>null</code> if none is found
-   * @throws NullPointerException if <code>clazz</code> or
-   *         <code>annotationClass</code> is <code>null</code>
-   */
-  public static <T> Class<? super T> findFirstClassAnnotatedWith(
-    Class<T> clazz, Class<? extends Annotation> annotationClass
-  ) {
-    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
-    org.apache.commons.lang3.Validate.notNull(
-      annotationClass, "invalid null annotation class"
-    );
-    Class<? super T> c = clazz;
-
-    do {
-      if (c.getDeclaredAnnotationsByType(annotationClass).length > 0) {
-        return c;
-      }
-      c = c.getSuperclass();
-    } while (c != null);
-    return null;
-  }
-
-  /**
    * Finds the first annotation from a given class' and interface's hierarchy of
    * the specified annotation.
    *
@@ -161,17 +128,50 @@ public class ReflectionUtils {
   }
 
   /**
+   * Finds the first class from a given class' hierarchy that is annotated
+   * with the specified annotation.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of the class to start searching from
+   *
+   * @param  clazz the class from which to search
+   * @param  annotationClass the annotation to search for
+   * @return the first class in <code>clazz</code>'s hierarchy annotated with
+   *         the specified annotation or <code>null</code> if none is found
+   * @throws NullPointerException if <code>clazz</code> or
+   *         <code>annotationClass</code> is <code>null</code>
+   */
+  public static <T> Class<? super T> findFirstClassAnnotatedWith(
+    Class<T> clazz, Class<? extends Annotation> annotationClass
+  ) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.notNull(
+      annotationClass, "invalid null annotation class"
+    );
+    Class<? super T> c = clazz;
+
+    do {
+      if (c.getDeclaredAnnotationsByType(annotationClass).length > 0) {
+        return c;
+      }
+      c = c.getSuperclass();
+    } while (c != null);
+    return null;
+  }
+
+  /**
    * Finds the first class from a given class' hierarchy that is not annotated
    * with the specified annotation.
    *
    * @author paouelle
    *
-   * @param <T> the type of the class t start searching from
+   * @param <T> the type of the class to start searching from
    *
    * @param  clazz the class from which to search
    * @param  annotationClass the annotation to search for
-   * @return the non-<code>null</code> first class in <code>clazz</code>'s
-   *         hierarchy not annotated with the specified annotation
+   * @return the first class in <code>clazz</code>'s hierarchy not annotated
+   *         with the specified annotation or <code>null</code> if none found
    * @throws NullPointerException if <code>clazz</code> or
    *         <code>annotationClass</code> is <code>null</code>
    */
@@ -184,10 +184,44 @@ public class ReflectionUtils {
     );
     Class<? super T> c = clazz;
 
-    while (c.getDeclaredAnnotationsByType(annotationClass).length > 0) {
+    while ((c != null)
+           && (c.getDeclaredAnnotationsByType(annotationClass).length > 0)) {
       c = c.getSuperclass();
     }
     return c;
+  }
+
+  /**
+   * Finds the last class from a given class' hierarchy that is annotated
+   * with the specified annotation.
+   *
+   * @author paouelle
+   *
+   * @param <T> the type of the class to start searching from
+   *
+   * @param  clazz the class from which to search
+   * @param  annotationClass the annotation to search for
+   * @return the last class in <code>clazz</code>'s hierarchy annotated with
+   *         the specified annotation or <code>null</code> if none found
+   * @throws NullPointerException if <code>clazz</code> or
+   *         <code>annotationClass</code> is <code>null</code>
+   */
+  public static <T> Class<? super T> findLastClassAnnotatedWith(
+    Class<T> clazz, Class<? extends Annotation> annotationClass
+  ) {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    org.apache.commons.lang3.Validate.notNull(
+      annotationClass, "invalid null annotation class"
+    );
+    Class<? super T> p = null;
+    Class<? super T> c = clazz;
+
+    while ((c != null)
+        && (c.getDeclaredAnnotationsByType(annotationClass).length > 0)) {
+      p = c;
+      c = c.getSuperclass();
+    }
+    return p;
   }
 
   /**
@@ -1180,7 +1214,7 @@ public class ReflectionUtils {
       case BOOLEAN:
         return boolean[].class;
       default:
-        throw new ClassNotFoundException("unknown primitive kind: " + kind);
+        throw new ClassNotFoundException("unknown primitive array element kind: " + kind);
     }
   }
 
@@ -1209,6 +1243,8 @@ public class ReflectionUtils {
       return Array.newInstance(Class.forName(compType.toString()), 0).getClass();
     } else if (tm.getKind().isPrimitive()) {
       return ReflectionUtils.primitiveClassFor(tm.getKind());
+    } else if (tm.getKind() == TypeKind.VOID) {
+      return Void.TYPE;
     } else if (tm instanceof DeclaredType) {
       return ReflectionUtils.classFor((DeclaredType)tm);
     } // else - oh! well, rely on toString()
