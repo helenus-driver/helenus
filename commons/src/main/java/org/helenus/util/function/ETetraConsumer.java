@@ -15,7 +15,6 @@
  */
 package org.helenus.util.function;
 
-
 /**
  * The <code>ETetraConsumer</code> interface expands on the {@link TetraConsumer}
  * interface to provide the ability to throw back exceptions.
