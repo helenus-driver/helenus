@@ -58,7 +58,9 @@ public interface Update<T>
    *
    * @author paouelle
    *
-   * @return this UPDATE statement.
+   * @return this UPDATE statement
+   * @throws IllegalArgumentException if conditions where already registered
+   *         via {@link #onlyIf} option first
    */
   public Update<T> ifExists();
 
@@ -69,8 +71,8 @@ public interface Update<T>
    *
    * @author paouelle
    *
-   * @param  assignments the assignments to add.
-   * @return the Assignments of this UPDATE statement.
+   * @param  assignments the assignments to add
+   * @return the Assignments of this UPDATE statement
    * @throws IllegalArgumentException if the assignment references a column
    *         not defined in the POJO
    */
@@ -81,7 +83,7 @@ public interface Update<T>
    *
    * @author paouelle
    *
-   * @return the assignments of this UPDATE statement.
+   * @return the assignments of this UPDATE statement
    */
   public Assignments<T> with();
 
@@ -104,7 +106,7 @@ public interface Update<T>
    *
    * @author paouelle
    *
-   * @return the where clause of this query to which more clause can be added.
+   * @return the where clause of this query to which more clause can be added
    */
   public Where<T> where();
 
@@ -113,8 +115,8 @@ public interface Update<T>
    * <p>
    * This is a shorter/more readable version for {@code onlyIf().and(condition)}.
    *
-   * @param  condition the condition to add.
-   * @return the conditions of this query to which more conditions can be added.
+   * @param  condition the condition to add
+   * @return the conditions of this query to which more conditions can be added
    * @throws IllegalArgumentException if the condition reference a column not
    *         defined by the POJO or if the {@link #ifExists} option was first
    *         selected
@@ -124,11 +126,65 @@ public interface Update<T>
   /**
    * Adds a conditions clause (IF) to this statement.
    *
-   * @return the conditions of this query to which more conditions can be added.
+   * @return the conditions of this query to which more conditions can be added
    * @throws IllegalArgumentException if the {@link #ifExists} option was first
    *         selected
    */
   public Conditions<T> onlyIf();
+
+  /**
+   * Adds a previous conditions clause (IF) to this statement.
+   * <p>
+   * This is a shorter/more readable version for {@code previouslyIf().and(condition)}.
+   * <p>
+   * Previous conditions for an UDPATE statement are used when previous assignments
+   * are introduced via {@link StatementBuilder#previous} or
+   * {@link StatementBuilder#set(CharSequence, Object, Object)} in order to provide
+   * conditions for the the "delete" statement that might be generated when a
+   * primary key is being updated for a table.
+   * <p>
+   * Please keep in mind that provided conditions has a non negligible
+   * performance impact and should be avoided when possible.
+   * <p>
+   * <i>Note:</i> Previous conditions will not work if multiple tables are
+   * configured for the given POJO as updates to multiple to multiple tables
+   * for a given POJO are combined into a single transaction.
+   *
+   * @author paouelle
+   *
+   * @param  condition the previous condition to add
+   * @return the previous conditions of this query to which more conditions can
+   *         be added
+   * @throws IllegalArgumentException if the condition reference a column not
+   *         defined by the POJO or if the {@link #ifExists} option was first
+   *         selected
+   */
+  public Conditions<T> previouslyIf(Clause condition);
+
+  /**
+   * Adds a conditions clause (IF) to this statement.
+   * <p>
+   * Previous conditions for an UDPATE statement are used when previous assignments
+   * are introduced via {@link StatementBuilder#previous} or
+   * {@link StatementBuilder#set(CharSequence, Object, Object)} in order to provide
+   * conditions for the the "delete" statement that might be generated when a
+   * primary key is being updated for a table.
+   * <p>
+   * Please keep in mind that provided conditions has a non negligible
+   * performance impact and should be avoided when possible.
+   * <p>
+   * <i>Note:</i> Previous conditions will not work if multiple tables are
+   * configured for the given POJO as updates to multiple to multiple tables
+   * for a given POJO are combined into a single transaction.
+   *
+   * @author paouelle
+   *
+   * @return the previous conditions of this query to which more conditions can
+   *         be added
+   * @throws IllegalArgumentException if the {@link #ifExists} option was first
+   *         selected
+   */
+  public Conditions<T> previouslyIf();
 
   /**
    * Adds a new options for this UPDATE statement.
@@ -237,6 +293,25 @@ public interface Update<T>
     public Options<T> using(Using<?> using);
 
     /**
+     * Sets the 'IF EXISTS' option for this UPDATE statement.
+     * <p>
+     * An update with that option will not succeed unless the row exist at the
+     * time the update is executed.
+     * <p>
+     * Please keep in mind that using this option has a non negligible performance
+     * impact and should be avoided when possible and that no other 'if' conditions
+     * can be combined.
+     *
+     * @author paouelle
+     *
+     * @return this UPDATE statement
+     * @throws IllegalArgumentException if conditions where already registered
+     *         via {@link #onlyIf} option first
+     */
+    public Update<T> ifExists();
+
+
+    /**
      * Adds a condition to the UPDATE statement those assignments are part of.
      *
      * @author paouelle
@@ -249,6 +324,35 @@ public interface Update<T>
      *         selected
      */
     public Conditions<T> onlyIf(Clause condition);
+
+    /**
+     * Adds a previous conditions clause (IF) to this statement.
+     * <p>
+     * This is a shorter/more readable version for {@code previouslyIf().and(condition)}.
+     * <p>
+     * Previous conditions for an UDPATE statement are used when previous assignments
+     * are introduced via {@link StatementBuilder#previous} or
+     * {@link StatementBuilder#set(CharSequence, Object, Object)} in order to provide
+     * conditions for the the "delete" statement that might be generated when a
+     * primary key is being updated for a table.
+     * <p>
+     * Please keep in mind that provided conditions has a non negligible
+     * performance impact and should be avoided when possible.
+     * <p>
+     * <i>Note:</i> Previous conditions will not work if multiple tables are
+     * configured for the given POJO as updates to multiple to multiple tables
+     * for a given POJO are combined into a single transaction.
+     *
+     * @author paouelle
+     *
+     * @param  condition the previous condition to add
+     * @return the previous conditions of this query to which more conditions can
+     *         be added
+     * @throws IllegalArgumentException if the condition reference a column not
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
+     */
+    public Conditions<T> previouslyIf(Clause condition);
   }
 
   /**
@@ -295,24 +399,71 @@ public interface Update<T>
      *
      * @author paouelle
      *
-     * @param  using the using clause to add.
-     * @return the options of the UPDATE statement this WHERE clause is part of.
+     * @param  using the using clause to add
+     * @return the options of the UPDATE statement this WHERE clause is part of
      */
     public Options<T> using(Using<?> using);
+
+    /**
+     * Sets the 'IF EXISTS' option for this UPDATE statement.
+     * <p>
+     * An update with that option will not succeed unless the row exist at the
+     * time the update is executed.
+     * <p>
+     * Please keep in mind that using this option has a non negligible performance
+     * impact and should be avoided when possible and that no other 'if' conditions
+     * can be combined.
+     *
+     * @author paouelle
+     *
+     * @return this UPDATE statement
+     * @throws IllegalArgumentException if conditions where already registered
+     *         via {@link #onlyIf} option first
+     */
+    public Update<T> ifExists();
 
     /**
      * Adds a condition to the UPDATE statement this WHERE clause is part of.
      *
      * @author paouelle
      *
-     * @param  condition the condition to add.
+     * @param  condition the condition to add
      * @return the conditions for the UPDATE statement this WHERE clause is part
-     *         of.
+     *         of
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO or if the {@link #ifExists} option was first
      *         selected
      */
     public Conditions<T> onlyIf(Clause condition);
+
+    /**
+     * Adds a previous conditions clause (IF) to this statement.
+     * <p>
+     * This is a shorter/more readable version for {@code previouslyIf().and(condition)}.
+     * <p>
+     * Previous conditions for an UDPATE statement are used when previous assignments
+     * are introduced via {@link StatementBuilder#previous} or
+     * {@link StatementBuilder#set(CharSequence, Object, Object)} in order to provide
+     * conditions for the the "delete" statement that might be generated when a
+     * primary key is being updated for a table.
+     * <p>
+     * Please keep in mind that provided conditions has a non negligible
+     * performance impact and should be avoided when possible.
+     * <p>
+     * <i>Note:</i> Previous conditions will not work if multiple tables are
+     * configured for the given POJO as updates to multiple to multiple tables
+     * for a given POJO are combined into a single transaction.
+     *
+     * @author paouelle
+     *
+     * @param  condition the previous condition to add
+     * @return the previous conditions of this query to which more conditions can
+     *         be added
+     * @throws IllegalArgumentException if the condition reference a column not
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
+     */
+    public Conditions<T> previouslyIf(Clause condition);
   }
 
   /**
@@ -353,18 +504,65 @@ public interface Update<T>
     public Assignments<T> with(Assignment... assignments);
 
     /**
+     * Sets the 'IF EXISTS' option for this UPDATE statement.
+     * <p>
+     * An update with that option will not succeed unless the row exist at the
+     * time the update is executed.
+     * <p>
+     * Please keep in mind that using this option has a non negligible performance
+     * impact and should be avoided when possible and that no other 'if' conditions
+     * can be combined.
+     *
+     * @author paouelle
+     *
+     * @return this UPDATE statement
+     * @throws IllegalArgumentException if conditions where already registered
+     *         via {@link #onlyIf} option first
+     */
+    public Update<T> ifExists();
+
+    /**
      * Adds a condition to the UPDATE statement these options are part of.
      *
      * @author paouelle
      *
-     * @param  condition the condition to add.
+     * @param  condition the condition to add
      * @return the conditions for the UPDATE statement these options are part
-     *         of.
+     *         of
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO or if the {@link #ifExists} option was first
      *         selected
      */
     public Conditions<T> onlyIf(Clause condition);
+
+    /**
+     * Adds a previous conditions clause (IF) to this statement.
+     * <p>
+     * This is a shorter/more readable version for {@code previouslyIf().and(condition)}.
+     * <p>
+     * Previous conditions for an UDPATE statement are used when previous assignments
+     * are introduced via {@link StatementBuilder#previous} or
+     * {@link StatementBuilder#set(CharSequence, Object, Object)} in order to provide
+     * conditions for the the "delete" statement that might be generated when a
+     * primary key is being updated for a table.
+     * <p>
+     * Please keep in mind that provided conditions has a non negligible
+     * performance impact and should be avoided when possible.
+     * <p>
+     * <i>Note:</i> Previous conditions will not work if multiple tables are
+     * configured for the given POJO as updates to multiple to multiple tables
+     * for a given POJO are combined into a single transaction.
+     *
+     * @author paouelle
+     *
+     * @param  condition the previous condition to add
+     * @return the previous conditions of this query to which more conditions can
+     *         be added
+     * @throws IllegalArgumentException if the condition reference a column not
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
+     */
+    public Conditions<T> previouslyIf(Clause condition);
   }
 
   /**
@@ -392,8 +590,8 @@ public interface Update<T>
      *
      * @author paouelle
      *
-     * @param  condition the condition to add.
-     * @return this {@code Conditions} clause.
+     * @param  condition the condition to add
+     * @return this {@code Conditions} clause
      * @throws IllegalArgumentException if the condition reference a column not
      *         defined by the POJO
      */
@@ -404,9 +602,9 @@ public interface Update<T>
      *
      * @author paouelle
      *
-     * @param  assignments the assignments to add.
+     * @param  assignments the assignments to add
      * @return the assignments of the UPDATE statement those conditions are part
-     *         of.
+     *         of
      * @throws IllegalArgumentException if the assignment references a column
      *         is not defined in the POJO or invalid values or if missing
      *         mandatory columns are referenced by the new assignment
@@ -416,9 +614,9 @@ public interface Update<T>
     /**
      * Adds a where clause to the UPDATE statement these options are part of.
      *
-     * @param  clause clause to add.
+     * @param  clause clause to add
      * @return the WHERE clause of the UPDATE statement these options are part
-     *         of.
+     *         of
      * @throws IllegalArgumentException if the clause referenced a
      *         column which is not a primary key or an index column in the POJO
      *         or if the clause references columns not defined by the POJO or
@@ -429,8 +627,8 @@ public interface Update<T>
     /**
      * Adds an option to the UPDATE statement these conditions are part of.
      *
-     * @param  using the using clause to add.
-     * @return the options of the UPDATE statement these conditions are part of.
+     * @param  using the using clause to add
+     * @return the options of the UPDATE statement these conditions are part of
      */
     public Options<T> using(Using<?> using);
   }

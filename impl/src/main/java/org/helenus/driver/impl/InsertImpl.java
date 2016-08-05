@@ -142,6 +142,7 @@ public class InsertImpl<T>
    * @param  context the non-<code>null</code> class info context for the POJO
    *         associated with this statement
    * @param  table the table to insert into
+   * @param  usings the non-<code>null</code> list of "USINGS" options
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>context</code> is <code>null</code>
@@ -151,12 +152,13 @@ public class InsertImpl<T>
   InsertImpl(
     ClassInfoImpl<T>.POJOContext context,
     TableInfoImpl<T> table,
+    List<UsingImpl<?>> usings,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
     super(Void.class, context, mgr, bridge);
     tables.add(table);
-    this.usings = new OptionsImpl<>(this);
+    this.usings = new OptionsImpl<>(this, usings);
   }
 
   /**
@@ -754,7 +756,7 @@ public class InsertImpl<T>
      *
      * @author paouelle
      */
-    private final List<UsingImpl<?>> usings = new ArrayList<>(5);
+    private final List<UsingImpl<?>> usings;
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -765,7 +767,21 @@ public class InsertImpl<T>
      *        creating options
      */
     OptionsImpl(InsertImpl<T> statement) {
+      this(statement,  new ArrayList<>(5));
+    }
+
+    /**
+     * Instantiates a new <code>OptionsImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param statement the non-<code>null</code> statement for which we are
+     *        creating options
+     * @param usings the non-<code>null</code> list of "USINGS" options
+     */
+    OptionsImpl(InsertImpl<T> statement, List<UsingImpl<?>> usings) {
       super(statement);
+      this.usings = usings;
     }
 
     /**

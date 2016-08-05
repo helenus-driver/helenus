@@ -851,15 +851,15 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @author paouelle
    *
    * @param  object the non-<code>null</code> POJO object
-   * @param  override a non-<code>null</code> map of values to use instead of
-   *         those provided by the object
+   * @param  pkeys_override a non-<code>null</code> map of primary key values
+   *         to use instead of those provided by the object
    * @return a non-<code>null</code> map of all primary key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(
-    T object, Map<String, Object> override
+    T object, Map<String, Object> pkeys_override
   ) {
     if (table == null) {
       return Collections.emptyMap();
@@ -869,7 +869,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     for (final Map.Entry<String, FieldInfoImpl<T>> e: primaryKeyColumns.entrySet()) {
       final String name = e.getKey();
       final FieldInfoImpl<T> field = e.getValue();
-      Object value = override.getOrDefault(name, this);
+      Object value = pkeys_override.getOrDefault(name, this);
 
       if (value == this) { // special case to detect that no override was provided
         value = field.getValue(object); // so get it from the object
@@ -1567,6 +1567,51 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       return false;
     }
     final FieldInfoImpl<?> f = multiKeyColumns.get(n);
+
+    return (f != null);
+  }
+
+  /**
+   * Checks if a column is defined as a non primary key column in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the name of the column to check if it is defined as a non
+   *         primary key column in this table
+   * @return <code>true</code> if the specified column is defined as a non
+   *         primary key column in this table; <code>false</code> otherwise
+   */
+  public boolean isNonPrimaryKeyColumn(Object name) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (table == null) {
+      return false;
+    }
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        if (!isNonPrimaryKeyColumn(n)) { // recurse to validate
+          return false;
+        }
+      }
+      return true;
+    }
+    if (name instanceof Utils.FCall) {
+      for (final Object parm: ((Utils.FCall)name)) {
+        if (!isNonPrimaryKeyColumn(parm)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    final String n;
+
+    if (name instanceof Utils.CName) {
+      n = ((Utils.CName)name).getColumnName();
+    } else if (name instanceof CharSequence) {
+      n = name.toString();
+    } else {
+      return false;
+    }
+    final FieldInfoImpl<?> f = nonPrimaryKeyColumns.get(n);
 
     return (f != null);
   }

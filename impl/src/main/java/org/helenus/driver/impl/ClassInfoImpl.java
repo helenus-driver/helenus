@@ -438,22 +438,22 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @author paouelle
      *
      * @param  tname the name of the table from which to retrieve columns
-     * @param  override a non-<code>null</code> map of values to use instead of
-     *         those provided by the object
+     * @param  pkeys_override a non-<code>null</code> map of primary key values
+     *         to use instead of those provided by the object
      * @return a non-<code>null</code> map of all primary key column/value pairs
      *         for the POJO
      * @throws IllegalArgumentException if a column is missing from the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
     public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(
-      String tname, Map<String, Object> override
+      String tname, Map<String, Object> pkeys_override
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getPrimaryKeyColumnValues(object, override);
+      return table.getPrimaryKeyColumnValues(object, pkeys_override);
     }
 
     /**
@@ -541,7 +541,9 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @throws IllegalArgumentException if a mandatory column is missing from
      *         the POJO
      */
-    public Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return

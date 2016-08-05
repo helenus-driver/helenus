@@ -87,6 +87,13 @@ public class DeleteImpl<T>
   private final OptionsImpl<T> usings;
 
   /**
+   * Holds the conditions for the delete statement.
+   *
+   * @author paouelle
+   */
+  private final ConditionsImpl<T> conditions;
+
+  /**
    * Holds a flag indicating if the "IF EXISTS" condition has been selected.
    *
    * @author paouelle
@@ -101,11 +108,12 @@ public class DeleteImpl<T>
   protected boolean allSelected = false;
 
   /**
-   * Holds a map of values to use instead of those reported by the POJO context.
+   * Holds a map of primary key values to use instead of those reported by the
+   * POJO context.
    *
    * @author paouelle
    */
-  private final Map<String, Object> override;
+  private final Map<String, Object> pkeys_override;
 
   /**
    * Instantiates a new <code>DeleteImpl</code> object.
@@ -146,8 +154,8 @@ public class DeleteImpl<T>
    * @param  columnNames the columns names that should be deleted by the query
    * @param  allSelected <code>true</code> if the special COUNT() or *
    *         has been selected
-   * @param  override an optional map of values to use instead of those provided
-   *         by the POJO context
+   * @param  pkeys_override an optional map of primary key values to use instead
+   *         of those provided by the POJO context
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>context</code> is <code>null</code>
@@ -159,7 +167,7 @@ public class DeleteImpl<T>
     String[] tables,
     List<Object> columnNames,
     boolean allSelected,
-    Map<String, Object> override,
+    Map<String, Object> pkeys_override,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
@@ -181,7 +189,8 @@ public class DeleteImpl<T>
     );
     this.where = new WhereImpl<>(this);
     this.usings = new OptionsImpl<>(this);
-    this.override = override;
+    this.conditions = new ConditionsImpl<>(this);
+    this.pkeys_override = pkeys_override;
   }
 
   /**
@@ -193,8 +202,12 @@ public class DeleteImpl<T>
    *         with this statement
    * @param  table the table to delete from
    * @param  usings the non-<code>null</code> list of "USINGS" options
-   * @param  override an optional map of values to use instead of those provided
-   *         by the POJO context
+   * @param  ifExists <code>true</code> if the "IF EXISTS" condition has been
+   *         selected; <code>false</code> otherwise
+   * @param  conditions the non-<code>null</code> conditions for the delete
+   *         statement
+   * @param  pkeys_override an optional map of primary key values to use instead
+   *         of those provided by the POJO context
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>context</code> is <code>null</code>
@@ -205,7 +218,9 @@ public class DeleteImpl<T>
     ClassInfoImpl<T>.Context context,
     TableInfoImpl<T> table,
     List<UsingImpl<?>> usings,
-    Map<String, Object> override,
+    boolean ifExists,
+    List<ClauseImpl> conditions,
+    Map<String, Object> pkeys_override,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
@@ -215,7 +230,9 @@ public class DeleteImpl<T>
     this.allSelected = true;
     this.where = new WhereImpl<>(this);
     this.usings = new OptionsImpl<>(this, usings);
-    this.override = override;
+    this.ifExists = ifExists;
+    this.conditions = new ConditionsImpl<>(this, conditions);
+    this.pkeys_override = pkeys_override;
   }
 
   /**
@@ -385,7 +402,7 @@ public class DeleteImpl<T>
             final StringBuilder sb = new StringBuilder(builder);
 
             Utils.joinAndAppend(table, sb, " AND ", cs.values());
-            builders.add(sb);
+            builders.add(finishBuildingQueryString(table, sb));
           }
           return;
         }
@@ -395,69 +412,101 @@ public class DeleteImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", cs.values());
     } else {
       // add where clauses for all primary key columns
-      final Map<String, Pair<Object, CQLDataType>> pkeys;
-
       try {
-        if (override == null) {
-          pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
-        } else {
-          pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName(), override);
+        final Map<String, Pair<Object, CQLDataType>> pkeys;
+
+        try {
+          if (pkeys_override == null) {
+            pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
+          } else {
+            pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName(), pkeys_override);
+          }
+        } catch (EmptyOptionalPrimaryKeyException e) {
+          // ignore and continue without updating this table
+          return;
+        }
+        if (!pkeys.isEmpty()) {
+          builder.append(" WHERE ");
+          if (!multiKeys.isEmpty()) {
+            // prepare all sets of values for all multi-keys present in the clause
+            final List<FieldInfoImpl<T>> cfinfos = new ArrayList<>(multiKeys.size());
+            final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
+
+            for (final FieldInfoImpl<T> finfo: multiKeys) {
+              final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
+
+              if (pset != null) {
+                @SuppressWarnings("unchecked")
+                final Set<Object> set = (Set<Object>)pset.getLeft();
+
+                if (set != null) { // we have keys for this multi-key column
+                  cfinfos.add(finfo);
+                  sets.add(set);
+                }
+              }
+            }
+            if (!sets.isEmpty()) {
+              // now iterate all combination of these sets to generate delete statements
+              // for each combination
+              @SuppressWarnings("unchecked")
+              final Collection<Object>[] asets = new Collection[sets.size()];
+
+              for (final Iterator<List<Object>> i = new CombinationIterator<>(Object.class, sets.toArray(asets)); i.hasNext(); ) {
+                // add the multi-key clause values from this combination to the map of primary keys
+                int j = -1;
+                for (final Object k: i.next()) {
+                  final FieldInfoImpl<T> finfo = cfinfos.get(++j);
+
+                  pkeys.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), Pair.of(k, finfo.getDataType().getElementType()));
+                }
+                final StringBuilder sb = new StringBuilder(builder);
+
+                Utils.joinAndAppendNamesAndValues(sb, " AND ", "=", pkeys);
+                builders.add(finishBuildingQueryString(table, sb));
+              }
+              return;
+            }
+          }
+          // we didn't have any multi-keys in the list (unlikely) so just delete it
+          // based on the provided list
+          Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
         }
       } catch (EmptyOptionalPrimaryKeyException e) {
         // ignore and continue without updating this table
         return;
       }
-      if (!pkeys.isEmpty()) {
-        builder.append(" WHERE ");
-        if (!multiKeys.isEmpty()) {
-          // prepare all sets of values for all multi-keys present in the clause
-          final List<FieldInfoImpl<T>> cfinfos = new ArrayList<>(multiKeys.size());
-          final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
-
-          for (final FieldInfoImpl<T> finfo: multiKeys) {
-            final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
-
-            if (pset != null) {
-              @SuppressWarnings("unchecked")
-              final Set<Object> set = (Set<Object>)pset.getLeft();
-
-              if (set != null) { // we have keys for this multi-key column
-                cfinfos.add(finfo);
-                sets.add(set);
-              }
-            }
-          }
-          if (!sets.isEmpty()) {
-            // now iterate all combination of these sets to generate delete statements
-            // for each combination
-            @SuppressWarnings("unchecked")
-            final Collection<Object>[] asets = new Collection[sets.size()];
-
-            for (final Iterator<List<Object>> i = new CombinationIterator<>(Object.class, sets.toArray(asets)); i.hasNext(); ) {
-              // add the multi-key clause values from this combination to the map of primary keys
-              int j = -1;
-              for (final Object k: i.next()) {
-                final FieldInfoImpl<T> finfo = cfinfos.get(++j);
-
-                pkeys.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), Pair.of(k, finfo.getDataType().getElementType()));
-              }
-              final StringBuilder sb = new StringBuilder(builder);
-
-              Utils.joinAndAppendNamesAndValues(sb, " AND ", "=", pkeys);
-              builders.add(sb);
-            }
-            return;
-          }
-        }
-        // we didn't have any multi-keys in the list (unlikely) so just delete it
-        // based on the provided list
-        Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
-      }
     }
+    builders.add(finishBuildingQueryString(table, builder));
+  }
+
+  /**
+   * Finishes building a query string for the specified table.
+   *
+   * @author paouelle
+   *
+   * @param  table the non-<code>null</code> table for which to build a query
+   *         string
+   * @param  builder the non-<code>null</code> builder where to add the rest of
+   *         the query string to build
+   * @return <code>builder</code>
+   * @throws ColumnPersistenceException if unable to persist a column's value
+   */
+  @SuppressWarnings("synthetic-access")
+  private StringBuilder finishBuildingQueryString(
+    TableInfoImpl<T> table, StringBuilder builder
+  ) {
     if (ifExists) {
       builder.append(" IF EXISTS");
+    } else if (!conditions.conditions.isEmpty()) {
+      // TODO: we need to also filter based on this table as there might not be any condition to set
+      // let's first validate the condition for this table
+      for (final ClauseImpl c: conditions.conditions) {
+        c.validate(table);
+      }
+      builder.append(" IF ");
+      Utils.joinAndAppend(table, builder, " AND ", conditions.conditions);
     }
-    builders.add(builder);
+    return builder;
   }
 
   /**
@@ -505,7 +554,7 @@ public class DeleteImpl<T>
           // we must create an insert for this table if not already done
           // otherwise, simply add this table to the list of tables to handle
           if (insert == null) {
-            insert = init(new InsertImpl<>(getPOJOContext(), table, mgr, bridge));
+            insert = init(new InsertImpl<>(getPOJOContext(), table, usings.usings, mgr, bridge));
           } else { // add this table to the mix
             insert.into(table);
           }
@@ -617,13 +666,46 @@ public class DeleteImpl<T>
    *
    * @see org.helenus.driver.Delete#ifExists()
    */
+  @SuppressWarnings("synthetic-access")
   @Override
   public Delete<T> ifExists() {
+    org.apache.commons.lang3.Validate.isTrue(
+      conditions.conditions.isEmpty(),
+      "cannot combined additional conditions with IF EXISTS"
+    );
     if (!ifExists) {
       setDirty();
       this.ifExists = true;
     }
     return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Delete#onlyIf(org.helenus.driver.Clause)
+   */
+  @Override
+  public Conditions<T> onlyIf(Clause condition) {
+    return conditions.and(condition);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Delete#onlyIf()
+   */
+  @Override
+  public Conditions<T> onlyIf() {
+    org.apache.commons.lang3.Validate.isTrue(
+      !ifExists,
+      "cannot combined additional conditions with IF EXISTS"
+    );
+    return conditions;
   }
 
   /**
@@ -750,6 +832,18 @@ public class DeleteImpl<T>
     public Delete<T> ifExists() {
       return statement.ifExists();
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Delete.Where#onlyIf(org.helenus.driver.Clause)
+     */
+    @Override
+    public Conditions<T> onlyIf(Clause condition) {
+      return statement.onlyIf(condition);
+    }
   }
 
   /**
@@ -830,6 +924,30 @@ public class DeleteImpl<T>
     @Override
     public Where<T> where(Clause clause) {
       return statement.where(clause);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Delete.Options#ifExists()
+     */
+    @Override
+    public Delete<T> ifExists() {
+      return statement.ifExists();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Delete.Options#onlyIf(org.helenus.driver.Clause)
+     */
+    @Override
+    public Conditions<T> onlyIf(Clause condition) {
+      return statement.onlyIf(condition);
     }
   }
 
@@ -1112,6 +1230,116 @@ public class DeleteImpl<T>
     @Override
     public Selection<T> mapElt(String columnName, Object key) {
       return addName(new Utils.CNameKey(columnName, key));
+    }
+  }
+
+  /**
+   * Conditions for a DELETE statement.
+   * <p>
+   * When provided some conditions, an update will not apply unless the provided
+   * conditions applies.
+   * <p>
+   * Please keep in mind that provided conditions has a non negligible
+   * performance impact and should be avoided when possible.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Aug 5, 2016 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @since 1.0
+   */
+  public static class ConditionsImpl<T>
+    extends ForwardingStatementImpl<Void, VoidFuture, T, DeleteImpl<T>>
+    implements Conditions<T> {
+    /**
+     * Holds the list of conditions for the statement
+     *
+     * @author paouelle
+     */
+    private final List<ClauseImpl> conditions;
+
+    /**
+     * Instantiates a new <code>ConditionsImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param statement the non-<code>null</code> statement for which we are
+     *        creating conditions
+     */
+    ConditionsImpl(DeleteImpl<T> statement) {
+      this(statement, new ArrayList<>(10));
+    }
+
+    /**
+     * Instantiates a new <code>ConditionsImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param statement the non-<code>null</code> statement for which we are
+     *        creating conditions
+     * @param conditions the non-<code>null</code> conditions for the statement
+     */
+    ConditionsImpl(DeleteImpl<T> statement, List<ClauseImpl> conditions) {
+      super(statement);
+      this.conditions = conditions;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Update.Conditions#and(org.helenus.driver.Clause)
+     */
+    @SuppressWarnings("synthetic-access")
+    @Override
+    public Conditions<T> and(Clause condition) {
+      org.apache.commons.lang3.Validate.notNull(condition, "invalid null condition");
+      org.apache.commons.lang3.Validate.isTrue(
+        !statement.ifExists,
+        "cannot combined additional conditions with IF EXISTS"
+      );
+      org.apache.commons.lang3.Validate.isTrue(
+        condition instanceof ClauseImpl,
+        "unsupported class of clauses: %s",
+        condition.getClass().getName()
+      );
+      final ClauseImpl c = (ClauseImpl)condition;
+
+      // just to be safe, validate anyway
+      org.apache.commons.lang3.Validate.isTrue("=".equals(c.getOperation()), "unsupported condition: %s", c);
+      // pre-validate against any table
+      getPOJOContext().getClassInfo().validateColumn(c.getColumnName().toString());
+      conditions.add(c);
+      setDirty();
+      return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Delete.Conditions#where(org.helenus.driver.Clause)
+     */
+    @Override
+    public Where<T> where(Clause clause) {
+      return statement.where(clause);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Delete.Conditions#using(org.helenus.driver.Using)
+     */
+    @Override
+    public Options<T> using(Using<?> using) {
+      return statement.using(using);
     }
   }
 }

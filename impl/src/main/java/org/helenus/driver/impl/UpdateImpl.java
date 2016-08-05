@@ -18,6 +18,7 @@ package org.helenus.driver.impl;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -99,6 +100,13 @@ public class UpdateImpl<T>
   private final ConditionsImpl<T> conditions;
 
   /**
+   * Holds the previous conditions for the update statement.
+   *
+   * @author paouelle
+   */
+  private final ConditionsImpl<T> previousConditions;
+
+  /**
    * Flag indicating if the "IF EXISTS" option has been selected.
    *
    * @author paouelle
@@ -160,6 +168,7 @@ public class UpdateImpl<T>
     this.where = new WhereImpl<>(this);
     this.usings = new OptionsImpl<>(this);
     this.conditions = new ConditionsImpl<>(this);
+    this.previousConditions = new ConditionsImpl<>(this);
   }
 
   /**
@@ -382,7 +391,7 @@ public class UpdateImpl<T>
             if (old_values == null) {
               old_values = new LinkedHashMap<>(table.getPrimaryKeys().size());
             }
-            final Object oldval = oa.getOldValue();
+            Object oldval = oa.getOldValue();
 
             if (!multiKeys.isEmpty()) {
               if (a instanceof AssignmentImpl.SetAssignmentImpl) {
@@ -394,7 +403,14 @@ public class UpdateImpl<T>
                 final FieldInfoImpl<?> f = table.getColumnImpl(a.getColumnName());
 
                 if (f.isMultiKey()) {
-                  ((Set<?>)oldval).removeAll((Set<?>)(sa.getValue()));
+                  final Set<?> newset = (Set<?>)sa.getValue();
+
+                  if (!newset.isEmpty()) {
+                    final Set<?> oldset = new HashSet<>((Set<?>)oldval); // clone it
+
+                    oldset.removeAll((Set<?>)(sa.getValue()));
+                    oldval = oldset;
+                  }
                 }
               }
             }
@@ -410,6 +426,8 @@ public class UpdateImpl<T>
             getPOJOContext(),
             table,
             usings.usings,
+            ifExists,
+            previousConditions.conditions,
             old_values, // pass our old values as override in the POJO
             mgr,
             bridge
@@ -417,7 +435,7 @@ public class UpdateImpl<T>
         }
         // time to shift gears to a full insert in which case we must rely
         // on the whole POJO as the assignments might not be complete
-        init(new InsertImpl<>(getPOJOContext(), table, mgr, bridge))
+        init(new InsertImpl<>(getPOJOContext(), table, usings.usings, mgr, bridge))
           .buildQueryStrings(table, builders);
         return;
       }
@@ -623,7 +641,7 @@ public class UpdateImpl<T>
           // we must create an insert for this table if not already done
           // otherwise, simply add this table to the list of tables to handle
           if (insert == null) {
-            insert = init(new InsertImpl<>(getPOJOContext(), table, mgr, bridge));
+            insert = init(new InsertImpl<>(getPOJOContext(), table, usings.usings, mgr, bridge));
           } else { // add this table to the mix
             insert.into(table);
           }
@@ -684,20 +702,6 @@ public class UpdateImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.Update#ifExists()
-   */
-  @Override
-  public Update<T> ifExists() {
-    this.ifExists = true;
-    setDirty();
-    return this;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
    * @see org.helenus.driver.Update#with(org.helenus.driver.Assignment[])
    */
   @Override
@@ -746,6 +750,29 @@ public class UpdateImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.Update#ifExists()
+   */
+  @SuppressWarnings("synthetic-access")
+  @Override
+  public Update<T> ifExists() {
+    org.apache.commons.lang3.Validate.isTrue(
+      conditions.conditions.isEmpty(),
+      "cannot combined additional conditions with IF EXISTS"
+    );
+    org.apache.commons.lang3.Validate.isTrue(
+      previousConditions.conditions.isEmpty(),
+      "cannot combined additional previous conditions with IF EXISTS"
+    );
+    this.ifExists = true;
+    setDirty();
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.Update#onlyIf(org.helenus.driver.Clause)
    */
   @Override
@@ -767,6 +794,34 @@ public class UpdateImpl<T>
       "cannot combined additional conditions with IF EXISTS"
     );
     return conditions;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Update#previouslyIf(org.helenus.driver.Clause)
+   */
+  @Override
+  public Conditions<T> previouslyIf(Clause condition) {
+    return previousConditions.and(condition);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.Update#previouslyIf()
+   */
+  @Override
+  public Conditions<T> previouslyIf() {
+    org.apache.commons.lang3.Validate.isTrue(
+      !ifExists,
+      "cannot combined additional previous conditions with IF EXISTS"
+    );
+    return previousConditions;
   }
 
   /**
@@ -996,11 +1051,35 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.Update.Assignments#ifExists()
+     */
+    @Override
+    public Update<T> ifExists() {
+      return statement.ifExists();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.Update.Assignments#onlyIf(org.helenus.driver.Clause)
      */
     @Override
     public Conditions<T> onlyIf(Clause condition) {
       return statement.onlyIf(condition);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Update.Assignments#previouslyIf(org.helenus.driver.Clause)
+     */
+    @Override
+    public Conditions<T> previouslyIf(Clause condition) {
+      return statement.previouslyIf(condition);
     }
   }
 
@@ -1125,11 +1204,35 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.Update.Where#ifExists()
+     */
+    @Override
+    public Update<T> ifExists() {
+      return statement.ifExists();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.Update.Where#onlyIf(org.helenus.driver.Clause)
      */
     @Override
     public Conditions<T> onlyIf(Clause condition) {
       return statement.onlyIf(condition);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Update.Where#previouslyIf(org.helenus.driver.Clause)
+     */
+    @Override
+    public Conditions<T> previouslyIf(Clause condition) {
+      return statement.previouslyIf(condition);
     }
   }
 
@@ -1204,11 +1307,35 @@ public class UpdateImpl<T>
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.Update.Options#ifExists()
+     */
+    @Override
+    public Update<T> ifExists() {
+      return statement.ifExists();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.Update.Options#onlyIf(org.helenus.driver.Clause)
      */
     @Override
     public Conditions<T> onlyIf(Clause condition) {
       return statement.onlyIf(condition);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Update.Options#previouslyIf(org.helenus.driver.Clause)
+     */
+    @Override
+    public Conditions<T> previouslyIf(Clause condition) {
+      return statement.previouslyIf(condition);
     }
   }
 
@@ -1276,8 +1403,6 @@ public class UpdateImpl<T>
 
       // just to be safe, validate anyway
       org.apache.commons.lang3.Validate.isTrue("=".equals(c.getOperation()), "unsupported condition: %s", c);
-      // un-comment only if the column name had to be a primary key or an index
-      // context.validatePrimaryKeyOrIndexColumn(c.name());
       // pre-validate against any table
       getPOJOContext().getClassInfo().validateColumn(c.getColumnName().toString());
       conditions.add(c);

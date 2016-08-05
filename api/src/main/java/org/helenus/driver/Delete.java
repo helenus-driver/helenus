@@ -68,9 +68,31 @@ public interface Delete<T>
    *
    * @author paouelle
    *
-   * @return the where clause of this query to which more clause can be added.
+   * @return the where clause of this query to which more clause can be added
    */
   public Where<T> where();
+
+  /**
+   * Adds a conditions clause (IF) to this statement.
+   * <p>
+   * This is a shorter/more readable version for {@code onlyIf().and(condition)}.
+   *
+   * @param  condition the condition to add
+   * @return the conditions of this query to which more conditions can be added
+   * @throws IllegalArgumentException if the condition reference a column not
+   *         defined by the POJO or if the {@link #ifExists} option was first
+   *         selected
+   */
+  public Conditions<T> onlyIf(Clause condition);
+
+  /**
+   * Adds a conditions clause (IF) to this statement.
+   *
+   * @return the conditions of this query to which more conditions can be added.
+   * @throws IllegalArgumentException if the {@link #ifExists} option was first
+   *         selected
+   */
+  public Conditions<T> onlyIf();
 
   /**
    * Adds a new options for this DELETE statement.
@@ -101,6 +123,8 @@ public interface Delete<T>
    *
    * @param  name the name of the option to retrieve
    * @return the registered option with the given name or empty if none registered
+   * @throws IllegalArgumentException if conditions where already registered
+   *         via {@link #onlyIf} option first
    */
   public <U> Optional<Using<U>> getUsing(String name);
 
@@ -140,8 +164,8 @@ public interface Delete<T>
      *
      * @author paouelle
      *
-     * @param  clause the clause to add.
-     * @return this WHERE clause.
+     * @param  clause the clause to add
+     * @return this WHERE clause
      * @throws IllegalArgumentException if the clause references a column
      *         not defined in the POJO
      * @throws ExcludedSuffixKeyException if the clause reference a suffix key
@@ -154,8 +178,8 @@ public interface Delete<T>
      *
      * @author paouelle
      *
-     * @param  using the using clause to add.
-     * @return the options of the DELETE statement this WHERE clause is part of.
+     * @param  using the using clause to add
+     * @return the options of the DELETE statement this WHERE clause is part of
      */
     public Options<T> using(Using<?> using);
 
@@ -173,9 +197,25 @@ public interface Delete<T>
      *
      * @author paouelle
      *
-     * @return the DELETE statement this WHERE clause is part of.
+     * @return the DELETE statement this WHERE clause is part of
+     * @throws IllegalArgumentException if conditions where already registered
+     *         via {@link #onlyIf} option first
      */
     public Delete<T> ifExists();
+
+    /**
+     * Adds a condition to the DELETE statement this WHERE clause is part of.
+     *
+     * @author paouelle
+     *
+     * @param  condition the condition to add
+     * @return the conditions for the DELETE statement this WHERE clause is part
+     *         of
+     * @throws IllegalArgumentException if the condition reference a column not
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
+     */
+    public Conditions<T> onlyIf(Clause condition);
   }
 
   /**
@@ -215,6 +255,40 @@ public interface Delete<T>
      *         and the specified value is marked as excluded
      */
     public Where<T> where(Clause clause);
+
+    /**
+     * Sets the 'IF EXISTS' option for the DELETE statement this WHERE clause
+     * is part of.
+     * <p>
+     * A delete with that option will report whether the statement actually
+     * resulted in data being deleted. The existence check and deletion are
+     * done transactionally in the sense that if multiple clients attempt to
+     * delete a given row with this option, then at most one may succeed.
+     * <p>
+     * Please keep in mind that using this option has a non negligible
+     * performance impact and should be avoided when possible.
+     *
+     * @author paouelle
+     *
+     * @return the DELETE statement this WHERE clause is part of
+     * @throws IllegalArgumentException if conditions where already registered
+     *         via {@link #onlyIf} option first
+     */
+    public Delete<T> ifExists();
+
+    /**
+     * Adds a condition to the DELETE statement this WHERE clause is part of.
+     *
+     * @author paouelle
+     *
+     * @param  condition the condition to add
+     * @return the conditions for the DELETE statement this WHERE clause is part
+     *         of
+     * @throws IllegalArgumentException if the condition reference a column not
+     *         defined by the POJO or if the {@link #ifExists} option was first
+     *         selected
+     */
+    public Conditions<T> onlyIf(Clause condition);
   }
 
   /**
@@ -359,5 +433,59 @@ public interface Delete<T>
      *         is <code>null</code>
      */
     public Selection<T> mapElt(String columnName, Object key);
+  }
+
+  /**
+   * Conditions for a DELETE statement.
+   * <p>
+   * When provided some conditions, a delete will not apply unless the provided
+   * conditions applies.
+   * <p>
+   * Please keep in mind that provided conditions has a non negligible
+   * performance impact and should be avoided when possible.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Aug 5, 2016 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the statement.
+   *
+   * @since 1.0
+   */
+  public interface Conditions<T>
+    extends Statement<T>, BatchableStatement<Void, VoidFuture> {
+    /**
+     * Adds the provided condition for the delete.
+     *
+     * @author paouelle
+     *
+     * @param  condition the condition to add
+     * @return this {@code Conditions} clause
+     * @throws IllegalArgumentException if the condition reference a column not
+     *         defined by the POJO
+     */
+    public Conditions<T> and(Clause condition);
+
+    /**
+     * Adds a where clause to the DELETE statement these options are part of.
+     *
+     * @param  clause clause to add
+     * @return the WHERE clause of the DELETE statement these options are part
+     *         of
+     * @throws IllegalArgumentException if the clause referenced a
+     *         column which is not a primary key or an index column in the POJO
+     *         or if the clause references columns not defined by the POJO or
+     *         invalid values
+     */
+    public Where<T> where(Clause clause);
+
+    /**
+     * Adds an option to the UPDATE statement these conditions are part of.
+     *
+     * @param  using the using clause to add
+     * @return the options of the UPDATE statement these conditions are part of
+     */
+    public Options<T> using(Using<?> using);
   }
 }
