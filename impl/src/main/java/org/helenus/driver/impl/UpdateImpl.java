@@ -409,7 +409,8 @@ public class UpdateImpl<T>
           init(new DeleteImpl<>(
             getPOJOContext(),
             table,
-            old_values, // pass our old values as override for the primary keys in the POJO
+            usings.usings,
+            old_values, // pass our old values as override in the POJO
             mgr,
             bridge
           )).buildQueryString(table, builders);

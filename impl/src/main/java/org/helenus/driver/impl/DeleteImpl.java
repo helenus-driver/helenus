@@ -101,12 +101,11 @@ public class DeleteImpl<T>
   protected boolean allSelected = false;
 
   /**
-   * Holds a map of primary key values to use instead of those reported by the
-   * POJO context.
+   * Holds a map of values to use instead of those reported by the POJO context.
    *
    * @author paouelle
    */
-  private final Map<String, Object> pkeys_override;
+  private final Map<String, Object> override;
 
   /**
    * Instantiates a new <code>DeleteImpl</code> object.
@@ -147,8 +146,8 @@ public class DeleteImpl<T>
    * @param  columnNames the columns names that should be deleted by the query
    * @param  allSelected <code>true</code> if the special COUNT() or *
    *         has been selected
-   * @param  pkeys_override an optional map of primary key values to use instead
-   *         of those provided by the POJO context
+   * @param  override an optional map of values to use instead of those provided
+   *         by the POJO context
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>context</code> is <code>null</code>
@@ -160,7 +159,7 @@ public class DeleteImpl<T>
     String[] tables,
     List<Object> columnNames,
     boolean allSelected,
-    Map<String, Object> pkeys_override,
+    Map<String, Object> override,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
@@ -182,7 +181,7 @@ public class DeleteImpl<T>
     );
     this.where = new WhereImpl<>(this);
     this.usings = new OptionsImpl<>(this);
-    this.pkeys_override = pkeys_override;
+    this.override = override;
   }
 
   /**
@@ -193,8 +192,9 @@ public class DeleteImpl<T>
    * @param  context the non-<code>null</code> class info context associated
    *         with this statement
    * @param  table the table to delete from
-   * @param  pkeys_override an optional map of primary key values to use instead
-   *         of those provided by the POJO context
+   * @param  usings the non-<code>null</code> list of "USINGS" options
+   * @param  override an optional map of values to use instead of those provided
+   *         by the POJO context
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>context</code> is <code>null</code>
@@ -204,7 +204,8 @@ public class DeleteImpl<T>
   DeleteImpl(
     ClassInfoImpl<T>.Context context,
     TableInfoImpl<T> table,
-    Map<String, Object> pkeys_override,
+    List<UsingImpl<?>> usings,
+    Map<String, Object> override,
     StatementManagerImpl mgr,
     StatementBridge bridge
   ) {
@@ -213,8 +214,8 @@ public class DeleteImpl<T>
     this.columnNames = null;
     this.allSelected = true;
     this.where = new WhereImpl<>(this);
-    this.usings = new OptionsImpl<>(this);
-    this.pkeys_override = pkeys_override;
+    this.usings = new OptionsImpl<>(this, usings);
+    this.override = override;
   }
 
   /**
@@ -397,10 +398,10 @@ public class DeleteImpl<T>
       final Map<String, Pair<Object, CQLDataType>> pkeys;
 
       try {
-        if (pkeys_override == null) {
+        if (override == null) {
           pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
         } else {
-          pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName(), pkeys_override);
+          pkeys = getPOJOContext().getPrimaryKeyColumnValues(table.getName(), override);
         }
       } catch (EmptyOptionalPrimaryKeyException e) {
         // ignore and continue without updating this table
@@ -771,7 +772,7 @@ public class DeleteImpl<T>
      *
      * @author paouelle
      */
-    private final List<UsingImpl<?>> usings = new ArrayList<>(5);
+    private final List<UsingImpl<?>> usings;
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -782,7 +783,21 @@ public class DeleteImpl<T>
      *        creating options
      */
     OptionsImpl(DeleteImpl<T> statement) {
+      this(statement, new ArrayList<>(5));
+    }
+
+    /**
+     * Instantiates a new <code>OptionsImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param statement the non-<code>null</code> statement for which we are
+     *        creating options
+     * @param usings the non-<code>null</code> list of "USINGS" options
+     */
+    OptionsImpl(DeleteImpl<T> statement, List<UsingImpl<?>> usings) {
       super(statement);
+      this.usings = usings;
     }
 
     /**

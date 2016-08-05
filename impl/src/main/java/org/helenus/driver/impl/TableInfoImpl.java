@@ -851,15 +851,15 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @author paouelle
    *
    * @param  object the non-<code>null</code> POJO object
-   * @param  pkeys_override a non-<code>null</code> map of primary key values
-   *         to use instead of those provided by the object
+   * @param  override a non-<code>null</code> map of values to use instead of
+   *         those provided by the object
    * @return a non-<code>null</code> map of all primary key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
   Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(
-    T object, Map<String, Object> pkeys_override
+    T object, Map<String, Object> override
   ) {
     if (table == null) {
       return Collections.emptyMap();
@@ -869,7 +869,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     for (final Map.Entry<String, FieldInfoImpl<T>> e: primaryKeyColumns.entrySet()) {
       final String name = e.getKey();
       final FieldInfoImpl<T> field = e.getValue();
-      Object value = pkeys_override.getOrDefault(name, this);
+      Object value = override.getOrDefault(name, this);
 
       if (value == this) { // special case to detect that no override was provided
         value = field.getValue(object); // so get it from the object
