@@ -30,9 +30,11 @@ import java.lang.reflect.Type;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 import java.net.JarURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
 
 import java.security.AccessController;
 
@@ -998,18 +1000,22 @@ public class ReflectionUtils {
     }
     final List<URL> urls = new LinkedList<>();
 
-    while (resources.hasMoreElements()) {
-      final URL url = resources.nextElement();
+    try {
+      while (resources.hasMoreElements()) {
+        final URL url = resources.nextElement();
 
-      if ("jar".equals(url.getProtocol())) {
-        ReflectionUtils.findResourcesFromJar(urls, url, scannedPath, cl);
-      } else if ("file".equals(url.getProtocol())) {
-        final File file = new File(url.getFile());
+        if ("jar".equals(url.getProtocol())) {
+          ReflectionUtils.findResourcesFromJar(urls, url, scannedPath, cl);
+        } else if ("file".equals(url.getProtocol())) {
+          final File file = new File(URLDecoder.decode(url.getFile(), "UTF-8"));
 
-        ReflectionUtils.findResourcesFromFile(urls, file, scannedPath, cl);
-      } else {
-        throw new IllegalArgumentException("package is provided by an unknown url: " + url);
+          ReflectionUtils.findResourcesFromFile(urls, file, scannedPath, cl);
+        } else {
+          throw new IllegalArgumentException("package is provided by an unknown url: " + url);
+        }
       }
+    } catch (UnsupportedEncodingException e) { // ignore as it should never happen that utf-8 is not supported!!!!
+      throw new InternalError(e);
     }
     return urls;
   }
