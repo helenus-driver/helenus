@@ -105,7 +105,17 @@ public interface FieldInfo<T> {
   public boolean isColumn();
 
   /**
-   * Checks if this field is annotated has a suffix key.
+   * Checks if this field is annotated as a static column.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this field is annotated as a static column;
+   *         <code>false</code> otherwise
+   */
+  public boolean isStatic();
+
+  /**
+   * Checks if this field is annotated as a suffix key.
    *
    * @author paouelle
    *

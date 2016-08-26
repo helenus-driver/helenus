@@ -160,7 +160,12 @@ public class CreateTableImpl<T>
     final Map<String, Ordering> ckeys = new LinkedHashMap<>(table.getClusteringKeys().size() * 3 / 2);
 
     for (final FieldInfoImpl<?> field: table.getColumnsImpl()) {
-      columns.add(field.getColumnName() + " " + field.getDataType().toCQL());
+      String cql = field.getColumnName() + " " + field.getDataType().toCQL();
+
+      if (field.isStatic()) {
+        cql += " STATIC";
+      }
+      columns.add(cql);
       if (field.isMultiKey()) {
         // we need to add a new column to represent a single value from the set
         // to be the clustering key in addition to the field's column

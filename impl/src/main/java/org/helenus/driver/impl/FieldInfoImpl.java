@@ -141,7 +141,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final boolean isOptional;
 
   /**
-   * This variable is used to cache Column annotation
+   * This variable is used to cache column annotation.
    *
    * @author vasu
    */
@@ -504,6 +504,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         field.getName()
       );
       org.apache.commons.lang3.Validate.isTrue(
+        !isStatic(),
+        "field cannot be annotated with @Column(isStatic=true): %s.%s",
+        declaringClass.getName(),
+        field.getName()
+      );
+      org.apache.commons.lang3.Validate.isTrue(
         !isPartitionKey(),
         "field cannot be annotated with @PartitionKey: %s.%s",
         declaringClass.getName(),
@@ -643,6 +649,29 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
           field.getName()
         );
       }
+      if (isStatic()) {
+        org.apache.commons.lang3.Validate.isTrue(
+          !isPartitionKey(),
+          "field in table '%s' cannot be annotated with @Column(isStatic=true) if it is annotated with @PartitionKey: %s.%s",
+          tname,
+          declaringClass.getName(),
+          field.getName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !isClusteringKey(),
+          "field in table '%s' cannot be annotated with @Column(isStatic=true) if it is annotated with @ClusteringKey: %s.%s",
+          tname,
+          declaringClass.getName(),
+          field.getName()
+        );
+        org.apache.commons.lang3.Validate.isTrue(
+          !isSuffixKey(),
+          "field in table '%s' cannot be annotated with @Column(isStatic=true) if it is annotated with @SuffixKey: %s.%s",
+          tname,
+          declaringClass.getName(),
+          field.getName()
+        );
+      }
     }
   }
 
@@ -721,6 +750,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       @Override
       public String name() {
         return getName();
+      }
+      @Override
+      public boolean isStatic() {
+        return false;
       }
     };
     this.persisted = null;
@@ -1160,6 +1193,18 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   @Override
   public boolean isColumn() {
     return column != null;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.info.FieldInfo#isStatic()
+   */
+  @Override
+  public boolean isStatic() {
+    return (column != null) && column.isStatic();
   }
 
   /**

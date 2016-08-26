@@ -81,6 +81,19 @@ public @interface Column {
   String name();
 
   /**
+   * Flag indicating if the column should be a static column. A static column is
+   * common to all clustered rows of a given partition.
+   * <p>
+   * <i>Note:</i> Only valid for non-partition, non-clustering, and non-key-suffixes
+   * columns of tables. Not supported for user-defined types.
+   *
+   * @author paouelle
+   *
+   * @return a flag indicating if the column should be a static column
+   */
+  boolean isStatic() default false;
+
+  /**
    * The <code>Data</code> annotation is used to override the default mapping of
    * data types from the field's class of a column with a specified one. This
    * annotation applies to all tables the column might be persisted to.
