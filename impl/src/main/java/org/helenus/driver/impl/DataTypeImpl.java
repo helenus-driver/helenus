@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -362,6 +363,28 @@ public class DataTypeImpl {
             + "."
             + field.getName()
           );
+        } else if (LinkedHashSet.class.isAssignableFrom(clazz)
+                  || (Set.class.equals(clazz)
+                      && (type instanceof DataType)
+                      && (((DataType)type).getMainType() == DataType.ORDERED_SET))) {
+          if (persisted != null) {
+            // if persisted then we need to decode: LinkedHashSet<persisted.as()>
+            return DataDecoder.orderedSet(persisted.as().CLASS, mandatory);
+          }
+          final Type type = field.getGenericType();
+
+          if (type instanceof ParameterizedType) {
+            final ParameterizedType ptype = (ParameterizedType)type;
+            final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
+
+            return DataDecoder.orderedSet(ReflectionUtils.getRawClass(atype), mandatory);
+          }
+          throw new IllegalArgumentException(
+            "unable to determine element type for field: "
+            + field.getDeclaringClass().getName()
+            + "."
+            + field.getName()
+          );
         } else if (Set.class.isAssignableFrom(clazz)) {
           if (persisted != null) {
             // if persisted then we need to decode: Set<persisted.as()>
@@ -381,7 +404,10 @@ public class DataTypeImpl {
             + "."
             + field.getName()
           );
-        } else if (SortedMap.class.isAssignableFrom(clazz)) {
+        } else if (SortedMap.class.isAssignableFrom(clazz)
+                   || (Map.class.equals(clazz)
+                       && (type instanceof DataType)
+                       && (((DataType)type).getMainType() == DataType.SORTED_MAP))) {
           final Type type = field.getGenericType();
 
           if (type instanceof ParameterizedType) {
@@ -493,6 +519,22 @@ public class DataTypeImpl {
           "unable to determine element type for class: "
           + clazz.getName()
         );
+      } else if (LinkedHashSet.class.isAssignableFrom(clazz)
+                 || (Set.class.equals(clazz)
+                     && (type instanceof DataType)
+                     && (((DataType)type).getMainType() == DataType.ORDERED_SET))) {
+        final Type type = clazz.getGenericSuperclass();
+
+        if (type instanceof ParameterizedType) {
+          final ParameterizedType ptype = (ParameterizedType)type;
+          final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
+
+          return DataDecoder.orderedSet(ReflectionUtils.getRawClass(atype), true);
+        }
+        throw new IllegalArgumentException(
+          "unable to determine element type for class: "
+          + clazz.getName()
+        );
       } else if (Set.class.isAssignableFrom(clazz)) {
         final Type type = clazz.getGenericSuperclass();
 
@@ -506,7 +548,10 @@ public class DataTypeImpl {
           "unable to determine element type for class: "
           + clazz.getName()
         );
-      } else if (SortedMap.class.isAssignableFrom(clazz)) {
+      } else if (SortedMap.class.isAssignableFrom(clazz)
+                 || (Map.class.equals(clazz)
+                     && (type instanceof DataType)
+                     && (((DataType)type).getMainType() == DataType.SORTED_MAP))) {
         final Type type = clazz.getGenericSuperclass();
 
         if (type instanceof ParameterizedType) {
@@ -585,14 +630,13 @@ public class DataTypeImpl {
       }
       if (type == DataType.LIST) {
         return new PersistedList<>(persisted, persister, fname, (List<T>)val, false);
-      }
-      if (type == DataType.SET) {
+      } else if (type == DataType.SET) {
         return new PersistedSet<>(persisted, persister, fname, (Set<T>)val, false);
-      }
-      if (type == DataType.MAP) {
+      } else if (type == DataType.ORDERED_SET) {
+        return new PersistedOrderedSet<>(persisted, persister, fname, (Set<T>)val, false);
+      } else if (type == DataType.MAP) {
         return new PersistedMap<>(persisted, persister, fname, (Map<?, T>)val, false);
-      }
-      if (type == DataType.SORTED_MAP) {
+      } else if (type == DataType.SORTED_MAP) {
         return new PersistedNavigableMap<>(persisted, persister, fname, (Map<?, T>)val, false);
       }
       // for all else, simply encode the value directly
@@ -633,13 +677,15 @@ public class DataTypeImpl {
       }
       if ((type == DataType.LIST)
           || (type == DataType.SET)
-          || (type == DataType.MAP)) {
+          || (type == DataType.ORDERED_SET)
+          || (type == DataType.MAP)
+          || (type == DataType.SORTED_MAP)) {
         // encode the element value directly
         final PersistedValue<T, PT> pval = new PersistedValue<>(
             persisted, persister, fname
         ).setDecodedValue((T)val);
 
-        pval.getEncodedValue(); // force it to be decoded
+        pval.getEncodedValue(); // force it to be encoded
         return pval;
       }
       throw new IOException("field is not a list, a set, or a map");
@@ -678,14 +724,13 @@ public class DataTypeImpl {
       }
       if (type == DataType.LIST) {
         return new PersistedList<>(persisted, persister, fname, (List<PT>)val, true);
-      }
-      if (type == DataType.SET) {
+      } else if (type == DataType.SET) {
         return new PersistedSet<>(persisted, persister, fname, (Set<PT>)val, true);
-      }
-      if (type == DataType.MAP) {
+      } else if (type == DataType.ORDERED_SET) {
+        return new PersistedOrderedSet<>(persisted, persister, fname, (Set<PT>)val, true);
+      } else if (type == DataType.MAP) {
         return new PersistedMap<>(persisted, persister, fname, (Map<?,PT>)val, true);
-      }
-      if (type == DataType.SORTED_MAP) {
+      } else if (type == DataType.SORTED_MAP) {
         return new PersistedNavigableMap<>(persisted, persister, fname, (Map<?,PT>)val, true);
       }
       // for all else, simply decode the value directly
@@ -918,7 +963,7 @@ public class DataTypeImpl {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
 
-        types.add(DataType.SET);
+        types.add(LinkedHashSet.class.isAssignableFrom(clazz) ? DataType.ORDERED_SET : DataType.SET);
         if (persisted != null) {
           types.add(persisted.as());
         } else {

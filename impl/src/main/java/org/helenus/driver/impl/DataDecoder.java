@@ -24,7 +24,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -802,22 +803,20 @@ public abstract class DataDecoder<V> {
           // that mandatory and primary keys be non null
           if (mandatory) {
             if (eclazz.isEnum()) {
-              // for enum values we create an enum set. Now we won't preserve the order
-              // the entries were added but that should be fine anyways in this case
+              // for enum values we create an enum set
               return EnumSet.noneOf((Class<? extends Enum>)eclazz);
             }
-            return new LinkedHashSet(8); // to keep order
+            return new HashSet(8); // to keep order
           }
           return set;
         }
         final Set nset;
 
         if (eclazz.isEnum()) {
-          // for enum values we create an enum set. Now we won't preserve the order
-          // the entries were added but that should be fine anyways in this case
+          // for enum values we create an enum set
           nset = EnumSet.noneOf((Class<? extends Enum>)eclazz);
         } else {
-          nset = new LinkedHashSet(set.size()); // to keep order
+          nset = new HashSet(set.size() * 3 / 2); // to keep order
         }
         if (eclazz.isAssignableFrom(etype)) {
           // we only need to store elements to make sure list is modifiable
@@ -854,6 +853,69 @@ public abstract class DataDecoder<V> {
   }
 
   /**
+   * Gets a "list" to {@link Set} decoder based on the given element class.
+   *
+   * @author paouelle
+   *
+   * @param  eclazz the non-<code>null</code> class of elements
+   * @param  mandatory if the field associated with the decoder is mandatory or
+   *         represents a primary key
+   * @return the non-<code>null</code> decoder for sets of the specified element
+   *         class
+   */
+  @SuppressWarnings("rawtypes")
+  public final static DataDecoder<LinkedHashSet> orderedSet(
+    final Class<?> eclazz, final boolean mandatory
+  ) {
+    return new DataDecoder<LinkedHashSet>(LinkedHashSet.class) {
+      @SuppressWarnings("unchecked")
+      private LinkedHashSet decodeImpl(Class<?> etype, List<Object> set) {
+        if (set == null) {
+          // safe to return as is unless mandatory, that is because Cassandra
+          // returns null for empty lists and the schema definition requires
+          // that mandatory and primary keys be non null
+          if (mandatory) {
+            return new LinkedHashSet(8);
+          }
+          return null;
+        }
+        final LinkedHashSet nset = new LinkedHashSet(set.size() * 3 / 2);
+
+        if (eclazz.isAssignableFrom(etype)) {
+          // we only need to store elements to make sure set is modifiable
+          nset.addAll(set);
+        } else {
+          // will need to do some conversion of each element
+          final ElementConverter converter = ElementConverter.getConverter(eclazz, etype);
+
+          for (final Object o: set) {
+            nset.add((o != null) ? converter.convert(o) : null);
+          }
+        }
+        return nset;
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected LinkedHashSet decodeImpl(Row row, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          row.isNull(name) ? null : row.getList(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected LinkedHashSet decodeImpl(UDTValue uval, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          uval.isNull(name) ? null : uval.getList(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+    };
+  }
+
+  /**
    * Gets a "map" to {@link Map} decoder based on the given key and value classes.
    *
    * @author paouelle
@@ -878,22 +940,20 @@ public abstract class DataDecoder<V> {
           // that mandatory and primary keys be non null
           if (mandatory) {
             if (ekclazz.isEnum()) {
-              // for enum keys we create an enum map. Now we won't preserve the order
-              // the entries were added but that should be fine anyways in this case
+              // for enum keys we create an enum map
               return new EnumMap(ekclazz);
             }
-            return new LinkedHashMap(8); // to keep order
+            return new HashMap(8); // to keep order
           }
           return map;
         }
         final Map nmap;
 
         if (ekclazz.isEnum()) {
-          // for enum keys we create an enum map. Now we won't preserve the order
-          // the entries were added but that should be fine anyways in this case
+          // for enum keys we create an enum map
           nmap = new EnumMap(ekclazz);
         } else {
-          nmap = new LinkedHashMap(map.size()); // to keep order
+          nmap = new HashMap(map.size() * 3 / 2); // to keep order
         }
         if (ekclazz.isAssignableFrom(ektype) && evclazz.isAssignableFrom(evtype)) {
           nmap.putAll(map);

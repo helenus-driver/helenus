@@ -538,7 +538,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       );
       if (isInTable
           && ((clusteringKey != null) || (partitionKey != null))
-          && (definition.getMainType() == DataType.SET)) {
+          && ((definition.getMainType() == DataType.SET)
+              || (definition.getMainType() == DataType.ORDERED_SET))) {
         final Type type = field.getGenericType();
 
         if (type instanceof ParameterizedType) {
@@ -1551,7 +1552,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws IllegalArgumentException if the specified value is not of the
    *         right type or is <code>null</code> when the field is mandatory
    */
-  public void validateCollectionValue(CQLDataType type, Object value) {
+  private void validateCollectionValue(CQLDataType type, Object value) {
     if (persister != null) { // will be persisted anyway so no need to check
       return;
     }
@@ -1584,6 +1585,34 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       "invalid element value for column '%s'; expecting type '%s': %s",
       getColumnName(), etype.name(), value
     );
+  }
+
+  /**
+   * Validate the provided value for this list field.
+   *
+   * @author paouelle
+   *
+   * @param  value the element value to be validated
+   * @throws IllegalArgumentException if the specified value is not of the
+   *         right element type or the value is <code>null</code> when the
+   *         column is mandatory
+   */
+  public void validateListValue(Object value) {
+    validateCollectionValue(definition.getMainType(), value);
+  }
+
+  /**
+   * Validate the provided value for this set field.
+   *
+   * @author paouelle
+   *
+   * @param  value the element value to be validated
+   * @throws IllegalArgumentException if the specified value is not of the
+   *         right element type or the value is <code>null</code> when the
+   *         column is mandatory
+   */
+  public void validateSetValue(Object value) {
+    validateCollectionValue(definition.getMainType(), value);
   }
 
   /**

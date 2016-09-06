@@ -17,7 +17,6 @@ package org.helenus.driver.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -886,7 +885,7 @@ public abstract class AssignmentImpl
      */
     @Override
     void validate(TableInfoImpl<?> table) {
-      table.validateCollectionColumnAndValue(name, DataType.LIST, value);
+      table.validateListColumnAndValue(name, value);
     }
   }
 
@@ -957,7 +956,7 @@ public abstract class AssignmentImpl
      */
     @Override
     void validate(TableInfoImpl<?> table) {
-      table.validateCollectionColumnAndValue(name, DataType.LIST, value);
+      table.validateListColumnAndValue(name, value);
     }
   }
 
@@ -1051,11 +1050,11 @@ public abstract class AssignmentImpl
         if ((finfo != null)
             && ((finfo.getDataType().getMainType() == DataType.MAP)
                 || (finfo.getDataType().getMainType() == DataType.SORTED_MAP))) {
-          table.validateMapColumnAndKeys(name, (Collection<?>)collection);
-        } else {
-          table.validateCollectionColumnAndValues(
-            name, ctype, (Collection<?>)collection
-          );
+          table.validateMapColumnAndKeys(name, (Iterable<?>)collection);
+        } else if ((ctype == DataType.SET) || (ctype == DataType.ORDERED_SET)) {
+          table.validateSetColumnAndValues(name, (Iterable<?>)collection);
+        } else { // must be a list
+          table.validateListColumnAndValues(name, (Iterable<?>)collection);
         }
       }
     }

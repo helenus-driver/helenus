@@ -16,10 +16,11 @@
 package org.helenus.driver.impl;
 
 import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.iterators.TransformIterator;
@@ -32,7 +33,7 @@ import org.helenus.driver.persistence.Persister;
  * The <code>PersistedList</code> class provides a {@link List} implementation
  * suitable to hold persisted values.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -45,6 +46,24 @@ import org.helenus.driver.persistence.Persister;
  */
 public class PersistedList<T, PT>
   extends AbstractList<T> implements PersistedObject<T, PT> {
+  /**
+   * Creates a new empty list that resembles the type of the provided list.
+   *
+   * @author paouelle
+   *
+   * @param <NV> the new list value type
+   *
+   * @param  list the non-<code>null</code> list to create a resembling one from
+   * @return a new map that resembles the provided one (i.e. {@link ArrayList}
+   *         or {@link LinkedList}
+   */
+  private static <NV> List<NV> newList(List<?> list) {
+    if (list instanceof LinkedList) {
+      return new LinkedList<>();
+    }
+    return new ArrayList<>(list.size());
+  }
+
   /**
    * Holds the persisted annotation for this list.
    *
@@ -99,26 +118,21 @@ public class PersistedList<T, PT>
     this.persisted = persisted;
     this.persister = persister;
     this.fname = fname;
+    this.list = PersistedList.newList(list);
     if (encoded) {
-      this.list = ((List<PT>)list).stream()
-          .map(
-            pt -> new PersistedValue<>(persisted, persister, fname)
-                  .setEncodedValue(pt)
-          )
-          .collect(Collectors.toList());
+      ((List<PT>)list).forEach(
+        pt -> this.list.add(new PersistedValue<>(persisted, persister, fname)
+              .setEncodedValue(pt))
+      );
     } else {
-      this.list = ((List<T>)list).stream()
-          .map(
-            t -> {
-              final PersistedValue<T, PT> pval = new PersistedValue<>(
-                persisted, persister, fname
-              ).setDecodedValue(t);
+      ((List<T>)list).forEach(t -> {
+        final PersistedValue<T, PT> pval = new PersistedValue<>(
+          persisted, persister, fname
+        ).setDecodedValue(t);
 
-              pval.getEncodedValue(); // force it to be encoded
-              return pval;
-            }
-          )
-          .collect(Collectors.toList());
+        pval.getEncodedValue(); // force it to be encoded
+        this.list.add(pval);
+      });
     }
   }
 

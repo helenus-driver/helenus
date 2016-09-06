@@ -50,6 +50,7 @@ import org.helenus.driver.Keywords;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.CQLDataType;
+import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.UDTEntity;
 import org.helenus.driver.persistence.UDTTypeEntity;
 
@@ -356,6 +357,11 @@ public abstract class Utils {
     if (value instanceof List) {
       appendList((List)value, definition, sb);
       return true;
+    } else if ((definition != null)
+               && (definition.getMainType() == DataType.ORDERED_SET)
+               && (value instanceof Collection)) {
+      appendList((Collection)value, definition, sb);
+      return true;
     } else if (value instanceof Set) {
       appendSet((Set)value, definition, sb);
       return true;
@@ -384,23 +390,27 @@ public abstract class Utils {
   }
 
   static StringBuilder appendList(
-    List<?> l,
+    Collection<?> l,
     CQLDataType definition,
     StringBuilder sb
   ) {
     final CQLDataType vdef = definition.getElementType();
 
     sb.append('[');
+    boolean first = true;
+
     if (l instanceof PersistedList) {
       l = ((PersistedList<?,?>)l).getPersistedList();
     }
-    for (int i = 0; i < l.size(); i++ ) {
-      final Object elt = l.get(i);
-
+    for (final Object elt: l) {
       org.apache.commons.lang3.Validate.isTrue(
-        elt != null, "null are not supported in lists"
+        elt != null,
+        "null are not supported in %s",
+        (l instanceof List) ? "lists" : ((l instanceof Set) ? "sets" : "collections")
       );
-      if (i > 0) {
+      if (first) {
+        first = false;
+      } else {
         sb.append(',');
       }
       appendFlatValue(elt, vdef, sb);
@@ -422,7 +432,7 @@ public abstract class Utils {
     if (s instanceof PersistedSet) {
       s = ((PersistedSet<?,?>)s).getPersistedSet();
     }
-    for (Object elt : s) {
+    for (final Object elt : s) {
       org.apache.commons.lang3.Validate.isTrue(
         elt != null, "null are not supported in sets"
       );
@@ -451,7 +461,7 @@ public abstract class Utils {
     if (m instanceof PersistedMap) {
       m = ((PersistedMap<?,?,?>)m).getPersistedMap();
     }
-    for (Map.Entry<?, ?> entry : m.entrySet()) {
+    for (final Map.Entry<?, ?> entry : m.entrySet()) {
       final Object eval = entry.getValue();
 
       org.apache.commons.lang3.Validate.isTrue(

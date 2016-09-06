@@ -38,7 +38,6 @@ import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.Column;
-import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.Table;
 
 /**
@@ -2303,33 +2302,28 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Validates if a column is defined as the given collection data type by the
+   * Validates if a column is defined as the given list data type by the
    * POJO and its potential element value in this table.
    *
    * @author paouelle
    *
    * @param  name the column name to validate
-   * @param  type the collection data type of the column to validate
-   * @param  value the element value to be validated for the collection
-   * @throws NullPointerException if <code>name</code> or <code>type</code> is
-   *         <code>null</code>
+   * @param  value the element value to be validated for the list
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if the specified column is not defined
-   *         by the POJO as the provided data type or if the specified value is
-   *         not of the right element type or is <code>null</code> when the
-   *         column is mandatory
+   *         by the POJO as a list or if the specified value is not of the right
+   *         element type or is <code>null</code> when the column is mandatory
    */
-  public void validateCollectionColumnAndValue(
-    CharSequence name, DataType type, Object value
+  public void validateListColumnAndValue(
+    CharSequence name, Object value
   ) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
-        validateCollectionColumnAndValue(n, type, value); // recurse to validate
+        validateListColumnAndValue(n, value); // recurse to validate
       }
       return;
     }
-    org.apache.commons.lang3.Validate.notNull(type, "invalid null column type");
-    org.apache.commons.lang3.Validate.isTrue(type.isCollection(), "%s is not a collection type", name);
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
@@ -2349,37 +2343,34 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         n
       );
     }
-    field.validateCollectionValue(type, value);
+    field.validateListValue(value);
   }
 
   /**
-   * Validates if a column is defined as the given collection data type by the
+   * Validates if a column is defined as the given list data type by the
    * POJO and its potential element value in this table.
    *
    * @author paouelle
    *
    * @param  name the column name to validate
-   * @param  type the collection data type of the column to validate
-   * @param  values the list of element values to be validated for the collection
-   * @throws NullPointerException if <code>name</code> or <code>type</code> is
-   *         <code>null</code>
+   * @param  values the element values to be validated for the list
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    * @throws IllegalArgumentException if the specified column is not
-   *         defined by the POJO as the specified data type or if any of the
-   *         specified values are not of the right element type or are
-   *         <code>null</code> when the column is mandatory
+   *         defined by the POJO as the list or if any of the specified values
+   *         are not of the right element type or are <code>null</code> when the
+   *         column is mandatory
    */
-  public void validateCollectionColumnAndValues(
-    CharSequence name, DataType type, Iterable<?> values
+  public void validateListColumnAndValues(
+    CharSequence name, Iterable<?> values
   ) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
-        validateCollectionColumnAndValues(n, type, values); // recurse to validate
+        validateListColumnAndValues(n, values); // recurse to validate
       }
       return;
     }
     org.apache.commons.lang3.Validate.notNull(values, "invalid null list of values");
-    org.apache.commons.lang3.Validate.isTrue(type.isCollection(), "%s is not a collection type", name);
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
@@ -2400,7 +2391,101 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       );
     }
     for (final Object value: values) {
-      field.validateCollectionValue(type, value);
+      field.validateListValue(value);
+    }
+  }
+
+  /**
+   * Validates if a column is defined as the given set data type by the
+   * POJO and its potential element value in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  value the element value to be validated for the set
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not defined
+   *         by the POJO as a set or if the specified value is not of the right
+   *         element type or is <code>null</code> when the column is mandatory
+   */
+  public void validateSetColumnAndValue(
+    CharSequence name, Object value
+  ) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        validateSetColumnAndValue(n, value); // recurse to validate
+      }
+      return;
+    }
+    final String n = name.toString();
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    field.validateSetValue(value);
+  }
+
+  /**
+   * Validates if a column is defined as a set by the POJO and its potential
+   * element value in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  values the element values to be validated for the set
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not
+   *         defined by the POJO as a set or if any of the specified values are
+   *         not of the right element type or are <code>null</code> when the
+   *         column is mandatory
+   */
+  public void validateSetColumnAndValues(
+    CharSequence name, Iterable<?> values
+  ) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        validateSetColumnAndValues(n, values); // recurse to validate
+      }
+      return;
+    }
+    org.apache.commons.lang3.Validate.notNull(values, "invalid null list of values");
+    final String n = name.toString();
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    for (final Object value: values) {
+      field.validateSetValue(value);
     }
   }
 
@@ -2514,7 +2599,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         the right mapping types
    */
   public void validateMapColumnAndKeys(
-    CharSequence name, Collection<?> keys
+    CharSequence name, Iterable<?> keys
   ) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
     if (name instanceof Utils.CNameSequence) {

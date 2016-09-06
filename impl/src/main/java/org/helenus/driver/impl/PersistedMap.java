@@ -19,10 +19,13 @@ import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.iterators.TransformIterator;
@@ -34,7 +37,7 @@ import org.helenus.driver.persistence.Persister;
  * The <code>PersistedMap</code> class provides a {@link Map} implementation
  * suitable to hold persisted values.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -48,6 +51,27 @@ import org.helenus.driver.persistence.Persister;
  */
 public class PersistedMap<K, T, PT>
   extends AbstractMap<K, T> implements PersistedObject<T, PT> {
+  /**
+   * Creates a new empty map that resembles the type of the provided map.
+   *
+   * @author paouelle
+   *
+   * @param <NK> the new map key type
+   * @param <NV> the new map value type
+   *
+   * @param  map the non-<code>null</code> map to create a resembling one from
+   * @return a new map that resembles the provided one (i.e. {@link TreeMap},
+   *         {@link LinkedHashMap}, or {@link HashMap}
+   */
+  private static <NK, NV> Map<NK, NV> newMap(Map<?, ?> map) {
+    if (map instanceof SortedMap) {
+      return new TreeMap<>();
+    } else if (map instanceof LinkedHashMap) {
+      return new LinkedHashMap<>(map.size() * 3 / 2);
+    }
+    return new HashMap<>(map.size() * 3 / 2);
+  }
+
   /**
    * Holds the persisted annotation for this map.
    *
@@ -180,14 +204,7 @@ public class PersistedMap<K, T, PT>
     Map<K, ?> map,
     boolean encoded
   ) {
-    this(
-      persisted,
-      persister,
-      fname,
-      new LinkedHashMap<>(map.size() * 3 / 2), // to preserve order
-      map,
-      encoded
-    );
+    this(persisted, persister, fname, PersistedMap.newMap(map), map, encoded);
   }
 
   /**

@@ -15,13 +15,10 @@
  */
 package org.helenus.driver.impl;
 
-import java.util.AbstractSet;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.iterators.TransformIterator;
@@ -30,8 +27,8 @@ import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
 
 /**
- * The <code>PersistedSet</code> class provides a {@link Set} implementation
- * suitable to hold persisted values.
+ * The <code>PersistedOrderedSet</code> class provides a {@link LinkedHashSet}
+ * implementation suitable to hold persisted values.
  *
  * @copyright 2015-2016 The Helenus Driver Project Authors
  *
@@ -44,27 +41,14 @@ import org.helenus.driver.persistence.Persister;
  *
  * @since 1.0
  */
-public class PersistedSet<T, PT>
-  extends AbstractSet<T> implements PersistedObject<T, PT> {
+public class PersistedOrderedSet<T, PT>
+  extends LinkedHashSet<T> implements PersistedObject<T, PT> {
   /**
-   * Creates a new empty set that resembles the type of the provided set.
+   * Holds the serialVersionUID.
    *
-   * @author paouelle
-   *
-   * @param <NV> the new set value type
-   *
-   * @param  set the non-<code>null</code> set to create a resembling one from
-   * @return a new map that resembles the provided one (i.e. {@link TreeSet},
-   *         {@link LinkedHashSet}, or {@link HashSet}
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
    */
-  private static <NV> Set<NV> newSet(Set<?> set) {
-    if (set instanceof SortedSet) {
-      return new TreeSet<>();
-    } else if (set instanceof LinkedHashSet) {
-      return new LinkedHashSet<>(set.size() * 3 / 2);
-    }
-    return new HashSet<>(set.size() * 3 / 2);
-  }
+  private static final long serialVersionUID = 1444306189578940573L;
 
   /**
    * Holds the persisted annotation for this set.
@@ -92,7 +76,7 @@ public class PersistedSet<T, PT>
    *
    * @author paouelle
    */
-  private final Set<PersistedValue<T, PT>> set;
+  private final LinkedHashSet<PersistedValue<T, PT>> set;
 
   /**
    * Instantiates a new <code>PersistedSet</code> object.
@@ -102,7 +86,6 @@ public class PersistedSet<T, PT>
    * @param  persisted the non-<code>null</code> persisted annotation
    * @param  persister the non-<code>null</code> persister
    * @param  fname the non-<code>null</code> field name
-   * @param  pset the underlying persisted set
    * @param  set the non-<code>null</code> encoded/decoded set
    * @param  encoded <code>true</code> if the set contains encoded values;
    *         <code>false</code> if it contains decoded values (this will force
@@ -111,60 +94,37 @@ public class PersistedSet<T, PT>
    * @throws ClassCastException if any values cannot be encoded to the expected type
    */
   @SuppressWarnings("unchecked")
-  PersistedSet(
+  PersistedOrderedSet(
     Persisted persisted,
     Persister<T, PT> persister,
     String fname,
-    Set<PersistedValue<T, PT>> pset,
     Set<?> set,
     boolean encoded
   ) {
     this.persisted = persisted;
     this.persister = persister;
     this.fname = fname;
-    this.set = pset;
     if (encoded) {
-       ((Set<PT>)set).forEach(
-         pt -> pset.add(new PersistedValue<>(persisted, persister, fname)
-               .setEncodedValue(pt))
-       );
+      this.set = ((Set<PT>)set).stream()
+        .map(
+          pt -> new PersistedValue<>(persisted, persister, fname)
+                .setEncodedValue(pt)
+        )
+        .collect(Collectors.toCollection(LinkedHashSet::new)); // to preserve order
     } else {
-      ((Set<T>)set).forEach(
-        t -> {
-          final PersistedValue<T, PT> pval = new PersistedValue<>(
-            persisted, persister, fname
-          ).setDecodedValue(t);
+      this.set = ((Set<T>)set).stream()
+        .map(
+          t -> {
+            final PersistedValue<T, PT> pval = new PersistedValue<>(
+              persisted, persister, fname
+            ).setDecodedValue(t);
 
-          pval.getEncodedValue(); // force it to be encoded
-          pset.add(pval);
-        });
+            pval.getEncodedValue(); // force it to be encoded
+            return pval;
+          }
+        )
+        .collect(Collectors.toCollection(LinkedHashSet::new)); // to preserve order
     }
-  }
-
-  /**
-   * Instantiates a new <code>PersistedSet</code> object.
-   *
-   * @author paouelle
-   *
-   * @param  persisted the non-<code>null</code> persisted annotation
-   * @param  persister the non-<code>null</code> persister
-   * @param  fname the non-<code>null</code> field name
-   * @param  set the non-<code>null</code> encoded/decoded set
-   * @param  encoded <code>true</code> if the set contains encoded values;
-   *         <code>false</code> if it contains decoded values (this will force
-   *         all values to be encoded)
-   * @throws IllegalArgumentException if unable to encode/decode the values properly
-   * @throws ClassCastException if any values cannot be encoded to the expected type
-   */
-  @SuppressWarnings("unchecked")
-  PersistedSet(
-    Persisted persisted,
-    Persister<T, PT> persister,
-    String fname,
-    Set<?> set,
-    boolean encoded
-  ) {
-    this(persisted, persister, fname, PersistedSet.newSet(set), set, encoded);
   }
 
   /**
@@ -174,7 +134,7 @@ public class PersistedSet<T, PT>
    *
    * @return the non-<code>null</code> persisted set
    */
-  public Set<PersistedValue<T, PT>> getPersistedSet() {
+  public LinkedHashSet<PersistedValue<T, PT>> getPersistedSet() {
     return set;
   }
 

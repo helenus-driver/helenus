@@ -27,7 +27,7 @@ import org.helenus.driver.persistence.Persister;
  * The <code>PersistedSortedMap</code> class provides a {@link SortedMap}
  * implementation suitable to hold persisted values.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Nov 10, 2015 - paouelle - Creation

@@ -20,6 +20,7 @@ import java.lang.reflect.InvocationTargetException;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -381,12 +382,16 @@ public abstract class UDTClassInfoImpl<T>
       );
     } else if (Set.class.isAssignableFrom(clazz)) {
       table.addNonPrimaryColumn(
-        new FieldInfoImpl<>(this, DataType.SET, (obj, val) -> {
-          final Set s = (Set)obj;
+        new FieldInfoImpl<>(
+          this,
+          LinkedHashSet.class.isAssignableFrom(clazz) ? DataType.ORDERED_SET : DataType.SET,
+          (obj, val) -> {
+            final Set s = (Set)obj;
 
-          s.clear();
-          s.addAll((Collection)val);
-        })
+            s.clear();
+            s.addAll((Collection)val);
+          }
+        )
       );
     } else if (Map.class.isAssignableFrom(clazz)) {
       table.addNonPrimaryColumn(

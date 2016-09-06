@@ -28,6 +28,7 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -127,7 +128,7 @@ public @interface Column {
      * - "uuid"      - {@link UUID}
      * - "varint"    - {@link BigInteger}
      *
-     * - "list&lt;ctype&gt;"       - {@link List} of the corresponding element type
+     * - "list&lt;ctype&gt;"       - {@link List} or {@link LinkedHashSet} of the corresponding element type
      * - "map&lt;ctype, ctype&gt;" - {@link Map} of the corresponding element types
      * - "set&lt;ctype&gt;"        - {@link Set} of the corresponding element type
      *
@@ -139,13 +140,14 @@ public @interface Column {
 
     /**
      * Optionally indicates the argument types for a collection type. Only used
-     * when {@link DataType#LIST}, {@link DataType#SET}, {@link DataType#MAP},
-     * or {@link DataType#SORTED_MAP} is defined as {@link #type} and cannot be
-     * set to one of the collection type either.
+     * when {@link DataType#LIST}, {@link DataType#SET}, {@link DataType#ORDERED_SET},
+     * {@link DataType#MAP}, or {@link DataType#SORTED_MAP} is defined as
+     * {@link #type} and cannot be set to one of the collection type either.
      *
      * @author paouelle
      *
-     * @return the optional argument types for a collection type
+     * @return the optional argument types for a collection type or empty to
+     *         infer them automatically
      */
     DataType[] arguments() default {};
   }
