@@ -18,11 +18,13 @@ package org.helenus.driver.impl;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.Spliterator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.iterators.TransformIterator;
 
+import org.helenus.commons.collections.iterators.TransformSpliterator;
 import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
 
@@ -79,6 +81,22 @@ public class PersistedOrderedSet<T, PT>
   private final LinkedHashSet<PersistedValue<T, PT>> set;
 
   /**
+   * Instantiates a new <code>PersistedOrderedSet</code> object.
+   *
+   * @author paouelle
+   *
+   * @param set the non-<code>null</code> set to clone
+   */
+  @SuppressWarnings("unchecked")
+  PersistedOrderedSet(PersistedOrderedSet<T, PT> set) {
+    super(6);
+    this.persisted = set.persisted;
+    this.persister = set.persister;
+    this.fname = set.fname;
+    this.set = (LinkedHashSet<PersistedValue<T, PT>>)set.set.clone();
+  }
+
+  /**
    * Instantiates a new <code>PersistedSet</code> object.
    *
    * @author paouelle
@@ -101,6 +119,7 @@ public class PersistedOrderedSet<T, PT>
     Set<?> set,
     boolean encoded
   ) {
+    super(6);
     this.persisted = persisted;
     this.persister = persister;
     this.fname = fname;
@@ -143,7 +162,7 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.util.Set#size()
+   * @see java.util.HashSet#size()
    */
   @Override
   public int size() {
@@ -155,7 +174,7 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.util.Set#isEmpty()
+   * @see java.util.HashSet#isEmpty()
    */
   @Override
   public boolean isEmpty() {
@@ -167,11 +186,28 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.util.Set#iterator()
+   * @see java.util.HashSet#iterator()
    */
   @Override
   public Iterator<T> iterator() {
     return new TransformIterator<PersistedValue<T, PT>, T>(set.iterator()) {
+      @Override
+      protected T transform(PersistedValue<T, PT> pv) {
+        return pv.getDecodedValue();
+      }
+    };
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.util.LinkedHashSet#spliterator()
+   */
+  @Override
+  public Spliterator<T> spliterator() {
+    return new TransformSpliterator<PersistedValue<T, PT>, T>(set.spliterator()) {
       @Override
       protected T transform(PersistedValue<T, PT> pv) {
         return pv.getDecodedValue();
@@ -208,7 +244,23 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.util.Set#add(java.lang.Object)
+   * @see java.util.HashSet#contains(java.lang.Object)
+   */
+  @Override
+  public boolean contains(Object o) {
+    return set.contains(
+      new PersistedValue<>(persisted, persister, fname).setDecodedValue(
+        persister.getDecodedClass().cast(o)
+      )
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.util.HashSet#add(java.lang.Object)
    */
   @Override
   public boolean add(T e) {
@@ -222,7 +274,7 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.util.Set#remove(java.lang.Object)
+   * @see java.util.HashSet#remove(java.lang.Object)
    */
   @Override
   public boolean remove(Object o) {
@@ -238,7 +290,7 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.util.Set#clear()
+   * @see java.util.HashSet#clear()
    */
   @Override
   public void clear() {
@@ -250,10 +302,22 @@ public class PersistedOrderedSet<T, PT>
    *
    * @author paouelle
    *
-   * @see java.lang.Object#toString()
+   * @see java.util.AbstractCollection#toString()
    */
   @Override
   public String toString() {
     return set.toString();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.util.HashSet#clone()
+   */
+  @Override
+  public Object clone() {
+    return new PersistedOrderedSet<>(this);
   }
 }

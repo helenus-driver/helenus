@@ -25,11 +25,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.Spliterator;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.iterators.TransformIterator;
 
+import org.helenus.commons.collections.iterators.TransformSpliterator;
 import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
 
@@ -354,6 +356,15 @@ public class PersistedMap<K, T, PT>
           };
         }
         @Override
+        public Spliterator<T> spliterator() {
+          return new TransformSpliterator<PersistedValue<T, PT>, T>(vcol.spliterator()) {
+            @Override
+            protected T transform(PersistedValue<T, PT> pv) {
+              return pv.getDecodedValue();
+            }
+          };
+        }
+        @Override
         public Stream<T> stream() {
           return vcol.stream().map(pv -> pv.getDecodedValue());
         }
@@ -403,6 +414,19 @@ public class PersistedMap<K, T, PT>
               return new PersistedEntry(me);
             }
           };
+        }
+        @Override
+        public Spliterator<Map.Entry<K, T>> spliterator() {
+          final TransformSpliterator<Map.Entry<K, PersistedValue<T, PT>>, Map.Entry<K, T>> si
+            = new TransformSpliterator<Map.Entry<K, PersistedValue<T, PT>>, Map.Entry<K, T>>(eset.spliterator()) {
+              @Override
+              protected Map.Entry<K, T> transform(Map.Entry<K, PersistedValue<T, PT>> me) {
+                return new PersistedEntry(me);
+              }
+            };
+
+          si.setReverseTransformer(pe -> ((PersistedEntry)pe).me);
+          return si;
         }
         @Override
         public Stream<Map.Entry<K, T>> stream() {
@@ -461,7 +485,7 @@ public class PersistedMap<K, T, PT>
    */
   @SuppressWarnings("javadoc")
   class PersistedEntry implements Map.Entry<K, T> {
-    private final Map.Entry<K, PersistedValue<T, PT>> me;
+    final Map.Entry<K, PersistedValue<T, PT>> me;
 
     PersistedEntry(final Map.Entry<K, PersistedValue<T, PT>> me) {
       this.me = me;

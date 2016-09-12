@@ -21,11 +21,13 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.Spliterator;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.iterators.TransformIterator;
 
+import org.helenus.commons.collections.iterators.TransformSpliterator;
 import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
 
@@ -212,6 +214,23 @@ public class PersistedSet<T, PT>
   @Override
   public Iterator<T> iterator() {
     return new TransformIterator<PersistedValue<T, PT>, T>(set.iterator()) {
+      @Override
+      protected T transform(PersistedValue<T, PT> pv) {
+        return pv.getDecodedValue();
+      }
+    };
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.util.LinkedHashSet#spliterator()
+   */
+  @Override
+  public Spliterator<T> spliterator() {
+    return new TransformSpliterator<PersistedValue<T, PT>, T>(set.spliterator()) {
       @Override
       protected T transform(PersistedValue<T, PT> pv) {
         return pv.getDecodedValue();

@@ -45,7 +45,7 @@ public class TransformListIterator<I, O> implements ListIterator<O> {
   /**
    * Holds the iterator to be transformed.
    *
-   * @author The Helenus Driver Project Authors
+   * @author paouelle
    */
   private ListIterator<? extends I> i;
 
@@ -59,7 +59,7 @@ public class TransformListIterator<I, O> implements ListIterator<O> {
   /**
    * Constructs a transforming list iterator using an input list iterator.
    *
-   * @author The Helenus Driver Project Authors
+   * @author paouelle
    *
    * @param i a list iterator to be transformed
    */
@@ -71,7 +71,7 @@ public class TransformListIterator<I, O> implements ListIterator<O> {
    * Constructs a transforming list iterator using an input list iterator and the
    * specified transformer.
    *
-   * @author The Helenus Driver Project Authors
+   * @author paouelle
    *
    * @param i a list iterator to be transformed
    * @param transformer a transformer object
@@ -86,7 +86,7 @@ public class TransformListIterator<I, O> implements ListIterator<O> {
   /**
    * Transforms the given object using the transformer.
    *
-   * @author The Helenus Driver Project Authors
+   * @author paouelle
    *
    * @param  source the object to transform
    * @return the transformed object
@@ -238,7 +238,7 @@ public class TransformListIterator<I, O> implements ListIterator<O> {
   }
 
   /**
-   * Sets the transformer this the iterator to use.
+   * Sets the transformer this iterator will use.
    *
    * @author paouelle
    *
