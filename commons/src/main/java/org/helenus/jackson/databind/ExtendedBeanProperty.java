@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.helenus.jackson.jdatabind;
+package org.helenus.jackson.databind;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;

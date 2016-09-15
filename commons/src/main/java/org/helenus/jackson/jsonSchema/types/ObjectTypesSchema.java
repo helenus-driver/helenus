@@ -30,7 +30,7 @@ import com.fasterxml.jackson.databind.type.SimpleType;
 import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
 import com.fasterxml.jackson.module.jsonSchema.types.ReferenceSchema;
 
-import org.helenus.jackson.jdatabind.ExtendedBeanProperty;
+import org.helenus.jackson.databind.ExtendedBeanProperty;
 
 /**
  * The <code>ObjectTypesSchema</code> class extends the {@link ObjectSchema}

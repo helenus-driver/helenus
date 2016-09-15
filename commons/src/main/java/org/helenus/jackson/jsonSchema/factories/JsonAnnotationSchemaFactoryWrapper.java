@@ -987,8 +987,8 @@ public class JsonAnnotationSchemaFactoryWrapper extends SchemaFactoryWrapper {
 //        if (type.getRawClass().getSimpleName().equals("RoleMap")) {
 //          System.out.println("**************** HERE HERE HERE OPROPS: " + writer.getName() + " RoleMap - " + schema);
 //        }
-//          if (writer.getName().equals("groups")) {
-//            System.out.println("*** GROUPS");
+//          if (writer.getName().equals("org")) {
+//            System.out.println("*** ORGS");
 //          }
         if (isIncluded(writer)) {
           ((JsonAnnotationVisitorContext)visitorContext).withEnumValuesDo(
