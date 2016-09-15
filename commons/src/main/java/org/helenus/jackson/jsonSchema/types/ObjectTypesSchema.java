@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.type.SimpleType;
 import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema;
+import com.fasterxml.jackson.module.jsonSchema.types.ReferenceSchema;
 
 import org.helenus.jackson.jdatabind.ExtendedBeanProperty;
 
@@ -103,6 +104,29 @@ public class ObjectTypesSchema extends ObjectSchema {
     setDependencies(schema.getDependencies());
     setPatternProperties(schema.getPatternProperties());
     setProperties(schema.getProperties());
+  }
+
+  /**
+   * Instantiates a new <code>ObjectTypesSchema</code> object.
+   *
+   * @author paouelle
+   *
+   * @param schema the object types schema to shallow copy
+   * @param ref the reference schema for which we are copying the object schema
+   */
+  public ObjectTypesSchema(ObjectTypesSchema schema, ReferenceSchema ref) {
+    this(schema);
+    // JsonSchema
+    setDisallow(ref.getDisallow());
+    setExtends(ref.getExtends());
+    setRequired(ref.getRequired());
+    setReadonly(ref.getReadonly());
+    setDescription(ref.getDescription());
+    // SimpleTypeSchema
+    setDefault(ref.getDefault());
+    setTitle(ref.getTitle());
+    setPathStart(ref.getPathStart());
+    setLinks(ref.getLinks());
   }
 
   /**
