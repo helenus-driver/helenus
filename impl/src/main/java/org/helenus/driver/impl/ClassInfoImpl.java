@@ -326,6 +326,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *        the suffix values
      */
     protected void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {
+      suffixes.clear();
       for (final Map.Entry<String, FieldInfoImpl<T>> e: suffixFields.entrySet()) {
         final String suffix = e.getKey();
         final FieldInfoImpl<T> field = e.getValue();
@@ -644,6 +645,36 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         return Collections.emptyMap();
       }
       return table.getColumnValues(object, names);
+    }
+
+    /**
+     * Adds a suffix to the context for use in keyspace name creation by retrieving
+     * its value from the associated POJO.
+     *
+     * @author paouelle
+     *
+     * @param  suffix the suffix name
+     * @throws NullPointerException if <code>suffix</code> is <code>null</code>
+     * @throws IllegalArgumentException if the POJO doesn't require the specified
+     *         suffix or if the value doesn't match the POJO's definition for the
+     *         specified suffix
+     * @throws ExcludedSuffixKeyException if the specified suffix value is
+     *         marked as excluded the specified suffix key
+     */
+    public void addSuffix(String suffix) {
+      org.apache.commons.lang3.Validate.notNull(suffix, "invalid null suffix");
+      final FieldInfoImpl<T> field = suffixesByName.get(suffix);
+
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "%s doesn't define keyspace suffix: %s",
+        clazz.getSimpleName(),
+        suffix
+      );
+      final Object val = field.getValue(object);
+
+      validateSuffix(suffix, val);
+      suffixes.put(suffix, val);
     }
   }
 
@@ -1747,6 +1778,19 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    */
   public POJOContext newContext(T object) {
     return new POJOContext(object);
+  }
+
+  /**
+   * Checks if the specified name is defined as a column for any tables.
+   *
+   * @author paouelle
+   *
+   * @param  name the name of the column
+   * @return <code>true</code> if that name is defined as a column for any tables;
+   *         <code>false</code> otherwise
+   */
+  public boolean isColumn(String name) {
+    return columns.contains(name);
   }
 
   /**

@@ -34,6 +34,7 @@ import com.datastax.driver.core.Row;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.ExcludedSuffixKeyException;
 import org.helenus.driver.Insert;
 import org.helenus.driver.ObjectExistException;
 import org.helenus.driver.StatementBridge;
@@ -451,6 +452,12 @@ public class InsertImpl<T>
       values.isEmpty(),
       "separate values have already been added to this statement"
     );
+    final Map<String, FieldInfoImpl<T>> suffixes = getPOJOContext().getClassInfo().suffixesByName;
+
+    if (!suffixes.isEmpty()) {
+      getPOJOContext().populateSuffixes(suffixes);
+      setDirty();
+    }
     if (!allValuesAdded) {
       columns.clear();
       this.allValuesAdded = true;
@@ -469,6 +476,19 @@ public class InsertImpl<T>
    */
   @Override
   public Insert<T> value(String name) {
+    final boolean isSuffixKey = getPOJOContext().getClassInfo().isSuffixKey(name);
+
+    if (isSuffixKey) {
+      try {
+        getPOJOContext().addSuffix(name);
+        setDirty();
+      } catch (ExcludedSuffixKeyException e) { // ignore and continue without value
+      }
+      // only continue to add if it is a column too and if all values were not added
+      if (allValuesAdded || !getPOJOContext().getClassInfo().isColumn(name)) {
+        return this;
+      }
+    }
     getPOJOContext().getClassInfo().validateColumn(name);
     if (!allValuesAdded) {
       final int size = columns.size();
@@ -488,13 +508,32 @@ public class InsertImpl<T>
    *
    * @see org.helenus.driver.Insert#values(java.lang.String[])
    */
+  @SuppressWarnings({"cast", "unchecked", "rawtypes"})
   @Override
   public Insert<T> values(String... names) {
-    getPOJOContext().getClassInfo().validateColumns(names);
+    final List<String> ns = new ArrayList<>(names.length);
+
+    for (final String n: names) {
+      final boolean isSuffixKey = getPOJOContext().getClassInfo().isSuffixKey(n);
+
+      if (isSuffixKey) {
+        try {
+          getPOJOContext().addSuffix(n);
+          setDirty();
+        } catch (ExcludedSuffixKeyException e) { // ignore and continue without value
+        }
+        // only continue to add if it is a column too and if all values were not added
+        if (!allValuesAdded || !getPOJOContext().getClassInfo().isColumn(n)) {
+          continue;
+        }
+      }
+      ns.add(n);
+    }
+    getPOJOContext().getClassInfo().validateColumns((List<Object>)(List)ns);
     if (!allValuesAdded) {
       final int size = columns.size();
 
-      columns.addAll(getPOJOContext().getClassInfo().getColumns());
+      columns.addAll(ns);
       if (size != columns.size()) { // new ones were added
         setDirty();
       }
@@ -511,13 +550,26 @@ public class InsertImpl<T>
    */
   @Override
   public Insert<T> value(String name, Object value) {
+    final boolean isSuffixKey = getPOJOContext().getClassInfo().isSuffixKey(name);
+
+    if (value instanceof Optional) {
+      value = ((Optional<?>)value).orElse(null);
+    }
+    if (isSuffixKey) {
+      try {
+        getPOJOContext().addSuffix(name, value);
+        setDirty();
+      } catch (ExcludedSuffixKeyException e) { // ignore and continue without value
+      }
+      // only continue to add if it is a column too and if all values were not added
+      if (allValuesAdded || !getPOJOContext().getClassInfo().isColumn(name)) {
+        return this;
+      }
+    }
     org.apache.commons.lang3.Validate.validState(
       !allValuesAdded,
       "all columns from the object have already been added to this statement"
     );
-    if (value instanceof Optional) {
-      value = ((Optional<?>)value).orElse(null);
-    }
     getPOJOContext().getClassInfo().validateColumnAndValue(name, value);
     columns.remove(name);
     values.put(name, value);
