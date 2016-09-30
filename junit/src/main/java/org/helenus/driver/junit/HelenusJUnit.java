@@ -1256,7 +1256,7 @@ public class HelenusJUnit implements MethodRule {
             // register the suffix value with the corresponding suffix name
             try {
               cs.where(StatementBuilder.eq(ss.key, ss.value));
-            } catch (ExcludedSuffixKeyException e) {// ignore this combination
+            } catch (ExcludedSuffixKeyException e) { // ignore this combination
               continue next_combination;
             }
           }
@@ -1349,9 +1349,52 @@ public class HelenusJUnit implements MethodRule {
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
       HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
-      final MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(clazz);
+      MutablePair<List<Object>, Group> p = HelenusJUnit.initials.get(clazz);
       final Group group;
 
+      if (p == null) {
+        // hum! it means that somehow the schema was created but we didn't
+        // have time to compute the initial objects - so let's do it here
+        // find all suffixes that are defined for this classes
+        final Collection<Collection<Strings>> suffixes = ((target != null)
+          ? HelenusJUnit.getSuffixKeyValues(cinfo)
+          : null
+        );
+        final boolean initialsOnly = ((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic());
+        final List<Object> initials = new ArrayList<>();
+
+        if (CollectionUtils.isEmpty(suffixes)) {
+          initials.addAll(cinfo.newContext().getInitialObjects());
+          if (!initialsOnly) {
+            // no suffixes so just the one schema required
+            final CreateSchemaImpl<?> cs = HelenusJUnit.initTrace(
+              (CreateSchemaImpl<?>)StatementBuilder.createSchema(clazz)
+            );
+
+            initials.addAll(cs.getContext().getInitialObjects());
+          }
+        } else {
+          next_combination:
+          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+            final CreateSchemaImpl<?> cs = HelenusJUnit.initTrace(
+              (CreateSchemaImpl<?>)StatementBuilder.createSchema(clazz)
+            );
+
+            // pass all required suffixes
+            for (final Strings ss: i.next()) {
+              // register the suffix value with the corresponding suffix name
+              try {
+                cs.where(StatementBuilder.eq(ss.key, ss.value));
+              } catch (ExcludedSuffixKeyException e) { // ignore this combination
+                continue next_combination;
+              }
+            }
+            initials.addAll(cs.getContext().getInitialObjects());
+          }
+        }
+        p = MutablePair.of(initials, null);
+        HelenusJUnit.initials.put(clazz, p); // cache all initials objects for next time
+      }
       if (p.getRight() != null) {
         group = p.getRight();
       } else {
