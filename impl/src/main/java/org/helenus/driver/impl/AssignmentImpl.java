@@ -353,7 +353,7 @@ public abstract class AssignmentImpl
       // special case for assignment as we want to remember optional primary keys set as null
       super.validate(table); // take care of set assignment
       // make sure the old value is valid too
-      table.validateColumnAndValue(name, old);
+      table.validateColumnAndValue(name, old, true);
     }
 
     /**
@@ -426,7 +426,7 @@ public abstract class AssignmentImpl
      */
     @Override
     void validate(TableInfoImpl<?> table) {
-      table.validateColumnAndValue(name, old);
+      table.validateColumnAndValue(name, old, true);
     }
 
     /**

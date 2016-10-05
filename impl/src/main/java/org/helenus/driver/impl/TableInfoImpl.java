@@ -2271,33 +2271,60 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         right type or is <code>null</code> when the column is mandatory
    */
   public void validateColumnAndValue(CharSequence name, Object value) {
+    validateColumnAndValue(name, value, false);
+  }
+
+  /**
+   * Validates if a column is defined by the POJO and its potential value in
+   * this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  value the value to validate for the column
+   * @param  optional <code>true</code> to not fail the request if the specified
+   *         column is not defined; <code>false</code> to fail if it is not defined
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not defined
+   *         by the POJO and <code>optional</code> is <code>false</code> or if
+   *         the specified value is not of the right type or is <code>null</code>
+   *         when the column is mandatory
+   */
+  public void validateColumnAndValue(
+    CharSequence name, Object value, boolean optional
+  ) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
-        validateColumnAndValue(n, value); // recurse to validate
+        validateColumnAndValue(n, value, optional); // recurse to validate
       }
       return;
     }
     final String n = name.toString();
     final FieldInfoImpl<T> field = columns.get(n);
 
-    if (table != null) {
-      org.apache.commons.lang3.Validate.isTrue(
-        field != null,
-        "pojo '%s' doesn't define column '%s' in table '%s'",
-        clazz.getSimpleName(),
-        n,
-        table.name()
-      );
-    } else {
-      org.apache.commons.lang3.Validate.isTrue(
-        field != null,
-        "udt '%s' doesn't define column '%s'",
-        clazz.getSimpleName(),
-        n
+    if (field != null) {
+      field.validateValue(value);
+    } else if (!optional) {
+      if (table != null) {
+        throw new IllegalArgumentException(
+          "pojo '"
+          + clazz.getSimpleName()
+          + "' doesn't define column '"
+          + n
+          + "' in table '"
+          + table.name()
+          + "'"
+        );
+      }
+      throw new IllegalArgumentException(
+        "udt '"
+        + clazz.getSimpleName()
+        + "' doesn't define column '"
+        + n
+        + "'"
       );
     }
-    field.validateValue(value);
   }
 
   /**
