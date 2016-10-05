@@ -18,7 +18,13 @@ package org.helenus.util;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 
 import org.helenus.lang.Tolerable;
 
@@ -34,6 +40,53 @@ import org.helenus.lang.Tolerable;
  * @since 1.0
  */
 public class Objects {
+  /**
+   * Returns <code>true</code> if the arguments are equal to each other while
+   * ignoring case when comparing their elements and <code>false</code> otherwise.
+   * <p>
+   * Consequently, if both arguments are <code>null</code>, <code>true</code>
+   * is returned and if exactly one argument is <code>null</code>,
+   * <code>false</code> is returned. Otherwise, equality is determined by converting
+   * each element to its lower case representation and comparing.
+   * <p>
+   * <i>Note:</i> Only sets and lists are currently supported.
+   *
+   * @author paouelle
+   *
+   * @param  a a collection of strings
+   * @param  b another collection of strings to be compared with <code>a</code>
+   *         for equality while ignoring case
+   * @return <code>true</code> if the arguments are equal to each other while
+   *         ignoring case when comparing their elements and <code>false</code>
+   *         otherwise
+   */
+  public static boolean equalsIgnoreCase(
+    Collection<String> a, Collection<String> b
+  ) {
+    if (a == b) {
+      return true;
+    } else if ((a instanceof Set) && (b instanceof Set)) {
+      return java.util.Objects.equals(
+        a.stream()
+          .map(StringUtils::lowerCase)
+          .collect(Collectors.toSet()),
+        b.stream()
+          .map(StringUtils::lowerCase)
+          .collect(Collectors.toSet())
+      );
+    } else if ((a instanceof List) && (b instanceof List)) {
+      return java.util.Objects.equals(
+        a.stream()
+          .map(StringUtils::lowerCase)
+          .collect(Collectors.toList()),
+        b.stream()
+          .map(StringUtils::lowerCase)
+          .collect(Collectors.toList())
+      );
+    }
+    return false;
+  }
+
   /**
    * Returns <code>true</code> if the arguments are equal to each other with
    * a tolerable error and <code>false</code> otherwise.

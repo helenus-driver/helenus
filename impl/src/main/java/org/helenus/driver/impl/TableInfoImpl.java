@@ -191,7 +191,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @author paouelle
    */
   private final Map<String, FieldInfoImpl<T>> multiKeyColumns
-    = new LinkedHashMap<>(2);
+    = new LinkedHashMap<>(4);
 
   /**
    * Holds the fields which are defined as multi-keys for the table (may be
@@ -201,6 +201,15 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    */
   private final List<FieldInfoImpl<T>> multiKeyColumnsList
     = new ArrayList<>(2);
+
+  /**
+   * Holds the fields which are defined as case insensitive keys for the table
+   * (may be empty if none defined).
+   *
+   * @author paouelle
+   */
+  private final Map<String, FieldInfoImpl<T>> caseInsensitiveKeyColumns
+    = new LinkedHashMap<>(4);
 
   /**
    * Flag indicating if at least one column is defined as a collection.
@@ -344,6 +353,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           multiKeyColumns.put(field.getColumnName(), field);
           multiKeyColumnsList.add(field);
         }
+        if (field.isCaseInsensitiveKey()) {
+          caseInsensitiveKeyColumns.put(field.getColumnName(), field);
+        }
       } else if (field.isClusteringKey()) {
         lastClusteringKey = field;
         mandatoryAndPrimaryKeyColumns.put(field.getColumnName(), field);
@@ -355,6 +367,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         if (field.isMultiKey()) {
           multiKeyColumns.put(field.getColumnName(), field);
           multiKeyColumnsList.add(field);
+        }
+        if (field.isCaseInsensitiveKey()) {
+          caseInsensitiveKeyColumns.put(field.getColumnName(), field);
         }
       } else {
         if (field.isIndex()) {
@@ -1571,6 +1586,51 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
+   * Checks if a column is defined as a case insensitive key in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the name of the column to check if it is defined as a case
+   *         insensitive key in this table
+   * @return <code>true</code> if the specified column is defined as a case
+   *         insensitive key in this table; <code>false</code> otherwise
+   */
+  public boolean isCaseInsensitiveKey(Object name) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (table == null) {
+      return false;
+    }
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        if (!isMultiKey(n)) { // recurse to validate
+          return false;
+        }
+      }
+      return true;
+    }
+    if (name instanceof Utils.FCall) {
+      for (final Object parm: ((Utils.FCall)name)) {
+        if (!isMultiKey(parm)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    final String n;
+
+    if (name instanceof Utils.CName) {
+      n = ((Utils.CName)name).getColumnName();
+    } else if (name instanceof CharSequence) {
+      n = name.toString();
+    } else {
+      return false;
+    }
+    final FieldInfoImpl<?> f = caseInsensitiveKeyColumns.get(n);
+
+    return (f != null);
+  }
+
+  /**
    * Checks if a column is defined as a non primary key column in this table.
    *
    * @author paouelle
@@ -1802,14 +1862,49 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Gets the multi-keys for the POJO in this table if one is defined.
+   * Checks if this table defines multi-keys.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this table defines multi-keys; <code>false</code>
+   *         otherwise
+   */
+  public boolean hasMultiKeys() {
+    return !multiKeyColumns.isEmpty();
+  }
+
+  /**
+   * Checks if this table defines case insensitive keys.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this table defines case insensitive keys;
+   *         <code>false</code> otherwise
+   */
+  public boolean hasCaseInsensitiveKeys() {
+    return !caseInsensitiveKeyColumns.isEmpty();
+  }
+
+  /**
+   * Gets the multi-keys for the POJO in this table if any is defined.
    *
    * @author paouelle
    *
    * @return a non-<code>null</code> set of all multi-key column fields
    */
-  public List<FieldInfoImpl<T>> getMultiKeys() {
-    return multiKeyColumnsList;
+  public Collection<FieldInfoImpl<T>> getMultiKeys() {
+    return multiKeyColumns.values();
+  }
+
+  /**
+   * Gets the case insensitive keys for the POJO in this table if any is defined.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> set of all case insensitive key column fields
+   */
+  public Collection<FieldInfoImpl<T>> getCaseInsensitiveKeys() {
+    return caseInsensitiveKeyColumns.values();
   }
 
   /**

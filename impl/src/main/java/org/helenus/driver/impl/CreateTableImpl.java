@@ -175,6 +175,15 @@ public class CreateTableImpl<T>
           + " "
           + field.getDataType().getFirstArgumentType().toCQL()
         );
+      } else if (field.isCaseInsensitiveKey()) {
+        // we need to add a new column to represent the lower case value of
+        // the key in addition to the field's column
+        columns.add(
+          StatementImpl.CI_PREFIX
+          + field.getColumnName()
+          + " "
+          + field.getDataType().toCQL()
+        );
       }
     }
     for (final FieldInfoImpl<?> field: table.getPartitionKeys()) {
@@ -182,6 +191,10 @@ public class CreateTableImpl<T>
         // we need to add the special new column to represent a single value from the set
         // as the partition key instead of the annotated one
         pkeys.add(StatementImpl.MK_PREFIX + field.getColumnName());
+      } else if (field.isCaseInsensitiveKey()) {
+        // we need to add the special new column to represent the lower case value
+        // of the partition key instead of the annotated one
+        pkeys.add(StatementImpl.CI_PREFIX + field.getColumnName());
       } else {
         pkeys.add(field.getColumnName());
       }
@@ -192,6 +205,13 @@ public class CreateTableImpl<T>
         // as the clustering key instead of the annotated one
         ckeys.put(
           StatementImpl.MK_PREFIX + field.getColumnName(),
+          field.getClusteringKey().order()
+        );
+      } else if (field.isCaseInsensitiveKey()) {
+        // we need to add the special new column to represent the lower case value
+        // of the clustering key instead of the annotated one
+        ckeys.put(
+          StatementImpl.CI_PREFIX + field.getColumnName(),
           field.getClusteringKey().order()
         );
       } else {

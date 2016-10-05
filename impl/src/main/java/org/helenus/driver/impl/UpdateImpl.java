@@ -21,12 +21,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.ResultSet;
@@ -298,6 +301,7 @@ public class UpdateImpl<T>
       Utils.joinAndAppend(table, builder, " AND ", usings.usings);
     }
     final Collection<FieldInfoImpl<T>> multiKeys = table.getMultiKeys();
+    final Collection<FieldInfoImpl<T>> caseInsensitiveKeys = table.getCaseInsensitiveKeys();
     AssignmentsImpl<T> assignments = this.assignments;
 
     if (assignments.isEmpty()) {
@@ -305,11 +309,37 @@ public class UpdateImpl<T>
       assignments = (AssignmentsImpl<T>)new AssignmentsImpl<>(this).and(
         new AssignmentImpl.DelayedSetAllAssignmentImpl()
       );
+      if (!caseInsensitiveKeys.isEmpty()) {
+        // we need to add the key set for each case insensitive keys in the assignments
+        // as it would not have been added by the DelayedSetAll since it is marked
+        // as a key. However, in this context the real key is
+        // the special "ci_<name>" one and not the field which is annotated as one
+        // make sure not to report we are adding them all from that point on since
+        // we are about to add more delayed set for each case insensitive keys
+        assignments.hasAllFromObject = false;
+        for (final FieldInfoImpl<T> finfo: caseInsensitiveKeys) {
+          if (finfo.isMultiKey()) { // will be handled separately after this
+            continue;
+          }
+          final String cname = finfo.getColumnName();
+          final AssignmentImpl.WithOldValue old = this.assignments.previous.get(cname);
+
+          if (old != null) {
+            assignments.assignments.add(
+              new AssignmentImpl.DelayedReplaceAssignmentImpl(cname, old.getOldValue())
+            );
+          } else {
+            assignments.assignments.add(
+              new AssignmentImpl.DelayedSetAssignmentImpl(cname)
+            );
+          }
+        }
+      }
       if (!multiKeys.isEmpty()) {
         // we need to add the key set for each multi-keys in the assignments as
         // it would not have been added by the DelayedSetAll since it is marked
         // as a key. However, in this context the real key is
-        // the special "mk_<name>" one and not the set which is annotated as one
+        // the special "mk_<name>" one and not the field which is annotated as one
         // make sure not to report we are adding them all from that point on since
         // we are about to add more delayed set for each multi keys
         assignments.hasAllFromObject = false;
@@ -330,14 +360,15 @@ public class UpdateImpl<T>
       }
       // we need to add the key set for each old values in the assignments as
       // it would not have been added by the DelayedSetAll since it is marked as
-      // a key. We can skip multi-keys as they would be added above.
+      // a key. We can skip multi-keys and case insensitive keys as they would be added above.
       // make sure not to report we are adding them all from that point on since
       // we are about to add more delayed set for each old key values
       for (final AssignmentImpl.WithOldValue a: this.assignments.previous.values()) {
         final CharSequence cname = ((AssignmentImpl)a).getColumnName();
 
         if (table.getPrimaryKey(cname) != null) { // old value for a primary key
-          if (multiKeys.isEmpty() || !table.isMultiKey(cname)) {
+          if ((multiKeys.isEmpty() || !table.isMultiKey(cname))
+              && (caseInsensitiveKeys.isEmpty() || !table.isCaseInsensitiveKey(cname))) {
             assignments.hasAllFromObject = false;
             assignments.assignments.add(
               new AssignmentImpl.DelayedReplaceAssignmentImpl(cname, a.getOldValue())
@@ -393,6 +424,18 @@ public class UpdateImpl<T>
             }
             Object oldval = oa.getOldValue();
 
+            if (!caseInsensitiveKeys.isEmpty()) {
+              if (a instanceof AssignmentImpl.SetAssignmentImpl) {
+                if (oldval != null) {
+                  final FieldInfoImpl<?> f = table.getColumnImpl(a.getColumnName());
+
+                  if (f.isCaseInsensitiveKey() && !f.isMultiKey()) { // multi-keys are handled next
+                    // lower case the old value
+                    oldval = StringUtils.lowerCase(oldval.toString());
+                  }
+                }
+              }
+            }
             if (!multiKeys.isEmpty()) {
               if (a instanceof AssignmentImpl.SetAssignmentImpl) {
                 // check if this set assignment is for a multi-column and if it is then we
@@ -403,13 +446,26 @@ public class UpdateImpl<T>
                 final FieldInfoImpl<?> f = table.getColumnImpl(a.getColumnName());
 
                 if (f.isMultiKey()) {
-                  final Set<?> newset = (Set<?>)sa.getValue();
+                  if (oldval != null) {
+                    final Collection<?> newset = (Collection<?>)sa.getValue();
 
-                  if (!newset.isEmpty()) {
-                    final Set<?> oldset = new HashSet<>((Set<?>)oldval); // clone it
+                    if (!newset.isEmpty()) {
+                      if (f.isCaseInsensitiveKey()) {
+                        final Set<String> oldset = ((Collection<?>)oldval).stream()
+                          .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                          .collect(Collectors.toCollection(LinkedHashSet::new));
 
-                    oldset.removeAll((Set<?>)(sa.getValue()));
-                    oldval = oldset;
+                        newset.forEach(
+                          v -> oldset.remove((v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                        );
+                        oldval = oldset;
+                      } else {
+                        final Set<?> oldset = new HashSet<>((Collection<?>)oldval); // clone it
+
+                        oldset.removeAll(newset);
+                        oldval = oldset;
+                      }
+                    }
                   }
                 }
               }
@@ -457,6 +513,30 @@ public class UpdateImpl<T>
         return;
       }
       builder.append(" WHERE ");
+      // if we have case insensitive keys then we need to process those first
+      // and then address the multi keys combinations
+      if (!caseInsensitiveKeys.isEmpty()) {
+        for (final FieldInfoImpl<T> finfo: caseInsensitiveKeys) {
+          if (finfo.isMultiKey()) { // will be handled separately after this
+            continue;
+          }
+          final ClauseImpl cic = cs.remove(finfo.getColumnName());
+
+          if ((cic != null) && (cic instanceof ClauseImpl.SimpleClauseImpl)) {
+            // we have a clause for this case insensitive column
+            final Object v = cic.firstValue();
+
+            cs.put(
+              StatementImpl.CI_PREFIX + cic.getColumnName(),
+              new ClauseImpl.SimpleClauseImpl(
+                StatementImpl.CI_PREFIX + cic.getColumnName(),
+                cic.getOperation(),
+                (v != null) ? StringUtils.lowerCase(v.toString()) : null
+              )
+            );
+          }
+        }
+      }
       if (!multiKeys.isEmpty()) {
         // prepare all sets of values for all multi-keys present in the clause
         final List<Collection<ClauseImpl.EqClauseImpl>> sets = new ArrayList<>(multiKeys.size());
@@ -465,15 +545,28 @@ public class UpdateImpl<T>
           final ClauseImpl mkc = cs.remove(finfo.getColumnName());
 
           if (mkc != null) { // we have a clause for this multi-key column
+            final boolean ci = finfo.isCaseInsensitiveKey();
             final List<ClauseImpl.EqClauseImpl> set = new ArrayList<>();
 
             for (final Object v: mkc.values()) {
-              if (v instanceof Set<?>) {
-                for (final Object sv: (Set<?>)v) {
-                  set.add(new ClauseImpl.EqClauseImpl(
-                    StatementImpl.MK_PREFIX + finfo.getColumnName(), sv
-                  ));
+              if (v instanceof Collection<?>) {
+                for (final Object sv: (Collection<?>)v) {
+                  if (ci && (sv != null)) {
+                    set.add(new ClauseImpl.EqClauseImpl(
+                      StatementImpl.MK_PREFIX + finfo.getColumnName(),
+                      StringUtils.lowerCase(sv.toString())
+                    ));
+                  } else {
+                    set.add(new ClauseImpl.EqClauseImpl(
+                      StatementImpl.MK_PREFIX + finfo.getColumnName(), sv
+                    ));
+                  }
                 }
+              } else if (ci && (v != null)) {
+                set.add(new ClauseImpl.EqClauseImpl(
+                  StatementImpl.MK_PREFIX + finfo.getColumnName(),
+                  StringUtils.lowerCase(v.toString())
+                ));
               } else {
                 set.add(new ClauseImpl.EqClauseImpl(
                   StatementImpl.MK_PREFIX + finfo.getColumnName(), v
@@ -515,6 +608,28 @@ public class UpdateImpl<T>
 
         if (!pkeys.isEmpty()) {
           builder.append(" WHERE ");
+          // if we have case insensitive keys then we need to process those first
+          // and then address the multi keys combinations
+          if (!caseInsensitiveKeys.isEmpty()) {
+            for (final FieldInfoImpl<T> finfo: caseInsensitiveKeys) {
+              if (finfo.isMultiKey()) { // will be handled separately after this
+                continue;
+              }
+              final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
+
+              if (pset != null) {
+                final Object v = pset.getLeft();
+
+                pkeys.put(
+                  StatementImpl.CI_PREFIX + finfo.getColumnName(),
+                  Pair.of(
+                    (v != null) ? StringUtils.lowerCase(v.toString()) : null,
+                    pset.getRight()
+                  )
+                );
+              }
+            }
+          }
           if (!multiKeys.isEmpty()) {
             // prepare all sets of values for all multi-keys present in the clause
             final List<FieldInfoImpl<T>> cfinfos = new ArrayList<>(multiKeys.size());
@@ -529,7 +644,14 @@ public class UpdateImpl<T>
 
                 if (set != null) { // we have keys for this multi-key column
                   cfinfos.add(finfo);
-                  sets.add(set);
+                  if (finfo.isCaseInsensitiveKey()) {
+                    sets.add(set.stream()
+                      .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                      .collect(Collectors.toCollection(LinkedHashSet::new))
+                    );
+                  } else {
+                    sets.add(set);
+                  }
                 }
               }
             }

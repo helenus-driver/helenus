@@ -24,8 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.ResultSet;
@@ -48,7 +50,7 @@ import org.helenus.driver.persistence.CQLDataType;
  * {@link com.datastax.driver.core.querybuilder.Insert} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -222,8 +224,33 @@ public class InsertImpl<T>
     // check if the table has multi-keys in which case we need to iterate all
     // possible combinations/values for all keys and generate separate insert
     // statements
+    // also check if we have case insensitive keys as we need to convert values
+    // to lower case and change the column name being queried
     final Collection<FieldInfoImpl<T>> multiKeys = table.getMultiKeys();
+    final Collection<FieldInfoImpl<T>> caseInsensitiveKeys = table.getCaseInsensitiveKeys();
 
+    // if we have case insensitive keys then we need to process those first
+    // and then address the multi keys combinations
+    if (!caseInsensitiveKeys.isEmpty()) {
+      for (final FieldInfoImpl<T> finfo: caseInsensitiveKeys) {
+        if (finfo.isMultiKey()) { // will be handled separately after this
+          continue;
+        }
+        final Pair<Object, CQLDataType> pset = columns.get(finfo.getColumnName()); // we need to leave the original column there as is
+
+        if (pset != null) {
+          final Object v = pset.getLeft();
+
+          columns.put(
+            StatementImpl.CI_PREFIX + finfo.getColumnName(),
+            Pair.of(
+              (v != null) ? StringUtils.lowerCase(v.toString()) : null,
+              pset.getRight()
+            )
+          );
+        }
+      }
+    }
     if (!multiKeys.isEmpty()) {
       // prepare sets of values for all multi-keys
       final Collection<Object>[] sets = new Collection[multiKeys.size()];
@@ -231,9 +258,16 @@ public class InsertImpl<T>
 
       for (final FieldInfoImpl<T> finfo: multiKeys) {
         final Pair<Object, CQLDataType> pset = columns.get(finfo.getColumnName());
+        final boolean ci = finfo.isCaseInsensitiveKey();
 
         if (pset != null) {
-          sets[++j] = (Set<Object>)pset.getLeft();
+          if (ci) {
+            sets[++j] = ((Collection<Object>)pset.getLeft()).stream()
+              .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+              .collect(Collectors.toCollection(LinkedHashSet::new));
+          } else {
+            sets[++j] = (Collection<Object>)pset.getLeft();
+          }
         } else {
           sets[++j] = null;
         }
@@ -245,7 +279,10 @@ public class InsertImpl<T>
         j = -1;
         // add all multi-key column values from this combination to the column map
         for (final FieldInfoImpl<T> finfo: multiKeys) {
-          columns.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), Pair.of(ckeys.get(++j), finfo.getDataType().getElementType()));
+          columns.put(
+            StatementImpl.MK_PREFIX + finfo.getColumnName(),
+            Pair.of(ckeys.get(++j), finfo.getDataType().getElementType())
+          );
         }
         // finally build the query for this combination
         buildQueryString(table, columns, builders);

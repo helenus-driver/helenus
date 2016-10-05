@@ -90,6 +90,18 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   public final static String MK_PREFIX = "mk_";
 
   /**
+   * Holds the column name prefix used for the special column key created for
+   * case insensitive keys.
+   * <p>
+   * <i>Note:</i> Multi-clustering key columns also marked as case insensitive
+   * will not be using this prefix and instead will continue using the
+   * {@link #MK_PREFIX} prefix.
+   *
+   * @author paouelle
+   */
+  public final static String CI_PREFIX = "ci_";
+
+  /**
    * Holds the column name prefix used for the special column that holds the
    * collection of elements for a user-defined type that extends {@link List},
    * {@link Set}, or {@link Map}.

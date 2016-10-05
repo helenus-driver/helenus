@@ -286,7 +286,6 @@ public abstract class ClauseImpl
       this.definition = definition;
     }
 
-
     /**
      * {@inheritDoc}
      *
@@ -307,6 +306,13 @@ public abstract class ClauseImpl
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
             Utils.appendValue(finfo.encodeElementValue(value), (definition != null) ? definition : finfo.getDataType().getElementType(), sb);
+            return;
+          }
+        } else if (sname.startsWith(StatementImpl.CI_PREFIX)) {
+          sname = sname.substring(StatementImpl.CI_PREFIX.length()); // strip ci prefix
+          finfo = tinfo.getColumnImpl(sname);
+          if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
+            Utils.appendValue(finfo.encodeValue(value), (definition != null) ? definition : finfo.getDataType(), sb);
             return;
           }
         }
@@ -362,11 +368,22 @@ public abstract class ClauseImpl
     <T> void validate(TableInfoImpl<T> table) {
       table.validateColumnAndValue(name, value);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation() + " " + firstValue();
+    }
   }
 
-
   /**
-   * The <code>SimpleClauseImpl</code> class defines a clause specifying a column,
+   * The <code>EqClauseImpl</code> class defines a clause specifying a column,
    * operator, and single value.
    *
    * @copyright 2015-2015 The Helenus Driver Project Authors
@@ -380,7 +397,7 @@ public abstract class ClauseImpl
     extends SimpleClauseImpl
     implements Clause.Equality {
     /**
-     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     * Instantiates a new <code>EqClauseImpl</code> object.
      *
      * @author paouelle
      *
@@ -393,7 +410,7 @@ public abstract class ClauseImpl
     }
 
     /**
-     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     * Instantiates a new <code>EqClauseImpl</code> object.
      *
      * @author paouelle
      *
@@ -406,7 +423,7 @@ public abstract class ClauseImpl
     }
 
     /**
-     * Instantiates a new <code>SimpleClauseImpl</code> object.
+     * Instantiates a new <code>EqClauseImpl</code> object.
      *
      * @author paouelle
      *
@@ -517,6 +534,22 @@ public abstract class ClauseImpl
             }
             return;
           }
+        } else if (sname.startsWith(StatementImpl.CI_PREFIX)) {
+          sname = sname.substring(StatementImpl.CI_PREFIX.length()); // strip ci prefix
+          finfo = tinfo.getColumnImpl(sname);
+          if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
+            if (finfo.isPersisted()) {
+              final List<Object> pvals = new ArrayList<>(values.size());
+
+              for (final Object val: values) {
+                pvals.add(finfo.encodeElementValue(val));
+              }
+              Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType()).append(")");
+            } else {
+              Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType()).append(")");
+            }
+            return;
+          }
         }
         throw new IllegalStateException("unknown column '" + name + "'");
       }
@@ -526,9 +559,9 @@ public abstract class ClauseImpl
         for (final Object val: values) {
           pvals.add(finfo.encodeValue(val));
         }
-        Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType().getElementType()).append(")");
+        Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType()).append(")");
       } else {
-        Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType().getElementType()).append(")");
+        Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType()).append(")");
       }
     }
 
@@ -578,6 +611,18 @@ public abstract class ClauseImpl
     @Override
     <T> void validate(TableInfoImpl<T> table) {
       table.validateColumnAndValues(name, values);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation() + " " + values;
     }
   }
 
@@ -705,6 +750,18 @@ public abstract class ClauseImpl
     @Override
     <T> void validate(TableInfoImpl<T> table) {
       throw new IllegalStateException("should not be called");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation() + " " + object;
     }
   }
 
@@ -915,6 +972,18 @@ public abstract class ClauseImpl
     <T> void validate(TableInfoImpl<T> table) {
       throw new IllegalStateException("should not be called");
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation();
+    }
   }
 
   /**
@@ -992,6 +1061,18 @@ public abstract class ClauseImpl
     <T> void validate(TableInfoImpl<T> table) {
       throw new IllegalStateException("should not be called");
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation();
+    }
   }
 
   /**
@@ -1068,6 +1149,18 @@ public abstract class ClauseImpl
     @Override
     <T> void validate(TableInfoImpl<T> table) {
       throw new IllegalStateException("should not be called");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation();
     }
   }
 }

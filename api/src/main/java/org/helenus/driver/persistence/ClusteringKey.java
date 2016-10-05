@@ -41,7 +41,7 @@ import org.helenus.annotation.Keyable;
  * another column of the element type as the actual clustering key and create
  * multiple entries in the table; one per element of the multi-key.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -75,4 +75,17 @@ public @interface ClusteringKey {
    * @return the optional order for the clustering key
    */
   Ordering order() default Ordering.ASCENDING;
+
+  /**
+   * Specifies whether or not to ignore case on this key if defined as a string.
+   * <p>
+   * If set to <code>true</code> a duplicate of the column is created with its
+   * value converted to lower case. By default, Helenus will not ignore case.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if the annotated string column should be considered
+   *         case insensitive; <code>false</code> for normal handling
+   */
+  boolean ignoreCase() default false;
 }

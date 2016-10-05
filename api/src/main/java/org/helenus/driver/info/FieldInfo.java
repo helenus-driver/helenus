@@ -246,6 +246,17 @@ public interface FieldInfo<T> {
   public ClusteringKey getClusteringKey();
 
   /**
+   * Checks if this field is annotated as a case insensitive partition or
+   * clustering key.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this field is annotated as a case insensitive
+   *         partition or clustering key; <code>false</code> otherwise
+   */
+  public boolean isCaseInsensitiveKey();
+
+  /**
    * Checks if this field is also a type key.
    *
    * @author paouelle

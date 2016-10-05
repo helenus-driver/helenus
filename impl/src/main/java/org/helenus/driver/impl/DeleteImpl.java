@@ -19,10 +19,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -346,7 +347,13 @@ public class DeleteImpl<T>
       builder.append(" USING ");
       Utils.joinAndAppend(table, builder, " AND ", usings.usings);
     }
+    // check if the table has multi-keys in which case we need to iterate all
+    // possible combinations/values for all keys and generate separate delete
+    // statements
+    // also check if we have case insensitive keys as we need to convert values
+    // to lower case and change the column name being queried
     final Collection<FieldInfoImpl<T>> multiKeys = table.getMultiKeys();
+    final Collection<FieldInfoImpl<T>> caseInsensitiveKeys = table.getCaseInsensitiveKeys();
 
     if (!where.clauses.isEmpty()) {
       // let's first preprocess and validate the clauses for this table
@@ -360,6 +367,30 @@ public class DeleteImpl<T>
         return;
       }
       builder.append(" WHERE ");
+      // if we have case insensitive keys then we need to process those first
+      // and then address the multi keys combinations
+      if (!caseInsensitiveKeys.isEmpty()) {
+        for (final FieldInfoImpl<T> finfo: caseInsensitiveKeys) {
+          if (finfo.isMultiKey()) { // will be handled separately after this
+            continue;
+          }
+          final ClauseImpl cic = cs.remove(finfo.getColumnName());
+
+          if ((cic != null) && (cic instanceof ClauseImpl.SimpleClauseImpl)) {
+            // we have a clause for this case insensitive column
+            final Object v = cic.firstValue();
+
+            cs.put(
+              StatementImpl.CI_PREFIX + cic.getColumnName(),
+              new ClauseImpl.SimpleClauseImpl(
+                StatementImpl.CI_PREFIX + cic.getColumnName(),
+                cic.getOperation(),
+                (v != null) ? StringUtils.lowerCase(v.toString()) : null
+              )
+            );
+          }
+        }
+      }
       if (!multiKeys.isEmpty()) {
         // prepare all sets of values for all multi-keys present in the clause
         final List<Collection<ClauseImpl.EqClauseImpl>> sets = new ArrayList<>(multiKeys.size());
@@ -368,15 +399,28 @@ public class DeleteImpl<T>
           final ClauseImpl mkc = cs.remove(finfo.getColumnName());
 
           if (mkc != null) { // we have a clause for this multi-key column
+            final boolean ci = finfo.isCaseInsensitiveKey();
             final List<ClauseImpl.EqClauseImpl> set = new ArrayList<>();
 
             for (final Object v: mkc.values()) {
-              if (v instanceof Set<?>) {
-                for (final Object sv: (Set<?>)v) {
-                  set.add(new ClauseImpl.EqClauseImpl(
-                    StatementImpl.MK_PREFIX + finfo.getColumnName(), sv
-                  ));
+              if (v instanceof Collection<?>) {
+                for (final Object sv: (Collection<?>)v) {
+                  if (ci && (sv != null)) {
+                    set.add(new ClauseImpl.EqClauseImpl(
+                      StatementImpl.MK_PREFIX + finfo.getColumnName(),
+                      StringUtils.lowerCase(sv.toString())
+                    ));
+                  } else {
+                    set.add(new ClauseImpl.EqClauseImpl(
+                      StatementImpl.MK_PREFIX + finfo.getColumnName(), sv
+                    ));
+                  }
                 }
+              } else if (ci && (v != null)) {
+                set.add(new ClauseImpl.EqClauseImpl(
+                  StatementImpl.MK_PREFIX + finfo.getColumnName(),
+                  StringUtils.lowerCase(v.toString())
+                ));
               } else {
                 set.add(new ClauseImpl.EqClauseImpl(
                   StatementImpl.MK_PREFIX + finfo.getColumnName(), v
@@ -427,6 +471,28 @@ public class DeleteImpl<T>
         }
         if (!pkeys.isEmpty()) {
           builder.append(" WHERE ");
+          // if we have case insensitive keys then we need to process those first
+          // and then address the multi keys combinations
+          if (!caseInsensitiveKeys.isEmpty()) {
+            for (final FieldInfoImpl<T> finfo: caseInsensitiveKeys) {
+              if (finfo.isMultiKey()) { // will be handled separately after this
+                continue;
+              }
+              final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
+
+              if (pset != null) {
+                final Object v = pset.getLeft();
+
+                pkeys.put(
+                  StatementImpl.CI_PREFIX + finfo.getColumnName(),
+                  Pair.of(
+                    (v != null) ? StringUtils.lowerCase(v.toString()) : null,
+                    pset.getRight()
+                  )
+                );
+              }
+            }
+          }
           if (!multiKeys.isEmpty()) {
             // prepare all sets of values for all multi-keys present in the clause
             final List<FieldInfoImpl<T>> cfinfos = new ArrayList<>(multiKeys.size());
@@ -437,11 +503,18 @@ public class DeleteImpl<T>
 
               if (pset != null) {
                 @SuppressWarnings("unchecked")
-                final Set<Object> set = (Set<Object>)pset.getLeft();
+                final Collection<Object> set = (Collection<Object>)pset.getLeft();
 
                 if (set != null) { // we have keys for this multi-key column
                   cfinfos.add(finfo);
-                  sets.add(set);
+                  if (finfo.isCaseInsensitiveKey()) {
+                    sets.add(set.stream()
+                      .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                      .collect(Collectors.toCollection(LinkedHashSet::new))
+                    );
+                  } else {
+                    sets.add(set);
+                  }
                 }
               }
             }
@@ -457,7 +530,10 @@ public class DeleteImpl<T>
                 for (final Object k: i.next()) {
                   final FieldInfoImpl<T> finfo = cfinfos.get(++j);
 
-                  pkeys.put(StatementImpl.MK_PREFIX + finfo.getColumnName(), Pair.of(k, finfo.getDataType().getElementType()));
+                  pkeys.put(
+                    StatementImpl.MK_PREFIX + finfo.getColumnName(),
+                    Pair.of(k, finfo.getDataType().getElementType())
+                  );
                 }
                 final StringBuilder sb = new StringBuilder(builder);
 

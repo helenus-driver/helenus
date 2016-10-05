@@ -650,6 +650,28 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
           field.getName()
         );
       }
+      if (isCaseInsensitiveKey()) {
+        // make sure data type is string or element type is string for multi keys
+        if (multiKeyType != null) {
+          org.apache.commons.lang3.Validate.isTrue(
+            String.class.equals(multiKeyType),
+            "field in table '%s' must be a Set of Strings if it is annotated with @%s(ignoreCase=true): %s.%s",
+            tname,
+            (isPartitionKey() ? "PartitionKey" : "ClusteringKey"),
+            declaringClass.getName(),
+            field.getName()
+          );
+        } else {
+          org.apache.commons.lang3.Validate.isTrue(
+            String.class.equals(getType()),
+            "field in table '%s' must be a String if it is annotated with @%s(ignoreCase=true): %s.%s",
+            tname,
+            (isPartitionKey() ? "PartitionKey" : "ClusteringKey"),
+            declaringClass.getName(),
+            field.getName()
+          );
+        }
+      }
       if (isStatic()) {
         org.apache.commons.lang3.Validate.isTrue(
           !isPartitionKey(),
@@ -1386,6 +1408,19 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   @Override
   public ClusteringKey getClusteringKey() {
     return clusteringKey;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.info.FieldInfo#isCaseInsensitiveKey()
+   */
+  @Override
+  public boolean isCaseInsensitiveKey() {
+    return ((isPartitionKey() && partitionKey.ignoreCase())
+            || (isClusteringKey() && clusteringKey.ignoreCase()));
   }
 
   /**

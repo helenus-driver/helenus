@@ -525,12 +525,16 @@ public class SelectImpl<T>
       final OrderingImpl oi = (OrderingImpl)o;
 
       oi.validate(table);
-      // check the referenced column is a multi-key in which case we actually
-      // need to treat this ordering request as if it was for the special
-      // multi-key column instead
+      // check the referenced column is a multi-key or a case insensitive key
+      // in which case we actually need to treat this ordering request as if
+      // it was for the special multi-key column instead
       if (table.isMultiKey(oi.getColumnName())) {
         this.orderings.add(
           new OrderingImpl(StatementImpl.MK_PREFIX + oi.getColumnName(), oi.isDescending())
+        );
+      } else if (table.isCaseInsensitiveKey(oi.getColumnName())) {
+        this.orderings.add(
+          new OrderingImpl(StatementImpl.CI_PREFIX + oi.getColumnName(), oi.isDescending())
         );
       } else {
         this.orderings.add(oi);
@@ -636,45 +640,80 @@ public class SelectImpl<T>
       // in which case we want to make sure to add clauses for them too
       // and also check for multi-keys as we need to convert the provided value
       // (if a set of size 1) into an EQ or an IN for the non-set column
+      // finally check for case insensitive keys as we need to convert the
+      // provided value to lower case for the special column
       final List<ClauseImpl> clauses = new ArrayList<>(this.clauses);
 
-      if (!table.getMultiKeys().isEmpty()) {
+      if (table.hasMultiKeys() || table.hasCaseInsensitiveKeys()) {
         // need to see if we have multi-keys in the list and if
         // so, we need to convert its value (if a set) into an "EQ" or an "IN"
+        // need to also see if we have case insensitive keys in the list and if so,
+        // we need to convert its value to lower case
         for (final ListIterator<ClauseImpl> i = clauses.listIterator(); i.hasNext(); ) {
           final ClauseImpl clause = i.next();
           final FieldInfoImpl<?> f = table.getColumnImpl(clause.getColumnName());
 
-          if ((f != null) && f.isMultiKey()) {
-            final Set<Object> in = new LinkedHashSet<>(8); // preserve order
+          if (f != null) {
+            final boolean ci = f.isCaseInsensitiveKey();
 
-            for (final Object v: clause.values()) {
-              if (v instanceof Collection<?>) {
-                in.addAll((Collection<?>)v);
+            if (f.isMultiKey()) {
+              final Set<Object> in = new LinkedHashSet<>(8); // preserve order
+
+              for (final Object v: clause.values()) {
+                if (v instanceof Collection<?>) {
+                  if (ci) {
+                    ((Collection<?>)v).forEach(iv -> in.add(
+                      (iv != null) ? StringUtils.lowerCase(iv.toString()) : null
+                    ));
+                  } else {
+                    in.addAll((Collection<?>)v);
+                  }
+                } else if (ci && (v != null)) {
+                  in.add(StringUtils.lowerCase(v.toString()));
+                } else {
+                  in.add(v);
+                }
+              }
+              if (in.size() == 1) {
+                i.set(new ClauseImpl.SimpleClauseImpl(
+                  StatementImpl.MK_PREFIX + clause.getColumnName(),
+                  clause.getOperation(),
+                  in.iterator().next()
+                ));
               } else {
-                in.add(v);
+                // NOTE: Cassandra doesn't support using an 'IN' for a clustering key
+                // if as part of the columns selected, one is a collection. In our
+                // case, the multi-key column is itself a collection as such, we will
+                // never be able to support the 'IN' clause for that column
+                // TODO: we could look into storing the actual set column for the MK as a frozen set and see if that lifts this restriction
+                if (f.isClusteringKey()) {
+                  throw new IllegalArgumentException(
+                    "unsupported selection of multiple values for clustering multi-key column '"
+                    + clause.getColumnName()
+                    + "'"
+                   );
+                }
+                i.set(new ClauseImpl.InClauseImpl(
+                  StatementImpl.MK_PREFIX + clause.getColumnName(), in
+                ));
               }
-            }
-            if (in.size() == 1) {
-              i.set(new ClauseImpl.EqClauseImpl(
-                StatementImpl.MK_PREFIX + clause.getColumnName(), in.iterator().next()
-              ));
-            } else {
-              // NOTE: Cassandra doesn't support using an 'IN' for a clustering key
-              // if as part of the columns selected, one is a collection. In our
-              // case, the multi-key column is itself a collection as such, we will
-              // never be able to support the 'IN' clause for that column
-              // TODO: we could look into storing the actual set column for the MK as a frozen set and see if that lifts this restriction
-              if (f.isClusteringKey()) {
-                throw new IllegalArgumentException(
-                  "unsupported selection of multiple values for clustering multi-key column '"
-                  + clause.getColumnName()
-                  + "'"
-                 );
+            } else if (ci) {
+              if (clause instanceof ClauseImpl.InClauseImpl) {
+                i.set(new ClauseImpl.InClauseImpl(
+                  StatementImpl.CI_PREFIX + clause.getColumnName(),
+                  clause.values().stream()
+                    .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                    .collect(Collectors.toSet())
+                ));
+              } else if (clause instanceof ClauseImpl.SimpleClauseImpl) {
+                final Object v = clause.firstValue();
+
+                i.set(new ClauseImpl.SimpleClauseImpl(
+                  StatementImpl.CI_PREFIX + clause.getColumnName(),
+                  clause.getOperation(),
+                  (v != null) ? StringUtils.lowerCase(v.toString()) : null
+                ));
               }
-              i.set(new ClauseImpl.InClauseImpl(
-                StatementImpl.MK_PREFIX + clause.getColumnName(), in
-              ));
             }
           }
         }
