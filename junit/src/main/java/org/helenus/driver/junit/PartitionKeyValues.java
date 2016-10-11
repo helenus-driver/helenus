@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,17 +24,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * The <code>SuffixKeyValues</code> annotation allows a test method or class to
- * define specific suffix key values to be used when creating schemas for pojos.
+ * The <code>PartitionKeyValues</code> annotation allows a test method or class to
+ * define specific keyspace key values to be used when creating schemas for pojos.
  * <p>
- * When defining suffix key values, one can set them on either the test class or
- * the test method. Suffix key values defined on the test methods will override
- * any the values defined for the same suffix type on the class. The order of
+ * When defining keyspace key values, one can set them on either the test class or
+ * the test method. Partition key values defined on the test methods will override
+ * any the values defined for the same keyspace key type on the class. The order of
  * the annotations provided also indicates a priority. That is that the first
  * annotation that matches will override all others found on the same method or
  * class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jun 28, 2015 - paouelle - Creation
@@ -43,25 +43,25 @@ import java.lang.annotation.Target;
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-@Repeatable(SuffixKeyValuess.class)
+@Repeatable(PartitionKeyValuess.class)
 @Inherited
 @Documented
-public @interface SuffixKeyValues {
+public @interface PartitionKeyValues {
   /**
-   * The type for the suffix key.
+   * The type for the keyspace key.
    *
    * @author paouelle
    *
-   * @return the type for the suffix key
+   * @return the type for the keyspace key
    */
   String type();
 
   /**
-   * The values for the suffix key.
+   * The values for the keyspace key.
    *
    * @author paouelle
    *
-   * @return the values for the suffix key
+   * @return the values for the keyspace key
    */
   String[] values();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import org.helenus.driver.persistence.TypeEntity;
  * The <code>TypeClassInfoImpl</code> class provides information about a
  * particular POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -131,12 +131,12 @@ public class TypeClassInfoImpl<T>
    * @throws IllegalArgumentException if the POJO class is improperly annotated
    */
   private void validate(Class<? super T> rclazz) {
-    // check suffix keys
-    getSuffixKeys().forEach(
+    // check keyspace keys
+    getKeyspaceKeys().forEach(
       (n, f) -> {
         org.apache.commons.lang3.Validate.isTrue(
           rclazz.equals(f.getDeclaringClass()),
-          "@SuffixKey annotation with name '%s' is not defined in root element class '%s' for type class: %s; found in class: %s",
+          "@PartitionKey annotation with name '%s' is not defined in root element class '%s' for type class: %s; found in class: %s",
           n,
           rclazz.getSimpleName(),
           clazz.getSimpleName(),
@@ -275,31 +275,31 @@ public class TypeClassInfoImpl<T>
 
   /**
    * Converts the specified result row into a POJO object defined by this
-   * class information and suffix map.
+   * class information and keyspace key map.
    *
    * @author paouelle
    *
    * @param  row the result row to convert into a POJO
    * @param  type the POJO type extracted from the specified row
-   * @param  suffixes a map of suffix values to report back into the created
+   * @param  kkeys a map of keyspace key values to report back into the created
    *         POJO
    * @return the POJO object corresponding to the given result row or <code>null</code>
    *         if the type doesn't match this type entity name
-   * @throws NullPointerException if <code>type</code> or <code>suffixes</code>
+   * @throws NullPointerException if <code>type</code> or <code>kkeys</code>
    *         is <code>null</code>
    * @throws ObjectConversionException if unable to convert to a POJO
    */
   @SuppressWarnings("unchecked")
-  public T getObject(Row row, String type, Map<String, Object> suffixes) {
+  public T getObject(Row row, String type, Map<String, Object> kkeys) {
     if (row != null) {
       if (this.type.equals(type)) { // it is our kind
-        return super.getObject(row, suffixes);
+        return super.getObject(row, kkeys);
       }
       final TypeClassInfoImpl<?> tinfo = rinfo.getType(type);
 
       if (clazz.isAssignableFrom(tinfo.getObjectClass())) {
         // delegate to this sub type info class
-        return (T)tinfo.getObject(row, type, suffixes);
+        return (T)tinfo.getObject(row, type, kkeys);
       }
     }
     return null;
@@ -313,7 +313,7 @@ public class TypeClassInfoImpl<T>
    * @see org.helenus.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
    */
   @Override
-  public T getObject(Row row, Map<String, Object> suffixes) {
+  public T getObject(Row row, Map<String, Object> kkeys) {
     if (row == null) {
       return null;
     }
@@ -330,7 +330,7 @@ public class TypeClassInfoImpl<T>
           final String type = Objects.toString(field.decodeValue(row), null);
 
           if (type != null) {
-            return getObject(row, type, suffixes);
+            return getObject(row, type, kkeys);
           }
           break;
         }

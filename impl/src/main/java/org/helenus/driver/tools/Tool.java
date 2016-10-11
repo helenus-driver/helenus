@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ import org.reflections.scanners.SubTypesScanner;
  * The <code>Tool</code> class defines a command line tool that can be used
  * along with the driver.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -426,7 +426,7 @@ public class Tool {
   @SuppressWarnings("static-access")
   private final static Option matches_only = Option.builder()
     .longOpt("matches-only")
-    .desc("to specify that only keyspace that matches the specified suffixes should be created")
+    .desc("to specify that only keyspace that matches the specified keyspace keys should be created")
     .build();
 
   /**
@@ -479,13 +479,13 @@ public class Tool {
     .build();
 
   /**
-   * Holds the suffix options.
+   * Holds the keyspace key type options.
    *
    * @author paouelle
    */
   @SuppressWarnings("static-access")
-  private final static Option suffixes = Option.builder("S")
-    .desc("to specify value(s) for suffix types (e.g. -Scustomer=acme, -Sregion=emea)")
+  private final static Option keyspaceKeys = Option.builder("K")
+    .desc("to specify value(s) for keyspace key types (e.g. -Kcustomer=acme, -Kregion=emea)")
     .numberOfArgs(2)
     .argName("type=value")
     .valueSeparator()
@@ -516,7 +516,7 @@ public class Tool {
        .addOption(Tool.objects)
        .addOption(Tool.jsons)
        .addOption(Tool.jsonview)
-       .addOption(Tool.suffixes)
+       .addOption(Tool.keyspaceKeys)
        .addOption(Tool.server)
        .addOption(Tool.port)
        .addOption(Tool.filters)
@@ -634,9 +634,9 @@ public class Tool {
    * @author paouelle
    *
    * @param  pkgs the set of packages and/or classes to create schemas for
-   * @param  suffixes the map of provided suffix values
+   * @param  kkeys the map of provided keyspace key values
    * @param  matching whether or not to only create schemas for keyspaces that
-   *         matches the specified set of suffixes
+   *         matches the specified set of keyspace keys
    * @param  alter whether to alter or create the schemas
    * @param  s the sequence where to add the generated statements
    * @throws LinkageError if the linkage fails for one of the specified entity
@@ -648,7 +648,7 @@ public class Tool {
    */
   private static void createSchemasFromPackagesOrClasses(
     String[] pkgs,
-    Map<String, String> suffixes,
+    Map<String, String> kkeys,
     boolean matching,
     boolean alter,
     Sequence s
@@ -659,9 +659,9 @@ public class Tool {
            ? StatementBuilder.alterMatchingSchemas(pkgs)
            : StatementBuilder.alterSchemas(pkgs));
 
-      // pass all suffixes
-      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-        // register the suffix value with the corresponding suffix type
+      // pass all keyspace keys
+      for (final Map.Entry<String, String> e: kkeys.entrySet()) {
+        // register the keyspace key value with the corresponding keyspace key type
         cs.where(StatementBuilder.eq(e.getKey(), e.getValue()));
       }
       cs.classInfos().forEachOrdered(cinfo -> System.out.println(
@@ -677,9 +677,9 @@ public class Tool {
             : StatementBuilder.createSchemas(pkgs));
 
       cs.ifNotExists();
-      // pass all suffixes
-      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-        // register the suffix value with the corresponding suffix type
+      // pass all keyspace keys
+      for (final Map.Entry<String, String> e: kkeys.entrySet()) {
+        // register the keyspace key value with the corresponding keyspace key type
         cs.where(StatementBuilder.eq(e.getKey(), e.getValue()));
       }
       cs.classInfos().forEachOrdered(cinfo -> System.out.println(
@@ -699,9 +699,9 @@ public class Tool {
    * @author paouelle
    *
    * @param  pkgs the set of packages and/or classes to truncate schema tables for
-   * @param  suffixes the map of provided suffix values
+   * @param  kkeys the map of provided keyspace key values
    * @param  matching whether or not to only truncate schema tables for keyspaces
-   *         that matches the specified set of suffixes
+   *         that matches the specified set of keyspace keys
    * @param  s the sequence where to add the generated statements
    * @throws LinkageError if the linkage fails for one of the specified entity
    *         class
@@ -712,7 +712,7 @@ public class Tool {
    */
   private static void truncateSchemasFromPackagesOrClasses(
     String[] pkgs,
-    Map<String, String> suffixes,
+    Map<String, String> kkeys,
     boolean matching,
     Sequence s
   ) {
@@ -721,9 +721,9 @@ public class Tool {
           ? StatementBuilder.createMatchingSchemas(pkgs)
           : StatementBuilder.createSchemas(pkgs));
 
-    // pass all suffixes
-    for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-      // register the suffix value with the corresponding suffix type
+    // pass all keyspace keys
+    for (final Map.Entry<String, String> e: kkeys.entrySet()) {
+      // register the keyspace key value with the corresponding keyspace key type
       cs.where(StatementBuilder.eq(e.getKey(), e.getValue()));
     }
     cs.classInfos().forEachOrdered(cinfo -> {
@@ -755,8 +755,8 @@ public class Tool {
   private static void createSchemas(CommandLine line) throws Exception {
     final String[] opts = line.getOptionValues(Tool.schemas.getLongOpt());
     @SuppressWarnings({"cast", "unchecked", "rawtypes"})
-    final Map<String, String> suffixes
-      = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
+    final Map<String, String> kkeys
+      = (Map<String, String>)(Map)line.getOptionProperties(Tool.keyspaceKeys.getOpt());
     final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
     final boolean alter = line.hasOption(Tool.alter.getLongOpt());
     final Sequence s = StatementBuilder.sequence();
@@ -766,16 +766,16 @@ public class Tool {
       + ": searching for schema definitions in "
       + Arrays.toString(opts)
     );
-    if (!suffixes.isEmpty()) {
+    if (!kkeys.isEmpty()) {
       System.out.print(
         " with "
         + (matching ? "matching " : "")
-        + "suffixes "
-        + suffixes
+        + "keyspace keys "
+        + kkeys
       );
     }
     System.out.println();
-    Tool.createSchemasFromPackagesOrClasses(opts, suffixes, matching, alter, s);
+    Tool.createSchemasFromPackagesOrClasses(opts, kkeys, matching, alter, s);
     if (s.isEmpty() || (s.getQueryString() == null)) {
       System.out.println(
         Tool.class.getSimpleName()
@@ -804,8 +804,8 @@ public class Tool {
   private static void truncateSchemas(CommandLine line) throws Exception {
     final String[] opts = line.getOptionValues(Tool.truncate.getLongOpt());
     @SuppressWarnings({"cast", "unchecked", "rawtypes"})
-    final Map<String, String> suffixes
-      = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
+    final Map<String, String> kkeys
+      = (Map<String, String>)(Map)line.getOptionProperties(Tool.keyspaceKeys.getOpt());
     final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
     final Sequence s = StatementBuilder.sequence();
 
@@ -814,16 +814,16 @@ public class Tool {
       + ": searching for schema definitions in "
       + Arrays.toString(opts)
     );
-    if (!suffixes.isEmpty()) {
+    if (!kkeys.isEmpty()) {
       System.out.print(
         " with "
         + (matching ? "matching " : "")
-        + "suffixes "
-        + suffixes
+        + "keyspace keys "
+        + kkeys
       );
     }
     System.out.println();
-    Tool.truncateSchemasFromPackagesOrClasses(opts, suffixes, matching, s);
+    Tool.truncateSchemasFromPackagesOrClasses(opts, kkeys, matching, s);
     if (s.isEmpty() || (s.getQueryString() == null)) {
       System.out.println(
         Tool.class.getSimpleName()
@@ -841,9 +841,9 @@ public class Tool {
    * @author paouelle
    *
    * @param  pkgs the set of packages and/or classes to create Json schemas for
-   * @param  suffixes the map of provided suffix values
+   * @param  kkeys the map of provided keyspace key values
    * @param  matching whether or not to only create schemas for keyspaces that
-   *         matches the specified set of suffixes
+   *         matches the specified set of keyspace keys
    * @param  schemas the map where to record the Json schema for the pojo classes
    *         found
    * @param  view the json view to use when generating the schemas
@@ -858,7 +858,7 @@ public class Tool {
   @SuppressWarnings("deprecation")
   private static void createJsonSchemasFromPackagesOrClasses(
     String[] pkgs,
-    Map<String, String> suffixes,
+    Map<String, String> kkeys,
     boolean matching,
     Map<Class<?>, JsonSchema> schemas,
     Class<?> view
@@ -871,9 +871,9 @@ public class Tool {
            ? StatementBuilder.createMatchingSchemas(pkg)
            : StatementBuilder.createSchemas(pkg));
 
-      // pass all suffixes
-      for (final Map.Entry<String, String> e: suffixes.entrySet()) {
-        // register the suffix value with the corresponding suffix type
+      // pass all keyspace keys
+      for (final Map.Entry<String, String> e: kkeys.entrySet()) {
+        // register the keyspace key value with the corresponding keyspace key type
         cs.where(
           StatementBuilder.eq(e.getKey(), e.getValue())
         );
@@ -947,8 +947,8 @@ public class Tool {
   private static void createJsonSchemas(CommandLine line) throws Exception {
     final String[] opts = line.getOptionValues(Tool.jsons.getLongOpt());
     @SuppressWarnings({"cast", "unchecked", "rawtypes"})
-    final Map<String, String> suffixes
-      = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
+    final Map<String, String> kkeys
+      = (Map<String, String>)(Map)line.getOptionProperties(Tool.keyspaceKeys.getOpt());
     final boolean matching = line.hasOption(Tool.matches_only.getLongOpt());
     final Map<Class<?>, JsonSchema> schemas = new LinkedHashMap<>();
     final Class<?> view;
@@ -965,16 +965,16 @@ public class Tool {
       + ": searching for Json schema definitions in "
       + Arrays.toString(opts)
     );
-    if (!suffixes.isEmpty()) {
+    if (!kkeys.isEmpty()) {
       System.out.print(
         " with "
         + (matching ? "matching " : "")
-        + "suffixes "
-        + suffixes
+        + "keyspace keys "
+        + kkeys
       );
     }
     System.out.println();
-    Tool.createJsonSchemasFromPackagesOrClasses(opts, suffixes, matching, schemas, view);
+    Tool.createJsonSchemasFromPackagesOrClasses(opts, kkeys, matching, schemas, view);
     if (schemas.isEmpty()) {
       System.out.println(
         Tool.class.getSimpleName()
@@ -1005,17 +1005,17 @@ public class Tool {
 
   /**
    * Gets the initial objects to insert using the specified initial method and
-   * suffixes
+   * keyspace keys.
    *
    * @author paouelle
    *
    * @param  initial a non-<code>null</code> initial method to retrieve objects with
-   * @param  suffixes the non-<code>null</code> map of suffixes configured
+   * @param  kkeys the non-<code>null</code> map of keyspace keys configured
    * @return a non-<code>null</code> collection of the initial objects to insert in the table
    */
   @SuppressWarnings("unchecked")
   private static Collection<?> getInitialObjects(
-    Method initial, Map<String, String> suffixes
+    Method initial, Map<String, String> kkeys
   ) {
     try {
       final Object ret;
@@ -1023,7 +1023,7 @@ public class Tool {
       if (initial.getParameterCount() == 0) {
         ret = initial.invoke(null);
       } else {
-        ret = initial.invoke(null, suffixes);
+        ret = initial.invoke(null, kkeys);
       }
       if (ret == null) {
         return Collections.emptyList();
@@ -1111,7 +1111,7 @@ public class Tool {
           );
         }
         // validate that if it has parameters than it must be a Map<String, String>
-        // to provide the values for the suffixes when initializing objects
+        // to provide the values for the keyspace keys when initializing objects
         final Class<?>[] cparms = m.getParameterTypes();
 
         if (cparms.length > 1) {
@@ -1226,10 +1226,10 @@ public class Tool {
    * @author paouelle
    *
    * @param classes the collection of classes for object creators
-   * @param suffixes the map of provided suffix values
+   * @param kkeys the map of provided keyspace key values
    */
   private static void insertObjectsFromClasses(
-    Collection<Class<?>> classes, Map<String, String> suffixes
+    Collection<Class<?>> classes, Map<String, String> kkeys
   ) {
     for (final Class<?> clazz: classes) {
       final Map<Method, Class<?>[]> initials = Tool.findInitials(clazz);
@@ -1246,7 +1246,7 @@ public class Tool {
 
       for (final Map.Entry<Method, Class<?>[]> e: initials.entrySet()) {
         final Method m = e.getKey();
-        final Collection<?> ios = Tool.getInitialObjects(m, suffixes);
+        final Collection<?> ios = Tool.getInitialObjects(m, kkeys);
 
         System.out.println(
           Tool.class.getSimpleName()
@@ -1291,8 +1291,8 @@ public class Tool {
   private static void insertObjects(CommandLine line) throws Exception {
     final String[] opts = line.getOptionValues(Tool.objects.getLongOpt());
     @SuppressWarnings({"cast", "unchecked", "rawtypes"})
-    final Map<String, String> suffixes
-      = (Map<String, String>)(Map)line.getOptionProperties(Tool.suffixes.getOpt());
+    final Map<String, String> kkeys
+      = (Map<String, String>)(Map)line.getOptionProperties(Tool.keyspaceKeys.getOpt());
     final boolean no_dependents = line.hasOption(Tool.no_dependents.getLongOpt());
 
     System.out.print(
@@ -1300,8 +1300,8 @@ public class Tool {
       + ": searching for object creators in "
       + Arrays.toString(opts)
     );
-    if (!suffixes.isEmpty()) {
-      System.out.print(" with suffixes " + suffixes);
+    if (!kkeys.isEmpty()) {
+      System.out.print(" with keyspace keys " + kkeys);
     }
     if (no_dependents) {
       System.out.print(" not including dependent creators");
@@ -1316,7 +1316,7 @@ public class Tool {
       final List<Class<?>> cs = GraphUtils.sort(classes);
 
       Collections.reverse(cs);
-      Tool.insertObjectsFromClasses(cs, suffixes);
+      Tool.insertObjectsFromClasses(cs, kkeys);
     } catch (IllegalCycleException e) {
       System.out.println(
         Tool.class.getSimpleName()

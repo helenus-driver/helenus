@@ -96,13 +96,13 @@ public class UDTRootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addSuffix(java.lang.String, java.lang.Object)
+     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addKeyspaceKey(java.lang.String, java.lang.Object)
      */
     @Override
-    public void addSuffix(String suffix, Object value) {
-      super.addSuffix(suffix, value);
+    public void addKeyspaceKey(String name, Object value) {
+      super.addKeyspaceKey(name, value);
       contexts.values().forEach(
-        tc -> tc.addSuffix(suffix, value)
+        tc -> tc.addKeyspaceKey(name, value)
       );
     }
   }
@@ -154,11 +154,11 @@ public class UDTRootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixKeyValues()
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceKeyValues()
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getSuffixKeyValues() {
-      return tcontext.getSuffixKeyValues();
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceKeyValues() {
+      return tcontext.getKeyspaceKeyValues();
     }
 
     /**
@@ -178,11 +178,11 @@ public class UDTRootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addSuffix(java.lang.String, java.lang.Object)
+     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addKeyspaceKey(java.lang.String, java.lang.Object)
      */
     @Override
-    public void addSuffix(String suffix, Object value) {
-      tcontext.addSuffix(suffix, value);
+    public void addKeyspaceKey(String name, Object value) {
+      tcontext.addKeyspaceKey(name, value);
     }
 
     /**

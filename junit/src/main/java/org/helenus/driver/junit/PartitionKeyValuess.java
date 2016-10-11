@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Defines several {@link SuffixKeyValuess} annotations on the same element in
- * order to define multiple {@link SuffixKeyValues} annotations for the same
+ * Defines several {@link PartitionKeyValues} annotations on the same element in
+ * order to define multiple {@link PartitionKeyValues} annotations for the same
  * test method or class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jun 28, 2015 - paouelle - Creation
@@ -38,13 +38,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
 @Documented
-public @interface SuffixKeyValuess {
+public @interface PartitionKeyValuess {
   /**
-   * List of all {@link SuffixKeyValues} annotations.
+   * List of all {@link PartitionKeyValues} annotations.
    *
    * @author paouelle
    *
-   * @return the list of all suffix key values annotations
+   * @return the list of all keyspace key values annotations
    */
-  SuffixKeyValues[] value();
+  PartitionKeyValues[] value();
 }

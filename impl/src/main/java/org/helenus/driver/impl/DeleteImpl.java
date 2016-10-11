@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -308,7 +308,7 @@ public class DeleteImpl<T>
    * @param  builders the non-<code>null</code> list of builders where to add
    *         the query strings built
    * @throws IllegalArgumentException if the keyspace has not yet been computed
-   *         and cannot be computed with the provided suffixes yet or if
+   *         and cannot be computed with the provided keyspace keys yet or if
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
@@ -871,9 +871,9 @@ public class DeleteImpl<T>
       if (!(c instanceof ClauseImpl.Delayed) && !(c instanceof ClauseImpl.DelayedWithObject)) {
         // pre-validate against any table
         if (c instanceof Clause.Equality) {
-          getContext().getClassInfo().validateColumnOrSuffix(c.getColumnName().toString());
-          if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
-            statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+          getContext().getClassInfo().validateColumnOrKeyspaceKey(c.getColumnName().toString());
+          if (statement.getContext().getClassInfo().isKeyspaceKey(c.getColumnName().toString())) {
+            statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
           }
         } else {
           getContext().getClassInfo().validateColumn(c.getColumnName().toString());
@@ -1180,7 +1180,7 @@ public class DeleteImpl<T>
      * Specifies to delete from all tables defined in the POJO using the
      * keyspace defined in the POJO.
      * <p>
-     * This flavor should be used when the POJO doesn't require suffixes to the
+     * This flavor should be used when the POJO doesn't require keyspace keys to the
      * keyspace name.
      *
      * @author paouelle
@@ -1188,7 +1188,7 @@ public class DeleteImpl<T>
      * @return a newly build DELETE statement that deletes from all tables
      *         defined in the POJO
      * @throws IllegalArgumentException if unable to compute the keyspace name
-     *         without any suffixes or any of the referenced columns are not
+     *         without any keyspace keys or any of the referenced columns are not
      *         defined by the POJO
      */
     @Override

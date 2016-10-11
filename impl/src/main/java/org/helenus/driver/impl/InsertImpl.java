@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import com.datastax.driver.core.Row;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.ColumnPersistenceException;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.Insert;
 import org.helenus.driver.ObjectExistException;
 import org.helenus.driver.StatementBridge;
@@ -185,7 +185,7 @@ public class InsertImpl<T>
    * @param  builders the non-<code>null</code> list of builders where to add
    *         the query strings built
    * @throws IllegalArgumentException if the keyspace has not yet been computed
-   *         and cannot be computed with the provided suffixes yet or if the
+   *         and cannot be computed with the provided keyspace keys yet or if the
    *         POJO is missing primary, clustering, or mandatory columns defined
    *         by the specified table
    * @throws ColumnPersistenceException if unable to persist a column's value
@@ -316,7 +316,7 @@ public class InsertImpl<T>
    *         the query strings built
    * @param  columns the set of columns and values to insert
    * @throws IllegalArgumentException if the keyspace has not yet been computed
-   *         and cannot be computed with the provided suffixes yet or if the
+   *         and cannot be computed with the provided keyspace keys yet or if the
    *         POJO is missing primary, clustering, or mandatory columns defined
    *         by the specified table
    * @throws ColumnPersistenceException if unable to persist a column's value
@@ -489,10 +489,10 @@ public class InsertImpl<T>
       values.isEmpty(),
       "separate values have already been added to this statement"
     );
-    final Map<String, FieldInfoImpl<T>> suffixes = getPOJOContext().getClassInfo().suffixesByName;
+    final Map<String, FieldInfoImpl<T>> kkeys = getPOJOContext().getClassInfo().keyspaceKeysByName;
 
-    if (!suffixes.isEmpty()) {
-      getPOJOContext().populateSuffixes(suffixes);
+    if (!kkeys.isEmpty()) {
+      getPOJOContext().populateKeyspaceKeys(kkeys);
       setDirty();
     }
     if (!allValuesAdded) {
@@ -513,13 +513,13 @@ public class InsertImpl<T>
    */
   @Override
   public Insert<T> value(String name) {
-    final boolean isSuffixKey = getPOJOContext().getClassInfo().isSuffixKey(name);
+    final boolean isKeyspaceKey = getPOJOContext().getClassInfo().isKeyspaceKey(name);
 
-    if (isSuffixKey) {
+    if (isKeyspaceKey) {
       try {
-        getPOJOContext().addSuffix(name);
+        getPOJOContext().addKeyspaceKey(name);
         setDirty();
-      } catch (ExcludedSuffixKeyException e) { // ignore and continue without value
+      } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without value
       }
       // only continue to add if it is a column too and if all values were not added
       if (allValuesAdded || !getPOJOContext().getClassInfo().isColumn(name)) {
@@ -551,13 +551,13 @@ public class InsertImpl<T>
     final List<String> ns = new ArrayList<>(names.length);
 
     for (final String n: names) {
-      final boolean isSuffixKey = getPOJOContext().getClassInfo().isSuffixKey(n);
+      final boolean isKeyspaceKey = getPOJOContext().getClassInfo().isKeyspaceKey(n);
 
-      if (isSuffixKey) {
+      if (isKeyspaceKey) {
         try {
-          getPOJOContext().addSuffix(n);
+          getPOJOContext().addKeyspaceKey(n);
           setDirty();
-        } catch (ExcludedSuffixKeyException e) { // ignore and continue without value
+        } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without value
         }
         // only continue to add if it is a column too and if all values were not added
         if (!allValuesAdded || !getPOJOContext().getClassInfo().isColumn(n)) {
@@ -587,16 +587,16 @@ public class InsertImpl<T>
    */
   @Override
   public Insert<T> value(String name, Object value) {
-    final boolean isSuffixKey = getPOJOContext().getClassInfo().isSuffixKey(name);
+    final boolean isKeyspaceKey = getPOJOContext().getClassInfo().isKeyspaceKey(name);
 
     if (value instanceof Optional) {
       value = ((Optional<?>)value).orElse(null);
     }
-    if (isSuffixKey) {
+    if (isKeyspaceKey) {
       try {
-        getPOJOContext().addSuffix(name, value);
+        getPOJOContext().addKeyspaceKey(name, value);
         setDirty();
-      } catch (ExcludedSuffixKeyException e) { // ignore and continue without value
+      } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without value
       }
       // only continue to add if it is a column too and if all values were not added
       if (allValuesAdded || !getPOJOContext().getClassInfo().isColumn(name)) {

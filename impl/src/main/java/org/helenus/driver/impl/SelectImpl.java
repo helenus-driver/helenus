@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import com.datastax.driver.core.ResultSetFuture;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.Clause;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.ObjectSetFuture;
 import org.helenus.driver.Ordering;
@@ -53,7 +53,7 @@ import org.helenus.driver.info.TableInfo;
  * {@link com.datastax.driver.core.querybuilder.Select} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -109,7 +109,7 @@ public class SelectImpl<T>
   private boolean allowFiltering;
 
   /**
-   * Holds the computed keyspace name for this statement when suffixes are used
+   * Holds the computed keyspace name for this statement when keyspace keys are used
    * with an IN clause.
    *
    * @author paouelle
@@ -118,18 +118,18 @@ public class SelectImpl<T>
 
   /**
    * Holds underlying select statements for all combinations of an IN clause
-   * on keyspace suffixes.
+   * on keyspace keys.
    *
    * @author paouelle
    */
   private List<SelectImpl<T>> statements = null;
 
   /**
-   * Holds the collection of suffix values when using the IN clause.
+   * Holds the collection of keyspace key values when using the IN clause.
    *
    * @author paouelle
    */
-  private Map<String, Collection<?>> suffixes = null;
+  private Map<String, Collection<?>> keyspaceKeys = null;
 
   /**
    * List of columns added.
@@ -208,7 +208,7 @@ public class SelectImpl<T>
   }
 
   /**
-   * Gets the underlying statements when an IN clause is used with suffix keys.
+   * Gets the underlying statements when an IN clause is used with keyspace keys.
    *
    * @author paouelle
    *
@@ -216,14 +216,14 @@ public class SelectImpl<T>
    */
   @SuppressWarnings({"synthetic-access", "cast", "unchecked", "rawtypes"})
   private Stream<SelectImpl<T>> statements() {
-    // if we get here then the query was done for suffixes with an IN clause
+    // if we get here then the query was done for keyspace keys with an IN clause
     if (statements == null) {
       // in such case, we must generate one query for each combinations
       // and aggregate the results
-      final List<String> snames = new ArrayList<>(suffixes.keySet());
+      final List<String> snames = new ArrayList<>(keyspaceKeys.keySet());
       final CombinationIterator<Object> ci = new CombinationIterator<>(
         Object.class,
-        (Collection<Collection<Object>>)(Collection)suffixes.values()
+        (Collection<Collection<Object>>)(Collection)keyspaceKeys.values()
       );
       final List<SelectImpl<T>> statements = new ArrayList<>(ci.size());
 
@@ -231,13 +231,13 @@ public class SelectImpl<T>
       while (ci.hasNext()) {
         final List<Object> svalues = ci.next();
         // create a new select statement as a dup of this one but with
-        // the suffixes from the current combination
+        // the keyspace keys from the current combination
         final SelectImpl<T> s = new SelectImpl<>(this);
 
         for (int j = 0; j < snames.size(); j++) {
           try {
-            s.getContext().addSuffix(snames.get(j), svalues.get(j));
-          } catch (ExcludedSuffixKeyException e) { // ignore and continue without statement
+            s.getContext().addKeyspaceKey(snames.get(j), svalues.get(j));
+          } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without statement
             continue next_combination;
           }
         }
@@ -283,7 +283,7 @@ public class SelectImpl<T>
           // this is the worst case scenario where all combinations are valid
           super.simpleSize = new CombinationIterator<>(
             Object.class,
-            (Collection<Collection<Object>>)(Collection)suffixes.values()
+            (Collection<Collection<Object>>)(Collection)keyspaceKeys.values()
           ).size();
         }
       }
@@ -339,7 +339,7 @@ public class SelectImpl<T>
       if (getKeyspace() != null) {
         Utils.appendName(getKeyspace(), builder).append(".");
       }
-    } catch (ExcludedSuffixKeyException e) { // just skip this one since we were asked to skip the current keyspace suffix
+    } catch (ExcludedKeyspaceKeyException e) { // just skip this one since we were asked to skip the current keyspace key
       return null;
     }
     Utils.appendName(table.getName(), builder);
@@ -396,8 +396,8 @@ public class SelectImpl<T>
    */
   @Override
   protected ResultSetFuture executeAsyncRaw0() {
-    // if we are disabled or have no suffixes then no need for special treatment of the response
-    if (!isEnabled() || (suffixes == null)) {
+    // if we are disabled or have no keyspace keys then no need for special treatment of the response
+    if (!isEnabled() || (keyspaceKeys == null)) {
       return super.executeAsyncRaw0();
     }
     return new CompoundResultSetFuture(
@@ -418,8 +418,8 @@ public class SelectImpl<T>
    */
   @Override
   public ObjectSetFuture<T> executeAsync0() {
-    // if we are disabled or have no suffixes then no need for special treatment of the response
-    if (!isEnabled() || (suffixes == null)) {
+    // if we are disabled or have no keyspace keys then no need for special treatment of the response
+    if (!isEnabled() || (keyspaceKeys == null)) {
       return super.executeAsync0();
     }
     return new CompoundObjectSetFuture<>(
@@ -439,21 +439,21 @@ public class SelectImpl<T>
    * @return the non-<code>null</code> keyspace name associated with this
    *         context
    * @throws IllegalArgumentException if unable to compute the keyspace name
-   *         based on provided suffixes
+   *         based on provided keyspace keys
    */
   @SuppressWarnings({"synthetic-access", "cast", "unchecked", "rawtypes"})
   @Override
   public String getKeyspace() {
-    if (suffixes == null) {
+    if (keyspaceKeys == null) {
       return super.getKeyspace();
     }
     if (keyspace == null) {
-      // if we get here then the query was done for suffixes with an IN clause
+      // if we get here then the query was done for keyspace keys with an IN clause
       // in such case, we must generate one query for each combinations
       // and aggregate the results
-      final List<String> snames = new ArrayList<>(suffixes.keySet());
+      final List<String> snames = new ArrayList<>(keyspaceKeys.keySet());
       final CombinationIterator<Object> ci = new CombinationIterator<>(
-        Object.class, (Collection<Collection<Object>>)(Collection)suffixes.values()
+        Object.class, (Collection<Collection<Object>>)(Collection)keyspaceKeys.values()
       );
       final List<String> keyspaces = new ArrayList<>(ci.size());
 
@@ -461,13 +461,13 @@ public class SelectImpl<T>
       while (ci.hasNext()) {
         final List<Object> svalues = ci.next();
         // create a new select statement as a dup of this one but with
-        // the suffixes from the current combination
+        // the keyspace keys from the current combination
         final SelectImpl s = init(new SelectImpl(this));
 
         for (int j = 0; j < snames.size(); j++) {
           try {
-            s.getContext().addSuffix(snames.get(j), svalues.get(j));
-          } catch (ExcludedSuffixKeyException e) { // ignore and continue without the keyspace
+            s.getContext().addKeyspaceKey(snames.get(j), svalues.get(j));
+          } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without the keyspace
             continue next_combination;
           }
         }
@@ -766,40 +766,40 @@ public class SelectImpl<T>
         boolean add = true;
 
         if (c instanceof Clause.Equality) {
-          statement.table.validateSuffixKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
-          if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
+          statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
+          if (statement.getContext().getClassInfo().isKeyspaceKey(c.getColumnName().toString())) {
             try {
-              statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+              statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
               // only add if it is a column too
               add = statement.table.hasColumn(c.getColumnName());
-            } catch (ExcludedSuffixKeyException e) { // ignore and continue without clause
+            } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without clause
               return this;
             }
           }
           c.validate(statement.table);
         } else if (c instanceof Clause.In) {
-          statement.table.validateSuffixKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
-          if (statement.getContext().getClassInfo().isSuffixKey(c.getColumnName().toString())) {
-            // verify all suffix values one after the other to validate all of them
+          statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
+          if (statement.getContext().getClassInfo().isKeyspaceKey(c.getColumnName().toString())) {
+            // verify all keyspace key values one after the other to validate all of them
             final List<Object> values = new ArrayList<>(c.values());
 
             for (final Iterator<?> i = values.iterator(); i.hasNext(); ) {
               final Object v = i.next();
 
               try {
-                statement.getContext().getClassInfo().validateSuffix(
+                statement.getContext().getClassInfo().validateKeyspaceKey(
                   c.getColumnName().toString(), v
                 );
-              } catch (ExcludedSuffixKeyException e) { // ignore this suffix and value from the list
+              } catch (ExcludedKeyspaceKeyException e) { // ignore this keyspace key and value from the list
                 i.remove();
               }
             }
-            // keep track of all suffixes so we can generate all the underlying
+            // keep track of all keyspace keys so we can generate all the underlying
             // select statements later
-            if (statement.suffixes == null) {
-              statement.suffixes = new LinkedHashMap<>(6);
+            if (statement.keyspaceKeys == null) {
+              statement.keyspaceKeys = new LinkedHashMap<>(6);
             }
-            statement.suffixes.put(c.getColumnName().toString(), values);
+            statement.keyspaceKeys.put(c.getColumnName().toString(), values);
             // only add if it is a column too
             add = statement.table.hasColumn(c.getColumnName());
             // don't validate the clause as we know it is not a valid one with

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Defines several {@link SuffixKey} annotations on the same element in order to
- * define multiple suffixes for the same POJO.
+ * Defines several {@link KeyspaceKey} annotations on the same element in order to
+ * define multiple keyspace keys for the same POJO.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Mar 3, 2015 - paouelle - Creation
@@ -37,13 +37,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
 @Documented
-public @interface SuffixKeys {
+public @interface KeyspaceKeys {
   /**
-   * List of all {@link SuffixKey} annotations.
+   * List of all {@link KeyspaceKey} annotations.
    *
    * @author paouelle
    *
-   * @return the list of all suffix key annotations
+   * @return the list of all keyspace key annotations
    */
-  SuffixKey[] value();
+  KeyspaceKey[] value();
 }

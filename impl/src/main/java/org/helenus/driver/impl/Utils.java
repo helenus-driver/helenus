@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ import org.helenus.driver.persistence.UDTTypeEntity;
  * The <code>Utils</code> class is a copy of the
  * <i>com.datastax.driver.core.querybuilder.Utils</i> which is package private
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -564,7 +564,7 @@ public abstract class Utils {
         || name.startsWith("\"")
         || name.startsWith("token(")
         // | is used when a select statement requires searching multiple keyspaces
-        // as a result of using an IN with suffix keys
+        // as a result of using an IN with keyspace keys
         || name.contains("|")) {
       sb.append(name);
     } else {

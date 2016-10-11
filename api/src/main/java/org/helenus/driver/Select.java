@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import org.helenus.driver.info.TableInfo;
  * {@link com.datastax.driver.core.querybuilder.Select} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -184,7 +184,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
      * Specify to select from the keyspace as defined in the POJO and the
      * specified table.
      * <p>
-     * This flavor should be used when the POJO doesn't require suffixes to the
+     * This flavor should be used when the POJO doesn't require keyspace keys to the
      * keyspace name.
      *
      * @author paouelle
@@ -201,7 +201,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
      * Specify to select from the keyspace as defined in the POJO and the
      * specified table.
      * <p>
-     * This flavor should be used when the POJO doesn't require suffixes to the
+     * This flavor should be used when the POJO doesn't require keyspace keys to the
      * keyspace name.
      *
      * @author paouelle

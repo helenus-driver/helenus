@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,18 +24,19 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * The <code>SuffixKey</code> annotation specifies a suffix key to the database
- * keyspace name that is parameterized by an object attribute's value.
+ * The <code>KeyspaceKey</code> annotation specifies a keyspace key to the database
+ * keyspace name defined as a suffix to this name that is parameterized by an
+ * object attribute's value.
  * <p>
  * Attributes annotated with this annotation will be loaded with the corresponding
  * part of the keyspace name when reloaded from the database later.
  * <p>
  * When defining a user-defined type where the associated keyspace is defined
- * with suffixes, this annotation should be place on the class itself to provide
- * a mapping between a suffix type and a "fake" column name such that the suffix
- * could be specified in the CREATE TYPE statement.
+ * with keyspace keys, this annotation should be place on the class itself to provide
+ * a mapping between a keyspace key type and a "fake" column name such that the keyspace
+ * key could be specified in the CREATE TYPE statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -44,39 +45,39 @@ import java.lang.annotation.Target;
  */
 @Target({ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-@Repeatable(SuffixKeys.class)
+@Repeatable(KeyspaceKeys.class)
 @Inherited
 @Documented
-public @interface SuffixKey {
+public @interface KeyspaceKey {
   /**
-   * The name for the suffix key. If the same field is used both as a column and
-   * a suffix key, then this value should match what is defined in the
+   * The name for the keyspace key. If the same field is used both as a column
+   * and a keyspace key, then this value should match what is defined in the
    * {@link Column} annotation. This is the name used in "WHERE" clause when
    * building statements.
    *
    * @author paouelle
    *
-   * @return the name of the suffix key
+   * @return the name of the keyspace key
    */
   String name();
 
   /**
-   * The suffix type is to identify similar suffixes across many POJOs (e.g. a
-   * customer suffix).
+   * The key type is to identify similar keyspace keys across many POJOs
+   * (e.g. a customer acronym, a region name, ...).
    *
    * @author paouelle
    *
-   * @return the suffix type
+   * @return the key type
    */
   String type();
 
   /**
-   * The suffix values to exclude.
+   * The keyspace key values to exclude.
    *
    * @author paouelle
    *
-   * @return a list of suffix values that should be excluded (or for which no
-   *         keyspace would be created)
+   * @return a list of keyspace key values that should be excluded (or for which
+   *         no keyspace would be created)
    */
   String[] exclude() default {};
 }

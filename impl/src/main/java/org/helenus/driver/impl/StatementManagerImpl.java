@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ import org.helenus.driver.persistence.UDTTypeEntity;
  * The <code>StatementManagerImpl</code> class provides an implementation
  * for the {@link StatementManager}.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -153,8 +153,7 @@ public class StatementManagerImpl extends StatementManager {
 
   /**
    * Hold the classInfoCache. This static map is used to collect and store
-   * information about a given Object class file It finds out the keyspace suffix
-   * field, tables suffix which help to speed up querying on these tables
+   * information about a given object class file.
    *
    * @author vasu
    */
@@ -1106,11 +1105,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.StatementManager#isSuffixedLikeObject()
+   * @see org.helenus.driver.StatementManager#isKeyspacedLikeObject()
    */
   @Override
-  protected Clause isSuffixedLikeObject() {
-    return new ClauseImpl.IsSuffixedLikeObjectClauseImpl();
+  protected Clause isKeyspacedLikeObject() {
+    return new ClauseImpl.IsKeyspacedLikeObjectClauseImpl();
   }
 
   /**
@@ -1118,11 +1117,11 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.StatementManager#isSuffixedLike(java.lang.Object)
+   * @see org.helenus.driver.StatementManager#isKeyspacedLike(java.lang.Object)
    */
   @Override
-  protected <T> Clause isSuffixedLike(T object) {
-    return new ClauseImpl.IsSuffixedLikeClauseImpl(object);
+  protected <T> Clause isKeyspacedLike(T object) {
+    return new ClauseImpl.IsKeyspacedLikeClauseImpl(object);
   }
 
   /**

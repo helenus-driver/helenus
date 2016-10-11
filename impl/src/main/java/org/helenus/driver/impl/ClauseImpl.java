@@ -148,7 +148,7 @@ public abstract class ClauseImpl
 
     /**
      * Called at the time the clause is added to a statement to complete the
-     * clause by processing only the clause that references suffixes.
+     * clause by processing only the clause that references keyspace keys.
      *
      * @author paouelle
      *
@@ -156,7 +156,7 @@ public abstract class ClauseImpl
      *         the statement
      * @return a non-<code>null</code> list of new clause(s) corresponding to
      *         this one
-     * @throws IllegalArgumentException if missing mandatory suffixes are processed
+     * @throws IllegalArgumentException if missing mandatory v keys are processed
      */
     public <T> List<ClauseImpl> processWith(ClassInfoImpl<T> cinfo);
   }
@@ -445,7 +445,7 @@ public abstract class ClauseImpl
      */
     @Override
     <T> void validate(TableInfoImpl<T> table) {
-      table.validateSuffixOrColumnAndValue(name, value);
+      table.validateKeyspaceKeyOrColumnAndValue(name, value);
     }
   }
 
@@ -680,11 +680,11 @@ public abstract class ClauseImpl
         + table.getObjectClass().getName()
         + "'"
       );
-      final Collection<FieldInfoImpl<T>> keys = table.getSuffixAndPrimaryKeys();
+      final Collection<FieldInfoImpl<T>> keys = table.getKeyspaceAndPrimaryKeys();
       final List<ClauseImpl> clauses = new ArrayList<>(keys.size());
 
       for (final FieldInfoImpl<T> finfo: keys) {
-        final String name = finfo.isColumn() ? finfo.getColumnName() : finfo.getSuffixKeyName();
+        final String name = finfo.isColumn() ? finfo.getColumnName() : finfo.getKeyspaceKeyName();
 
         clauses.add(new ClauseImpl.EqClauseImpl(name, finfo.getValue((T)object)));
       }
@@ -709,11 +709,11 @@ public abstract class ClauseImpl
         + cinfo.getObjectClass().getName()
         + "'"
       );
-      final Collection<FieldInfoImpl<T>> keys = cinfo.getSuffixKeys().values();
+      final Collection<FieldInfoImpl<T>> keys = cinfo.getKeyspaceKeys().values();
       final List<ClauseImpl> clauses = new ArrayList<>(keys.size());
 
       for (final FieldInfoImpl<T> finfo: keys) {
-        clauses.add(new ClauseImpl.EqClauseImpl(finfo.getSuffixKeyName(), finfo.getValue((T)object)));
+        clauses.add(new ClauseImpl.EqClauseImpl(finfo.getKeyspaceKeyName(), finfo.getValue((T)object)));
       }
       return clauses;
     }
@@ -808,11 +808,11 @@ public abstract class ClauseImpl
         + table.getObjectClass().getName()
         + "'"
       );
-      final Collection<FieldInfoImpl<T>> keys = table.getSuffixAndPartitionKeys();
+      final Collection<FieldInfoImpl<T>> keys = table.getKeyspaceAndPartitionKeys();
       final List<ClauseImpl> clauses = new ArrayList<>(keys.size());
 
       for (final FieldInfoImpl<T> finfo: keys) {
-        final String name = finfo.isColumn() ? finfo.getColumnName() : finfo.getSuffixKeyName();
+        final String name = finfo.isColumn() ? finfo.getColumnName() : finfo.getKeyspaceKeyName();
 
         clauses.add(new ClauseImpl.EqClauseImpl(name, finfo.getValue((T)object)));
       }
@@ -833,27 +833,27 @@ public abstract class ClauseImpl
   }
 
   /**
-   * The <code>IsSuffixedLikeClauseImpl</code> class defines a delayed clause that
-   * generates a set of "equal" clauses for all suffix keys
+   * The <code>IsKeyspacedLikeClauseImpl</code> class defines a delayed clause that
+   * generates a set of "equal" clauses for all keyspace keys
    * of the provided POJO when added to a statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  static class IsSuffixedLikeClauseImpl extends IsClauseImpl {
+  static class IsKeyspacedLikeClauseImpl extends IsClauseImpl {
     /**
-     * Instantiates a new <code>IsSuffixedLikeClauseImpl</code> object.
+     * Instantiates a new <code>IsKeyspacedLikeClauseImpl</code> object.
      *
      * @author paouelle
      *
      * @param  object the POJO object
      * @throws NullPointerException if <code>object</code> is <code>null</code>
      */
-    IsSuffixedLikeClauseImpl(Object object) {
+    IsKeyspacedLikeClauseImpl(Object object) {
       super(object);
     }
 
@@ -875,7 +875,7 @@ public abstract class ClauseImpl
         + table.getObjectClass().getName()
         + "'"
       );
-      final Map<String, FieldInfoImpl<T>> keys = ((ClassInfoImpl<T>)table.getClassInfo()).getSuffixKeys();
+      final Map<String, FieldInfoImpl<T>> keys = ((ClassInfoImpl<T>)table.getClassInfo()).getKeyspaceKeys();
       final List<ClauseImpl> clauses = new ArrayList<>(keys.size());
 
       for (final Map.Entry<String, FieldInfoImpl<T>> e: keys.entrySet()) {
@@ -893,7 +893,7 @@ public abstract class ClauseImpl
      */
     @Override
     String getOperation() {
-      return "IS SUFFIXED LIKE";
+      return "IS KEYSPACED LIKE";
     }
   }
 
@@ -930,7 +930,7 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getSuffixAndPrimaryKeyColumnValues(table.getName());
+      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getKeyspaceAndPrimaryKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
       for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
@@ -1019,7 +1019,7 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getSuffixAndPartitionKeyColumnValues(table.getName());
+      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getKeyspaceAndPartitionKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
       for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
@@ -1076,24 +1076,24 @@ public abstract class ClauseImpl
   }
 
   /**
-   * The <code>IsSuffixedLikeObjectClauseImpl</code> class defines a delayed clause that
-   * generates a set of "equal" clauses for all suffix key columns
+   * The <code>IsKeyspacedLikeObjectClauseImpl</code> class defines a delayed clause that
+   * generates a set of "equal" clauses for all keyspace key columns
    * of the provided POJO when added to a statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  static class IsSuffixedLikeObjectClauseImpl extends ClauseImpl implements DelayedWithObject {
+  static class IsKeyspacedLikeObjectClauseImpl extends ClauseImpl implements DelayedWithObject {
     /**
-     * Instantiates a new <code>IsSuffixedLikeObjectClauseImpl</code> object.
+     * Instantiates a new <code>IsKeyspacedLikeObjectClauseImpl</code> object.
      *
      * @author paouelle
      */
-    IsSuffixedLikeObjectClauseImpl() {
+    IsKeyspacedLikeObjectClauseImpl() {
       super("");
     }
 
@@ -1108,7 +1108,7 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getSuffixKeyValues();
+      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getKeyspaceKeyValues();
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
       for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
@@ -1126,7 +1126,7 @@ public abstract class ClauseImpl
      */
     @Override
     String getOperation() {
-      return "IS SUFFIXED LIKE OBJECT";
+      return "IS KEYSPACED LIKE OBJECT";
     }
 
     /**

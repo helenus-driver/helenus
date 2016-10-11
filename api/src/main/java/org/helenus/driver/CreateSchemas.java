@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,12 @@ import org.helenus.driver.info.ClassInfo;
  * creating the required keyspaces, tables, types, and indexes.
  * <p>
  * <i>Note:</i> As opposed to the {@link CreateSchema} statement, this one is
- * designed to create schemas for multiple pojo classes; as such keyspace suffixes
- * are actually registered in the where clause using the suffix type which is
- * meant to organize suffixes across multiple pojo classes and not the suffix
- * name (a.k.a. the column name).
+ * designed to create schemas for multiple pojo classes; as such keyspace keys
+ * are actually registered in the where clause using the keyspace type which is
+ * meant to organize keyspace keys across multiple pojo classes and not the
+ * keyspace key name (a.k.a. the column name).
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -77,7 +77,7 @@ public interface CreateSchemas
 
   /**
    * Gets all POJO class informations defined in the corresponding package
-   * (whether or not required suffixes are provided in where clause).
+   * (whether or not required keyspace keys are provided in where clause).
    *
    * @author paouelle
    *
@@ -105,7 +105,7 @@ public interface CreateSchemas
 
   /**
    * Gets all POJO class informations defined in the corresponding package
-   * (whether or not required suffixes are provided in where clause).
+   * (whether or not required keyspace keys are provided in where clause).
    *
    * @author paouelle
    *
@@ -133,7 +133,7 @@ public interface CreateSchemas
   public CreateSchemas ifNotExists();
 
   /**
-   * Adds a WHERE clause to this statement used to specify suffixes by types
+   * Adds a WHERE clause to this statement used to specify keyspace keys by types
    * when required for specific POJO class schema creation.
    *
    * This is a shorter/more readable version for {@code where().and(clauses)}.
@@ -156,10 +156,10 @@ public interface CreateSchemas
 
   /**
    * The <code>Where</code> interface defines a WHERE clause for the CREATE
-   * SCHEMAS statement which can be used to specify suffix types used for
+   * SCHEMAS statement which can be used to specify keyspace key types used for
    * keyspace names as required by specific POJO class schema creation.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ import org.helenus.driver.CreateSchemas;
 import org.helenus.driver.CreateTable;
 import org.helenus.driver.CreateType;
 import org.helenus.driver.Delete;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.GenericStatement;
 import org.helenus.driver.Group;
 import org.helenus.driver.Insert;
@@ -133,7 +133,7 @@ import org.yaml.snakeyaml.reader.UnicodeReader;
  * <p>
  * <i>Note:</i> This file is largely based on cassandra-unit.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jun 27, 2015 - paouelle - Creation
@@ -337,12 +337,12 @@ public class HelenusJUnit implements MethodRule {
   private static volatile Object target = null;
 
   /**
-   * Holds the suffix key values for the current test method keyed by suffix
-   * types.
+   * Holds the keyspace key values for the current test method keyed by keyspace
+   * key types.
    *
    * @author paouelle
    */
-  private static volatile Map<String, Set<String>> suffixKeyValues = null;
+  private static volatile Map<String, Set<String>> keyspaceKeyValues = null;
 
   /**
    * Holds the capture lists. Use a concurrent list.
@@ -526,32 +526,32 @@ public class HelenusJUnit implements MethodRule {
   }
 
   /**
-   * Find the suffix key values from the specified test definition that matches
+   * Find the keyspace key values from the specified test definition that matches
    * the specified pojo class.
    *
    * @author paouelle
    *
    * @param  cinfo the non-<code>null</code> pojo class information
-   * @return a non-<code>null</code> collection of all suffix values keyed by
+   * @return a non-<code>null</code> collection of all keyspace key values keyed by
    *         their names based on the specified class info (each entry in the main
    *         collection provides another collection of all possible values for a
-   *         given suffix)
+   *         given keyspace key)
    */
-  private static Collection<Collection<Strings>> getSuffixKeyValues(
+  private static Collection<Collection<Strings>> getKeyspaceKeyValues(
     ClassInfo<?> cinfo
   ) {
-    final Map<String, Set<String>> skvss = HelenusJUnit.suffixKeyValues;
+    final Map<String, Set<String>> skvss = HelenusJUnit.keyspaceKeyValues;
 
     if (skvss == null) {
       return Collections.emptyList();
     }
     return skvss.entrySet().stream()
       .map(e -> {
-        final FieldInfo<?> finfo = cinfo.getSuffixKeyByType(e.getKey());
+        final FieldInfo<?> finfo = cinfo.getKeyspaceKeyByType(e.getKey());
 
-        if (finfo != null) { // pojo defines this suffix type
+        if (finfo != null) { // pojo defines this keyspace key type
           return e.getValue().stream()
-            .map(v -> new Strings(finfo.getSuffixKeyName(), v))
+            .map(v -> new Strings(finfo.getKeyspaceKeyName(), v))
             .collect(Collectors.toList());
         }
         return null;
@@ -572,9 +572,9 @@ public class HelenusJUnit implements MethodRule {
    * @param bo the non-<code>null</code> annotation for the method
    * @param target the test object for which we are calling the method
    * @param method the test method
-   * @param suffixes the map of suffixes to pass to the method
-   * @param onlyIfRequiresSuffixes <code>true</code> if the method should
-   *        not be called if it doesn't require suffixes
+   * @param kkeys the map of keyspace keys to pass to the method
+   * @param onlyIfRequiresKeyspaceKeys <code>true</code> if the method should
+   *        not be called if it doesn't require keyspace keys
    */
   private static void processBeforeObjects(
     Group group,
@@ -582,8 +582,8 @@ public class HelenusJUnit implements MethodRule {
     BeforeObjects bo,
     Object target,
     FrameworkMethod method,
-    Map<String, String> suffixes,
-    boolean onlyIfRequiresSuffixes
+    Map<String, String> kkeys,
+    boolean onlyIfRequiresKeyspaceKeys
   ) {
     if (!ArrayUtils.isEmpty(bo.value())
         && !ArrayUtils.contains(bo.value(), method.getName())) {
@@ -593,9 +593,9 @@ public class HelenusJUnit implements MethodRule {
       final Class<?>[] cparms = m.getParameterTypes();
       final Object ret;
 
-      // check if the method expects a map of suffixes
-      if (cparms.length == 0) { // doesn't care about suffixes
-        if (!onlyIfRequiresSuffixes) {
+      // check if the method expects a map of keyspace keys
+      if (cparms.length == 0) { // doesn't care about keyspace keys
+        if (!onlyIfRequiresKeyspaceKeys) {
           ret = m.invoke(target);
         } else {
           ret = null;
@@ -631,7 +631,7 @@ public class HelenusJUnit implements MethodRule {
             );
           }
         }
-        ret = m.invoke(target, suffixes);
+        ret = m.invoke(target, kkeys);
       }
       HelenusJUnit.processObjects(group, ret);
     } catch (IllegalAccessException e) { // should not happen
@@ -722,46 +722,46 @@ public class HelenusJUnit implements MethodRule {
     if ((target == null) || (method == null)) {
       return;
     }
-    final Map<String, Set<String>> suffixeValues = HelenusJUnit.suffixKeyValues;
-    final Collection<Collection<Strings>> suffixesByTypes;
+    final Map<String, Set<String>> kkeys = HelenusJUnit.keyspaceKeyValues;
+    final Collection<Collection<Strings>> keyspaceKeysByTypes;
 
-    if (suffixeValues != null) {
-      suffixesByTypes = suffixeValues.entrySet().stream()
-      .map(e -> e.getValue().stream()
-        .map(v -> new Strings(e.getKey(), v))
-        .collect(Collectors.toList())
-      )
-      .collect(Collectors.toList());
+    if (kkeys != null) {
+      keyspaceKeysByTypes = kkeys.entrySet().stream()
+        .map(e -> e.getValue().stream()
+          .map(v -> new Strings(e.getKey(), v))
+          .collect(Collectors.toList())
+        )
+        .collect(Collectors.toList());
     } else {
-      suffixesByTypes = Collections.emptyList();
+      keyspaceKeysByTypes = Collections.emptyList();
     }
     final Map<Method, BeforeObjects[]> methods = ReflectionUtils.getAllAnnotationsForMethodsAnnotatedWith(
       target.getClass(), BeforeObjects.class, true
     );
     final Group group = HelenusJUnit.initTrace(StatementBuilder.group());
 
-    if (CollectionUtils.isEmpty(suffixesByTypes)) {
-      // no suffixes so call with empty map of suffixes
+    if (CollectionUtils.isEmpty(keyspaceKeysByTypes)) {
+      // no keyspace keys so call with empty map of keyspace keys
       methods.forEach(
         (m, bos) -> HelenusJUnit.processBeforeObjects(
           group, m, bos[0], target, method, Collections.emptyMap(), false // BeforeObjects is not repeatable so only 1 in array
         )
       );
     } else {
-      boolean onlyIfRequiresSuffixes = false; // only the first time we call them
+      boolean keyspace = false; // only the first time we call them
 
-      for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixesByTypes); i.hasNext(); ) {
-        final List<Strings> isuffixes = i.next();
-        final Map<String, String> suffixes = new HashMap<>(isuffixes.size() * 3 / 2);
-        final boolean oirs = onlyIfRequiresSuffixes;
+      for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, keyspaceKeysByTypes); i.hasNext(); ) {
+        final List<Strings> ikkeys = i.next();
+        final Map<String, String> kkeyvalues = new HashMap<>(ikkeys.size() * 3 / 2);
+        final boolean oirs = keyspace;
 
-        isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
+        ikkeys.forEach(ss -> kkeyvalues.put(ss.key, ss.value));
         methods.forEach(
           (m, bos) -> HelenusJUnit.processBeforeObjects(
-            group, m, bos[0], target, method, suffixes, oirs // BeforeObjects is not repeatable so only 1 in array
+            group, m, bos[0], target, method, kkeyvalues, oirs // BeforeObjects is not repeatable so only 1 in array
           )
         );
-        onlyIfRequiresSuffixes = true; // from now on, only call those that requires suffixes
+        keyspace = true; // from now on, only call those that requires keyspace keys
       }
     }
     group.execute();
@@ -1041,32 +1041,32 @@ public class HelenusJUnit implements MethodRule {
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
       HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
-      // find all suffixes that are defined for this classes
-      final Collection<Collection<Strings>> suffixes = ((target != null)
-        ? HelenusJUnit.getSuffixKeyValues(cinfo)
+      // find all keyspace keys that are defined for this classes
+      final Collection<Collection<Strings>> kkeys = ((target != null)
+        ? HelenusJUnit.getKeyspaceKeyValues(cinfo)
         : null
       );
-      // since we already created the schema, we should have the right number of suffixes
+      // since we already created the schema, we should have the right number of keyspace keys
       // now generate as many insert statements for each initial object as
-      // required by the combination of all suffix values
-      if (CollectionUtils.isEmpty(suffixes)) {
-        // no suffixes so just the one truncate
+      // required by the combination of all keyspace key values
+      if (CollectionUtils.isEmpty(kkeys)) {
+        // no keyspace keys so just the one truncate
         group.add(HelenusJUnit.initTrace(
           StatementBuilder.truncate(cinfo.getObjectClass())
         ));
       } else {
         next_combination:
-        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, kkeys); i.hasNext(); ) {
           final Truncate<T> truncate = HelenusJUnit.initTrace(
             StatementBuilder.truncate(cinfo.getObjectClass())
           );
 
-          // pass all required suffixes
+          // pass all required keyspace keys
           for (final Strings ss: i.next()) {
-            // register the suffix value with the corresponding suffix name
+            // register the keyspace key value with the corresponding keyspace key name
             try {
               truncate.where(StatementBuilder.eq(ss.key, ss.value));
-            } catch (ExcludedSuffixKeyException e) {// ignore this combination
+            } catch (ExcludedKeyspaceKeyException e) {// ignore this combination
               continue next_combination;
             }
           }
@@ -1193,23 +1193,23 @@ public class HelenusJUnit implements MethodRule {
       logger.debug("Creating schema for %s", clazz.getSimpleName());
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
       HelenusJUnit.recursing.incrementAndGet(); // enable temporarily recursing
-      // find all suffixes that are defined for this classes
-      final Collection<Collection<Strings>> suffixes = ((target != null)
-        ? HelenusJUnit.getSuffixKeyValues(cinfo)
+      // find all keyspace keys that are defined for this classes
+      final Collection<Collection<Strings>> kkeys = ((target != null)
+        ? HelenusJUnit.getKeyspaceKeyValues(cinfo)
         : null
       );
 
-      // now check if we have the right number of suffixes as if we don't, we
+      // now check if we have the right number of keyspace keys as if we don't, we
       // cannot create this schema
-      if (cinfo.getNumSuffixKeys() != CollectionUtils.size(suffixes)) {
+      if (cinfo.getNumKeyspaceKeys() != CollectionUtils.size(kkeys)) {
         throw new AssertionError(
           "unable to create schema for '"
           + clazz.getSimpleName()
-          + "'; missing required suffix keys"
+          + "'; missing required keyspace keys"
         );
       }
       // now generate as many create schemas statement as required by the combination
-      // of all suffix values, at the same time compile separately the complete
+      // of all keyspace key values, at the same time compile separately the complete
       // list of initial objects so we have it already computed the next time
       // we reset the schema for this clazz
       final boolean initialsOnly = ((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic());
@@ -1223,13 +1223,13 @@ public class HelenusJUnit implements MethodRule {
       final GroupImpl ygroup = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
       final GroupImpl group = HelenusJUnit.initTrace((GroupImpl)StatementBuilder.group());
 
-      if (CollectionUtils.isEmpty(suffixes)) {
+      if (CollectionUtils.isEmpty(kkeys)) {
         initials.addAll(cinfo.newContext().getInitialObjects());
         if (initialsOnly) {
           // no need to create the schema as it would have already been created
           // by the root, we only need to insert initial objects, done later
         } else {
-          // no suffixes so just the one create schema required
+          // no keyspace keys so just the one create schema required
           final CreateSchemaImpl<?> cs = HelenusJUnit.initTrace(
             (CreateSchemaImpl<?>)StatementBuilder.createSchema(clazz)
           );
@@ -1245,18 +1245,18 @@ public class HelenusJUnit implements MethodRule {
         }
       } else {
         next_combination:
-        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, kkeys); i.hasNext(); ) {
           final CreateSchemaImpl<?> cs = HelenusJUnit.initTrace(
             (CreateSchemaImpl<?>)StatementBuilder.createSchema(clazz)
           );
 
           cs.ifNotExists();
-          // pass all required suffixes
+          // pass all required keyspace keys
           for (final Strings ss: i.next()) {
-            // register the suffix value with the corresponding suffix name
+            // register the keyspace key value with the corresponding keyspace key name
             try {
               cs.where(StatementBuilder.eq(ss.key, ss.value));
-            } catch (ExcludedSuffixKeyException e) { // ignore this combination
+            } catch (ExcludedKeyspaceKeyException e) { // ignore this combination
               continue next_combination;
             }
           }
@@ -1355,18 +1355,18 @@ public class HelenusJUnit implements MethodRule {
       if (p == null) {
         // hum! it means that somehow the schema was created but we didn't
         // have time to compute the initial objects - so let's do it here
-        // find all suffixes that are defined for this classes
-        final Collection<Collection<Strings>> suffixes = ((target != null)
-          ? HelenusJUnit.getSuffixKeyValues(cinfo)
+        // find all keyspace keys that are defined for this classes
+        final Collection<Collection<Strings>> kkeys = ((target != null)
+          ? HelenusJUnit.getKeyspaceKeyValues(cinfo)
           : null
         );
         final boolean initialsOnly = ((cinfo instanceof TypeClassInfoImpl) && !((TypeClassInfoImpl<?>)cinfo).isDynamic());
         final List<Object> initials = new ArrayList<>();
 
-        if (CollectionUtils.isEmpty(suffixes)) {
+        if (CollectionUtils.isEmpty(kkeys)) {
           initials.addAll(cinfo.newContext().getInitialObjects());
           if (!initialsOnly) {
-            // no suffixes so just the one schema required
+            // no keyspace keys so just the one schema required
             final CreateSchemaImpl<?> cs = HelenusJUnit.initTrace(
               (CreateSchemaImpl<?>)StatementBuilder.createSchema(clazz)
             );
@@ -1375,17 +1375,17 @@ public class HelenusJUnit implements MethodRule {
           }
         } else {
           next_combination:
-          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, kkeys); i.hasNext(); ) {
             final CreateSchemaImpl<?> cs = HelenusJUnit.initTrace(
               (CreateSchemaImpl<?>)StatementBuilder.createSchema(clazz)
             );
 
-            // pass all required suffixes
+            // pass all required keyspace keys
             for (final Strings ss: i.next()) {
-              // register the suffix value with the corresponding suffix name
+              // register the keyspace key value with the corresponding keyspace key name
               try {
                 cs.where(StatementBuilder.eq(ss.key, ss.value));
-              } catch (ExcludedSuffixKeyException e) { // ignore this combination
+              } catch (ExcludedKeyspaceKeyException e) { // ignore this combination
                 continue next_combination;
               }
             }
@@ -1514,7 +1514,7 @@ public class HelenusJUnit implements MethodRule {
    *         daemon or the helenus statement manager
    */
   protected void before(FrameworkMethod method, Object target) {
-    final Map<String, Set<String>> suffixes = new LinkedHashMap<>(12);
+    final Map<String, Set<String>> kkeys = new LinkedHashMap<>(12);
 
     synchronized (HelenusJUnit.class) {
       // make sure we are not running another test case
@@ -1533,10 +1533,10 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.start0(cfgname, timeout);
         HelenusJUnit.method = method;
         HelenusJUnit.target = target;
-        for (final SuffixKeyValues skvs: ReflectionJUnitUtils.getAnnotationsByType(
-              method.getMethod(), SuffixKeyValues.class
+        for (final PartitionKeyValues skvs: ReflectionJUnitUtils.getAnnotationsByType(
+              method.getMethod(), PartitionKeyValues.class
             )) {
-          suffixes.compute(
+          kkeys.compute(
             skvs.type(), (t, s) -> {
               if (s == null) {
                 s = new LinkedHashSet<>(Math.max(1, skvs.values().length) * 3 / 2);
@@ -1548,7 +1548,7 @@ public class HelenusJUnit implements MethodRule {
             }
           );
         }
-        HelenusJUnit.suffixKeyValues = suffixes;
+        HelenusJUnit.keyspaceKeyValues = kkeys;
         // finally cleanup the database for this new test
         HelenusJUnit.clear0();
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
@@ -1812,9 +1812,9 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Populates the database with objects returned by the specified function. This
    * version of the <code>populate()</code> allows one to receive a map of all
-   * suffix key values defined in the test environment using the
-   * {@link SuffixKeyValues} annotations. As such, the function might be called
-   * multiple times with each combination of suffix key values.
+   * keyspace key values defined in the test environment using the
+   * {@link PartitionKeyValues} annotations. As such, the function might be called
+   * multiple times with each combination of keyspace key values.
    * <p>
    * <i>Note:</i> The function can return an array, a {@link Collection},
    * an {@link Iterable}, an {@link Iterator}, an {@link Enumeration}, or a
@@ -1822,7 +1822,7 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    *
-   * @param  objs the function to receive a map of suffix key values and return
+   * @param  objs the function to receive a map of keyspace key values and return
    *         objects to populate the database with
    * @return this for chaining
    * @throws AssertionError if any error occurs
@@ -1833,31 +1833,31 @@ public class HelenusJUnit implements MethodRule {
     }
     try {
       HelenusJUnit.capturing.incrementAndGet(); // disable temporarily capturing
-      final Map<String, Set<String>> suffixeValues = HelenusJUnit.suffixKeyValues;
-      final Collection<Collection<Strings>> suffixesByTypes;
+      final Map<String, Set<String>> kkeysValues = HelenusJUnit.keyspaceKeyValues;
+      final Collection<Collection<Strings>> kkeysByTypes;
 
-      if (suffixeValues != null) {
-        suffixesByTypes = suffixeValues.entrySet().stream()
+      if (kkeysValues != null) {
+        kkeysByTypes = kkeysValues.entrySet().stream()
         .map(e -> e.getValue().stream()
           .map(v -> new Strings(e.getKey(), v))
           .collect(Collectors.toList())
         )
         .collect(Collectors.toList());
       } else {
-        suffixesByTypes = Collections.emptyList();
+        kkeysByTypes = Collections.emptyList();
       }
       final Group group = HelenusJUnit.initTrace(StatementBuilder.group());
 
-      if (CollectionUtils.isEmpty(suffixesByTypes)) {
-        // no suffixes so call with empty map of suffixes
+      if (CollectionUtils.isEmpty(kkeysByTypes)) {
+        // no keyspace keys so call with empty map of keyspace keys
         HelenusJUnit.processObjects(group, objs.apply(Collections.emptyMap()));
       } else {
-        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixesByTypes); i.hasNext(); ) {
-          final List<Strings> isuffixes = i.next();
-          final Map<String, String> suffixes = new HashMap<>(isuffixes.size() * 3 / 2);
+        for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, kkeysByTypes); i.hasNext(); ) {
+          final List<Strings> ikkeys = i.next();
+          final Map<String, String> kkeys = new HashMap<>(ikkeys.size() * 3 / 2);
 
-          isuffixes.forEach(ss -> suffixes.put(ss.key,  ss.value));
-          HelenusJUnit.processObjects(group, objs.apply(suffixes));
+          ikkeys.forEach(ss -> kkeys.put(ss.key, ss.value));
+          HelenusJUnit.processObjects(group, objs.apply(kkeys));
         }
       }
       group.execute();
@@ -2055,33 +2055,33 @@ public class HelenusJUnit implements MethodRule {
 
       classes.forEach(c -> {
         final ClassInfo<?> cinfo = StatementBuilder.getClassInfo(c);
-        // find all suffixes that are defined for this classes
-        final Collection<Collection<Strings>> suffixes = ((target != null)
-          ? HelenusJUnit.getSuffixKeyValues(cinfo)
+        // find all keyspace keys that are defined for this classes
+        final Collection<Collection<Strings>> kkeys = ((target != null)
+          ? HelenusJUnit.getKeyspaceKeyValues(cinfo)
           : null
         );
 
-        // since we already created the schema, we should have the right number of suffixes
+        // since we already created the schema, we should have the right number of keyspace keys
         // now generate as many insert statements for each initial object as
-        // required by the combination of all suffix values
-        if (CollectionUtils.isEmpty(suffixes)) {
-          // no suffixes so just the one truncate
+        // required by the combination of all keyspace key values
+        if (CollectionUtils.isEmpty(kkeys)) {
+          // no keyspace keys so just the one truncate
           group.add(HelenusJUnit.initTrace(
             StatementBuilder.truncate(c)
           ));
         } else {
           next_combination:
-          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, suffixes); i.hasNext(); ) {
+          for (final Iterator<List<Strings>> i = new CombinationIterator<>(Strings.class, kkeys); i.hasNext(); ) {
             final Truncate<?> truncate = HelenusJUnit.initTrace(
               StatementBuilder.truncate(c)
             );
 
-            // pass all required suffixes
+            // pass all required keyspace keys
             for (final Strings ss: i.next()) {
               try {
-                // register the suffix value with the corresponding suffix name
+                // register the keyspace key value with the corresponding keyspace key name
                 truncate.where(StatementBuilder.eq(ss.key, ss.value));
-              } catch (ExcludedSuffixKeyException e) {// ignore this combination
+              } catch (ExcludedKeyspaceKeyException e) {// ignore this combination
                 continue next_combination;
               }
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package org.helenus.driver;
  * The <code>CreateTable</code> interface provides support for the
  * CREATE TABLE statement for a POJO.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -87,7 +87,7 @@ public interface CreateTable<T>
   public Options<T> with();
 
   /**
-   * Adds a WHERE clause to this statement used to specify suffixes when required.
+   * Adds a WHERE clause to this statement used to specify keyspace keys when required.
    *
    * This is a shorter/more readable version for {@code where().and(clauses)}.
    *
@@ -96,8 +96,8 @@ public interface CreateTable<T>
    * @param  clause the clause to add
    * @return the where clause of this query to which more clause can be added.
    * @throws IllegalArgumentException if the clause doesn't reference a
-   *         suffix key defined in the POJO
-   * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+   *         keyspace key defined in the POJO
+   * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
    *         and the specified value is marked as excluded
    */
   public Where<T> where(Clause clause);
@@ -138,7 +138,7 @@ public interface CreateTable<T>
     public Options<T> and(TableWith option);
 
     /**
-     * Adds a WHERE clause to this statement used to specify suffixes when required.
+     * Adds a WHERE clause to this statement used to specify keyspace keys when required.
      *
      * This is a shorter/more readable version for {@code where().and(clauses)}.
      *
@@ -147,8 +147,8 @@ public interface CreateTable<T>
      * @param  clause the clause to add
      * @return the where clause of this query to which more clause can be added.
      * @throws IllegalArgumentException if the clause doesn't reference a
-     *         suffix key defined in the POJO
-     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     *         keyspace key defined in the POJO
+     * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
      *         and the specified value is marked as excluded
      */
     public Where<T> where(Clause clause);
@@ -165,10 +165,10 @@ public interface CreateTable<T>
 
   /**
    * The <code>Where</code> interface defines a WHERE clause for the CREATE
-   * TABLE statement which can be used to specify suffix keys used for the
+   * TABLE statement which can be used to specify keyspace keys used for the
    * keyspace name.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -188,8 +188,8 @@ public interface CreateTable<T>
      * @return this WHERE clause.
      * @throws NullPointerException if <code>clause</code> is <code>null</code>
      * @throws IllegalArgumentException if the clause doesn't reference a
-     *         suffix key defined in the POJO
-     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     *         keyspace key defined in the POJO
+     * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
      *         and the specified value is marked as excluded
      */
     public Where<T> and(Clause clause);

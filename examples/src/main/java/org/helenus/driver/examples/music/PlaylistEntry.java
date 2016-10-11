@@ -67,7 +67,7 @@ import org.helenus.driver.persistence.Table;
 @lombok.experimental.Accessors(chain=true)
 @lombok.ToString
 @lombok.EqualsAndHashCode(of={"id", "songOrder"})
-@Keyspace(suffixes=Constants.MUSIC)
+@Keyspace(keys=Constants.MUSIC)
 @Table(name=Constants.PLAYLISTS)
 @Entity
 public class PlaylistEntry {

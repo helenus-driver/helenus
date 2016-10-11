@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ import com.datastax.driver.core.UDTValue;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ColumnPersistenceException;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.ObjectNotFoundException;
 import org.helenus.driver.StatementManager;
@@ -63,7 +63,7 @@ import org.helenus.driver.persistence.Column;
 import org.helenus.driver.persistence.Entity;
 import org.helenus.driver.persistence.InitialObjects;
 import org.helenus.driver.persistence.Keyspace;
-import org.helenus.driver.persistence.SuffixKey;
+import org.helenus.driver.persistence.KeyspaceKey;
 import org.helenus.driver.persistence.Table;
 import org.helenus.driver.persistence.UDTEntity;
 import org.helenus.driver.persistence.UDTRootEntity;
@@ -72,7 +72,7 @@ import org.helenus.driver.persistence.UDTRootEntity;
  * The <code>ClassInfo</code> class provides information about a particular
  * POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle, vasu - Creation
@@ -88,7 +88,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    * The <code>Context</code> class provides a specific context for the POJO
    * as referenced while building a statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle, vasu - Creation
@@ -97,11 +97,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    */
   public class Context implements StatementManager.Context<T> {
     /**
-     * Holds the registered suffixes.
+     * Holds the registered keyspace keys.
      *
      * @author paouelle
      */
-    protected final Map<String, Object> suffixes = new LinkedHashMap<>(8);
+    protected final Map<String, Object> keyspaceKeys = new LinkedHashMap<>(8);
 
     /**
      * Instantiates a new <code>Context</code> object.
@@ -141,33 +141,33 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return the non-<code>null</code> keyspace name associated with this
      *         context
      * @throws ObjectNotFoundException if unable to compute the keyspace name
-     *         based on provided suffixes
-     * @throws ExcludedSuffixKeyException if the context defines a suffix value
-     *         which is marked as excluded for a given suffix key
+     *         based on provided keyspace keys
+     * @throws ExcludedKeyspaceKeyException if the context defines a keyspace key value
+     *         which is marked as excluded for a given keyspace key
      */
     @SuppressWarnings("synthetic-access")
     public String getKeyspace() {
-      final String[] types = keyspace.suffixes();
+      final String[] types = keyspace.keys();
       String name = keyspace.name();
 
       if (!ArrayUtils.isEmpty(types)) {
         final String[] svalues = new String[types.length];
 
-        // let's make sure we can resolve all suffix keys
+        // let's make sure we can resolve all keyspace keys
         for (int i = 0; i < types.length; i++) {
-          final FieldInfoImpl<T> finfo = (FieldInfoImpl<T>)getSuffixKeyByType(types[i]);
-          final SuffixKey skey = finfo.getSuffixKey();
+          final FieldInfoImpl<T> finfo = (FieldInfoImpl<T>)getKeyspaceKeyByType(types[i]);
+          final KeyspaceKey skey = finfo.getKeyspaceKey();
           final String key = skey.name();
-          final Object value = suffixes.get(key);
+          final Object value = keyspaceKeys.get(key);
 
           if (value == null) {
             throw new ObjectNotFoundException(
-              getObjectClass(), "missing suffix key '" + key + "'"
+              getObjectClass(), "missing keyspace key '" + key + "'"
             );
           }
           if (ArrayUtils.contains(skey.exclude(), value)) {
-            throw new ExcludedSuffixKeyException(
-              "excluded suffix key '"
+            throw new ExcludedKeyspaceKeyException(
+              "excluded keyspace key '"
               + key
               + "' value '"
               + value
@@ -197,23 +197,23 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Adds a suffix to the context for use in keyspace name creation.
+     * Adds a keyspace key to the context for use in keyspace name creation.
      *
      * @author paouelle
      *
-     * @param  suffix the suffix name
-     * @param  value the suffix value
-     * @throws NullPointerException if <code>suffix</code> or <code>value</code>
+     * @param  name the keyspace key name
+     * @param  value the keyspace key value
+     * @throws NullPointerException if <code>name</code> or <code>value</code>
      *         is <code>null</code>
      * @throws IllegalArgumentException if the POJO doesn't require the specified
-     *         suffix or if the value doesn't match the POJO's definition for the
-     *         specified suffix
-     * @throws ExcludedSuffixKeyException if the specified suffix value is
-     *         marked as excluded the specified suffix key
+     *         keyspace key or if the value doesn't match the POJO's definition for the
+     *         specified keyspace key
+     * @throws ExcludedKeyspaceKeyException if the specified keyspace key value is
+     *         marked as excluded the specified keyspace key
      */
-    public void addSuffix(String suffix, Object value) {
-      validateSuffix(suffix, value);
-      suffixes.put(suffix, value);
+    public void addKeyspaceKey(String name, Object value) {
+      validateKeyspaceKey(name, value);
+      keyspaceKeys.put(name, value);
     }
 
     /**
@@ -225,7 +225,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      */
     @Override
     public T getObject(Row row) {
-      return ClassInfoImpl.this.getObject(row, suffixes);
+      return ClassInfoImpl.this.getObject(row, keyspaceKeys);
     }
 
     /**
@@ -253,21 +253,21 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      */
     @SuppressWarnings("synthetic-access")
     public Collection<T> getInitialObjects() {
-      if (getSuffixKeys().isEmpty()) {
+      if (getKeyspaceKeys().isEmpty()) {
         return ClassInfoImpl.this.getInitialObjects(null);
       }
-      final Map<String, String> svalues = new LinkedHashMap<>(getSuffixKeys().size());
+      final Map<String, String> svalues = new LinkedHashMap<>(getKeyspaceKeys().size());
 
-      for (final Map.Entry<String, FieldInfoImpl<T>> e: getSuffixTypes().entrySet()) {
+      for (final Map.Entry<String, FieldInfoImpl<T>> e: getKeyspaceKeyTypes().entrySet()) {
         final String type = e.getKey();
         final FieldInfoImpl<T> finfo = e.getValue();
-        final String key = finfo.getSuffixKeyName();
-        final Object value = suffixes.get(key);
+        final String name = finfo.getKeyspaceKeyName();
+        final Object value = keyspaceKeys.get(name);
 
         org.apache.commons.lang3.Validate.isTrue(
           value != null,
-          "missing suffix key '%s'",
-          key
+          "missing keyspace key '%s'",
+          name
         );
         // use the natural toString() to convert the value into a string
         svalues.put(type, String.valueOf(value));
@@ -314,25 +314,25 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         object.getClass().getName(), clazz.getName()
       );
       this.object = object;
-      populateSuffixes(ClassInfoImpl.this.suffixesByName);
+      populateKeyspaceKeys(ClassInfoImpl.this.keyspaceKeysByName);
     }
 
     /**
-     * Populates the suffixes defined in the given map from the POJO.
+     * Populates the keyspace keys defined in the given map from the POJO.
      *
      * @author paouelle
      *
-     * @param suffixFields the map of suffix fields from the POJO where to extract
-     *        the suffix values
+     * @param fields the map of keyspace key fields from the POJO where to extract
+     *        the keyspace key values
      */
-    protected void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {
-      suffixes.clear();
-      for (final Map.Entry<String, FieldInfoImpl<T>> e: suffixFields.entrySet()) {
-        final String suffix = e.getKey();
+    protected void populateKeyspaceKeys(Map<String, FieldInfoImpl<T>> fields) {
+      keyspaceKeys.clear();
+      for (final Map.Entry<String, FieldInfoImpl<T>> e: fields.entrySet()) {
+        final String name = e.getKey();
         final FieldInfoImpl<T> field = e.getValue();
         final Object val = field.getValue(object);
 
-        suffixes.put(suffix, val);
+        keyspaceKeys.put(name, val);
       }
     }
 
@@ -389,25 +389,27 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Retrieves all suffix and partition key columns and their values from the
+     * Retrieves all keyspace and partition key columns and their values from the
      * POJO and the specified table.
      *
      * @author paouelle
      *
      * @param  tname the name of the table from which to retrieve columns
-     * @return a non-<code>null</code> map of all suffix key and partition key
+     * @return a non-<code>null</code> map of all keyspace key and partition key
      *         column/value pairs for the POJO
-     * @throws IllegalArgumentException if a column or a suffix is missing from
+     * @throws IllegalArgumentException if a column or a keyspace key is missing from
      *         the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
-      if (table == null) { // table not defined so return suffixes only
-        return getSuffixKeyValues();
+      if (table == null) { // table not defined so return keyspace keys only
+        return getKeyspaceKeyValues();
       }
-      return table.getSuffixAndPartitionKeyColumnValues(object);
+      return table.getKeyspaceAndPartitionKeyColumnValues(object);
     }
 
     /**
@@ -458,27 +460,25 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Retrieves all suffix keys and their values from the POJO.
+     * Retrieves all keyspace keys and their values from the POJO.
      *
      * @author paouelle
      *
-     * @return a non-<code>null</code> map of all suffix key name/value pairs
+     * @return a non-<code>null</code> map of all keyspace key name/value pairs
      *         for the POJO
-     * @throws IllegalArgumentException if a suffix is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a suffix key's value
+     * @throws IllegalArgumentException if a keyspace key is missing from the POJO
+     * @throws ColumnPersistenceException if unable to persist a keyspace key's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getSuffixKeyValues() {
-      final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(suffixes.size());
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceKeyValues() {
+      final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(keyspaceKeys.size());
 
-      for (final Map.Entry<String, FieldInfoImpl<T>> e: getSuffixKeys().entrySet()) {
+      for (final Map.Entry<String, FieldInfoImpl<T>> e: getKeyspaceKeys().entrySet()) {
         final String name = e.getKey();
         final FieldInfoImpl<T> field = e.getValue();
         final Object value = field.getValue(object);
 
         org.apache.commons.lang3.Validate.isTrue(
-          value != null,
-          "missing suffix key '%s'",
-          name
+          value != null, "missing keyspace key '%s'", name
         );
         values.put(name, Pair.of(value, field.getDataType()));
       }
@@ -486,25 +486,27 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Retrieves all suffix and primary key columns and their values from the
+     * Retrieves all keyspace and primary key columns and their values from the
      * POJO and the specified table.
      *
      * @author paouelle
      *
      * @param  tname the name of the table from which to retrieve columns
-     * @return a non-<code>null</code> map of all suffix key and primary key
+     * @return a non-<code>null</code> map of all keyspace key and primary key
      *         column/value pairs for the POJO
-     * @throws IllegalArgumentException if a column or a suffix is missing from
+     * @throws IllegalArgumentException if a column or a keyspace key is missing from
      *         the POJO
      * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(String tname) {
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
-      if (table == null) { // table not defined so return suffixes only
-        return getSuffixKeyValues();
+      if (table == null) { // table not defined so return keyspace keys only
+        return getKeyspaceKeyValues();
       }
-      return table.getSuffixAndPrimaryKeyColumnValues(object);
+      return table.getKeyspaceAndPrimaryKeyColumnValues(object);
     }
 
     /**
@@ -648,33 +650,33 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Adds a suffix to the context for use in keyspace name creation by retrieving
-     * its value from the associated POJO.
+     * Adds a keyspace key to the context for use in keyspace name creation by
+     * retrieving its value from the associated POJO.
      *
      * @author paouelle
      *
-     * @param  suffix the suffix name
-     * @throws NullPointerException if <code>suffix</code> is <code>null</code>
+     * @param  name the keyspace name
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
      * @throws IllegalArgumentException if the POJO doesn't require the specified
-     *         suffix or if the value doesn't match the POJO's definition for the
-     *         specified suffix
-     * @throws ExcludedSuffixKeyException if the specified suffix value is
-     *         marked as excluded the specified suffix key
+     *         keyspace key or if the value doesn't match the POJO's definition for the
+     *         specified keyspace key
+     * @throws ExcludedKeyspaceKeyException if the specified keyspace key value is
+     *         marked as excluded the specified keyspace key
      */
-    public void addSuffix(String suffix) {
-      org.apache.commons.lang3.Validate.notNull(suffix, "invalid null suffix");
-      final FieldInfoImpl<T> field = suffixesByName.get(suffix);
+    public void addKeyspaceKey(String name) {
+      org.apache.commons.lang3.Validate.notNull(name, "invalid null name");
+      final FieldInfoImpl<T> field = keyspaceKeysByName.get(name);
 
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "%s doesn't define keyspace suffix: %s",
+        "%s doesn't define keyspace key: %s",
         clazz.getSimpleName(),
-        suffix
+        name
       );
       final Object val = field.getValue(object);
 
-      validateSuffix(suffix, val);
-      suffixes.put(suffix, val);
+      validateKeyspaceKey(name, val);
+      keyspaceKeys.put(name, val);
     }
   }
 
@@ -743,20 +745,20 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   private final Set<String> columns;
 
   /**
-   * Holds a map of all fields annotated as suffixes keyed by the
-   * suffix name.
+   * Holds a map of all fields annotated as keyspace keys keyed by the
+   * keyspace key name.
    *
    * @author paouelle
    */
-  protected final Map<String, FieldInfoImpl<T>> suffixesByName;
+  protected final Map<String, FieldInfoImpl<T>> keyspaceKeysByName;
 
   /**
-   * Holds a map of all fields annotated as suffixes keyed by the
-   * suffix type.
+   * Holds a map of all fields annotated as keyspace keys keyed by the
+   * keyspace key type.
    *
    * @author paouelle
    */
-  protected final Map<String, FieldInfoImpl<T>> suffixesByType;
+  protected final Map<String, FieldInfoImpl<T>> keyspaceKeysByType;
 
   /**
    * Instantiates a new <code>ClassInfo</code> object.
@@ -779,8 +781,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null POJO class");
     this.columns = new LinkedHashSet<>(25);
     this.tables = new LinkedHashMap<>(12);
-    this.suffixesByName = new LinkedHashMap<>(8);
-    this.suffixesByType = new LinkedHashMap<>(8);
+    this.keyspaceKeysByName = new LinkedHashMap<>(8);
+    this.keyspaceKeysByType = new LinkedHashMap<>(8);
     this.entityAnnotationClass = entityAnnotationClass;
     this.clazz = clazz;
     this.constructor = findDefaultCtor(entityAnnotationClass);
@@ -788,7 +790,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     this.keyspace = findKeyspace();
     this.primary = findTables(mgr);
     findColumns();
-    findSuffixKeys();
+    findKeyspaceKeys();
     this.initials = findInitials();
   }
 
@@ -832,8 +834,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     this.columns = cinfo.columns;
     this.initials = cinfo.initials;
     this.tables = cinfo.tables;
-    this.suffixesByName = cinfo.suffixesByName;
-    this.suffixesByType = cinfo.suffixesByType;
+    this.keyspaceKeysByName = cinfo.keyspaceKeysByName;
+    this.keyspaceKeysByType = cinfo.keyspaceKeysByType;
   }
 
   /**
@@ -1041,11 +1043,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           );
         }
       }
-      // validate that if suffixes are defined, the method expects a Map<String, String>
-      // to provide the values for the suffixes when initializing objects
+      // validate that if keyspace keys are defined, the method expects a Map<String, String>
+      // to provide the values for the keyspace keys when initializing objects
       final Class<?>[] cparms = m.getParameterTypes();
 
-      if (suffixesByType.isEmpty()) {
+      if (keyspaceKeysByType.isEmpty()) {
         // should always be 0 as we used no classes in getMethod()
         if (cparms.length != 0) {
           throw new IllegalArgumentException(
@@ -1130,10 +1132,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       "%s is not annotated with @Keyspace",
       clazz.getSimpleName()
     );
-    // make sure that a keyspace name or suffix exist
+    // make sure that a keyspace name or key exist
     org.apache.commons.lang3.Validate.isTrue(
-      !keyspace.name().isEmpty() || (keyspace.suffixes().length != 0),
-      "@Keyspace annotation for %s must defined at least one of 'name' or 'suffixes'",
+      !keyspace.name().isEmpty() || (keyspace.keys().length != 0),
+      "@Keyspace annotation for %s must defined at least one of 'name' or 'keys'",
       clazz.getSimpleName()
     );
     return keyspace;
@@ -1218,112 +1220,112 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
-   * Finds and records all fields annotated as keyspace suffixes.
+   * Finds and records all fields annotated as keyspace keys.
    *
    * @author paouelle
    *
    * @throws IllegalArgumentException if unable to find a getter or setter
    *         method for the field of if improperly annotated
    */
-  private void findSuffixKeys() {
-    final Set<String> ksuffixes = new HashSet<>(keyspace.suffixes().length * 3 / 2);
+  private void findKeyspaceKeys() {
+    final Set<String> kkeys = new HashSet<>(keyspace.keys().length * 3 / 2);
 
-    for (final String s: keyspace.suffixes()) {
-      ksuffixes.add(s);
+    for (final String s: keyspace.keys()) {
+      kkeys.add(s);
     }
-    // check suffix keys defined on the class itself
-    final SuffixKey[] suffixes = clazz.getAnnotationsByType(SuffixKey.class);
+    // check keyspace keys defined on the class itself
+    final KeyspaceKey[] keys = clazz.getAnnotationsByType(KeyspaceKey.class);
 
     if (this instanceof UDTClassInfoImpl) {
-      for (final SuffixKey suffix: suffixes) {
+      for (final KeyspaceKey key: keys) {
         org.apache.commons.lang3.Validate.isTrue(
-          !suffixesByType.containsKey(suffix.type()),
-          "multiple @SuffixKey annotations found with type '%s' for class: %s",
-          suffix.type(),
+          !keyspaceKeysByType.containsKey(key.type()),
+          "multiple @KeyspaceKey annotations found with type '%s' for class: %s",
+          key.type(),
           clazz.getSimpleName()
         );
         org.apache.commons.lang3.Validate.isTrue(
-          !suffixesByName.containsKey(suffix.name()),
-          "multiple @SuffixKey annotations found with name '%s' for class: %s",
-          suffix.name(),
+          !keyspaceKeysByName.containsKey(key.name()),
+          "multiple @KeyspaceKey annotations found with name '%s' for class: %s",
+          key.name(),
           clazz.getSimpleName()
         );
         org.apache.commons.lang3.Validate.isTrue(
-          ksuffixes.remove(suffix.type()),
-          "@Keyspace annotation does not define suffix type '%s' for class: %s",
-          suffix.type(),
+          kkeys.remove(key.type()),
+          "@Keyspace annotation does not define keyspace key type '%s' for class: %s",
+          key.type(),
           clazz.getSimpleName()
         );
-        final FieldInfoImpl<T> field = new FieldInfoImpl<>(this, suffix);
+        final FieldInfoImpl<T> field = new FieldInfoImpl<>(this, key);
 
-        suffixesByName.put(suffix.name(), field);
-        suffixesByType.put(suffix.type(), field);
+        keyspaceKeysByName.put(key.name(), field);
+        keyspaceKeysByType.put(key.type(), field);
       }
     } else {
       org.apache.commons.lang3.Validate.isTrue(
-        suffixes.length == 0,
-        "%s POJOs do not support @SuffixKey annotations on the type; define a field instead",
+        keys.length == 0,
+        "%s POJOs do not support @KeyspaceKey annotations on the type; define a field instead",
         getEntityAnnotationClass().getSimpleName()
       );
       // make sure to walk up the class hierarchy
       for (final Field f: ReflectionUtils.getAllFieldsAnnotatedWith(
-        clazz, SuffixKey.class, true
+        clazz, KeyspaceKey.class, true
       )) {
         final FieldInfoImpl<T> field = new FieldInfoImpl<>(this, f);
-        final SuffixKey suffix = field.getSuffixKey();
+        final KeyspaceKey key = field.getKeyspaceKey();
 
         org.apache.commons.lang3.Validate.isTrue(
-          !suffixesByType.containsKey(suffix.type()),
-          "multipe @SuffixKey annotations found with type '%s' for class: %s",
-          suffix.type(),
+          !keyspaceKeysByType.containsKey(key.type()),
+          "multipe @KeyspaceKey annotations found with type '%s' for class: %s",
+          key.type(),
           clazz.getSimpleName()
         );
         org.apache.commons.lang3.Validate.isTrue(
-          !suffixesByName.containsKey(suffix.name()),
-          "multipe @SuffixKey annotations found with name '%s' for class: %s",
-          suffix.name(),
+          !keyspaceKeysByName.containsKey(key.name()),
+          "multipe @KeyspaceKey annotations found with name '%s' for class: %s",
+          key.name(),
           clazz.getSimpleName()
         );
         org.apache.commons.lang3.Validate.isTrue(
-          ksuffixes.remove(suffix.type()),
-          "@Keyspace annotation does not define suffix type '%s' for class: %s",
-          suffix.type(),
+          kkeys.remove(key.type()),
+          "@Keyspace annotation does not define keyspace key type '%s' for class: %s",
+          key.type(),
           clazz.getSimpleName()
         );
-        suffixesByName.put(suffix.name(), field);
-        suffixesByType.put(suffix.type(), field);
+        keyspaceKeysByName.put(key.name(), field);
+        keyspaceKeysByType.put(key.type(), field);
       }
     }
     org.apache.commons.lang3.Validate.isTrue(
-      ksuffixes.isEmpty(),
-      "missing @SuffixKey annotations for @Keyspace defined suffixes: %s for class: %s",
-      StringUtils.join(ksuffixes, ", "),
+      kkeys.isEmpty(),
+      "missing @KeyspaceKey annotations for @Keyspace defined keyspace keys: %s for class: %s",
+      StringUtils.join(kkeys, ", "),
       clazz.getSimpleName()
     );
   }
 
   /**
-   * Sets the specified suffix fields in the POJO object.
+   * Sets the specified keyspace key fields in the POJO object.
    *
    * @author paouelle
    *
    * @param  object the non-<code>null</code> POJO object
    * @param  row the non-<code>null</code> row being decoded to the POJO
-   * @param  map a non-<code>null</code> map of suffixes to fields to use
-   * @param  values the suffix values defined by the statement used when issuing
+   * @param  map a non-<code>null</code> map of keyspace keys to fields to use
+   * @param  values the keyspace key values defined by the statement used when issuing
    *         the query
-   * @throws ObjectConversionException if unable to set suffixes in the POJO
+   * @throws ObjectConversionException if unable to set keyspace keys in the POJO
    */
-  private void setSuffixFields(
+  private void setKeyspaceKeyFields(
     T object,
     Row row,
     Map<String, FieldInfoImpl<T>> map,
     Map<String, Object> values
   ) {
     for (final Map.Entry<String, Object> e: values.entrySet()) {
-      final String suffix = e.getKey();
+      final String name = e.getKey();
       final Object value = e.getValue();
-      final FieldInfoImpl<T> field = map.get(suffix);
+      final FieldInfoImpl<T> field = map.get(name);
 
       if (field != null) {
         try {
@@ -1332,7 +1334,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           throw new ObjectConversionException(
             clazz,
             row,
-            "unable to set '" + suffix + "' suffix in object",
+            "unable to set '" + name + "' keyspace key in object",
             iae
           );
         }
@@ -1554,11 +1556,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.ClassInfo#getNumSuffixKeys()
+   * @see org.helenus.driver.info.ClassInfo#getNumKeyspaceKeys()
    */
   @Override
-  public int getNumSuffixKeys() {
-    return suffixesByType.size();
+  public int getNumKeyspaceKeys() {
+    return keyspaceKeysByType.size();
   }
 
   /**
@@ -1566,11 +1568,11 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.ClassInfo#getSuffixKey(java.lang.String)
+   * @see org.helenus.driver.info.ClassInfo#getKeyspaceKey(java.lang.String)
    */
   @Override
-  public FieldInfo<T> getSuffixKey(String name) {
-    return suffixesByName.get(name);
+  public FieldInfo<T> getKeyspaceKey(String name) {
+    return keyspaceKeysByName.get(name);
   }
 
   /**
@@ -1578,50 +1580,50 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.ClassInfo#getSuffixKeyByType(java.lang.String)
+   * @see org.helenus.driver.info.ClassInfo#getKeyspaceKeyByType(java.lang.String)
    */
   @Override
-  public FieldInfo<T> getSuffixKeyByType(String type) {
-    return suffixesByType.get(type);
+  public FieldInfo<T> getKeyspaceKeyByType(String type) {
+    return keyspaceKeysByType.get(type);
   }
 
   /**
-   * Checks if the specified name is defined as a suffix key.
+   * Checks if the specified name is defined as a keyspace key.
    *
    * @author paouelle
    *
-   * @param  name the name of the suffix key
-   * @return <code>true</code> if that name is defined as a suffix key;
+   * @param  name the name of the keyspace key
+   * @return <code>true</code> if that name is defined as a keyspace key;
    *         <code>false</code> otherwise
    */
-  public boolean isSuffixKey(String name) {
-    final FieldInfoImpl<T> field = suffixesByName.get(name);
+  public boolean isKeyspaceKey(String name) {
+    final FieldInfoImpl<T> field = keyspaceKeysByName.get(name);
 
-    return (field != null) ? field.isSuffixKey() : false;
+    return (field != null) ? field.isKeyspaceKey() : false;
   }
 
   /**
-   * Gets the field info for all suffix keys defined by this POJO.
+   * Gets the field info for all keyspace keys defined by this POJO.
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> map of all suffix key fields keyed by
+   * @return the non-<code>null</code> map of all keyspace key fields keyed by
    *         their names
    */
-  public Map<String, FieldInfoImpl<T>> getSuffixKeys() {
-    return suffixesByName;
+  public Map<String, FieldInfoImpl<T>> getKeyspaceKeys() {
+    return keyspaceKeysByName;
   }
 
   /**
-   * Gets the field info for all suffix types defined by this POJO.
+   * Gets the field info for all keyspace key types defined by this POJO.
    *
    * @author paouelle
    *
-   * @return the non-<code>null</code> map of all suffix type fields keyed by
+   * @return the non-<code>null</code> map of all keyspace key type fields keyed by
    *         their types
    */
-  public Map<String, FieldInfoImpl<T>> getSuffixTypes() {
-    return suffixesByType;
+  public Map<String, FieldInfoImpl<T>> getKeyspaceKeyTypes() {
+    return keyspaceKeysByType;
   }
 
   /**
@@ -1809,20 +1811,20 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
 
   /**
    * Validates if a column is defined by the POJO in any tables or if it is
-   * defined as a suffix key.
+   * defined as a keyspace key.
    *
    * @author paouelle
    *
-   * @param  name the column name or suffix key to validate
+   * @param  name the column name or keyspace key to validate
    * @throws NullPointerException if <code>name</code> is <code>null</code>
-   * @throws IllegalArgumentException if the specified column or suffix key is
+   * @throws IllegalArgumentException if the specified column or keyspace key is
    *         not defined by the POJO
    */
-  public void validateColumnOrSuffix(String name) {
-    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name or suffix key");
+  public void validateColumnOrKeyspaceKey(String name) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name or keyspace key");
     org.apache.commons.lang3.Validate.isTrue(
-      columns.contains(name) || suffixesByName.containsKey(name),
-      "%s doesn't define column or suffix key '%s'",
+      columns.contains(name) || keyspaceKeysByName.containsKey(name),
+      "%s doesn't define column or keyspace key '%s'",
       clazz.getSimpleName(),
       name
     );
@@ -1891,51 +1893,51 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   }
 
   /**
-   * Validates the specified suffix and its value as being a valid suffix for
-   * the POJO.
+   * Validates the specified keyspace key and its value as being a valid keyspace
+   * key for the POJO.
    *
    * @author paouelle
    *
-   * @param  suffix the suffix to validate
-   * @param  value the value for the suffix
-   * @throws IllegalArgumentException if the suffix is not defined by this POJO
+   * @param  name the keyspace key to validate
+   * @param  value the value for the keyspace key
+   * @throws IllegalArgumentException if the keyspace key is not defined by this POJO
    *         if the specified value is not of the right type or is
    *         <code>null</code> when the field is mandatory
-   * @throws ExcludedSuffixKeyException if the specified suffix value is
-   *         marked as excluded the specified suffix key
+   * @throws ExcludedKeyspaceKeyException if the specified keyspace key value is
+   *         marked as excluded the specified keyspace key
    */
-  public void validateSuffix(String suffix, Object value) {
-    org.apache.commons.lang3.Validate.notNull(suffix, "invalid null suffix");
+  public void validateKeyspaceKey(String name, Object value) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null name");
     org.apache.commons.lang3.Validate.notNull(value, "invalid null value");
-    final FieldInfoImpl<T> field = suffixesByName.get(suffix);
+    final FieldInfoImpl<T> field = keyspaceKeysByName.get(name);
 
     org.apache.commons.lang3.Validate.isTrue(
       field != null,
-      "%s doesn't define keyspace suffix: %s",
+      "%s doesn't define keyspace key: %s",
       clazz.getSimpleName(),
-      suffix
+      name
     );
     field.validateValue(value);
   }
 
   /**
    * Converts the specified result row into a POJO object defined by this
-   * class information and suffix map.
+   * class information and keyspace key map.
    *
    * @author paouelle
    *
    * @param  row the result row to convert into a POJO
-   * @param  suffixes a map of suffix values to report back into the created
+   * @param  keyspaceKeys a map of keyspace key values to report back into the created
    *         POJO
    * @return the POJO object corresponding to the given result row
-   * @throws NullPointerException if <code>suffixes</code> is <code>null</code>
+   * @throws NullPointerException if <code>keyspaceKeys</code> is <code>null</code>
    * @throws ObjectConversionException if unable to convert to a POJO
    */
-  public T getObject(Row row, Map<String, Object> suffixes) {
+  public T getObject(Row row, Map<String, Object> keyspaceKeys) {
     if (row == null) {
       return null;
     }
-    org.apache.commons.lang3.Validate.notNull(suffixes, "invalid null suffixes");
+    org.apache.commons.lang3.Validate.notNull(keyspaceKeys, "invalid null keyspace keys");
     try {
       // create an empty shell for the pojo
       final T object = constructor.newInstance();
@@ -1951,8 +1953,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
           }
         }
       );
-      // now set suffixes back into pojo
-      setSuffixFields(object, row, this.suffixesByName, suffixes);
+      // now set keyspace keys back into pojo
+      setKeyspaceKeyFields(object, row, this.keyspaceKeysByName, keyspaceKeys);
       // now take care of the columns
       decodeAndSetColumnFields(object, row);
       return object;
@@ -2004,7 +2006,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    */
   @Override
   @SuppressWarnings("unchecked")
-  public Collection<T> getInitialObjects(Map<String, String> suffixes) {
+  public Collection<T> getInitialObjects(Map<String, String> keyspaceKeys) {
     if (initials.isEmpty()) {
       return Collections.emptyList();
     }
@@ -2014,10 +2016,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       for (final Method initial: initials) {
         final Object ret;
 
-        if (suffixesByType.isEmpty()) {
+        if (keyspaceKeysByType.isEmpty()) {
           ret = initial.invoke(null);
         } else {
-          ret = initial.invoke(null, suffixes);
+          ret = initial.invoke(null, keyspaceKeys);
         }
         if (ret == null) {
           return Collections.emptyList();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,12 @@ import org.helenus.driver.info.ClassInfo;
  * insert any initial objects defined by the POJO.
  * <p>
  * <i>Note:</i> As opposed to the {@link CreateSchemas} statement, this one is
- * designed to create the specified pojo class schema; as such keyspace suffixes
- * are actually registered in the where clause using the suffix name (a.k.a. the
- * column name) and not the suffix type which is meant to organize suffixes
- * across multiple pojo classes.
+ * designed to create the specified pojo class schema; as such keyspace keys
+ * are actually registered in the where clause using the keyspace key name
+ * (a.k.a. the column name) and not the keyspace key type which is meant to
+ * organize keyspace keys across multiple pojo classes.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -101,7 +101,8 @@ public interface CreateSchema<T>
   public CreateSchema<T> ifNotExists();
 
   /**
-   * Adds a WHERE clause to this statement used to specify suffixes when required.
+   * Adds a WHERE clause to this statement used to specify keyspace keys when
+   * required.
    *
    * This is a shorter/more readable version for {@code where().and(clauses)}.
    *
@@ -110,8 +111,8 @@ public interface CreateSchema<T>
    * @param  clause the clause to add
    * @return the where clause of this query to which more clause can be added.
    * @throws IllegalArgumentException if the clause doesn't reference a
-   *         suffix key defined in the POJO
-   * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+   *         keyspace key defined in the POJO
+   * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
    *         and the specified value is marked as excluded
    */
   public Where<T> where(Clause clause);
@@ -127,10 +128,10 @@ public interface CreateSchema<T>
 
   /**
    * The <code>Where</code> interface defines a WHERE clause for the CREATE
-   * SCHEMA statement which can be used to specify suffix keys used for the
+   * SCHEMA statement which can be used to specify keyspace keys used for the
    * keyspace name.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -150,8 +151,8 @@ public interface CreateSchema<T>
      * @return this WHERE clause.
      * @throws NullPointerException if <code>clause</code> is <code>null</code>
      * @throws IllegalArgumentException if the clause doesn't reference a
-     *         suffix key defined in the POJO
-     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     *         keyspace key defined in the POJO
+     * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
      *         and the specified value is marked as excluded
      */
     public Where<T> and(Clause clause);

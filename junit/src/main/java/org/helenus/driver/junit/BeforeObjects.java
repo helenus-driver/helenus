@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,10 +37,10 @@ import java.util.stream.Stream;
  * {@link Stream} of pojo objects or a single object to insert in the database.
  * Finally, if it is declared with a single parameter of type
  * <code>Map&lt;String, String&gt;</code> the Helenus JUnit framework will provide
- * access to each suffix key values based on the corresponding suffix types. It
+ * access to each keyspace key values based on the corresponding keyspace key types. It
  * is therefore possible that the method be called multiple times; once per set
- * of suffix key values. The suffix key values are computed from the
- * {@link SuffixKeyValues} annotation provided for the test method and class.
+ * of keyspace key values. The keyspace key values are computed from the
+ * {@link PartitionKeyValues} annotation provided for the test method and class.
  *
  * @copyright 2015-2016 The Helenus Driver Project Authors
  *

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
  * The <code>Keyspace</code> annotation specifies keyspace information for the
  * annotated object.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -48,7 +48,7 @@ public @interface Keyspace {
   /**
    * The name for the keyspace. Valid keyspace names are strings of alpha-numeric
    * characters and underscores, and must begin with a letter. An empty keyspace
-   * name cannot be referenced unless there is at least one suffix defined.
+   * name cannot be referenced unless there is at least one keyspace key defined.
    *
    * @author paouelle
    *
@@ -57,16 +57,16 @@ public @interface Keyspace {
   String name() default "";
 
   /**
-   * Optional list of suffix types to incorporate into the final keyspace name.
-   * These suffix key values are resolved at runtime from the value of the
-   * attribute or property tagged with a {@link SuffixKey} annotation which
-   * identifies the same suffix type.
+   * Optional list of keyspace key types to incorporate into the final keyspace name.
+   * These keyspace key values are resolved at runtime from the value of the
+   * attribute or property tagged with a {@link KeyspaceKey} annotation which
+   * identifies the same keyspace key type.
    *
    * @author paouelle
    *
-   * @return the optional list of suffix types
+   * @return the optional list of keyspace key types
    */
-  String[] suffixes() default {};
+  String[] keys() default {};
 
   /**
    * The optional placement strategy for the keyspace. Defaults to

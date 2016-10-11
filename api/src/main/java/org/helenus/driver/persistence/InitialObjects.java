@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,12 +38,12 @@ import java.util.stream.Stream;
  * {@link Collection}, an {@link Iterable}, an {@link Iterator}, an
  * {@link Enumeration}, or a {@link Stream} of pojo objects or a single object
  * to insert in the database. Finally, it must not take any parameters unless
- * the pojo class entity is defined with suffixes in which case it must expect
+ * the pojo class entity is defined with keyspace keys in which case it must expect
  * a single parameter of type <code>Map&lt;String, String&gt;</code> which will
- * be used to provide access to each suffix values based on the corresponding
- * suffix types.
+ * be used to provide access to each keyspace key values based on the corresponding
+ * keyspace key types.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  *

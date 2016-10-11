@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchema;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
@@ -40,7 +40,7 @@ import org.helenus.driver.persistence.Table;
 /**
  * The <code>CreateSchemaImpl</code> class defines a CREATE SCHEMA statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -177,12 +177,12 @@ public class CreateSchemaImpl<T>
     if (!isEnabled()) {
       return;
     }
-    // make sure we have a valid keyspace (handling suffix exclusions if any)
+    // make sure we have a valid keyspace (handling keyspace key exclusions if any)
     final String ks;
 
     try {
       ks = getKeyspace();
-    } catch (ExcludedSuffixKeyException e) { // skip it
+    } catch (ExcludedKeyspaceKeyException e) { // skip it
       return;
     }
     final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
@@ -336,10 +336,10 @@ public class CreateSchemaImpl<T>
 
   /**
    * The <code>WhereImpl</code> class defines a WHERE clause for the CREATE
-   * SCHEMA statement which can be used to specify suffix keys used for the
+   * SCHEMA statement which can be used to specify keyspace keys used for the
    * keyspace name.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -394,7 +394,7 @@ public class CreateSchemaImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
         setDirty();
       }
       return this;

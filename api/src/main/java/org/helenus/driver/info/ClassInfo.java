@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import org.helenus.driver.persistence.Keyspace;
  * The <code>ClassInfo</code> interface provides information about a particular
  * POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -68,33 +68,33 @@ public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
   public boolean supportsTablesAndIndexes();
 
   /**
-   * Gets the number of suffix keys defined by this class of pojo.
+   * Gets the number of keyspace keys defined by this class of pojo.
    *
    * @author paouelle
    *
-   * @return the number of suffix keys defined by this class of pojo
+   * @return the number of keyspace keys defined by this class of pojo
    */
-  public int getNumSuffixKeys();
+  public int getNumKeyspaceKeys();
 
   /**
-   * Gets the field info corresponding to the given suffix key.
+   * Gets the field info corresponding to the given keyspace key.
    *
    * @author paouelle
    *
-   * @param  name the name of the suffix key
+   * @param  name the name of the keyspace key
    * @return the corresponding field info or <code>null</code> if not defined
    */
-  public FieldInfo<T> getSuffixKey(String name);
+  public FieldInfo<T> getKeyspaceKey(String name);
 
   /**
-   * Gets the field info corresponding to the given suffix type.
+   * Gets the field info corresponding to the given keyspace key type.
    *
    * @author paouelle
    *
-   * @param  type the type of the suffix key
+   * @param  type the type of the keyspace key
    * @return the corresponding field info or <code>null</code> if not defined
    */
-  public FieldInfo<T> getSuffixKeyByType(String type);
+  public FieldInfo<T> getKeyspaceKeyByType(String type);
 
   /**
    * Gets the table info corresponding to the given table name.
@@ -175,10 +175,10 @@ public interface ClassInfo<T> extends Iterable<TableInfo<T>> {
    *
    * @author paouelle
    *
-   * @param  suffixes the map of all suffixes values (if any) keyed by the suffix
-   *         type
+   * @param  keys the map of all keyspace key values (if any) keyed by the keyspace
+   *         key type
    * @return a non-<code>null</code> collection of the initial objects to insert
    *         in the table
    */
-  public Collection<T> getInitialObjects(Map<String, String> suffixes);
+  public Collection<T> getInitialObjects(Map<String, String> keys);
 }

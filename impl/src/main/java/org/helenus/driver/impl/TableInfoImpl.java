@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ import org.helenus.driver.persistence.Table;
  * annotations for user-defined type entities. By design, the
  * {@link FieldInfoImpl} class will not allow any type of keys but only columns.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -766,29 +766,31 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Retrieves all suffix and partition key columns and their values from the POJO.
+   * Retrieves all keyspace and partition key columns and their values from the POJO.
    *
    * @author paouelle
    *
    * @param  object the non-<code>null</code> POJO object
-   * @return a non-<code>null</code> map of all suffix key and partition key
+   * @return a non-<code>null</code> map of all keyspace key and partition key
    *         column/value pairs for the POJO
-   * @throws IllegalArgumentException if a column or a suffix key is missing
+   * @throws IllegalArgumentException if a column or a keyspace key is missing
    *         from the POJO
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(T object) {
+  Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(
+    T object
+  ) {
     if (table == null) {
       return Collections.emptyMap();
     }
-    final Map<String, FieldInfoImpl<T>> skeys = cinfo.getSuffixKeys();
+    final Map<String, FieldInfoImpl<T>> skeys = cinfo.getKeyspaceKeys();
     final Map<String, FieldInfoImpl<T>> keys = new LinkedHashMap<>(
       primaryKeyColumns.size() + skeys.size()
     );
 
-    // start with suffix keys
+    // start with keyspace keys
     keys.putAll(skeys);
-    // now add partition keys (overriding suffixes if names clashes!!!)
+    // now add partition keys (overriding keyspace keys if names clashes!!!)
     keys.putAll(partitionKeyColumns);
     final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(keys.size());
 
@@ -799,7 +801,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         value != null,
-        "missing suffix or partition key column '%s' from table '%s' for pojo '%s'",
+        "missing keyspace or partition key column '%s' from table '%s' for pojo '%s'",
         name,
         table.name(),
         clazz.getSimpleName()
@@ -916,29 +918,29 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Retrieves all suffix and primary key columns and their values from the POJO.
+   * Retrieves all keyspace and primary key columns and their values from the POJO.
    *
    * @author paouelle
    *
    * @param  object the non-<code>null</code> POJO object
-   * @return a non-<code>null</code> map of all suffix key and primary key
+   * @return a non-<code>null</code> map of all keyspace key and primary key
    *         column/value pairs for the POJO
-   * @throws IllegalArgumentException if a column or a suffix key is missing
+   * @throws IllegalArgumentException if a column or a keyspace key is missing
    *         from the POJO
    * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(T object) {
+  Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(T object) {
     if (table == null) {
       return Collections.emptyMap();
     }
-    final Map<String, FieldInfoImpl<T>> skeys = cinfo.getSuffixKeys();
+    final Map<String, FieldInfoImpl<T>> skeys = cinfo.getKeyspaceKeys();
     final Map<String, FieldInfoImpl<T>> keys = new LinkedHashMap<>(
       primaryKeyColumns.size() + skeys.size()
     );
 
-    // start with suffix keys
+    // start with keyspace keys
     keys.putAll(skeys);
-    // now add primary keys (overriding suffixes if names clashes!!!)
+    // now add primary keys (overriding keyspace keys if names clashes!!!)
     keys.putAll(primaryKeyColumns);
     final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(keys.size());
 
@@ -949,7 +951,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
 
       org.apache.commons.lang3.Validate.isTrue(
         value != null,
-        "missing suffix or primary key column '%s' from table '%s' for pojo '%s'; null value",
+        "missing keyspace or primary key column '%s' from table '%s' for pojo '%s'; null value",
         name,
         table.name(),
         clazz.getSimpleName()
@@ -1809,21 +1811,21 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Gets the set of suffix and partition column fields for the POJO in this table.
+   * Gets the set of keyspace and partition key column fields for the POJO in this table.
    *
    * @author paouelle
    *
-   * @return a non-<code>null</code> set of all suffix and partition column fields
+   * @return a non-<code>null</code> set of all keyspace and partition key column fields
    */
-  public Collection<FieldInfoImpl<T>> getSuffixAndPartitionKeys() {
-    final Map<String, FieldInfoImpl<T>> skeys = cinfo.getSuffixKeys();
+  public Collection<FieldInfoImpl<T>> getKeyspaceAndPartitionKeys() {
+    final Map<String, FieldInfoImpl<T>> kkeys = cinfo.getKeyspaceKeys();
     final Map<String, FieldInfoImpl<T>> keys = new LinkedHashMap<>(
-      primaryKeyColumns.size() + skeys.size()
+      primaryKeyColumns.size() + kkeys.size()
     );
 
-    // start with suffix keys
-    keys.putAll(skeys);
-    // now add partition keys (overriding suffixes if names clashes!!!)
+    // start with keyspace keys
+    keys.putAll(kkeys);
+    // now add partition keys (overriding keyspace keys if names clashes!!!)
     keys.putAll(partitionKeyColumns);
     return keys.values();
   }
@@ -1908,21 +1910,21 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Gets the set of suffix and primary column fields for the POJO in this table.
+   * Gets the set of keyspace and primary key column fields for the POJO in this table.
    *
    * @author paouelle
    *
-   * @return a non-<code>null</code> set of all suffix and primary column fields
+   * @return a non-<code>null</code> set of all keyspace and primary key column fields
    */
-  public Collection<FieldInfoImpl<T>> getSuffixAndPrimaryKeys() {
-    final Map<String, FieldInfoImpl<T>> skeys = cinfo.getSuffixKeys();
+  public Collection<FieldInfoImpl<T>> getKeyspaceAndPrimaryKeys() {
+    final Map<String, FieldInfoImpl<T>> kkeys = cinfo.getKeyspaceKeys();
     final Map<String, FieldInfoImpl<T>> keys = new LinkedHashMap<>(
-      primaryKeyColumns.size() + skeys.size()
+      primaryKeyColumns.size() + kkeys.size()
     );
 
-    // start with suffix keys
-    keys.putAll(skeys);
-    // now add primary keys (overriding suffixes if names clashes!!!)
+    // start with keyspace keys
+    keys.putAll(kkeys);
+    // now add primary keys (overriding keyspace keys if names clashes!!!)
     keys.putAll(primaryKeyColumns);
     return keys.values();
   }
@@ -2135,7 +2137,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Validates if a column is defined as either a suffix key, a primary key, or
+   * Validates if a column is defined as either a keyspace key, a primary key, or
    * an index column, by the POJO in this table.
    * <p>
    * <i>Note:</i> Only the column names passed as a {@link String} are
@@ -2148,7 +2150,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws IllegalArgumentException if the specified column is not defined
    *         by the POJO or is not a primary key or an index column
    */
-  public void validateSuffixKeyOrPrimaryKeyOrIndexColumn(Object name) {
+  public void validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(Object name) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
@@ -2169,21 +2171,20 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     }
     FieldInfoImpl<T> field = columns.get(n);
 
-    if (field == null) {
-      // check suffixes
-      field = (FieldInfoImpl<T>)cinfo.getSuffixKey(n);
+    if (field == null) { // check keyspace keys
+      field = (FieldInfoImpl<T>)cinfo.getKeyspaceKey(n);
     }
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "pojo '%s' doesn't define column or suffix key '%s' in table '%s'",
+        "pojo '%s' doesn't define column or keyspace key '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
       );
       org.apache.commons.lang3.Validate.isTrue(
-        field.isPartitionKey() || field.isClusteringKey() || field.isSuffixKey() || field.isIndex(),
-        "pojo '%s' doesn't define suffix key, primary key, or index column '%s' in table '%s'",
+        field.isPartitionKey() || field.isClusteringKey() || field.isKeyspaceKey() || field.isIndex(),
+        "pojo '%s' doesn't define keyspace key, primary key, or index column '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()
@@ -2328,39 +2329,38 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
-   * Validates if a column or suffix is defined by the POJO as a column or as a
-   * suffix and its potential value in this table.
+   * Validates if a column or keyspace key is defined by the POJO as a column or as a
+   * keyspace key and its potential value in this table.
    *
    * @author paouelle
    *
-   * @param  name the column or suffix name to validate
+   * @param  name the column or keyspace key name to validate
    * @param  value the value to validate for the column
    * @throws NullPointerException if <code>name</code> is <code>null</code>
-   * @throws IllegalArgumentException if the specified column or suffix is not
+   * @throws IllegalArgumentException if the specified column or keyspace key is not
    *         defined by the POJO or if the specified value is not of the
    *         right type or is <code>null</code> when the column is mandatory
    */
-  public void validateSuffixOrColumnAndValue(CharSequence name, Object value) {
+  public void validateKeyspaceKeyOrColumnAndValue(CharSequence name, Object value) {
     org.apache.commons.lang3.Validate.notNull(
-      name, "invalid null column name or suffix key"
+      name, "invalid null column name or keyspace key"
     );
     if (name instanceof Utils.CNameSequence) {
       for (final String n: ((Utils.CNameSequence)name).getNames()) {
-        validateSuffixOrColumnAndValue(n, value); // recurse to validate
+        validateKeyspaceKeyOrColumnAndValue(n, value); // recurse to validate
       }
       return;
     }
     final String n = name.toString();
     FieldInfoImpl<T> field = columns.get(n);
 
-    if (field == null) {
-      // check suffixes
-      field = (FieldInfoImpl<T>)cinfo.getSuffixKey(n);
+    if (field == null) { // check keyspace keys
+      field = (FieldInfoImpl<T>)cinfo.getKeyspaceKey(n);
     }
     if (table != null) {
       org.apache.commons.lang3.Validate.isTrue(
         field != null,
-        "pojo '%s' doesn't define column or suffix key '%s' in table '%s'",
+        "pojo '%s' doesn't define column or keyspace key '%s' in table '%s'",
         clazz.getSimpleName(),
         n,
         table.name()

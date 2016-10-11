@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * <p>
  * An executable statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -64,7 +64,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *         <code>null</code> if none defined yet
    * @throws IllegalArgumentException if the statement is associated with a POJO
    *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   *         computed with the provided keyspace keys yet
    */
   public String getKeyspace();
 
@@ -348,7 +348,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    * @return a valid CQL query string or <code>null</code> if nothing to query
    * @throws IllegalArgumentException if the statement is associated with a POJO
    *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   *         computed with the provided keyspace keys yet
    */
   public String getQueryString();
 
@@ -368,7 +368,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *         That result will never be <code>null</code>
    * @throws IllegalArgumentException if the statement is associated with a POJO
    *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   *         computed with the provided keyspace keys yet
    * @throws NoHostAvailableException if no host in the cluster can be
    *         contacted successfully to execute this statement.
    * @throws QueryExecutionException if the statement triggered an execution
@@ -405,7 +405,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    * @return a future on the result of the statement's execution
    * @throws IllegalArgumentException if the statement is associated with a POJO
    *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   *         computed with the provided keyspace keys yet
    * @throws StatementPreprocessingException if the statement cannot be preprocessed
    *         for execution
    */
@@ -429,7 +429,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *         never be null but can be empty (and will be for any non SELECT statement).
    * @throws IllegalArgumentException if the statement is associated with a POJO
    *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   *         computed with the provided keyspace keys yet
    * @throws NoHostAvailableException if no host in the cluster can be
    *         contacted successfully to execute this statement.
    * @throws QueryExecutionException if the statement triggered an execution
@@ -462,7 +462,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    * @return a future on the raw result of the statement.
    * @throws IllegalArgumentException if the statement is associated with a POJO
    *         and the keyspace has not yet been computed and cannot be
-   *         computed with the provided suffixes yet
+   *         computed with the provided keyspace keys yet
    * @throws StatementPreprocessingException if the statement cannot be preprocessed
    *         for execution
    */

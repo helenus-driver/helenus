@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import org.helenus.driver.VoidFuture;
 /**
  * The <code>CreateKeyspaceImpl</code> class defines a CREATE KEYSPACE statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -310,10 +310,10 @@ public class CreateKeyspaceImpl<T>
 
   /**
    * The <code>WhereImpl</code> class defines a WHERE clause for the CREATE
-   * KEYSPACE statement which can be used to specify suffix keys used for the
+   * KEYSPACE statement which can be used to specify keyspace keys used for the
    * keyspace name.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -368,7 +368,7 @@ public class CreateKeyspaceImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
         setDirty();
       }
       return this;

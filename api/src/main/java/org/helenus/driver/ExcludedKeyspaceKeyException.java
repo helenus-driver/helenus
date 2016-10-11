@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,19 @@
 package org.helenus.driver;
 
 /**
- * The <code>ExcludedSuffixKeyException</code> class extends on the
+ * The <code>ExcludedKeyspaceKeyException</code> class extends on the
  * {@link IllegalArgumentException} for cases where a keyspace cannot be obtained
- * as the context contains a suffix value that was excluded for a specific suffix
- * key.
+ * as the context contains a keyspace key value that was excluded for a specific
+ * keyspace key.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Apr 7, 2015 - paouelle - Creation
  *
  * @since 1.0
  */
-public class ExcludedSuffixKeyException extends IllegalArgumentException {
+public class ExcludedKeyspaceKeyException extends IllegalArgumentException {
   /**
    * Holds the serialVersionUID.
    *
@@ -37,43 +37,43 @@ public class ExcludedSuffixKeyException extends IllegalArgumentException {
   private static final long serialVersionUID = -8462250603572084873L;
 
   /**
-   * Instantiates a new <code>ExcludedSuffixKeyException</code> object.
+   * Instantiates a new <code>ExcludedKeyspaceKeyException</code> object.
    *
    * @author paouelle
    */
-  public ExcludedSuffixKeyException() {}
+  public ExcludedKeyspaceKeyException() {}
 
   /**
-   * Instantiates a new <code>ExcludedSuffixKeyException</code> object.
+   * Instantiates a new <code>ExcludedKeyspaceKeyException</code> object.
    *
    * @author paouelle
    *
    * @param msg the exception message
    */
-  public ExcludedSuffixKeyException(String msg) {
+  public ExcludedKeyspaceKeyException(String msg) {
     super(msg);
   }
 
   /**
-   * Instantiates a new <code>ExcludedSuffixKeyException</code> object.
+   * Instantiates a new <code>ExcludedKeyspaceKeyException</code> object.
    *
    * @author paouelle
    *
    * @param cause the exception cause
    */
-  public ExcludedSuffixKeyException(Throwable cause) {
+  public ExcludedKeyspaceKeyException(Throwable cause) {
     super(cause);
   }
 
   /**
-   * Instantiates a new <code>ExcludedSuffixKeyException</code> object.
+   * Instantiates a new <code>ExcludedKeyspaceKeyException</code> object.
    *
    * @author paouelle
    *
    * @param message the exception message
    * @param cause the exception cause
    */
-  public ExcludedSuffixKeyException(String message, Throwable cause) {
+  public ExcludedKeyspaceKeyException(String message, Throwable cause) {
     super(message, cause);
   }
 }

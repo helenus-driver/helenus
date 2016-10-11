@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ import org.helenus.driver.persistence.UDTTypeEntity;
  * The <code>UDTClassInfoImpl</code> class provides information about a
  * particular POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Mar 3, 2015 - paouelle - Creation
@@ -108,10 +108,10 @@ public abstract class UDTClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#populateSuffixes(java.util.Map)
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#populateKeyspaceKeys(java.util.Map)
      */
     @Override
-    protected final void populateSuffixes(Map<String, FieldInfoImpl<T>> suffixFields) {}
+    protected final void populateKeyspaceKeys(Map<String, FieldInfoImpl<T>> kkeysFields) {}
 
     /**
      * Retrieves all columns and their values from the POJO.
@@ -159,10 +159,10 @@ public abstract class UDTClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPartitionKeyColumnValues(java.lang.String)
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -183,10 +183,10 @@ public abstract class UDTClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPrimaryKeyColumnValues(java.lang.String)
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -716,7 +716,7 @@ public abstract class UDTClassInfoImpl<T>
    * @see org.helenus.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
    */
   @Override
-  public T getObject(Row row, Map<String, Object> suffixes) {
+  public T getObject(Row row, Map<String, Object> kkeys) {
     throw new ObjectConversionException(
       clazz,
       row,

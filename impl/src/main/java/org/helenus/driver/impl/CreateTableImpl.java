@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.helenus.driver.persistence.Ordering;
 /**
  * The <code>CreateTableImpl</code> class defines a CREATE TABLE statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -147,7 +147,7 @@ public class CreateTableImpl<T>
    *         the specified table or <code>null</code> if there is none for the
    *         specified table
    * @throws IllegalArgumentException if the keyspace has not yet been computed
-   *         and cannot be computed with the provided suffixes yet or if
+   *         and cannot be computed with the provided keyspace keys yet or if
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
@@ -439,10 +439,10 @@ public class CreateTableImpl<T>
 
   /**
    * The <code>WhereImpl</code> class defines a WHERE clause for the CREATE
-   * TABLE statement which can be used to specify suffix keys used for the
+   * TABLE statement which can be used to specify keyspace keys used for the
    * keyspace name.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -497,7 +497,7 @@ public class CreateTableImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
         setDirty();
       }
       return this;

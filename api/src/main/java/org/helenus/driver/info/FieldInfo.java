@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,16 +19,16 @@ import java.lang.annotation.Annotation;
 
 import org.helenus.driver.persistence.ClusteringKey;
 import org.helenus.driver.persistence.Index;
+import org.helenus.driver.persistence.KeyspaceKey;
 import org.helenus.driver.persistence.PartitionKey;
 import org.helenus.driver.persistence.Persisted;
-import org.helenus.driver.persistence.SuffixKey;
 import org.helenus.driver.persistence.TypeKey;
 
 /**
  * The <code>FieldInfo</code> interface provides information about a specific
  * field in a given table for a particular POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -72,7 +72,7 @@ public interface FieldInfo<T> {
    * @author paouelle
    *
    * @return the table info this field is defined in or <code>null</code>
-   *         if it represents only a suffix and not a column
+   *         if it represents only a keyspace key and not a column
    */
   public TableInfo<T> getTableInfo();
 
@@ -115,14 +115,14 @@ public interface FieldInfo<T> {
   public boolean isStatic();
 
   /**
-   * Checks if this field is annotated as a suffix key.
+   * Checks if this field is annotated as a keyspace key.
    *
    * @author paouelle
    *
-   * @return <code>true</code> if this field is annotated as a suffix key;
+   * @return <code>true</code> if this field is annotated as a keyspace key;
    *         <code>false</code> otherwise
    */
-  public boolean isSuffixKey();
+  public boolean isKeyspaceKey();
 
   /**
    * Gets the column name for this field.
@@ -135,24 +135,24 @@ public interface FieldInfo<T> {
   public String getColumnName();
 
   /**
-   * Gets the suffix key name for this field.
+   * Gets the keyspace key name for this field.
    *
    * @author paouelle
    *
-   * @return the suffix key name for this field if it is annotated as a suffix
+   * @return the keyspace key name for this field if it is annotated as a keyspace
    *         key; <code>null</code> otherwise
    */
-  public String getSuffixKeyName();
+  public String getKeyspaceKeyName();
 
   /**
-   * Gets the suffix key annotation for this field.
+   * Gets the keyspace key annotation for this field.
    *
    * @author paouelle
    *
-   * @return the suffix key annotation for this field if it is annotated as a
-   *         suffix key; <code>null</code> otherwise
+   * @return the keyspace key annotation for this field if it is annotated as a
+   *         keyspace key; <code>null</code> otherwise
    */
-  public SuffixKey getSuffixKey();
+  public KeyspaceKey getKeyspaceKey();
 
   /**
    * Checks if this field is mandatory.

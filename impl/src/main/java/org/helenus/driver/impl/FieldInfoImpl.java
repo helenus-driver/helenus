@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ import com.datastax.driver.core.exceptions.InvalidTypeException;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ColumnPersistenceException;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
@@ -56,11 +56,11 @@ import org.helenus.driver.persistence.ClusteringKey;
 import org.helenus.driver.persistence.Column;
 import org.helenus.driver.persistence.DataType;
 import org.helenus.driver.persistence.Index;
+import org.helenus.driver.persistence.KeyspaceKey;
 import org.helenus.driver.persistence.Mandatory;
 import org.helenus.driver.persistence.PartitionKey;
 import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.Persister;
-import org.helenus.driver.persistence.SuffixKey;
 import org.helenus.driver.persistence.Table;
 import org.helenus.driver.persistence.TypeKey;
 
@@ -72,7 +72,7 @@ import org.helenus.driver.persistence.TypeKey;
  * might be passed in for user-defined type entities. By design, this class
  * will not allow any type of keys but only columns.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle, vasu - Creation
@@ -99,7 +99,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
 
   /**
    * Holds the table information for this field. Can be <code>null</code> if
-   * the field is only used as a keyspace suffix.
+   * the field is only used as a keyspace key.
    *
    * @author vasu
    */
@@ -167,11 +167,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final Persister<?, ?> persister;
 
   /**
-   * Suffix annotation for this field if any.
+   * Keyspace key annotation for this field if any.
    *
    * @author vasu
    */
-  private final SuffixKey suffix;
+  private final KeyspaceKey keyspaceKey;
 
   /**
    * Flag indicating if the field is mandatory (i.e. cannot be <code>null</code>).
@@ -318,7 +318,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.column = field.column;
     this.persisted = field.persisted;
     this.persister = field.persister;
-    this.suffix = field.suffix;
+    this.keyspaceKey = field.keyspaceKey;
     this.mandatory = mandatory;
     this.index = field.index;
     this.partitionKey = field.partitionKey;
@@ -361,15 +361,15 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.column = null;
     this.persisted = null;
     this.persister = null;
-    this.suffix = field.getAnnotation(SuffixKey.class);
-    this.mandatory = true; // keyspace suffixes are mandatory fields
-    this.index = null; // we don't care about this for keyspace suffixes
-    this.partitionKey = null; // we don't care about this for keyspace suffixes
-    this.clusteringKey = null; // we don't care about this for keyspace suffixes
-    this.typeKey = null; // we don't care about this for keyspace suffixes
-    this.multiKeyType = null; // we don't care about this for keyspace suffixes
-    this.definition = null; // we don't care about this for keyspace suffixes
-    this.decoder = null; // we don't care about this for keyspace suffixes
+    this.keyspaceKey = field.getAnnotation(KeyspaceKey.class);
+    this.mandatory = true; // keyspace keys are mandatory fields
+    this.index = null; // we don't care about this for keyspace keys
+    this.partitionKey = null; // we don't care about this for keyspace keys
+    this.clusteringKey = null; // we don't care about this for keyspace keys
+    this.typeKey = null; // we don't care about this for keyspace keys
+    this.multiKeyType = null; // we don't care about this for keyspace keys
+    this.definition = null; // we don't care about this for keyspace keys
+    this.decoder = null; // we don't care about this for keyspace keys
     this.getters = new HashMap<>(6);
     this.setters = new HashMap<>(6);
     findGetter(declaringClass);
@@ -414,7 +414,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     } else {
       this.persister = null;
     }
-    this.suffix = field.getAnnotation(SuffixKey.class);
+    this.keyspaceKey = field.getAnnotation(KeyspaceKey.class);
     this.mandatory = (
       // primitive types for fields must be mandatory since null is not possible
       field.getType().isPrimitive() || (field.getAnnotation(Mandatory.class) != null)
@@ -688,8 +688,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
           field.getName()
         );
         org.apache.commons.lang3.Validate.isTrue(
-          !isSuffixKey(),
-          "field in table '%s' cannot be annotated with @Column(isStatic=true) if it is annotated with @SuffixKey: %s.%s",
+          !isKeyspaceKey(),
+          "field in table '%s' cannot be annotated with @Column(isStatic=true) if it is annotated with @KeyspaceKey: %s.%s",
           tname,
           declaringClass.getName(),
           field.getName()
@@ -700,35 +700,35 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
 
   /**
    * Instantiates a new fake <code>FieldInfoImpl</code> object to represent a
-   * suffix key associated with the POJO class of a user-defined type.
+   * keyspace key associated with the POJO class of a user-defined type.
    *
    * @author paouelle
    *
    * @param  cinfo the non-<code>null</code> class info for the POJO
-   * @param  suffix the non-<code>null</code> suffix annotation for the POJO class
+   * @param  kkey the non-<code>null</code> keyspace key annotation for the POJO class
    */
-  FieldInfoImpl(ClassInfoImpl<T> cinfo, SuffixKey suffix) {
+  FieldInfoImpl(ClassInfoImpl<T> cinfo, KeyspaceKey kkey) {
     this.clazz = cinfo.getObjectClass();
     this.cinfo = cinfo;
     this.tinfo = null;
     this.declaringClass = cinfo.getObjectClass();
     this.field = null;
     this.isFinal = true;
-    this.name = suffix.name();
+    this.name = kkey.name();
     this.type = String.class;
     this.isOptional = false;
     this.column = null;
     this.persisted = null;
     this.persister = null;
-    this.suffix = suffix;
-    this.mandatory = true; // keyspace suffixes are mandatory fields
-    this.index = null; // we don't care about this for keyspace suffixes
-    this.partitionKey = null; // we don't care about this for keyspace suffixes
-    this.clusteringKey = null; // we don't care about this for keyspace suffixes
-    this.typeKey = null; // we don't care about this for keyspace suffixes
-    this.multiKeyType = null; // we don't care about this for keyspace suffixes
-    this.definition = null; // we don't care about this for keyspace suffixes
-    this.decoder = null; // we don't care about this for keyspace suffixes
+    this.keyspaceKey = kkey;
+    this.mandatory = true; // keyspace keys are mandatory fields
+    this.index = null; // we don't care about this for keyspace keys
+    this.partitionKey = null; // we don't care about this for keyspace keys
+    this.clusteringKey = null; // we don't care about this for keyspace keys
+    this.typeKey = null; // we don't care about this for keyspace keys
+    this.multiKeyType = null; // we don't care about this for keyspace keys
+    this.definition = null; // we don't care about this for keyspace keys
+    this.decoder = null; // we don't care about this for keyspace keys
     this.getters = null;
     this.setters = null;
     this.finalValue = null;
@@ -781,7 +781,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     };
     this.persisted = null;
     this.persister = null;
-    this.suffix = null;
+    this.keyspaceKey = null;
     this.mandatory = true; // collection column is mandatory
     this.index = null;
     this.partitionKey = null;
@@ -1247,11 +1247,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.FieldInfo#getSuffixKeyName()
+   * @see org.helenus.driver.info.FieldInfo#getKeyspaceKeyName()
    */
   @Override
-  public String getSuffixKeyName() {
-    return (suffix != null) ? suffix.name() : null;
+  public String getKeyspaceKeyName() {
+    return (keyspaceKey != null) ? keyspaceKey.name() : null;
   }
 
   /**
@@ -1271,11 +1271,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.FieldInfo#isSuffixKey()
+   * @see org.helenus.driver.info.FieldInfo#isKeyspaceKey()
    */
   @Override
-  public boolean isSuffixKey() {
-    return suffix != null;
+  public boolean isKeyspaceKey() {
+    return keyspaceKey != null;
   }
 
   /**
@@ -1283,11 +1283,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.FieldInfo#getSuffixKey()
+   * @see org.helenus.driver.info.FieldInfo#getKeyspaceKey()
    */
   @Override
-  public SuffixKey getSuffixKey() {
-    return suffix;
+  public KeyspaceKey getKeyspaceKey() {
+    return keyspaceKey;
   }
 
   /**
@@ -1491,7 +1491,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @param  value the value to be validated
    * @throws IllegalArgumentException if the specified value is not of the
    *         right type or is <code>null</code> when the field is mandatory
-   * @throws ExcludedSuffixKeyException if this field is a suffix and the
+   * @throws ExcludedKeyspaceKeyException if this field is a keyspace key and the
    *         specified value is marked as excluded
    */
   public void validateValue(Object value) {
@@ -1559,15 +1559,15 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     } else {
       org.apache.commons.lang3.Validate.isTrue(
         type.isInstance(value),
-        "invalid value for suffix '%s'; expecting class '%s' but found '%s'",
-        this.getSuffixKey().name(),
+        "invalid value for keyspace key '%s'; expecting class '%s' but found '%s'",
+        this.getKeyspaceKey().name(),
         type.getName(),
         (value != null) ? value.getClass().getName() : "null"
       );
-      if (ArrayUtils.contains(suffix.exclude(), value)) {
-        throw new ExcludedSuffixKeyException(
-          "excluded suffix key '"
-          + suffix.name()
+      if (ArrayUtils.contains(keyspaceKey.exclude(), value)) {
+        throw new ExcludedKeyspaceKeyException(
+          "excluded keyspace key '"
+          + keyspaceKey.name()
           + "' value '"
           + value
           + "' for object class: "

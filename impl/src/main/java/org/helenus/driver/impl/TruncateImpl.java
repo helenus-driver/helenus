@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.helenus.driver.Clause;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Truncate;
 import org.helenus.driver.VoidFuture;
@@ -28,7 +28,7 @@ import org.helenus.driver.VoidFuture;
 /**
  * The <code>TruncateImpl</code> class defines a TRUNCATE statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -114,7 +114,7 @@ public class TruncateImpl<T>
    * @return the string builder used to build the query string for the specified
    *         table or <code>null</code> if there is none for the specified table
    * @throws IllegalArgumentException if the keyspace has not yet been computed
-   *         and cannot be computed with the provided suffixes yet
+   *         and cannot be computed with the provided keyspace keys yet
    */
   private StringBuilder buildQueryString(TableInfoImpl<T> table) {
     final StringBuilder builder = new StringBuilder();
@@ -124,7 +124,7 @@ public class TruncateImpl<T>
       if (getKeyspace() != null) {
         Utils.appendName(getKeyspace(), builder).append(".");
       }
-    } catch (ExcludedSuffixKeyException e) { // just skip this one since we were asked to skip the current keyspace suffix
+    } catch (ExcludedKeyspaceKeyException e) { // just skip this one since we were asked to skip the current keyspace key
       return null;
     }
     Utils.appendName(table.getName(), builder);
@@ -186,10 +186,10 @@ public class TruncateImpl<T>
 
   /**
    * The <code>WhereImpl</code> class defines a WHERE clause for the TRUNCATE
-   * statement which can be used to specify suffix keys used for the
+   * statement which can be used to specify keyspace keys used for the
    * keyspace name.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -244,7 +244,7 @@ public class TruncateImpl<T>
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addSuffix(c.getColumnName().toString(), c.firstValue());
+        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
         setDirty();
       }
       return this;

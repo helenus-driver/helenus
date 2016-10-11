@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import org.helenus.commons.collections.graph.ConcurrentHashDirectedGraph;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateSchemas;
-import org.helenus.driver.ExcludedSuffixKeyException;
+import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.SequenceableStatement;
 import org.helenus.driver.StatementBridge;
@@ -54,7 +54,7 @@ import org.reflections.Reflections;
  * indexes) to support the schema for a given package of POJOs. It will take
  * care of creating the required keyspace, tables, types, and indexes.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -73,7 +73,7 @@ public class CreateSchemasImpl
 
   /**
    * Flag indicating if only POJOs with keyspace names that can be computed
-   * based on exactly the set of suffixes provided should be considered.
+   * based on exactly the set of keyspace keys provided should be considered.
    *
    * @author paouelle
    */
@@ -115,7 +115,7 @@ public class CreateSchemasImpl
    * @param  pkgs the packages and/or classes where to find all POJO classes to
    *         create schemas for associated with this statement
    * @param  matching <code>true</code> to only consider POJOs with keyspace names
-   *         that can be computed with exactly the set of suffixes provided
+   *         that can be computed with exactly the set of keyspace keys provided
    * @param  mgr the non-<code>null</code> statement manager
    * @param  bridge the non-<code>null</code> statement bridge
    * @throws NullPointerException if <code>pkgs</code> is <code>null</code>
@@ -396,8 +396,8 @@ public class CreateSchemasImpl
    * @author paouelle
    *
    * @return the list of contexts for all POJO for which we are creating schemas
-   * @throws IllegalArgumentException if the value for a provided suffix doesn't
-   *         match the POJO's definition for that suffix
+   * @throws IllegalArgumentException if the value for a provided keyspace key doesn't
+   *         match the POJO's definition for that keyspace key
    */
   @SuppressWarnings({"synthetic-access", "unchecked", "rawtypes"})
   private List<ClassInfoImpl<?>.Context> getContexts() {
@@ -415,24 +415,24 @@ public class CreateSchemasImpl
           IllegalArgumentException iae = null;
           int found = 0;
 
-          // populate the required suffixes
-          for (final Map.Entry<String, FieldInfoImpl<?>> e: (Set<Map.Entry<String, FieldInfoImpl<?>>>)(Set)cinfo.getSuffixTypes().entrySet()) {
+          // populate the required keyspace keys
+          for (final Map.Entry<String, FieldInfoImpl<?>> e: (Set<Map.Entry<String, FieldInfoImpl<?>>>)(Set)cinfo.getKeyspaceKeyTypes().entrySet()) {
             final String type = e.getKey();
             final FieldInfoImpl<?> finfo = e.getValue();
 
-            if (!where.suffixes.containsKey(type)) {
-              // we are missing a required suffix for this POJO and since all pojos
+            if (!where.keyspaceKeys.containsKey(type)) {
+              // we are missing a required keyspace key for this POJO and since all pojos
               // references the same @Keyspace, all of them will have the same problem
               // -- so continue with next keyspace and ignore any errors that might
-              //    occurred for suffixes before that
+              //    occurred for keyspace keys before that
               continue next_keyspace;
             }
             found++;
-            // don't forget to convert the type into the suffix key name for the
+            // don't forget to convert the type into the keyspace key name for the
             // associated POJO
             try {
-              context.addSuffix(finfo.getSuffixKey().name(), where.suffixes.get(type));
-            } catch (ExcludedSuffixKeyException ee) { // ignore and skip this class
+              context.addKeyspaceKey(finfo.getKeyspaceKey().name(), where.keyspaceKeys.get(type));
+            } catch (ExcludedKeyspaceKeyException ee) { // ignore and skip this class
               continue next_class;
             } catch (IllegalArgumentException ee) {
               if (iae == null) { // keep only first one
@@ -440,13 +440,13 @@ public class CreateSchemasImpl
               }
             }
           }
-          // if we get here then we must have found all required suffixes in the
+          // if we get here then we must have found all required keyspace keys in the
           // where clause so whether or not we consider it depends on whether or
-          // not we required the exact same number of suffixes as defined if we
+          // not we required the exact same number of keyspace keys as defined if we
           // are matching or if we are not matching (and there would potentially
-          // be more suffixes defined than we needed)
-          if ((found == where.suffixes.size()) || !matching) {
-            // if we got an error on one of the suffix, throw it back
+          // be more keyspace keys defined than we needed)
+          if ((found == where.keyspaceKeys.size()) || !matching) {
+            // if we got an error on one of the keyspace key, throw it back
             if (iae != null) {
               throw iae;
             }
@@ -676,10 +676,10 @@ public class CreateSchemasImpl
 
   /**
    * The <code>WhereImpl</code> class defines a WHERE clause for the CREATE
-   * SCHEMAS statement which can be used to specify suffix types used for
+   * SCHEMAS statement which can be used to specify keyspace key types used for
    * keyspace names.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -690,11 +690,11 @@ public class CreateSchemasImpl
     extends ForwardingStatementImpl<Void, VoidFuture, Void, CreateSchemasImpl>
     implements Where {
     /**
-     * Holds the suffixes with their values.
+     * Holds the keyspace keys with their values.
      *
      * @author paouelle
      */
-    private final Map<String, Object> suffixes = new HashMap<>(8);
+    private final Map<String, Object> keyspaceKeys = new HashMap<>(8);
 
     /**
      * Instantiates a new <code>WhereImpl</code> object.
@@ -739,7 +739,7 @@ public class CreateSchemasImpl
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        suffixes.put(c.getColumnName().toString(), c.firstValue());
+        keyspaceKeys.put(c.getColumnName().toString(), c.firstValue());
         setDirty();
       }
       return this;

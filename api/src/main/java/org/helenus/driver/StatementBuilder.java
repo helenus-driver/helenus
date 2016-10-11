@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ import org.helenus.driver.persistence.Column;
  * method to retrieve a class loader to use when it needs to find classes. If not
  * available, it will fallback to using {@link Class#forName(String)} directly.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -774,7 +774,7 @@ public final class StatementBuilder {
    * the required keyspaces, user-defined types, tables, and indexes.
    * <p>
    * <i>Note:</i> This statement will create the schemas for all POJOs for which
-   * the defined keyspace can be computed with any of the specified suffixes via
+   * the defined keyspace can be computed with any of the specified keyspace keys via
    * the WHERE clauses.
    * <p>
    * <i>Note:</i> Executing this statement will potentially create the keyspaces,
@@ -806,7 +806,7 @@ public final class StatementBuilder {
    * <p>
    * <i>Note:</i> This statement will create the schemas for only the POJOs for
    * which the defined keyspace can be computed with exactly all of the specified
-   * suffixes via the WHERE clauses.
+   * keyspace keys via the WHERE clauses.
    * <p>
    * <i>Note:</i> Executing this statement will potentially create the keyspaces,
    * all user-defined types, all tables and all indexes for all tables. Since
@@ -866,7 +866,7 @@ public final class StatementBuilder {
    * <p>
    * <i>Note:</i> This statement will create and/or alter the schemas for all
    * POJOs for which the defined keyspace can be computed with any of the
-   * specified suffixes via the WHERE clauses.
+   * specified keyspace keys via the WHERE clauses.
    * <p>
    * <i>Note:</i> Executing this statement will potentially create and/or alter
    * the keyspaces, all user-defined types, all tables and all indexes for all
@@ -899,7 +899,7 @@ public final class StatementBuilder {
    * <p>
    * <i>Note:</i> This statement will create and/or alter the schemas for only
    * the POJOs for which the defined keyspace can be computed with exactly all
-   * of the specified suffixes via the WHERE clauses.
+   * of the specified keyspace keys via the WHERE clauses.
    * <p>
    * <i>Note:</i> Executing this statement will potentially create and/or alter
    * the keyspaces, all user-defined types, all tables and all indexes for all
@@ -1193,36 +1193,36 @@ public final class StatementBuilder {
   }
 
   /**
-   * Creates a set of "equal" where clause stating all suffix keys must be
+   * Creates a set of "equal" where clause stating all keyspace keys must be
    * equal to the POJO's used when the statement was initialized.
    *
    * @author paouelle
    *
    * @return the corresponding where clause
    */
-  public static Clause isSuffixedLikeObject() {
-    return StatementManager.getManager().isSuffixedLikeObject();
+  public static Clause isKeyspacedLikeObject() {
+    return StatementManager.getManager().isKeyspacedLikeObject();
   }
 
   /**
-   * Creates a set of "equal" where clause stating all suffix keys must be
+   * Creates a set of "equal" where clause stating all keyspace keys must be
    * equal to the provided POJO's.
    *
    * @author paouelle
    *
    * @param <T> The type of POJO.
    *
-   * @param  object the POJO from which to get the suffix keys
+   * @param  object the POJO from which to get the keyspace keys
    * @return the corresponding where clause
    * @throws NullPointerException if <code>object</code> is <code>null</code>
    */
-  public static <T> Clause isSuffixedLike(T object) {
-    return StatementManager.getManager().isSuffixedLike(object);
+  public static <T> Clause isKeyspacedLike(T object) {
+    return StatementManager.getManager().isKeyspacedLike(object);
   }
 
   /**
    * Creates a set of "equal" where clause stating all partition primary key
-   * columns and suffix keys must be equal to the POJO's used when the statement
+   * columns and keyspace keys must be equal to the POJO's used when the statement
    * was initialized.
    *
    * @author paouelle
@@ -1235,13 +1235,13 @@ public final class StatementBuilder {
 
   /**
    * Creates a set of "equal" where clause stating all partition primary key
-   * columns and suffix keys must be equal to the provided POJO's.
+   * columns and keyspace keys must be equal to the provided POJO's.
    *
    * @author paouelle
    *
    * @param <T> The type of POJO.
    *
-   * @param  object the POJO from which to get the primary and suffix keys
+   * @param  object the POJO from which to get the primary and keyspace keys
    * @return the corresponding where clause
    * @throws NullPointerException if <code>object</code> is <code>null</code>
    */
@@ -1251,7 +1251,7 @@ public final class StatementBuilder {
 
   /**
    * Creates a set of "equal" where clause stating all primary key columns
-   * and suffix keys must be equal to the POJO's used when the statement was
+   * and keyspace keys must be equal to the POJO's used when the statement was
    * initialized.
    *
    * @author paouelle
@@ -1264,13 +1264,13 @@ public final class StatementBuilder {
 
   /**
    * Creates a set of "equal" where clause stating all primary key columns
-   * and suffix keys must be equal to the provided POJO's.
+   * and keyspace keys must be equal to the provided POJO's.
    *
    * @author paouelle
    *
    * @param <T> The type of POJO.
    *
-   * @param  object the PJO from which to get the primary and suffix keys
+   * @param  object the PJO from which to get the primary and keyspace keys
    * @return the corresponding where clause
    * @throws NullPointerException if <code>object</code> is <code>null</code>
    */
@@ -1282,7 +1282,7 @@ public final class StatementBuilder {
    * Creates an "equal" where clause stating the provided column must be equal
    * to the provided value.
    * <p>
-   * This clause can also be used to identify a suffix key to use as part of
+   * This clause can also be used to identify a keyspace key to use as part of
    * the statement.
    *
    * @author paouelle
@@ -1300,7 +1300,7 @@ public final class StatementBuilder {
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
    * <p>
-   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * <i>Note:</i> Can also be used with a keyspace key in order to select from
    * multiple keyspaces at the same time. In such case, the select statement
    * will actually be split into multiple select statements (one for each
    * matching keyspace) and the result will be combined as if only one select
@@ -1322,7 +1322,7 @@ public final class StatementBuilder {
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
    * <p>
-   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * <i>Note:</i> Can also be used with a keyspace key in order to select from
    * multiple keyspaces at the same time. In such case, the select statement
    * will actually be split into multiple select statements (one for each
    * matching keyspace) and the result will be combined as if only one select
@@ -1344,7 +1344,7 @@ public final class StatementBuilder {
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
    * <p>
-   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * <i>Note:</i> Can also be used with a keyspace key in order to select from
    * multiple keyspaces at the same time. In such case, the select statement
    * will actually be split into multiple select statements (one for each
    * matching keyspace) and the result will be combined as if only one select
@@ -1366,7 +1366,7 @@ public final class StatementBuilder {
    * Create an "in" where clause stating the provided column must be equal to
    * a value in the provided range.
    * <p>
-   * <i>Note:</i> Can also be used with a suffix key in order to select from
+   * <i>Note:</i> Can also be used with a keyspace key in order to select from
    * multiple keyspaces at the same time. In such case, the select statement
    * will actually be split into multiple select statements (one for each
    * matching keyspace) and the result will be combined as if only one select

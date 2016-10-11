@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ public interface Delete<T>
    * @return the where clause of this query to which more clause can be added.
    * @throws IllegalArgumentException if the clause references a column
    *         not defined in the POJO
-   * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+   * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
    *         and the specified value is marked as excluded
    */
   public Where<T> where(Clause clause);
@@ -168,7 +168,7 @@ public interface Delete<T>
      * @return this WHERE clause
      * @throws IllegalArgumentException if the clause references a column
      *         not defined in the POJO
-     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
      *         and the specified value is marked as excluded
      */
     public Where<T> and(Clause clause);
@@ -251,7 +251,7 @@ public interface Delete<T>
      * @return the WHERE clause of the DELETE statement these options are part of.
      * @throws IllegalArgumentException if the clause references a column
      *         not defined in the POJO
-     * @throws ExcludedSuffixKeyException if the clause reference a suffix key
+     * @throws ExcludedKeyspaceKeyException if the clause reference a keyspace key
      *         and the specified value is marked as excluded
      */
     public Where<T> where(Clause clause);
@@ -325,7 +325,7 @@ public interface Delete<T>
     /**
      * Adds tables to delete from using the keyspace defined in the POJO.
      * <p>
-     * This flavor should be used when the POJO doesn't require suffixes to the
+     * This flavor should be used when the POJO doesn't require keyspace keys to the
      * keyspace name.
      *
      * @author paouelle
@@ -342,7 +342,7 @@ public interface Delete<T>
     /**
      * Adds tables to delete from using the keyspace defined in the POJO.
      * <p>
-     * This flavor should be used when the POJO doesn't require suffixes to the
+     * This flavor should be used when the POJO doesn't require keyspace keys to the
      * keyspace name.
      *
      * @author paouelle
@@ -359,7 +359,7 @@ public interface Delete<T>
      * Specifies to delete from all tables defined in the POJO using the
      * keyspace defined in the POJO.
      * <p>
-     * This flavor should be used when the POJO doesn't require suffixes to the
+     * This flavor should be used when the POJO doesn't require keyspace keys to the
      * keyspace name.
      *
      * @author paouelle

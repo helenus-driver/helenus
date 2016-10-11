@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -279,7 +279,7 @@ public class UpdateImpl<T>
    * @param  builders the non-<code>null</code> list of builders where to add
    *         the query strings built
    * @throws IllegalArgumentException if the keyspace has not yet been computed
-   *         and cannot be computed with the provided suffixes yet or if
+   *         and cannot be computed with the provided keyspace keys yet or if
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table

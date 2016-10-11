@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ import org.helenus.annotation.Keyable;
  * The <code>Column</code> annotation specifies a mapped column for a persistent
  * property or field.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -85,8 +85,8 @@ public @interface Column {
    * Flag indicating if the column should be a static column. A static column is
    * common to all clustered rows of a given partition.
    * <p>
-   * <i>Note:</i> Only valid for non-partition, non-clustering, and non-key-suffixes
-   * columns of tables. Not supported for user-defined types.
+   * <i>Note:</i> Only valid for non-partition, non-clustering, and non-keyspace
+   * key columns of tables. Not supported for user-defined types.
    *
    * @author paouelle
    *
@@ -99,7 +99,7 @@ public @interface Column {
    * data types from the field's class of a column with a specified one. This
    * annotation applies to all tables the column might be persisted to.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation

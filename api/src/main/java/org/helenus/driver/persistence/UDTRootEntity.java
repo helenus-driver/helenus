@@ -37,7 +37,7 @@ import java.lang.annotation.Target;
  * This attribute will be used to hold the UDT entity type and used to identify the
  * class that will be re-created at the time an object is retrieved from Cassandra.
  * <p>
- * The root UDT entity class must defined must defined the keyspace and suffix
+ * The root UDT entity class must defined must defined the keyspace and keyspace
  * keys.
  *
  * @copyright 2015-2016 The Helenus Driver Project Authors

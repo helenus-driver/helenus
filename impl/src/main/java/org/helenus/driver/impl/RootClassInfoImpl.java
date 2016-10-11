@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import org.helenus.driver.persistence.RootEntity;
  * The <code>RootClassInfoImpl</code> class provides information about a
  * particular root element POJO class.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -94,13 +94,13 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addSuffix(java.lang.String, java.lang.Object)
+     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addKeyspaceKey(java.lang.String, java.lang.Object)
      */
     @Override
-    public void addSuffix(String suffix, Object value) {
-      super.addSuffix(suffix, value);
+    public void addKeyspaceKey(String name, Object value) {
+      super.addKeyspaceKey(name, value);
       contexts.values().forEach(
-        tc -> tc.addSuffix(suffix, value)
+        tc -> tc.addKeyspaceKey(name, value)
       );
     }
   }
@@ -176,11 +176,11 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPartitionKeyColumnValues(java.lang.String)
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPartitionKeyColumnValues(String tname) {
-      return tcontext.getSuffixAndPartitionKeyColumnValues(tname);
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
+      return tcontext.getKeyspaceAndPartitionKeyColumnValues(tname);
     }
 
     /**
@@ -200,11 +200,11 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixKeyValues()
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceKeyValues()
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getSuffixKeyValues() {
-      return tcontext.getSuffixKeyValues();
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceKeyValues() {
+      return tcontext.getKeyspaceKeyValues();
     }
 
     /**
@@ -212,11 +212,11 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getSuffixAndPrimaryKeyColumnValues(java.lang.String)
+     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getSuffixAndPrimaryKeyColumnValues(String tname) {
-      return tcontext.getSuffixAndPrimaryKeyColumnValues(tname);
+    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
+      return tcontext.getKeyspaceAndPrimaryKeyColumnValues(tname);
     }
 
     /**
@@ -302,11 +302,11 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addSuffix(java.lang.String, java.lang.Object)
+     * @see org.helenus.driver.impl.ClassInfoImpl.Context#addKeyspaceKey(java.lang.String, java.lang.Object)
      */
     @Override
-    public void addSuffix(String suffix, Object value) {
-      tcontext.addSuffix(suffix, value);
+    public void addKeyspaceKey(String name, Object value) {
+      tcontext.addKeyspaceKey(name, value);
     }
 
     /**
@@ -737,7 +737,7 @@ public class RootClassInfoImpl<T>
    * @see org.helenus.driver.impl.ClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
    */
   @Override
-  public T getObject(Row row, Map<String, Object> suffixes) {
+  public T getObject(Row row, Map<String, Object> kkeys) {
     if (row == null) {
       return null;
     }
@@ -759,7 +759,7 @@ public class RootClassInfoImpl<T>
               clazz, row, "unknown POJO type: " + type
             );
           }
-          return tcinfo.getObject(row, type, suffixes);
+          return tcinfo.getObject(row, type, kkeys);
         }
       }
     }

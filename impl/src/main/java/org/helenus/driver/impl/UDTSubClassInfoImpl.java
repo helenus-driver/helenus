@@ -145,26 +145,26 @@ public class UDTSubClassInfoImpl<T> extends UDTRootClassInfoImpl<T> {
 
   /**
    * Converts the specified result row into a POJO object defined by this
-   * class information and suffix map.
+   * class information and keyspace key map.
    *
    * @author paouelle
    *
    * @param  row the result row to convert into a POJO
    * @param  type the POJO type extracted from the specified row
-   * @param  suffixes a map of suffix values to report back into the created
+   * @param  kkeys a map of keyspace key values to report back into the created
    *         POJO
    * @return the POJO object corresponding to the given result row or <code>null</code>
    *         if the type doesn't match this type entity name
-   * @throws NullPointerException if <code>type</code> or <code>suffixes</code>
+   * @throws NullPointerException if <code>type</code> or <code>kkeys</code>
    *         is <code>null</code>
    * @throws ObjectConversionException if unable to convert to a POJO
    */
-  public T getObject(Row row, String type, Map<String, Object> suffixes) {
+  public T getObject(Row row, String type, Map<String, Object> kkeys) {
     if ((row == null)
         || !clazz.isAssignableFrom(super.getType(type).getObjectClass())) {
       return null;
     }
-    return super.getObject(row, suffixes);
+    return super.getObject(row, kkeys);
   }
 
   /**
@@ -175,7 +175,7 @@ public class UDTSubClassInfoImpl<T> extends UDTRootClassInfoImpl<T> {
    * @see org.helenus.driver.impl.UDTRootClassInfoImpl#getObject(com.datastax.driver.core.Row, java.util.Map)
    */
   @Override
-  public T getObject(Row row, Map<String, Object> suffixes) {
+  public T getObject(Row row, Map<String, Object> kkeys) {
     if (row == null) {
       return null;
     }
@@ -189,7 +189,7 @@ public class UDTSubClassInfoImpl<T> extends UDTRootClassInfoImpl<T> {
 
       if ((i != -1) && table.getName().equals(cdefs.getTable(i))) {
         return getObject(
-          row, Objects.toString(type.decodeValue(row), null), suffixes
+          row, Objects.toString(type.decodeValue(row), null), kkeys
         );
       }
     }
