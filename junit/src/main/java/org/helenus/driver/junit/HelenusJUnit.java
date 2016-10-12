@@ -79,8 +79,10 @@ import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.db.SystemKeyspace;
 import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.service.CassandraDaemon;
+import org.apache.cassandra.service.StorageService;
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.AlterSchema;
@@ -1156,6 +1158,14 @@ public class HelenusJUnit implements MethodRule {
         // make sure to also clear the pojo class info in order to force the dependencies
         // to other pojos to be re-created when they are referenced
         mgr.clearCache();
+        // force a flush and a compaction of all keyspaces
+        for (final String ks: StorageService.instance.getKeyspaces()) {
+          if (!ks.startsWith(SystemKeyspace.NAME)) { // skip system keyspaces
+            logger.debug("Flushing and compacting keyspace: %s", ks);
+            StorageService.instance.forceKeyspaceFlush(ks);
+            StorageService.instance.forceKeyspaceCompaction(false, ks);
+          }
+        }
       } catch (AssertionError|ThreadDeath|StackOverflowError|OutOfMemoryError e) {
         throw e;
       } catch (Throwable t) {
