@@ -27,7 +27,7 @@
   <groupId>org.helenus</groupId>
   <artifactId>helenus</artifactId>
   <packaging>pom</packaging>
-  <version>1.0.15-SNAPSHOT</version>
+  <version>3.0.1-SNAPSHOT</version>
 
   <name>Helenus</name>
   <description>JPA-like syntax for annotating POJO classes for persistence via Cassandra's Java driver</description>
