@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package org.helenus.driver;
  * {@link com.datastax.driver.core.querybuilder.Clause} to provide support for
  * POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -31,7 +31,7 @@ public interface Clause {
   /**
    * The <code>Equality</code> class defines an equality clause.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -43,7 +43,7 @@ public interface Clause {
   /**
    * The <code>In</code> class defines an in clause.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Mar 3, 2015 - paouelle - Creation
@@ -51,4 +51,16 @@ public interface Clause {
    * @since 1.0
    */
   public interface In extends Clause {}
+
+  /**
+   * The <code>Compound</code> class defines a compound clause.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Oct 13, 2016 - paouelle - Creation
+   *
+   * @since 3.0
+   */
+  public interface Compound extends Clause {}
 }

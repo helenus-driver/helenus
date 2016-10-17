@@ -185,7 +185,9 @@ public class CreateSchemaImpl<T>
     } catch (ExcludedKeyspaceKeyException e) { // skip it
       return;
     }
-    final Keyspace keyspace = getContext().getClassInfo().getKeyspace();
+    final ClassInfoImpl<T>.Context context = getContext();
+    final ClassInfoImpl<T> cinfo = context.getClassInfo();
+    final Keyspace keyspace = cinfo.getKeyspace();
     final Pair<String, Keyspace> pk = Pair.of(ks, keyspace);
 
     // start by generating the keyspace
@@ -193,7 +195,7 @@ public class CreateSchemaImpl<T>
     // --- is provided in the method calls (used by create schemas)
     if ((keyspaces == null) || !keyspaces.contains(pk)) {
       final CreateKeyspaceImpl<T> ck = init(new CreateKeyspaceImpl<>(
-        getContext(), mgr, bridge
+        context, mgr, bridge
       ));
 
       if (ifNotExists) {
@@ -204,12 +206,12 @@ public class CreateSchemaImpl<T>
         keyspaces.add(pk);
       }
     }
-    if (getClassInfo().supportsTablesAndIndexes()) {
+    if (cinfo.supportsTablesAndIndexes()) {
       boolean createTable = true;
 
       if (tables != null) {
         createTable = false; // until proven otherwise
-        for (final TableInfoImpl<T> table: getContext().getClassInfo().getTablesImpl()) {
+        for (final TableInfoImpl<T> table: cinfo.getTablesImpl()) {
           Set<Table> stables = tables.get(pk);
 
           if (stables == null) {
@@ -223,10 +225,10 @@ public class CreateSchemaImpl<T>
       }
       if (createTable) {
         final CreateTableImpl<T> ct = init(
-          new CreateTableImpl<>(getContext(), null, mgr, bridge)
+          new CreateTableImpl<>(context, null, mgr, bridge)
         );
         final CreateIndexImpl<T> ci = init(
-          new CreateIndexImpl<>(getContext(), null, null, mgr, bridge)
+          new CreateIndexImpl<>(context, null, null, mgr, bridge)
         );
 
         if (ifNotExists) {
@@ -238,7 +240,7 @@ public class CreateSchemaImpl<T>
       }
     } else {
       final CreateTypeImpl<T> ct = init(
-        new CreateTypeImpl<>(getContext(), mgr, bridge)
+        new CreateTypeImpl<>(context, mgr, bridge)
       );
 
       if (ifNotExists) {
@@ -256,15 +258,12 @@ public class CreateSchemaImpl<T>
       }
     }
     // finish with initial objects
-    final Collection<T> objs = getContext().getInitialObjects();
+    final Collection<T> objs = context.getInitialObjects();
 
     if (!objs.isEmpty()) {
       for (final T io: objs) {
         group.add(init(new InsertImpl<>(
-          getContext().getClassInfo().newContext(io),
-          (String[])null,
-          mgr,
-          bridge
+          cinfo.newContext(io), (String[])null, mgr, bridge
         )));
       }
     }
@@ -382,19 +381,32 @@ public class CreateSchemaImpl<T>
         "unsupported clause '%s' for a CREATE SCHEMA statement",
         clause
       );
+      final ClassInfoImpl<T>.Context context = getContext();
+      final ClassInfoImpl<T> cinfo = context.getClassInfo();
+
       if (clause instanceof ClauseImpl.Delayed) {
-        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(statement.getContext().getClassInfo())) {
+        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(cinfo)) {
           and(c); // recurse to add the processed clause
         }
       } else {
-        final ClauseImpl c = (ClauseImpl)clause;
-
         org.apache.commons.lang3.Validate.isTrue(
           clause instanceof Clause.Equality,
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
+        final ClauseImpl c = (ClauseImpl)clause;
+
+        if (c instanceof ClauseImpl.CompoundEqClauseImpl) {
+          final ClauseImpl.Compound cc = (ClauseImpl.Compound)c;
+          final List<String> names = cc.getColumnNames();
+          final List<?> values = cc.getColumnValues();
+
+          for (int i = 0; i < names.size(); i++) {
+            context.addKeyspaceKey(names.get(i), values.get(i));
+          }
+        } else {
+          context.addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
+        }
         setDirty();
       }
       return this;

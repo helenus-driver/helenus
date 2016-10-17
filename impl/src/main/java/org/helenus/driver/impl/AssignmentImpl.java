@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.Pair;
 
 import org.helenus.driver.Assignment;
@@ -41,7 +43,6 @@ import org.helenus.driver.persistence.DataType;
  *
  * @since 1.0
  */
-@lombok.ToString
 public abstract class AssignmentImpl
   extends Utils.Appendeable
   implements Assignment {
@@ -147,14 +148,13 @@ public abstract class AssignmentImpl
    * The <code>SetAssignmentImpl</code> class defines a "SET" assignment specifying
    * a column name of the POJO and a value.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class SetAssignmentImpl extends AssignmentImpl {
     /**
      * Holds the value to assign to the column name.
@@ -166,7 +166,7 @@ public abstract class AssignmentImpl
     /**
      * Holds the definition associated with the value if any.
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      */
     private final CQLDataType definition;
 
@@ -288,14 +288,13 @@ public abstract class AssignmentImpl
    * specifying a column name of the POJO, an old value to be replaced with a
    * new value.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class ReplaceAssignmentImpl
     extends SetAssignmentImpl implements WithOldValue {
     /**
@@ -380,7 +379,6 @@ public abstract class AssignmentImpl
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class PreviousAssignmentImpl
     extends AssignmentImpl implements WithOldValue {
     /**
@@ -447,14 +445,13 @@ public abstract class AssignmentImpl
    * specifying a column name of the POJO and where the value is extracted from
    * the POJO in play.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class DelayedSetAssignmentImpl
     extends SetAssignmentImpl implements DelayedWithObject {
     /**
@@ -548,7 +545,6 @@ public abstract class AssignmentImpl
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class DelayedReplaceAssignmentImpl
     extends DelayedSetAssignmentImpl implements WithOldValue {
     /**
@@ -652,14 +648,13 @@ public abstract class AssignmentImpl
    * column names and values will actually be filled at the time the assignment
    * is added to the statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class DelayedSetAllAssignmentImpl extends AssignmentImpl implements DelayedWithObject {
     /**
      * Holds the POJO from which to get the non-primary column values or
@@ -753,14 +748,13 @@ public abstract class AssignmentImpl
    * The <code>CounterAssignmentImpl</code> class defines a counter-specific
    * increment or decrement assignment.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class CounterAssignmentImpl extends AssignmentImpl {
     /**
      * Holds the increment value.
@@ -829,14 +823,13 @@ public abstract class AssignmentImpl
    * The <code>ListPrependAssignmentImpl</code> class defines an assignment that
    * preprends elements to a list.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class ListPrependAssignmentImpl extends AssignmentImpl {
     /**
      * Holds the elements to prepend to the list.
@@ -893,14 +886,13 @@ public abstract class AssignmentImpl
    * The <code>ListSetIdxAssignmentImpl</code> class defines an assignment that
    * allows replacement of a specific index in a list.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class ListSetIdxAssignmentImpl extends AssignmentImpl {
     /**
      * Holds the index of the element to replace.
@@ -965,14 +957,13 @@ public abstract class AssignmentImpl
    * enables new/existing elements to be appended/discarded to/from a list or a
    * set.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class CollectionAssignmentImpl extends AssignmentImpl {
     /**
      * Holds the collection type.
@@ -1064,14 +1055,13 @@ public abstract class AssignmentImpl
    * The <code>MapPutAssignmentImpl</code> class defines an assignment which provides
    * the ability to add mappings in a map.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  @lombok.ToString(callSuper=true)
   static class MapPutAssignmentImpl extends AssignmentImpl {
     /**
      * Holds the key of the mapping to be added.
@@ -1136,5 +1126,19 @@ public abstract class AssignmentImpl
     void validate(TableInfoImpl<?> table) {
       table.validateMapColumnAndKeyValue(name, key, value);
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(
+      this, ToStringStyle.SHORT_PREFIX_STYLE, true
+    );
   }
 }

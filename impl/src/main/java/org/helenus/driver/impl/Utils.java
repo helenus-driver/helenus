@@ -137,6 +137,34 @@ public abstract class Utils {
     return sb;
   }
 
+  public static StringBuilder joinAndAppend(
+    TableInfoImpl<?> tinfo,
+    StringBuilder sb,
+    String separator,
+    Collection<? extends Appendeable> values,
+    Collection<? extends Appendeable> moreValues
+  ) {
+    boolean first = true;
+
+    for (final Appendeable value: values) {
+      if (!first) {
+        sb.append(separator);
+      } else {
+        first = false;
+      }
+      value.appendTo(tinfo, sb);
+    }
+    for (final Appendeable value: moreValues) {
+      if (!first) {
+        sb.append(separator);
+      } else {
+        first = false;
+      }
+      value.appendTo(tinfo, sb);
+    }
+    return sb;
+  }
+
   public static StringBuilder joinAndAppendNames(
     StringBuilder sb,
     String separator,

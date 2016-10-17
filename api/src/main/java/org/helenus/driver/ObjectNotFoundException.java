@@ -18,8 +18,6 @@ package org.helenus.driver;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import lombok.NonNull;
-
 import org.apache.commons.lang3.StringUtils;
 
 import com.datastax.driver.core.exceptions.InvalidQueryException;
@@ -140,8 +138,9 @@ public class ObjectNotFoundException extends RuntimeException {
    * @throws NullPointerException if <code>key</code> is <code>null</code>
    */
   public synchronized ObjectNotFoundException addDetail(
-    @NonNull String key, Object value
+    String key, Object value
   ) {
+    org.apache.commons.lang3.Validate.notNull(key, "invalid null key");
     if (details == null) {
       this.details = new LinkedHashMap<>(16);
     }

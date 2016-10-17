@@ -48,7 +48,7 @@ public class PersistedOrderedSet<T, PT>
   /**
    * Holds the serialVersionUID.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private static final long serialVersionUID = 1444306189578940573L;
 

@@ -18,8 +18,6 @@ package org.helenus.driver;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import lombok.NonNull;
-
 /**
  * The <code>ObjectConversionException</code> exception can be thrown as a
  * result of validating a POJO object before inserting or updating it.
@@ -207,8 +205,9 @@ public class ObjectValidationException extends IllegalArgumentException {
    * @throws NullPointerException if <code>key</code> is <code>null</code>
    */
   public synchronized ObjectValidationException addDetail(
-    @NonNull String key, Object value
+    String key, Object value
   ) {
+    org.apache.commons.lang3.Validate.notNull(key, "invalid null key");
     if (details == null) {
       this.details = new LinkedHashMap<>(16);
     }

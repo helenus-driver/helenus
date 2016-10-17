@@ -74,6 +74,7 @@ import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.WriteType;
+import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
@@ -284,7 +285,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Holds the keyspaces created so far via create schema statements.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private static final Set<Pair<String, Keyspace>> keyspaces
     = ConcurrentHashMap.newKeySet();
@@ -292,7 +293,7 @@ public class HelenusJUnit implements MethodRule {
   /**
    * Holds the tables created so far via create schema statements.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    */
   private static final Map<Pair<String, Keyspace>, Set<Table>> tables
     = new ConcurrentHashMap<>();
@@ -520,7 +521,7 @@ public class HelenusJUnit implements MethodRule {
         FileUtils.deleteDirectory(dir);
       }
       DatabaseDescriptor.createAllDirectories();
-      CommitLog.instance.getContext(); // wait for commit log allocator instantiation to avoid hanging on a race condition
+      CommitLog.instance.getCurrentPosition(); // wait for commit log allocator instantiation to avoid hanging on a race condition
       CommitLog.instance.resetUnsafe(true); // cleanup screws with CommitLog, this brings it back to safe state
     } catch (IOException e) {
       throw new AssertionError(e);
@@ -907,6 +908,8 @@ public class HelenusJUnit implements MethodRule {
             .withQueryOptions(new QueryOptions().setRefreshSchemaIntervalMillis(0)) // disable debouncing schema updates since we are unit testing!
             .withRetryPolicy(new LoggingRetryPolicy(new RetryPolicy() {
               @Override
+              public void init(Cluster cluster) {}
+              @Override
               public RetryDecision onReadTimeout(
                 com.datastax.driver.core.Statement statement,
                 ConsistencyLevel cl,
@@ -943,6 +946,18 @@ public class HelenusJUnit implements MethodRule {
                 int nbRetry
               ) {
                 return RetryDecision.rethrow();
+              }
+              @Override
+              public RetryDecision onRequestError(
+                com.datastax.driver.core.Statement statement,
+                ConsistencyLevel cl,
+                DriverException e,
+                int nbRetry
+              ) {
+                return RetryDecision.rethrow();
+              }
+              @Override
+              public void close() {
               }
             }))
             .addContactPoint(host)

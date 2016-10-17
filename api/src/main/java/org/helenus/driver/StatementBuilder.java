@@ -1289,11 +1289,32 @@ public final class StatementBuilder {
    *
    * @param  name the column name
    * @param  value the value
-   * @return the corresponding where equality clause.
+   * @return the corresponding where equality clause
    * @throws NullPointerException if <code>columnName</code> is <code>null</code>
    */
   public static Clause.Equality eq(CharSequence name, Object value) {
     return StatementManager.getManager().eq(name, value);
+  }
+
+  /**
+   * Creates an "equal" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code eq(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) = (2, 'test') }.
+   * <p>
+   * Please note that this variant is only supported starting with Cassandra 2.0.6.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where equality clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  public static Clause.Equality eq(List<String> names, List<?> values) {
+    return StatementManager.getManager().eq(names, values);
   }
 
   /**

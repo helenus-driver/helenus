@@ -50,8 +50,6 @@ import org.helenus.driver.persistence.RootEntity;
  *
  * @since 1.0
  */
-@lombok.ToString(callSuper=true, of={"ntypes"})
-@lombok.EqualsAndHashCode(callSuper=true)
 public class RootClassInfoImpl<T>
   extends ClassInfoImpl<T>
   implements RootClassInfo<T> {
@@ -764,5 +762,24 @@ public class RootClassInfoImpl<T>
       }
     }
     throw new ObjectConversionException(clazz, row, "missing POJO type column");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return (
+      getClass().getSimpleName()
+      + "[clazz=" + clazz
+      + ",keyspace=" + getKeyspace()
+      + ",ntypes=" + ntypes
+      + ",columns=" + getColumns()
+      + "]"
+    );
   }
 }

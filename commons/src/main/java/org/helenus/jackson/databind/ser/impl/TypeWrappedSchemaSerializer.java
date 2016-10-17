@@ -55,7 +55,7 @@ public class TypeWrappedSchemaSerializer extends JsonSerializer<Object> {
   /**
    * Instantiates a new <code>TypeWrappedSchemaSerializer</code> object.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param typeSer the type serializer being wrapped
    * @param ser the value serializer being wrapped
@@ -69,7 +69,7 @@ public class TypeWrappedSchemaSerializer extends JsonSerializer<Object> {
   /**
    * Instantiates a new <code>TypeWrappedSchemaSerializer</code> object.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param ser the type wrapped serializer being replaced
    */

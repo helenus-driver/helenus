@@ -81,8 +81,6 @@ import org.helenus.driver.persistence.UDTRootEntity;
  *
  * @since 1.0
  */
-@lombok.ToString(of={"clazz", "keyspace", "columns"})
-@lombok.EqualsAndHashCode(of="clazz")
 public class ClassInfoImpl<T> implements ClassInfo<T> {
   /**
    * The <code>Context</code> class provides a specific context for the POJO
@@ -2066,5 +2064,55 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         throw new IllegalStateException(t);
       }
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#hashCode()
+   */
+  @Override
+  public int hashCode() {
+    return clazz.hashCode();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#equals(java.lang.Object)
+   */
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (obj instanceof ClassInfoImpl) {
+      final ClassInfoImpl<?> c = (ClassInfoImpl<?>)obj;
+
+      return clazz.equals(c.clazz);
+    }
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return (
+      getClass().getSimpleName()
+      + "[clazz=" + clazz
+      + ",keyspace=" + keyspace
+      + ",columns=" + columns
+      + "]"
+    );
   }
 }

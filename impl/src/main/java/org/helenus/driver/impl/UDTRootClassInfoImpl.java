@@ -52,8 +52,6 @@ import org.helenus.driver.persistence.UDTRootEntity;
  *
  * @since 1.0
  */
-@lombok.ToString(callSuper=true, of={"ntypes"})
-@lombok.EqualsAndHashCode(callSuper=true)
 public class UDTRootClassInfoImpl<T>
   extends UDTClassInfoImpl<T>
   implements UDTRootClassInfo<T> {
@@ -636,5 +634,26 @@ public class UDTRootClassInfoImpl<T>
       }
     }
     throw new ObjectConversionException(clazz, uval, "missing POJO type column");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return (
+      getClass().getSimpleName()
+      + "[name=" + getName()
+      + ",clazz=" + clazz
+      + ",keyspace=" + getKeyspace()
+      + ",ntypes=" + ntypes
+      + ",columns=" + getColumns()
+      + ",table=" + getTableImpl()
+      + "]"
+    );
   }
 }

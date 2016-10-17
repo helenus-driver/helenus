@@ -1032,6 +1032,25 @@ public abstract class StatementManager {
   protected abstract Clause.Equality eq(CharSequence name, Object value);
 
   /**
+   * Creates an "equal" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code eq(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) = (2, 'test') }.
+   * <p>
+   * Please note that this variant is only supported starting with Cassandra 2.0.6.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  protected abstract Clause.Equality eq(List<String> names, List<?> values);
+
+  /**
    * Create an "in" where clause stating the provided column must be equal to
    * one of the provided values.
    * <p>

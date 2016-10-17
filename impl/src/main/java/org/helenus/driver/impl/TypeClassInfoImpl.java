@@ -44,8 +44,6 @@ import org.helenus.driver.persistence.TypeEntity;
  *
  * @since 2.0
  */
-@lombok.ToString(callSuper=true, exclude="rinfo")
-@lombok.EqualsAndHashCode(callSuper=true, exclude="rinfo")
 public class TypeClassInfoImpl<T>
   extends ClassInfoImpl<T>
   implements TypeClassInfo<T> {
@@ -337,5 +335,24 @@ public class TypeClassInfoImpl<T>
       }
     }
     throw new ObjectConversionException(clazz, row, "missing POJO type column");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return (
+      getClass().getSimpleName()
+      + "[type=" + type
+      + ",clazz=" + clazz
+      + ",keyspace=" + getKeyspace()
+      + ",columns=" + getColumns()
+      + "]"
+    );
   }
 }

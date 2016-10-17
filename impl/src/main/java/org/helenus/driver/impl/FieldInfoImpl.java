@@ -38,6 +38,8 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.text.WordUtils;
 
 import com.datastax.driver.core.Row;
@@ -81,7 +83,6 @@ import org.helenus.driver.persistence.TypeKey;
  *
  * @since 1.0
  */
-@lombok.ToString(exclude={"cinfo", "tinfo"})
 public class FieldInfoImpl<T> implements FieldInfo<T> {
   /**
    * Holds the class for the POJO.
@@ -2370,5 +2371,23 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    */
   public Stream<UDTClassInfoImpl<?>> udts() {
     return (definition != null) ? definition.udts() : Stream.empty();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    final ReflectionToStringBuilder sb = new ReflectionToStringBuilder(
+      this, ToStringStyle.SHORT_PREFIX_STYLE
+    );
+
+    sb.setAppendTransients(true);
+    sb.setExcludeFieldNames("cinfo", "tinfo");
+    return sb.toString();
   }
 }

@@ -57,8 +57,6 @@ import org.helenus.driver.persistence.UDTTypeEntity;
  *
  * @since 1.0
  */
-@lombok.ToString(callSuper=true)
-@lombok.EqualsAndHashCode(callSuper=true)
 public abstract class UDTClassInfoImpl<T>
   extends ClassInfoImpl<T> implements CQLDataType {
   /**
@@ -773,5 +771,25 @@ public abstract class UDTClassInfoImpl<T>
         );
       }
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return (
+      getClass().getSimpleName()
+      + "[name=" + name
+      + ",clazz=" + clazz
+      + ",keyspace=" + getKeyspace()
+      + ",columns=" + getColumns()
+      + ",table=" + table
+      + "]"
+    );
   }
 }

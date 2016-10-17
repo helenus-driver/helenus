@@ -38,8 +38,6 @@ import org.helenus.driver.persistence.UDTRootEntity;
  *
  * @since 2.0
  */
-@lombok.ToString(callSuper=true, exclude="rinfo")
-@lombok.EqualsAndHashCode(callSuper=true, exclude="rinfo")
 public class UDTTypeClassInfoImpl<T>
   extends UDTClassInfoImpl<T> implements UDTTypeClassInfo<T> {
   /**
@@ -234,5 +232,26 @@ public class UDTTypeClassInfoImpl<T>
     // set the type key manually
     getTableImpl().getTypeKey().ifPresent(f -> f.setValue(t, getType()));
     return t;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return (
+      getClass().getSimpleName()
+      + "[name=" + getName()
+      + ",dynamic=" + dynamic
+      + ",clazz=" + clazz
+      + ",keyspace=" + getKeyspace()
+      + ",columns=" + getColumns()
+      + ",table=" + getTableImpl()
+      + "]"
+    );
   }
 }

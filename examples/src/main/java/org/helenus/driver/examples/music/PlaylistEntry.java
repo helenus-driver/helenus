@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ import org.helenus.driver.persistence.Table;
  *   </li>
  * </ul>
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 23, 2015 - paouelle - Creation
@@ -61,12 +61,6 @@ import org.helenus.driver.persistence.Table;
  *
  * @see <a href="http://www.datastax.com/documentation/cql/3.1/cql/ddl/ddl_music_service_c.html">Datastax Music Service Example</a>
  */
-@lombok.NoArgsConstructor
-@lombok.Getter
-@lombok.Setter
-@lombok.experimental.Accessors(chain=true)
-@lombok.ToString
-@lombok.EqualsAndHashCode(of={"id", "songOrder"})
 @Keyspace(keys=Constants.MUSIC)
 @Table(name=Constants.PLAYLISTS)
 @Entity
@@ -159,7 +153,6 @@ public class PlaylistEntry {
    *
    * @author paouelle
    */
-  @lombok.NonNull
   @Column(name=Constants.ID)
   @PartitionKey
   @Mandatory
@@ -170,7 +163,6 @@ public class PlaylistEntry {
    *
    * @author paouelle
    */
-  @lombok.NonNull
   @Column(name=Constants.SONG_ORDER)
   @ClusteringKey
   @Mandatory
@@ -181,7 +173,6 @@ public class PlaylistEntry {
    *
    * @author paouelle
    */
-  @lombok.NonNull
   @Column(name=Constants.SONG_ID)
   @Mandatory
   private UUID songId;
@@ -191,7 +182,6 @@ public class PlaylistEntry {
    *
    * @author paouelle
    */
-  @lombok.NonNull
   @Column(name=Constants.TITLE)
   @Mandatory
   private String title;
@@ -201,7 +191,6 @@ public class PlaylistEntry {
    *
    * @author paouelle
    */
-  @lombok.NonNull
   @Column(name=Constants.ALBUM)
   @Mandatory
   private String album;
@@ -211,7 +200,6 @@ public class PlaylistEntry {
    *
    * @author paouelle
    */
-  @lombok.NonNull
   @Column(name=Constants.ARTIST)
   @Index
   @Mandatory

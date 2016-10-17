@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -57,7 +59,6 @@ import org.helenus.driver.persistence.Table;
  *
  * @since 1.0
  */
-@lombok.ToString(exclude={"cinfo"})
 public class TableInfoImpl<T> implements TableInfo<T> {
   /**
    * Cleanups the specified table name according to Cassandra's guidelines.
@@ -2766,5 +2767,23 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    */
   public Stream<UDTClassInfoImpl<?>> udts() {
     return columns.values().stream().flatMap(f -> f.udts());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    final ReflectionToStringBuilder sb = new ReflectionToStringBuilder(
+      this, ToStringStyle.SHORT_PREFIX_STYLE
+    );
+
+    sb.setAppendTransients(true);
+    sb.setExcludeFieldNames("cinfo");
+    return sb.toString();
   }
 }

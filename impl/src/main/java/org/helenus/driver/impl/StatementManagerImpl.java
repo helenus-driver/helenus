@@ -44,6 +44,7 @@ import org.apache.logging.log4j.Logger;
 import com.datastax.driver.core.CloseFuture;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.KeyspaceMetadata;
+import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
@@ -389,7 +390,7 @@ public class StatementManagerImpl extends StatementManager {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.StatementManager#getRootClassInfo(java.lang.Class)
    */
@@ -1058,11 +1059,7 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected CharSequence quote(String columnName) {
     org.apache.commons.lang3.Validate.notNull(columnName, "invalid null column name");
-    final StringBuilder sb = new StringBuilder(columnName.length() + 2);
-
-    sb.append("\"");
-    Utils.appendName(columnName, sb);
-    return new CNameSequence(sb.toString(), columnName);
+    return Metadata.quote(columnName);
   }
 
   /**
@@ -1182,6 +1179,18 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected Clause.Equality eq(CharSequence name, Object value) {
     return new ClauseImpl.EqClauseImpl(name, value);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#eq(java.util.List, java.util.List)
+   */
+  @Override
+  protected Clause.Equality eq(List<String> names, List<?> values) {
+    return new ClauseImpl.CompoundEqClauseImpl(names, values);
   }
 
   /**
@@ -2024,7 +2033,7 @@ public class StatementManagerImpl extends StatementManager {
   /**
    * Gets the maximum replication factor defined for the specified keyspace.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  keyspace the keyspace for which to get its minimum replication factor
    * @return the maximum replication factor for the specified keyspace or <code>0</code>

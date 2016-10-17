@@ -246,19 +246,27 @@ public class CreateTypeImpl<T>
         "unsupported clause '%s' for a CREATE TYPE statement",
         clause
       );
+      final ClassInfoImpl<T>.Context context = getContext();
+      final ClassInfoImpl<T> cinfo = context.getClassInfo();
+
       if (clause instanceof ClauseImpl.Delayed) {
-        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(statement.getContext().getClassInfo())) {
+        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(cinfo)) {
           and(c); // recurse to add the processed clause
         }
       } else {
         final ClauseImpl c = (ClauseImpl)clause;
 
-        org.apache.commons.lang3.Validate.isTrue(
-          clause instanceof Clause.Equality,
-          "unsupported class of clauses: %s",
-          clause.getClass().getName()
-        );
-        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
+        if (c instanceof ClauseImpl.CompoundEqClauseImpl) {
+          final ClauseImpl.Compound cc = (ClauseImpl.Compound)c;
+          final List<String> names = cc.getColumnNames();
+          final List<?> values = cc.getColumnValues();
+
+          for (int i = 0; i < names.size(); i++) {
+            context.addKeyspaceKey(names.get(i), values.get(i));
+          }
+        } else {
+          context.addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
+        }
         setDirty();
       }
       return this;

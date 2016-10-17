@@ -33,8 +33,6 @@ import org.helenus.driver.persistence.UDTEntity;
  *
  * @since 1.0
  */
-@lombok.ToString(callSuper=true)
-@lombok.EqualsAndHashCode(callSuper=true)
 public class UDTActualClassInfoImpl<T>
   extends UDTClassInfoImpl<T> implements UDTClassInfo<T> {
   /**

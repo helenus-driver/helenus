@@ -43,8 +43,6 @@ import org.helenus.driver.persistence.Table;
  *
  * @since 2.0
  */
-@lombok.ToString(callSuper=true)
-@lombok.EqualsAndHashCode(callSuper=true, exclude="rinfo")
 public class SubClassInfoImpl<T> extends RootClassInfoImpl<T> {
   /**
    * Holds the class info for the root entity this POJO is a type.

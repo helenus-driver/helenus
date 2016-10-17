@@ -509,16 +509,16 @@ public class CreateSchemasImpl
     ));
 
     contexts.forEach(c -> {
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        final CreateSchemaImpl<?> cs = init(new CreateSchemaImpl(c, mgr, bridge));
+      @SuppressWarnings({"rawtypes", "unchecked"})
+      final CreateSchemaImpl<?> cs = init(new CreateSchemaImpl(c, mgr, bridge));
 
-        if (ifNotExists) {
-          cs.ifNotExists();
-        }
-        cs.buildSequencedStatements(
-          keyspaces, tables, kgroup, tgroup, igroup, yseq, group
-        );
-      });
+      if (ifNotExists) {
+        cs.ifNotExists();
+      }
+      cs.buildSequencedStatements(
+        keyspaces, tables, kgroup, tgroup, igroup, yseq, group
+      );
+    });
     return Stream.of(kgroup, yseq, tgroup, igroup, group)
       .filter(g -> !g.isEmpty())
       .collect(Collectors.toList());
@@ -727,8 +727,11 @@ public class CreateSchemasImpl
         "unsupported clause '%s' for a CREATE SCHEMAS statement",
         clause
       );
+      final ClassInfoImpl<?>.Context context = getContext();
+      final ClassInfoImpl<?> cinfo = context.getClassInfo();
+
       if (clause instanceof ClauseImpl.Delayed) {
-        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(statement.getContext().getClassInfo())) {
+        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(cinfo)) {
           and(c); // recurse to add the processed clause
         }
       } else {
@@ -739,7 +742,17 @@ public class CreateSchemasImpl
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        keyspaceKeys.put(c.getColumnName().toString(), c.firstValue());
+        if (c instanceof ClauseImpl.CompoundEqClauseImpl) {
+          final ClauseImpl.Compound cc = (ClauseImpl.Compound)c;
+          final List<String> names = cc.getColumnNames();
+          final List<?> values = cc.getColumnValues();
+
+          for (int i = 0; i < names.size(); i++) {
+            keyspaceKeys.put(names.get(i), values.get(i));
+          }
+        } else {
+          keyspaceKeys.put(c.getColumnName().toString(), c.firstValue());
+        }
         setDirty();
       }
       return this;
