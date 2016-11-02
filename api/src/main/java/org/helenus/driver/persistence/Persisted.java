@@ -67,8 +67,8 @@ public @interface Persisted {
    * <p>
    * <i>Note:</i> that the data type specified cannot be one of
    * {@link DataType#INFERRED}, {@link DataType#LIST}, {@link DataType#SET},
-   * {@link DataType#ORDERED_SET} {@link DataType#MAP}, or
-   * {@link DataType#SORTED_MAP}. Otherwise an error will be thrown when
+   * {@link DataType#ORDERED_SET}, {@link DataType#SORTED_SET}, {@link DataType#MAP},
+   * or {@link DataType#SORTED_MAP}. Otherwise an error will be thrown when
    * analyzing the POJO at runtime.
    *
    * @author paouelle

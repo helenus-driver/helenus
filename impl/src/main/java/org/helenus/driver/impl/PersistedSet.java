@@ -97,6 +97,23 @@ public class PersistedSet<T, PT>
   private final Set<PersistedValue<T, PT>> set;
 
   /**
+   * Instantiates a new <code>PersistedMap</code> object.
+   *
+   * @author paouelle
+   *
+   * @param pset the persisted set from which we are creating another view
+   * @param set the set view we are creating
+   */
+  PersistedSet(
+    PersistedSet<T, PT> pset, Set<PersistedValue<T, PT>> set
+  ) {
+    this.persisted = pset.persisted;
+    this.persister = pset.persister;
+    this.fname = pset.fname;
+    this.set = set;
+  }
+
+  /**
    * Instantiates a new <code>PersistedSet</code> object.
    *
    * @author paouelle

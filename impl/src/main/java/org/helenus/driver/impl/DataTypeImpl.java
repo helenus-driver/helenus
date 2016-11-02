@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
@@ -385,6 +386,28 @@ public class DataTypeImpl {
             + "."
             + field.getName()
           );
+        } else if (SortedSet.class.isAssignableFrom(clazz)
+                   || (Set.class.equals(clazz)
+                       && (type instanceof DataType)
+                       && (((DataType)type).getMainType() == DataType.SORTED_SET))) {
+          if (persisted != null) {
+            // if persisted then we need to decode: SortedSet<persisted.as()>
+            return DataDecoder.sortedSet(persisted.as().CLASS, mandatory);
+          }
+          final Type type = field.getGenericType();
+
+          if (type instanceof ParameterizedType) {
+            final ParameterizedType ptype = (ParameterizedType)type;
+            final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
+
+            return DataDecoder.sortedSet(ReflectionUtils.getRawClass(atype), mandatory);
+          }
+          throw new IllegalArgumentException(
+            "unable to determine element type for field: "
+            + field.getDeclaringClass().getName()
+            + "."
+            + field.getName()
+          );
         } else if (Set.class.isAssignableFrom(clazz)) {
           if (persisted != null) {
             // if persisted then we need to decode: Set<persisted.as()>
@@ -634,6 +657,8 @@ public class DataTypeImpl {
         return new PersistedSet<>(persisted, persister, fname, (Set<T>)val, false);
       } else if (type == DataType.ORDERED_SET) {
         return new PersistedOrderedSet<>(persisted, persister, fname, (Set<T>)val, false);
+      } else if (type == DataType.SORTED_SET) {
+        return new PersistedSortedSet<>(persisted, persister, fname, (Set<T>)val, false);
       } else if (type == DataType.MAP) {
         return new PersistedMap<>(persisted, persister, fname, (Map<?, T>)val, false);
       } else if (type == DataType.SORTED_MAP) {
@@ -728,6 +753,8 @@ public class DataTypeImpl {
         return new PersistedSet<>(persisted, persister, fname, (Set<PT>)val, true);
       } else if (type == DataType.ORDERED_SET) {
         return new PersistedOrderedSet<>(persisted, persister, fname, (Set<PT>)val, true);
+      } else if (type == DataType.SORTED_SET) {
+        return new PersistedSortedSet<>(persisted, persister, fname, (Set<PT>)val, true);
       } else if (type == DataType.MAP) {
         return new PersistedMap<>(persisted, persister, fname, (Map<?,PT>)val, true);
       } else if (type == DataType.SORTED_MAP) {

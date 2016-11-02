@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.UUID;
 
 /**
@@ -64,6 +65,7 @@ public enum DataType implements CQLDataType {
   LIST("list", 1, List.class),
   SET("set", 1, Set.class),
   ORDERED_SET("list", 1, LinkedHashSet.class),
+  SORTED_SET("set", 1, SortedSet.class),
   MAP("map", 2, Map.class),
   SORTED_MAP("map", 2, NavigableMap.class);
 

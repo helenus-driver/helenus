@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -384,7 +385,9 @@ public abstract class UDTClassInfoImpl<T>
       table.addNonPrimaryColumn(
         new FieldInfoImpl<>(
           this,
-          LinkedHashSet.class.isAssignableFrom(clazz) ? DataType.ORDERED_SET : DataType.SET,
+          (LinkedHashSet.class.isAssignableFrom(clazz)
+           ? DataType.ORDERED_SET
+           : (SortedSet.class.isAssignableFrom(clazz) ? DataType.SORTED_SET : DataType.SET)),
           (obj, val) -> {
             final Set s = (Set)obj;
 
