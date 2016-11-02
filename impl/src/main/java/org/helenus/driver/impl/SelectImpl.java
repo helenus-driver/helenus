@@ -584,7 +584,7 @@ public class SelectImpl<T>
    * The <code>WhereImpl</code> class defines a WHERE clause for a SELECT
    * statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -628,6 +628,32 @@ public class SelectImpl<T>
     }
 
     /**
+     * Ands the specified clause along with others.
+     *
+     * @author paouelle
+     *
+     * @param  table the non-<code>null</code> table for which to extract
+     *         column's values for
+     * @param  clauses the non-<code>null</code> list of clauses to which
+     *         to add the clause once resolved
+     * @param  clause the non-<code>null</code> assignment to and together
+     *         with others
+     */
+    private void andClause(
+      TableInfoImpl<T> table, List<ClauseImpl> clauses, ClauseImpl clause
+    ) {
+      if (clause instanceof ClauseImpl.Compound) {
+        final List<ClauseImpl> eclauses = ((ClauseImpl.Compound)clause).extractSpecialColumns(table);
+
+        if (eclauses != null) {
+          eclauses.forEach(c -> andClause(table, clauses, c)); // recurse to add the processed clause
+          return;
+        } // else - continue with the current one as is
+      }
+      clauses.add(clause);
+    }
+
+    /**
      * Gets the "where" clauses while adding missing final partition keys.
      *
      * @author paouelle
@@ -642,81 +668,92 @@ public class SelectImpl<T>
       // (if a set of size 1) into an EQ or an IN for the non-set column
       // finally check for case insensitive keys as we need to convert the
       // provided value to lower case for the special column
-      final List<ClauseImpl> clauses = new ArrayList<>(this.clauses);
+      final List<ClauseImpl> clauses;
 
       if (table.hasMultiKeys() || table.hasCaseInsensitiveKeys()) {
+        clauses = new ArrayList<>(this.clauses.size()); // preserver order
+        for (final ClauseImpl c: this.clauses) {
+          andClause(table, clauses, c); // this will properly extract special columns as simple clauses
+        }
         // need to see if we have multi-keys in the list and if
         // so, we need to convert its value (if a set) into an "EQ" or an "IN"
         // need to also see if we have case insensitive keys in the list and if so,
         // we need to convert its value to lower case
         for (final ListIterator<ClauseImpl> i = clauses.listIterator(); i.hasNext(); ) {
           final ClauseImpl clause = i.next();
-          final FieldInfoImpl<?> f = table.getColumnImpl(clause.getColumnName());
 
-          if (f != null) {
-            final boolean ci = f.isCaseInsensitiveKey();
+          if (clause instanceof ClauseImpl.SimpleClauseImpl) {
+            final String name = clause.getColumnName().toString();
+            final FieldInfoImpl<?> finfo = table.getColumnImpl(name);
 
-            if (f.isMultiKey()) {
-              final Set<Object> in = new LinkedHashSet<>(8); // preserve order
+            if (finfo != null) {
+              final boolean ci = finfo.isCaseInsensitiveKey();
 
-              for (final Object v: clause.values()) {
-                if (v instanceof Collection<?>) {
-                  if (ci) {
-                    ((Collection<?>)v).forEach(iv -> in.add(
-                      (iv != null) ? StringUtils.lowerCase(iv.toString()) : null
-                    ));
+              if (finfo.isMultiKey()) {
+                final Set<Object> in = new LinkedHashSet<>(8); // preserve order
+                final String mkname = StatementImpl.MK_PREFIX + name;
+
+                for (final Object v: clause.values()) {
+                  if (v instanceof Collection<?>) {
+                    if (ci) {
+                      ((Collection<?>)v).forEach(iv -> in.add(
+                        (iv != null) ? StringUtils.lowerCase(iv.toString()) : null
+                      ));
+                    } else {
+                      in.addAll((Collection<?>)v);
+                    }
+                  } else if (ci && (v != null)) {
+                    in.add(StringUtils.lowerCase(v.toString()));
                   } else {
-                    in.addAll((Collection<?>)v);
+                    in.add(v);
                   }
-                } else if (ci && (v != null)) {
-                  in.add(StringUtils.lowerCase(v.toString()));
+                }
+                if (in.size() == 1) {
+                  i.set(new ClauseImpl.SimpleClauseImpl(
+                    mkname, clause.getOperation(), in.iterator().next()
+                  ));
                 } else {
-                  in.add(v);
+                  // NOTE: Cassandra doesn't support using an 'IN' for a clustering key
+                  // if as part of the columns selected, one is a collection. In our
+                  // case, the multi-key column is itself a collection as such, we will
+                  // never be able to support the 'IN' clause for that column
+                  // TODO: we could look into storing the actual set column for the MK as a frozen set and see if that lifts this restriction
+                  if (finfo.isClusteringKey()) {
+                    throw new IllegalArgumentException(
+                      "unsupported selection of multiple values for clustering multi-key column '"
+                      + name
+                      + "'"
+                     );
+                  }
+                  i.set(new ClauseImpl.InClauseImpl(mkname, in));
                 }
-              }
-              if (in.size() == 1) {
-                i.set(new ClauseImpl.SimpleClauseImpl(
-                  StatementImpl.MK_PREFIX + clause.getColumnName(),
-                  clause.getOperation(),
-                  in.iterator().next()
-                ));
-              } else {
-                // NOTE: Cassandra doesn't support using an 'IN' for a clustering key
-                // if as part of the columns selected, one is a collection. In our
-                // case, the multi-key column is itself a collection as such, we will
-                // never be able to support the 'IN' clause for that column
-                // TODO: we could look into storing the actual set column for the MK as a frozen set and see if that lifts this restriction
-                if (f.isClusteringKey()) {
-                  throw new IllegalArgumentException(
-                    "unsupported selection of multiple values for clustering multi-key column '"
-                    + clause.getColumnName()
-                    + "'"
-                   );
-                }
-                i.set(new ClauseImpl.InClauseImpl(
-                  StatementImpl.MK_PREFIX + clause.getColumnName(), in
-                ));
-              }
-            } else if (ci) {
-              if (clause instanceof ClauseImpl.InClauseImpl) {
-                i.set(new ClauseImpl.InClauseImpl(
-                  StatementImpl.CI_PREFIX + clause.getColumnName(),
-                  clause.values().stream()
-                    .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
-                    .collect(Collectors.toSet())
-                ));
-              } else if (clause instanceof ClauseImpl.SimpleClauseImpl) {
+              } else if (ci) {
                 final Object v = clause.firstValue();
 
                 i.set(new ClauseImpl.SimpleClauseImpl(
-                  StatementImpl.CI_PREFIX + clause.getColumnName(),
+                  StatementImpl.CI_PREFIX + name,
                   clause.getOperation(),
                   (v != null) ? StringUtils.lowerCase(v.toString()) : null
                 ));
               }
             }
+          } else if (clause instanceof ClauseImpl.InClauseImpl) {
+            final String name = clause.getColumnName().toString();
+            final FieldInfoImpl<?> finfo = table.getColumnImpl(name);
+
+            // IN are not supported for multi-keys, so only need to handle case insensitive!
+            if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
+              i.set(new ClauseImpl.InClauseImpl(
+                StatementImpl.CI_PREFIX + name,
+                clause.values().stream()
+                  .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                  .collect(Collectors.toCollection(LinkedHashSet::new))
+              ));
+            }
           }
         }
+      } else {
+        clauses = new ArrayList<>(this.clauses);
       }
       for (final Map.Entry<String, Object> e: table.getFinalPrimaryKeyValues().entrySet()) {
         final String name = e.getKey();
@@ -724,7 +761,7 @@ public class SelectImpl<T>
         boolean found = false;
 
         for (final ClauseImpl c: this.clauses) {
-          if (name.equals(c.getColumnName().toString())) {
+          if (c.containsColumn(name)) {
             found = true;
             break;
           }
@@ -763,54 +800,141 @@ public class SelectImpl<T>
         }
       } else {
         final ClauseImpl c = (ClauseImpl)clause;
+        final ClassInfoImpl<T>.Context context = getContext();
+        final ClassInfoImpl<T> cinfo = context.getClassInfo();
         boolean add = true;
 
-        if (c instanceof Clause.Equality) {
-          statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
-          if (statement.getContext().getClassInfo().isKeyspaceKey(c.getColumnName().toString())) {
-            try {
-              statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
-              // only add if it is a column too
-              add = statement.table.hasColumn(c.getColumnName());
-            } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without clause
-              return this;
-            }
-          }
-          c.validate(statement.table);
-        } else if (c instanceof Clause.In) {
-          statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(c.getColumnName());
-          if (statement.getContext().getClassInfo().isKeyspaceKey(c.getColumnName().toString())) {
-            // verify all keyspace key values one after the other to validate all of them
-            final List<Object> values = new ArrayList<>(c.values());
+        if (c instanceof ClauseImpl.Compound) {
+          final ClauseImpl.Compound cc = (ClauseImpl.Compound)c;
+          final List<String> names = cc.getColumnNames();
+          final List<?> values = cc.getColumnValues();
 
-            for (final Iterator<?> i = values.iterator(); i.hasNext(); ) {
-              final Object v = i.next();
+          if (c instanceof ClauseImpl.CompoundEqClauseImpl) {
+            for (int i = 0; i < names.size(); i++) {
+              final String name = names.get(i);
 
-              try {
-                statement.getContext().getClassInfo().validateKeyspaceKey(
-                  c.getColumnName().toString(), v
-                );
-              } catch (ExcludedKeyspaceKeyException e) { // ignore this keyspace key and value from the list
-                i.remove();
+              statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(name);
+              if (cinfo.isKeyspaceKey(name)) {
+                try {
+                  context.addKeyspaceKey(name, values.get(i));
+                  setDirty();
+                  // only keep it in the compound clause if it is a column too
+                  if (!statement.table.hasColumn(name)) { // not a column so remove it from the lists
+                    names.remove(i);
+                    values.remove(i);
+                    i--; // to make sure index continues to the right one on the next iteration
+                  }
+                } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without value in clause
+                  names.remove(i);
+                  values.remove(i);
+                  i--; // to make sure index continues to the right one on the next iteration
+                }
               }
             }
-            // keep track of all keyspace keys so we can generate all the underlying
-            // select statements later
-            if (statement.keyspaceKeys == null) {
-              statement.keyspaceKeys = new LinkedHashMap<>(6);
+            if (names.isEmpty()) { // nothing in the remaining clause
+              return this;
             }
-            statement.keyspaceKeys.put(c.getColumnName().toString(), values);
-            // only add if it is a column too
-            add = statement.table.hasColumn(c.getColumnName());
-            // don't validate the clause as we know it is not a valid one with
-            // the collection of values from the in clause
-            // but that is ok since we already validated them here
+            c.validate(statement.table);
+          } else if (c instanceof ClauseImpl.CompoundInClauseImpl) {
+            for (int i = 0; i < names.size(); i++) {
+              final String name = names.get(i);
+
+              statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(name);
+              if (cinfo.isKeyspaceKey(name)) {
+                // verify all keyspace key values one after the other to validate all of them
+                final List<Object> cvalues = new ArrayList<>((Collection<?>)values.get(i));
+
+                for (final Iterator<?> ci = cvalues.iterator(); ci.hasNext(); ) {
+                  final Object v = ci.next();
+
+                  try {
+                    cinfo.validateKeyspaceKey(name, v);
+                  } catch (ExcludedKeyspaceKeyException e) { // ignore this keyspace key and value from the list
+                    ci.remove();
+                  }
+                }
+                if (cvalues.isEmpty()) { // no more values so remove that column
+                  names.remove(i);
+                  values.remove(i);
+                  i--; // to make sure index continues to the right one on the next iteration
+                } else {
+                  // keep track of all keyspace keys so we can generate all the underlying
+                  // select statements later
+                  if (statement.keyspaceKeys == null) {
+                    statement.keyspaceKeys = new LinkedHashMap<>(6);
+                  }
+                  statement.keyspaceKeys.put(name, cvalues);
+                  setDirty();
+                  // only keep it in the compound clause if it is a column too
+                  if (!statement.table.hasColumn(name)) { // not a column so remove it from the lists
+                    names.remove(i);
+                    values.remove(i);
+                    i--; // to make sure index continues to the right one on the next iteration
+                  }
+                }
+              }
+            }
+            if (names.isEmpty()) { // nothing in the remaining clause
+              return this;
+            }
+            c.validate(statement.table);
           } else {
+            names.forEach(name -> statement.table.validatePrimaryKeyOrIndexColumn(name));
             c.validate(statement.table);
           }
-        } else {
-          statement.table.validatePrimaryKeyOrIndexColumn(c.getColumnName());
-          c.validate(statement.table);
+          add = !names.isEmpty(); // otherwise, clause is now empty so don't add it
+        } else { // no a compound clause
+          final String name = c.getColumnName().toString();
+
+          if (c instanceof Clause.Equality) {
+            statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(name);
+            if (cinfo.isKeyspaceKey(name)) {
+              try {
+                context.addKeyspaceKey(name, c.firstValue());
+                setDirty();
+                // only add if it is a column too
+                add = statement.table.hasColumn(name);
+              } catch (ExcludedKeyspaceKeyException e) { // ignore and continue without clause
+                return this;
+              }
+            }
+            c.validate(statement.table);
+          } else if (c instanceof Clause.In) {
+            statement.table.validateKeyspaceKeyOrPrimaryKeyOrIndexColumn(name);
+            if (cinfo.isKeyspaceKey(name)) {
+              // verify all keyspace key values one after the other to validate all of them
+              final List<Object> values = new ArrayList<>(c.values());
+
+              for (final Iterator<?> i = values.iterator(); i.hasNext(); ) {
+                final Object v = i.next();
+
+                try {
+                  cinfo.validateKeyspaceKey(name, v);
+                } catch (ExcludedKeyspaceKeyException e) { // ignore this keyspace key and value from the list
+                  i.remove();
+                }
+              }
+              // keep track of all keyspace keys so we can generate all the underlying
+              // select statements later
+              if (statement.keyspaceKeys == null) {
+                statement.keyspaceKeys = new LinkedHashMap<>(6);
+              }
+              statement.keyspaceKeys.put(name, values);
+              setDirty();
+              // only add if it is a column too
+              add = statement.table.hasColumn(name);
+              if (add) {
+                // only validate if we are adding it, if not then we already validated
+                // them as keyspace values above
+                c.validate(statement.table);
+              }
+            } else {
+              c.validate(statement.table);
+            }
+          } else {
+            statement.table.validatePrimaryKeyOrIndexColumn(name);
+            c.validate(statement.table);
+          }
         }
         if (add) {
           clauses.add(c);
@@ -848,7 +972,7 @@ public class SelectImpl<T>
   /**
    * The <code>BuilderImpl</code> class defines an in-construction SELECT statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -995,7 +1119,7 @@ public class SelectImpl<T>
    * The <code>SelectionImpl</code> class defines a selection clause for an
    * in-construction SELECT statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation

@@ -2425,6 +2425,100 @@ public class TableInfoImpl<T> implements TableInfo<T> {
   }
 
   /**
+   * Validates if a column is defined as a collection data type by the
+   * POJO and its potential element value in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  value the element value to be validated for the collection
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not defined
+   *         by the POJO as a collection or if the specified value is not of the right
+   *         element type or is <code>null</code> when the column is mandatory
+   */
+  public void validateCollectionColumnAndValue(
+    CharSequence name, Object value
+  ) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        validateListColumnAndValue(n, value); // recurse to validate
+      }
+      return;
+    }
+    final String n = name.toString();
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    field.validateCollectionValue(value);
+  }
+
+  /**
+   * Validates if a column is defined as a collection data type by the
+   * POJO and its potential element value in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  values the element values to be validated for the list
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not
+   *         defined by the POJO as the collection or if any of the specified values
+   *         are not of the right element type or are <code>null</code> when the
+   *         column is mandatory
+   */
+  public void validateCollectionColumnAndValues(
+    CharSequence name, Iterable<?> values
+  ) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        validateCollectionColumnAndValues(n, values); // recurse to validate
+      }
+      return;
+    }
+    org.apache.commons.lang3.Validate.notNull(values, "invalid null list of values");
+    final String n = name.toString();
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    for (final Object value: values) {
+      field.validateCollectionValue(value);
+    }
+  }
+
+  /**
    * Validates if a column is defined as the given list data type by the
    * POJO and its potential element value in this table.
    *
@@ -2706,6 +2800,49 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     for (final Map.Entry<?, ?> e: mappings.entrySet()) {
       field.validateMapKeyValue(e.getKey(), e.getValue());
     }
+  }
+
+  /**
+   * Validates if a column is defined as a map by the POJO and its potential
+   * mapping key in this table.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to validate
+   * @param  key the mapping key to be validated for the map
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if the specified column is not defined
+   *         by the POJO as a map or if the specified key is not of
+   *         the right mapping types
+   */
+  public void validateMapColumnAndKey(CharSequence name, Object key) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    if (name instanceof Utils.CNameSequence) {
+      for (final String n: ((Utils.CNameSequence)name).getNames()) {
+        validateMapColumnAndKey(n, key); // recurse to validate
+      }
+      return;
+    }
+    final String n = name.toString();
+    final FieldInfoImpl<T> field = columns.get(n);
+
+    if (table != null) {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "pojo '%s' doesn't define column '%s' in table '%s'",
+        clazz.getSimpleName(),
+        n,
+        table.name()
+      );
+    } else {
+      org.apache.commons.lang3.Validate.isTrue(
+        field != null,
+        "udt '%s' doesn't define column '%s'",
+        clazz.getSimpleName(),
+        n
+      );
+    }
+    field.validateMapKey(key);
   }
 
   /**

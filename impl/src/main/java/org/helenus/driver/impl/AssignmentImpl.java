@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.helenus.driver.persistence.DataType;
  * {@link com.datastax.driver.core.querybuilder.Assignment} class to provide
  * support for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -78,6 +78,15 @@ public abstract class AssignmentImpl
   }
 
   /**
+   * Checks if this assignment is idempotent.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if it is idempotent; <code>false</code> otherwise
+   */
+  abstract boolean isIdempotent();
+
+  /**
    * Validates the assignment using the specified context.
    *
    * @author paouelle
@@ -93,7 +102,7 @@ public abstract class AssignmentImpl
    * at the time the assignment is added to the UPDATE statement initialized with
    * a POJO.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -264,6 +273,18 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return Utils.isIdempotent(value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.impl.AssignmentImpl#validate(org.helenus.driver.impl.TableInfoImpl)
      */
     @Override
@@ -420,6 +441,18 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return true; // this statement is never used towards Cassandra
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.impl.AssignmentImpl#validate(org.helenus.driver.impl.TableInfoImpl)
      */
     @Override
@@ -518,6 +551,18 @@ public abstract class AssignmentImpl
       return (List<AssignmentImpl>)(List)Arrays.asList(
         new SetAssignmentImpl(name, context.getColumnNonEncodedValue(table.getName(), name))
       );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl.SetAssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return true; // the value will be extracted from the pojo and that is idempotent by design
     }
 
     /**
@@ -655,7 +700,8 @@ public abstract class AssignmentImpl
    *
    * @since 1.0
    */
-  static class DelayedSetAllAssignmentImpl extends AssignmentImpl implements DelayedWithObject {
+  static class DelayedSetAllAssignmentImpl
+    extends AssignmentImpl implements DelayedWithObject {
     /**
      * Holds the POJO from which to get the non-primary column values or
      * <code>null</code> if this assignment is used as part of a POJO-based
@@ -729,6 +775,18 @@ public abstract class AssignmentImpl
         assignments.add(new SetAssignmentImpl(e.getKey(), e.getValue()));
       }
       return assignments;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return true; // the values will be extracted from the pojo and that is idempotent by design
     }
 
     /**
@@ -811,6 +869,18 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return false;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.impl.AssignmentImpl#validate(org.helenus.driver.impl.TableInfoImpl)
      */
     @Override
@@ -867,6 +937,18 @@ public abstract class AssignmentImpl
       Utils.appendList((List<?>)finfo.encodeValue(value), finfo.getDataType(), sb);
       sb.append("+");
       Utils.appendName(name, sb);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return false;
     }
 
     /**
@@ -944,6 +1026,18 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
      * @see org.helenus.driver.impl.AssignmentImpl#validate(org.helenus.driver.impl.TableInfoImpl)
      */
     @Override
@@ -988,6 +1082,40 @@ public abstract class AssignmentImpl
     private final boolean isAdd;
 
     /**
+     * Holds a flag indicating if this collection statement is idempotent.
+     *
+     * @author paouelle
+     */
+    private final boolean isIdempotent;
+
+    /**
+     * Instantiates a new <code>CollectionAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  ctype the non-<code>null</code> collection type
+     * @param  name the column name for this assignment
+     * @param  collection the elements to be appended or discarded
+     * @param  isAdd <code>true</code> if the elements are appended; <code>false</code>
+     *         if they should be discarded
+     * @param  isIdempotent whether this assignment is idempotent or not
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    CollectionAssignmentImpl(
+      DataType ctype,
+      CharSequence name,
+      Object collection,
+      boolean isAdd,
+      boolean isIdempotent
+    ) {
+      super(name);
+      this.ctype = ctype;
+      this.collection = collection;
+      this.isAdd = isAdd;
+      this.isIdempotent = isIdempotent;
+    }
+
+    /**
      * Instantiates a new <code>CollectionAssignmentImpl</code> object.
      *
      * @author paouelle
@@ -1000,12 +1128,12 @@ public abstract class AssignmentImpl
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
     CollectionAssignmentImpl(
-      DataType ctype, CharSequence name, Object collection, boolean isAdd
+      DataType ctype,
+      CharSequence name,
+      Object collection,
+      boolean isAdd
     ) {
-      super(name);
-      this.ctype = ctype;
-      this.collection = collection;
-      this.isAdd = isAdd;
+      this(ctype, name, collection, isAdd, true);
     }
 
     /**
@@ -1022,6 +1150,18 @@ public abstract class AssignmentImpl
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       Utils.appendCollection(finfo.encodeValue(collection), finfo.getDataType(), sb, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return isIdempotent;
     }
 
     /**
@@ -1113,6 +1253,18 @@ public abstract class AssignmentImpl
       // encodeElementValue, properly support MAP in to the definition.encodeElement()
       // --> Utils.appendValue(finfo.encodeValue(value), sb);
       Utils.appendValue(finfo.encodeElementValue(value), finfo.getDataType().getElementType(), sb);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return true;
     }
 
     /**

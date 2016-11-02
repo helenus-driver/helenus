@@ -254,6 +254,11 @@ public class CreateTypeImpl<T>
           and(c); // recurse to add the processed clause
         }
       } else {
+        org.apache.commons.lang3.Validate.isTrue(
+          clause instanceof Clause.Equality,
+          "unsupported class of clauses: %s",
+          clause.getClass().getName()
+        );
         final ClauseImpl c = (ClauseImpl)clause;
 
         if (c instanceof ClauseImpl.CompoundEqClauseImpl) {

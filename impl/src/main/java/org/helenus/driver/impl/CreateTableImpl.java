@@ -359,7 +359,7 @@ public class CreateTableImpl<T>
    * The <code>OptionsImpl</code> class defines the options of an CREATE
    * TABLE statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2016 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -485,19 +485,32 @@ public class CreateTableImpl<T>
         "unsupported clause '%s' for a CREATE TABLE statement",
         clause
       );
+      final ClassInfoImpl<T>.Context context = getContext();
+      final ClassInfoImpl<T> cinfo = context.getClassInfo();
+
       if (clause instanceof ClauseImpl.Delayed) {
-        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(statement.getContext().getClassInfo())) {
+        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(cinfo)) {
           and(c); // recurse to add the processed clause
         }
       } else {
-        final ClauseImpl c = (ClauseImpl)clause;
-
         org.apache.commons.lang3.Validate.isTrue(
           clause instanceof Clause.Equality,
           "unsupported class of clauses: %s",
           clause.getClass().getName()
         );
-        statement.getContext().addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
+        final ClauseImpl c = (ClauseImpl)clause;
+
+        if (c instanceof ClauseImpl.CompoundEqClauseImpl) {
+          final ClauseImpl.Compound cc = (ClauseImpl.Compound)c;
+          final List<String> names = cc.getColumnNames();
+          final List<?> values = cc.getColumnValues();
+
+          for (int i = 0; i < names.size(); i++) {
+            context.addKeyspaceKey(names.get(i), values.get(i));
+          }
+        } else {
+          context.addKeyspaceKey(c.getColumnName().toString(), c.firstValue());
+        }
         setDirty();
       }
       return this;

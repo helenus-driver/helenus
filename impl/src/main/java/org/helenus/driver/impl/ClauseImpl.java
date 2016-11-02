@@ -686,6 +686,226 @@ public abstract class ClauseImpl
   }
 
   /**
+   * The <code>ContainsClauseImpl</code> class defines the CONTAINS statement
+   * clause.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Oct 17, 2016 - paouelle - Creation
+   *
+   * @since 3.0
+   */
+  static class ContainsClauseImpl extends ClauseImpl {
+    /**
+     * Holds the value that must be contained.
+     *
+     * @author paouelle
+     */
+    private final Object value;
+
+    /**
+     * Instantiates a new <code>ContainsClauseImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column for this clause
+     * @param  value the value for this clause
+     * @throws NullPointerException if <code>name</code> or <code>value</code>
+     *         is <code>null</code>
+     */
+    ContainsClauseImpl(CharSequence name, Object value) {
+      super(name);
+      this.value = value;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     */
+    @Override
+    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+      Utils.appendName(name, sb).append(" CONTAINS ");
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
+
+      Utils.appendValue(finfo.encodeValue(value), finfo.getDataType().getElementType(), sb);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#firstValue()
+     */
+    @Override
+    Object firstValue() {
+      return value;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#values()
+     */
+    @Override
+    Collection<?> values() {
+      return Collections.singleton(value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#getOperation()
+     */
+    @Override
+    String getOperation() {
+      return "CONTAINS";
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#validate(org.helenus.driver.impl.TableInfoImpl)
+     */
+    @Override
+    <T> void validate(TableInfoImpl<T> table) {
+      table.validateCollectionColumnAndValue(name, value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation() + " " + value;
+    }
+  }
+
+  /**
+   * The <code>ContainsKeyClauseImpl</code> class defines the CONTAINS statement
+   * clause.
+   *
+   * @copyright 2015-2016 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Oct 17, 2016 - paouelle - Creation
+   *
+   * @since 3.0
+   */
+  static class ContainsKeyClauseImpl extends ClauseImpl {
+    /**
+     * Holds the key that must be contained.
+     *
+     * @author paouelle
+     */
+    private final Object key;
+
+    /**
+     * Instantiates a new <code>ContainsKeyClauseImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the name of the column for this clause
+     * @param  key the key for this clause
+     * @throws NullPointerException if <code>name</code> or <code>key</code>
+     *         is <code>null</code>
+     */
+    ContainsKeyClauseImpl(CharSequence name, Object key) {
+      super(name);
+      this.key = key;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     */
+    @Override
+    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+      Utils.appendName(name, sb).append(" CONTAINS KEY ");
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
+
+      Utils.appendValue(finfo.encodeValue(key), finfo.getDataType().getFirstArgumentType(), sb);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#firstValue()
+     */
+    @Override
+    Object firstValue() {
+      return key;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#values()
+     */
+    @Override
+    Collection<?> values() {
+      return Collections.singleton(key);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#getOperation()
+     */
+    @Override
+    String getOperation() {
+      return "CONTAINS KEY";
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.ClauseImpl#validate(org.helenus.driver.impl.TableInfoImpl)
+     */
+    @Override
+    <T> void validate(TableInfoImpl<T> table) {
+      table.validateMapColumnAndKey(name, key);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+      return name + " " + getOperation() + " " + key;
+    }
+  }
+
+  /**
    * The <code>CompoundClauseImpl</code> class defines a clause specifying a set
    * of columns, an operator, and a set of corresponding value.
    *

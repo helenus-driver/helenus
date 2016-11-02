@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import org.helenus.driver.persistence.CQLDataType;
  * The <code>AlterCreateTypeImpl</code> class defines a ALTER TYPE or CREATE TYPE
  * statement based on the current schema defined in Cassandra.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2016 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Apr 2, 2015 - paouelle - Creation

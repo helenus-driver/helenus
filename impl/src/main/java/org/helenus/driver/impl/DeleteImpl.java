@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -283,13 +284,13 @@ public class DeleteImpl<T>
       }
       // only pay attention if the referenced column name(s) is(are) defined in the table
       // as a primary key
-      if (table.hasPrimaryKey(clause.getColumnName())) {
+      final CharSequence name = clause.getColumnName();
+
+      if (table.hasPrimaryKey(name)) {
         clause.validate(table);
         // the IN relation is only supported for the last column of the partition key
         // or if it is for a multi-key
         if (clause instanceof ClauseImpl.InClauseImpl) {
-          final CharSequence name = clause.getColumnName();
-
           org.apache.commons.lang3.Validate.isTrue(
             table.isLastPartitionKey(name)
             || table.isMultiKey(name),
@@ -298,12 +299,12 @@ public class DeleteImpl<T>
             name
           );
         } else if (clause instanceof ClauseImpl.CompoundInClauseImpl) {
-          for (final String name: ((ClauseImpl.CompoundInClauseImpl)clause).getColumnNames()) {
+          for (final String cname: ((ClauseImpl.CompoundInClauseImpl)clause).getColumnNames()) {
             org.apache.commons.lang3.Validate.isTrue(
-              table.isLastPartitionKey(name) || table.isMultiKey(name),
+              table.isLastPartitionKey(cname) || table.isMultiKey(cname),
               "'IN' clause is only supported for the last column of the partition key "
               + "or for a multi-key in a DELETE statement: %s",
-              name
+              cname
             );
           }
         }
@@ -386,70 +387,68 @@ public class DeleteImpl<T>
         // and properly convert all case insensitive keys
         final List<Collection<ClauseImpl.EqClauseImpl>> sets = new ArrayList<>(multiKeys.size());
 
-        for (int i = 0; i < cs.size(); i++) {
-          final ClauseImpl c = cs.get(i);
+        for (final ListIterator<ClauseImpl> i = cs.listIterator(); i.hasNext(); ) {
+          final ClauseImpl c = i.next();
 
           if (c instanceof ClauseImpl.SimpleClauseImpl) {
             // if we have case insensitive keys then we need to process those first
             // and then address the multi keys combinations
             final String name = c.getColumnName().toString();
             final FieldInfoImpl<T> finfo = table.getColumnImpl(name);
-            final boolean ci = finfo.isCaseInsensitiveKey();
 
-            if (finfo.isMultiKey()) {
-              // remove the clause from the list as we will deal with a set of multi-keys
-              cs.remove(i);
-              i--; // move the index backward to continue at the right place on the next iteration
-              final List<ClauseImpl.EqClauseImpl> set = new ArrayList<>();
-              final String mkname = StatementImpl.MK_PREFIX + name;
+            if (finfo != null) {
+              final boolean ci = finfo.isCaseInsensitiveKey();
 
-              for (final Object v: c.values()) {
-                if (v instanceof Collection<?>) {
-                  for (final Object sv: (Collection<?>)v) {
-                    if (ci && (sv != null)) {
-                      set.add(new ClauseImpl.EqClauseImpl(
-                        mkname, StringUtils.lowerCase(sv.toString())
-                      ));
-                    } else {
-                      set.add(new ClauseImpl.EqClauseImpl(mkname, sv));
+              if (finfo.isMultiKey()) {
+                // remove the clause from the list as we will deal with a set of multi-keys
+                i.remove();
+                final List<ClauseImpl.EqClauseImpl> set = new ArrayList<>();
+                final String mkname = StatementImpl.MK_PREFIX + name;
+
+                for (final Object v: c.values()) {
+                  if (v instanceof Collection<?>) {
+                    for (final Object sv: (Collection<?>)v) {
+                      if (ci && (sv != null)) {
+                        set.add(new ClauseImpl.EqClauseImpl(
+                          mkname, StringUtils.lowerCase(sv.toString())
+                        ));
+                      } else {
+                        set.add(new ClauseImpl.EqClauseImpl(mkname, sv));
+                      }
                     }
+                  } else if (ci && (v != null)) {
+                    set.add(new ClauseImpl.EqClauseImpl(
+                      mkname, StringUtils.lowerCase(v.toString())
+                    ));
+                  } else {
+                    set.add(new ClauseImpl.EqClauseImpl(mkname, v));
                   }
-                } else if (ci && (v != null)) {
-                  set.add(new ClauseImpl.EqClauseImpl(
-                    mkname, StringUtils.lowerCase(v.toString())
-                  ));
-                } else {
-                  set.add(new ClauseImpl.EqClauseImpl(mkname, v));
                 }
-              }
-              if (!set.isEmpty()) {
-                sets.add(set);
-              }
-            } else if (ci) {
-              final Object v = c.firstValue();
+                if (!set.isEmpty()) {
+                  sets.add(set);
+                }
+              } else if (ci) {
+                final Object v = c.firstValue();
 
-              cs.set(
-                i, new ClauseImpl.SimpleClauseImpl(
+                i.set(new ClauseImpl.SimpleClauseImpl(
                   StatementImpl.CI_PREFIX + name,
                   c.getOperation(),
                   (v != null) ? StringUtils.lowerCase(v.toString()) : null
-                )
-              );
+                ));
+              }
             }
           } else if (c instanceof ClauseImpl.InClauseImpl) {
             final String name = c.getColumnName().toString();
             final FieldInfoImpl<T> finfo = table.getColumnImpl(name);
 
             // IN are not supported for multi-keys, so only need to handle case insensitive!
-            if (finfo.isCaseInsensitiveKey()) {
-              cs.set(
-                i, new ClauseImpl.InClauseImpl(
-                  StatementImpl.CI_PREFIX + name,
-                  c.values().stream()
-                    .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
-                    .collect(Collectors.toCollection(LinkedHashSet::new))
-                )
-              );
+            if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
+              i.set(new ClauseImpl.InClauseImpl(
+                StatementImpl.CI_PREFIX + name,
+                c.values().stream()
+                  .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
+                  .collect(Collectors.toCollection(LinkedHashSet::new))
+              ));
             }
           }
         }
@@ -852,7 +851,7 @@ public class DeleteImpl<T>
       for (final Map.Entry<String, Object> e: table.getFinalPrimaryKeyValues().entrySet()) {
         final String name = e.getKey();
 
-        // check if we already have a clause for that column
+        // check if we don't already have a clause for that column and add it if not
         if (!this.clauses.stream().anyMatch(c -> c.containsColumn(name))) {
           clauses.add(new ClauseImpl.EqClauseImpl(name, e.getValue()));
         }

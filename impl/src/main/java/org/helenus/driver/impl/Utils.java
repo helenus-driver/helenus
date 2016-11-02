@@ -42,10 +42,10 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import com.datastax.driver.core.TupleValue;
 import com.datastax.driver.core.UDTValue;
-import com.datastax.driver.core.querybuilder.BindMarker;
 import com.datastax.driver.core.utils.Bytes;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
+import org.helenus.driver.BindMarker;
 import org.helenus.driver.Keywords;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.info.ClassInfo;
@@ -233,6 +233,28 @@ public abstract class Utils {
     if ((value instanceof Number)
         && !((value instanceof BigInteger) || (value instanceof BigDecimal))) {
       return false;
+    }
+    return true;
+  }
+
+  public static boolean isIdempotent(Object value) {
+    if (value == null) {
+      return true;
+    } else if (value instanceof AssignmentImpl) {
+      return ((AssignmentImpl)value).isIdempotent();
+    } else if (value instanceof FCall) {
+      return false;
+    } else if (value instanceof RawString) {
+      return false;
+    } else if (value instanceof Collection) {
+      return ((Collection<?>)value).stream()
+        .allMatch(v -> Utils.isIdempotent(v));
+    } else if (value instanceof Map) {
+      return ((Map<?, ?>)value).entrySet().stream()
+        .allMatch(e -> Utils.isIdempotent(e.getKey()) && Utils.isIdempotent(e.getValue()));
+    } else if (value instanceof ClauseImpl) {
+      return ((ClauseImpl)value).values().stream()
+        .allMatch(v -> Utils.isIdempotent(v));
     }
     return true;
   }
@@ -825,6 +847,21 @@ public abstract class Utils {
     @Override
     public String toString() {
       return String.format("%s AS %s", column, alias);
+    }
+  }
+
+  static class Cast {
+    private final Object column;
+    private final DataType targetType;
+
+    Cast(Object column, DataType targetType) {
+      this.column = column;
+      this.targetType = targetType;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("CAST(%s AS %s)", column, targetType);
     }
   }
 }

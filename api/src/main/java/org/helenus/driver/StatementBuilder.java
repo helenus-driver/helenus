@@ -35,6 +35,7 @@ import com.datastax.driver.core.Row;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.Column;
+import org.helenus.driver.persistence.DataType;
 
 /**
  * The <code>StatementBuilder</code> class extends the functionality of Cassandra's
@@ -1156,12 +1157,12 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  columnName the column name to quote.
+   * @param  name the column name to quote.
    * @return the quoted column name.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  public static CharSequence quote(String columnName) {
-    return StatementManager.getManager().quote(columnName);
+  public static CharSequence quote(String name) {
+    return StatementManager.getManager().quote(name);
   }
 
   /**
@@ -1169,12 +1170,12 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  columnName the column name to take the token of.
-   * @return {@code "token(" + columnName + ")"}.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @param  name the column name to take the token of.
+   * @return {@code "token(" + name + ")"}.
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  public static CharSequence token(String columnName) {
-    return StatementManager.getManager().token(columnName);
+  public static CharSequence token(String name) {
+    return StatementManager.getManager().token(name);
   }
 
   /**
@@ -1184,12 +1185,12 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  columnNames the column names to take the token of.
+   * @param  names the column names to take the token of.
    * @return a string representing the token of the provided column names.
    * @throws NullPointerException if any of the column names are <code>null</code>
    */
-  public static CharSequence token(String... columnNames) {
-    return StatementManager.getManager().token(columnNames);
+  public static CharSequence token(String... names) {
+    return StatementManager.getManager().token(names);
   }
 
   /**
@@ -1290,7 +1291,7 @@ public final class StatementBuilder {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where equality clause
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   public static Clause.Equality eq(CharSequence name, Object value) {
     return StatementManager.getManager().eq(name, value);
@@ -1301,8 +1302,6 @@ public final class StatementBuilder {
    * <p>
    * For instance, {@code eq(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
    * will generate the CQL WHERE clause {@code (a, b) = (2, 'test') }.
-   * <p>
-   * Please note that this variant is only supported starting with Cassandra 2.0.6.
    *
    * @author paouelle
    *
@@ -1315,6 +1314,21 @@ public final class StatementBuilder {
    */
   public static Clause.Equality eq(List<String> names, List<?> values) {
     return StatementManager.getManager().eq(names, values);
+  }
+
+  /**
+   * Creates a "like" where clause stating the provided column must be like
+   * the provided value.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  value the value
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   */
+  public static Clause like(CharSequence name, Object value) {
+    return StatementManager.getManager().like(name, value);
   }
 
   /**
@@ -1407,6 +1421,38 @@ public final class StatementBuilder {
   }
 
   /**
+   * Creates a "contains" where clause stating the provided column must contain
+   * the value provided.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  value the value
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>name</code> or <code>value</code> is
+   *         <code>null</code>
+   */
+  public static Clause contains(CharSequence name, Object value) {
+    return StatementManager.getManager().contains(name, value);
+  }
+
+  /**
+   * Creates a "contains key" where clause stating the provided column must contain
+   * the key provided.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  key the key
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>name</code> or <code>key</code> is
+   *         <code>null</code>
+   */
+  public static Clause containsKey(CharSequence name, Object key) {
+    return StatementManager.getManager().containsKey(name, key);
+  }
+
+  /**
    * Creates a "lesser than" where clause stating the provided column must be
    * less than the provided value.
    *
@@ -1415,10 +1461,29 @@ public final class StatementBuilder {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   public static Clause lt(CharSequence name, Object value) {
     return StatementManager.getManager().lt(name, value);
+  }
+
+  /**
+   * Creates a "lesser than" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code lt(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &lt; (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  public static Clause lt(List<String> names, List<?> values) {
+    return StatementManager.getManager().lt(names, values);
   }
 
   /**
@@ -1430,10 +1495,29 @@ public final class StatementBuilder {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   public static Clause lte(CharSequence name, Object value) {
     return StatementManager.getManager().lte(name, value);
+  }
+
+  /**
+   * Creates a "lesser than or equal" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code lte(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &lt;= (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  public static Clause lte(List<String> names, List<?> values) {
+    return StatementManager.getManager().lte(names, values);
   }
 
   /**
@@ -1445,10 +1529,29 @@ public final class StatementBuilder {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   public static Clause gt(CharSequence name, Object value) {
     return StatementManager.getManager().gt(name, value);
+  }
+
+  /**
+   * Creates a "greater than" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code gt(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &gt; (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  public static Clause gt(List<String> names, List<?> values) {
+    return StatementManager.getManager().gt(names, values);
   }
 
   /**
@@ -1460,10 +1563,29 @@ public final class StatementBuilder {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   public static Clause gte(CharSequence name, Object value) {
     return StatementManager.getManager().gte(name, value);
+  }
+
+  /**
+   * Creates a "greater than or equal" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code gte(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &gt;= (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  public static Clause gte(List<String> names, List<?> values) {
+    return StatementManager.getManager().gte(names, values);
   }
 
   /**
@@ -1471,12 +1593,12 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  columnName the column name
+   * @param  name the column name
    * @return the corresponding ordering
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  public static Ordering asc(CharSequence columnName) {
-    return StatementManager.getManager().asc(columnName);
+  public static Ordering asc(CharSequence name) {
+    return StatementManager.getManager().asc(name);
   }
 
   /**
@@ -1484,12 +1606,12 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  columnName the column name
+   * @param  name the column name
    * @return the corresponding ordering
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  public static Ordering desc(CharSequence columnName) {
-    return StatementManager.getManager().desc(columnName);
+  public static Ordering desc(CharSequence name) {
+    return StatementManager.getManager().desc(name);
   }
 
   /**
@@ -2101,6 +2223,43 @@ public final class StatementBuilder {
    */
   public static Object fcall(String name, Object... parameters) {
     return StatementManager.getManager().fcall(name, parameters);
+  }
+
+  /**
+   * Creates a cast of a column using the given data type.
+   *
+   * @author paouelle
+   *
+   * @param  column the column to cast
+   * @param  dataType the data type to cast to
+   * @return the casted column
+   * @throws NullPointerException if <code>column</code> or <code>dataType</code>
+   *         is <code>null</code>
+   */
+  public static Object cast(Object column, DataType dataType) {
+    return StatementManager.getManager().cast(column, dataType);
+  }
+
+  /**
+   * Creates a {@code now()} function call.
+   *
+   * @author paouelle
+   *
+   * @return the function call
+   */
+  public static Object now() {
+    return StatementManager.getManager().now();
+  }
+
+  /**
+   * Creates a {@code uuid()} function call.
+   *
+   * @author paouelle
+   *
+   * @return the function call
+   */
+  public static Object uuid() {
+    return StatementManager.getManager().uuid();
   }
 
   /**

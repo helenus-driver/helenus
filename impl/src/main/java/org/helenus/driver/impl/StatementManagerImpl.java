@@ -1057,9 +1057,9 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#quote(java.lang.String)
    */
   @Override
-  protected CharSequence quote(String columnName) {
-    org.apache.commons.lang3.Validate.notNull(columnName, "invalid null column name");
-    return Metadata.quote(columnName);
+  protected CharSequence quote(String name) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    return Metadata.quote(name);
   }
 
   /**
@@ -1070,14 +1070,14 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#token(java.lang.String)
    */
   @Override
-  protected CharSequence token(String columnName) {
-    org.apache.commons.lang3.Validate.notNull(columnName, "invalid null column name");
-    final StringBuilder sb = new StringBuilder(columnName.length() + 7);
+  protected CharSequence token(String name) {
+    org.apache.commons.lang3.Validate.notNull(name, "invalid null column name");
+    final StringBuilder sb = new StringBuilder(name.length() + 7);
 
     sb.append("token(");
-    Utils.appendName(columnName, sb);
+    Utils.appendName(name, sb);
     sb.append(")");
-    return new CNameSequence(sb.toString(), columnName);
+    return new CNameSequence(sb.toString(), name);
   }
 
   /**
@@ -1088,13 +1088,13 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#token(java.lang.String[])
    */
   @Override
-  protected CharSequence token(String... columnNames) {
+  protected CharSequence token(String... names) {
     final StringBuilder sb = new StringBuilder();
 
     sb.append("token(");
-    Utils.joinAndAppendNames(sb, ",", Arrays.asList((Object[])columnNames));
+    Utils.joinAndAppendNames(sb, ",", Arrays.asList((Object[])names));
     sb.append(")");
-    return new CNameSequence(sb.toString(), columnNames);
+    return new CNameSequence(sb.toString(), names);
   }
 
   /**
@@ -1198,6 +1198,18 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#like(java.lang.CharSequence, java.lang.Object)
+   */
+  @Override
+  protected Clause like(CharSequence name, Object value) {
+    return new ClauseImpl.SimpleClauseImpl(name, "LIKE", value);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#in(java.lang.CharSequence, java.lang.Object[])
    */
   @Override
@@ -1260,11 +1272,47 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#contains(java.lang.CharSequence, java.lang.Object)
+   */
+  @Override
+  protected Clause contains(CharSequence name, Object value) {
+    return new ClauseImpl.ContainsClauseImpl(name, value);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#containsKey(java.lang.CharSequence, java.lang.Object)
+   */
+  @Override
+  protected Clause containsKey(CharSequence name, Object key) {
+    return new ClauseImpl.ContainsKeyClauseImpl(name, key);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#lt(java.lang.CharSequence, java.lang.Object)
    */
   @Override
   protected Clause lt(CharSequence name, Object value) {
     return new ClauseImpl.SimpleClauseImpl(name, "<", value);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#lt(java.util.List, java.util.List)
+   */
+  @Override
+  protected Clause lt(List<String> names, List<?> values) {
+    return new ClauseImpl.CompoundClauseImpl(names, "<", values);
   }
 
   /**
@@ -1284,11 +1332,35 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#lt(java.util.List, java.util.List)
+   */
+  @Override
+  protected Clause lte(List<String> names, List<?> values) {
+    return new ClauseImpl.CompoundClauseImpl(names, "<=", values);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#gt(java.lang.CharSequence, java.lang.Object)
    */
   @Override
   protected Clause gt(CharSequence name, Object value) {
     return new ClauseImpl.SimpleClauseImpl(name, ">", value);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#lt(java.util.List, java.util.List)
+   */
+  @Override
+  protected Clause gt(List<String> names, List<?> values) {
+    return new ClauseImpl.CompoundClauseImpl(names, ">", values);
   }
 
   /**
@@ -1308,11 +1380,23 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#lt(java.util.List, java.util.List)
+   */
+  @Override
+  protected Clause gte(List<String> names, List<?> values) {
+    return new ClauseImpl.CompoundClauseImpl(names, ">=", values);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#asc(java.lang.CharSequence)
    */
   @Override
-  protected Ordering asc(CharSequence columnName) {
-    return new OrderingImpl(columnName, false);
+  protected Ordering asc(CharSequence name) {
+    return new OrderingImpl(name, false);
   }
 
   /**
@@ -1323,8 +1407,8 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#desc(java.lang.CharSequence)
    */
   @Override
-  protected Ordering desc(CharSequence columnName) {
-    return new OrderingImpl(columnName, true);
+  protected Ordering desc(CharSequence name) {
+    return new OrderingImpl(name, true);
   }
 
   /**
@@ -1523,12 +1607,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Assignment append(CharSequence name, Object value) {
-    return new AssignmentImpl.CollectionAssignmentImpl(
-      DataType.LIST,
-      name,
-      Collections.singletonList(value),
-      true
-    );
+    return appendAll(name, Collections.singletonList(value));
   }
 
   /**
@@ -1540,7 +1619,9 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Assignment appendAll(CharSequence name, List<?> values) {
-    return new AssignmentImpl.CollectionAssignmentImpl(DataType.LIST, name, values, true);
+    return new AssignmentImpl.CollectionAssignmentImpl(
+      DataType.LIST, name, values, true, false
+    );
   }
 
   /**
@@ -1552,12 +1633,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Assignment discard(CharSequence name, Object value) {
-    return new AssignmentImpl.CollectionAssignmentImpl(
-      DataType.LIST,
-      name,
-      Collections.singletonList(value),
-      false
-    );
+    return discardAll(name, Collections.singletonList(value));
   }
 
   /**
@@ -1598,12 +1674,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Assignment add(CharSequence name, Object value) {
-    return new AssignmentImpl.CollectionAssignmentImpl(
-      DataType.SET,
-      name,
-      Collections.singleton(value),
-      true
-    );
+    return addAll(name, Collections.singleton(value));
   }
 
   /**
@@ -1627,12 +1698,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Assignment remove(CharSequence name, Object value) {
-    return new AssignmentImpl.CollectionAssignmentImpl(
-      DataType.SET,
-      name,
-      Collections.singleton(value),
-      false
-    );
+    return removeAll(name, Collections.singleton(value));
   }
 
   /**
@@ -1719,6 +1785,42 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   protected Object fcall(String name, Object... parameters) {
     return new Utils.FCall(name, parameters);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#cast(java.lang.Object, org.helenus.driver.persistence.DataType)
+   */
+  @Override
+  protected Object cast(Object column, DataType dataType) {
+    return new Utils.Cast(column, dataType);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#now()
+   */
+  @Override
+  protected Object now() {
+    return new Utils.FCall("now");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#uuid()
+   */
+  @Override
+  protected Object uuid() {
+    return new Utils.FCall("uuid");
   }
 
   /**

@@ -16,10 +16,17 @@
 package org.helenus.driver;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.ExecutionInfo;
+import com.datastax.driver.core.PagingState;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
+import com.datastax.driver.core.SocketOptions;
+import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.TimestampGenerator;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.PagingStateException;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.datastax.driver.core.policies.RetryPolicy;
@@ -320,6 +327,132 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *         fetch size will be used.
    */
   public int getFetchSize();
+
+  /**
+   * Sets the default timestamp for this statement (in microseconds since the epoch).
+   * <p>
+   * The actual timestamp that will be used for this statement is, in order of
+   * preference:
+   * <ul>
+   *   <li>the timestamp specified directly in the CQL query string (using the
+   *       {@code USING TIMESTAMP} syntax);</li>
+   *   <li>the timestamp specified through this method, if different from
+   *       {@link Long#MIN_VALUE};</li>
+   *   <li>the timestamp returned by the {@link TimestampGenerator} currently in use,
+   *       if different from {@link Long#MIN_VALUE}.</li>
+   * </ul>
+   * If none of these apply, no timestamp will be sent with the query and Cassandra
+   * will generate a server-side one (similar to the pre-V3 behavior).
+   *
+   * @author paouelle
+   *
+   * @param  defaultTimestamp the default timestamp for this query (must be strictly
+   *         positive)
+   * @return this {@code GenericStatement} object
+   *
+   * @see Cluster.Builder#withTimestampGenerator(TimestampGenerator)
+   */
+  @SuppressWarnings("javadoc")
+  public GenericStatement<R, F> setDefaultTimestamp(long defaultTimestamp);
+
+  /**
+   * Gets the default timestamp for this statement.
+   *
+   * @author paouelle
+   *
+   * @return the default timestamp (in microseconds since the epoch)
+   */
+  public long getDefaultTimestamp();
+
+  /**
+   * Overrides the default per-host read timeout ({@link SocketOptions#getReadTimeoutMillis()})
+   * for this statement.
+   * <p>
+   * You should override this only for statements for which the coordinator may
+   * allow a longer server-side timeout (for example aggregation queries).
+   *
+   * @author paouelle
+   *
+   * @param  readTimeoutMillis the timeout to set. Negative values are not allowed.
+   *         If it is 0, the read timeout will be disabled for this statement
+   * @return this {@code GenericStatement} object
+   */
+  public GenericStatement<R, F> setReadTimeoutMillis(int readTimeoutMillis);
+
+  /**
+   * Gets the per-host read timeout that was set for this statement.
+   *
+   * @author paouelle
+   *
+   * @return the timeout. Note that a negative value means that the default
+   *         {@link SocketOptions#getReadTimeoutMillis()} will be used
+   */
+  public int getReadTimeoutMillis();
+
+  /**
+   * Sets the paging state.
+   * <p>
+   * This will cause the next execution of this statement to fetch results from
+   * a given page, rather than restarting from the beginning.
+   * <p>
+   * You get the paging state from a previous execution of the statement (see
+   * {@link ExecutionInfo#getPagingState()}. This is typically used to iterate
+   * in a "stateless" manner (e.g. across HTTP requests):
+   * <pre>
+   *   final GenericStatement st = new SimpleStatement("your query");
+   *   final ResultSet rs = session.execute(st.setFetchSize(20));
+   *   final int available = rs.getAvailableWithoutFetching();
+   *
+   *   for (int i = 0; i < available; i++) {
+   *     Row row = rs.one();
+   *     // Do something with row (e.g. display it to the user...)
+   *   }
+   *   // Get state and serialize as string or byte[] to store it for the next execution
+   *   // (e.g. pass it as a parameter in the "next page" URI)
+   *   final PagingState pagingState = rs.getExecutionInfo().getPagingState();
+   *   final String savedState = pagingState.toString();
+   *
+   *   // Next execution:
+   *   // Get serialized state back (e.g. get URI parameter)
+   *   final String savedState = ...
+   *   final GenericStatement st = new SimpleStatement("your query");
+   *
+   *   st.setPagingState(PagingState.fromString(savedState));
+   *   final ResultSet rs = session.execute(st.setFetchSize(20));
+   *   final int available = rs.getAvailableWithoutFetching();
+   *
+   *   for (int i = 0; i < available; i++) {
+   *     ...
+   *   }
+   * }
+   * </pre>
+   * <p>
+   * The paging state can only be reused between perfectly identical statements
+   * (same query string, same bound parameters). Altering the contents of the
+   * paging state or trying to set it on a different statement will cause this
+   * method to fail.
+   * <p>
+   * Note that, due to internal implementation details, the paging state is not
+   * portable across native protocol versions (see the
+   * <a href="http://datastax.github.io/java-driver/features/native_protocol">online documentation</a>
+   * for more explanations about the native protocol). This means that
+   * {@code PagingState} instances generated with an old version won't work with
+   * a higher version. If that is a problem for you, consider using the "unsafe"
+   * API (see {@link #setPagingStateUnsafe(byte[])}).
+   *
+   * @author paouelle
+   *
+   * @param pagingState the paging state to set, or {@code null} to remove any state that was
+   *        previously set on this statement.
+   * @param codecRegistry the codec registry that will be used if this method needs to serialize the
+   *                      statement's values in order to check that the paging state matches.
+   * @return this {@code GenericStatement} object
+   * @throws PagingStateException if the paging state does not match this
+   *         statement
+   *
+   * @see #setPagingState(PagingState)
+   */
+  public Statement setPagingState(PagingState pagingState, CodecRegistry codecRegistry);
 
   /**
    * Gets user-defined data attached to this statement.

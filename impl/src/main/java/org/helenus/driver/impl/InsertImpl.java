@@ -258,9 +258,10 @@ public class InsertImpl<T>
 
       for (final FieldInfoImpl<T> finfo: multiKeys) {
         final Pair<Object, CQLDataType> pset = columns.get(finfo.getColumnName());
-        final boolean ci = finfo.isCaseInsensitiveKey();
 
         if (pset != null) {
+          final boolean ci = finfo.isCaseInsensitiveKey();
+
           if (ci) {
             sets[++j] = ((Collection<Object>)pset.getLeft()).stream()
               .map(v -> (v != null) ? StringUtils.lowerCase(v.toString()) : null)
@@ -433,7 +434,6 @@ public class InsertImpl<T>
         // where the entry "[applied]" is a boolean indicating if the insert was
         // successful and the rest are all the conditional values specified in
         // the INSERT request
-
         // check if the condition was successful
         final Row row = result.one();
 
@@ -709,7 +709,6 @@ public class InsertImpl<T>
     protected int simpleSize() {
       return getContext().getClassInfo().getNumTables(); // don't know more yet!!!
     }
-
 
     /**
      * {@inheritDoc}

@@ -1624,6 +1624,19 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
+   * Validate the provided element value for this collection field.
+   *
+   * @author paouelle
+   *
+   * @param  value the element value to be validated
+   * @throws IllegalArgumentException if the specified value is not of the
+   *         right type or is <code>null</code> when the column is mandatory
+   */
+  public void validateCollectionValue(Object value) {
+    validateCollectionValue(definition.getMainType(), value);
+  }
+
+  /**
    * Validate the provided value for this list field.
    *
    * @author paouelle

@@ -33,6 +33,7 @@ import com.datastax.driver.core.Session;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.Column;
+import org.helenus.driver.persistence.DataType;
 
 /**
  * The <code>StatementManager</code> abstract class is used to maintain and
@@ -911,22 +912,22 @@ public abstract class StatementManager {
    *
    * @author paouelle
    *
-   * @param  columnName the column name to quote.
+   * @param  name the column name to quote.
    * @return the quoted column name.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  protected abstract CharSequence quote(String columnName);
+  protected abstract CharSequence quote(String name);
 
   /**
    * The token of a column name.
    *
    * @author paouelle
    *
-   * @param  columnName the column name to take the token of.
-   * @return {@code "token(" + columnName + ")"}.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @param  name the column name to take the token of.
+   * @return {@code "token(" + name + ")"}.
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  protected abstract CharSequence token(String columnName);
+  protected abstract CharSequence token(String name);
 
   /**
    * The token of column names.
@@ -935,11 +936,11 @@ public abstract class StatementManager {
    *
    * @author paouelle
    *
-   * @param  columnNames the column names to take the token of.
+   * @param  names the column names to take the token of.
    * @return a string representing the token of the provided column names.
    * @throws NullPointerException if any of the column names are <code>null</code>
    */
-  protected abstract CharSequence token(String... columnNames);
+  protected abstract CharSequence token(String... names);
 
   /**
    * Creates a set of "equal" where clause stating all keyspace keys must be
@@ -1027,7 +1028,7 @@ public abstract class StatementManager {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where equality clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Clause.Equality eq(CharSequence name, Object value);
 
@@ -1036,8 +1037,6 @@ public abstract class StatementManager {
    * <p>
    * For instance, {@code eq(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
    * will generate the CQL WHERE clause {@code (a, b) = (2, 'test') }.
-   * <p>
-   * Please note that this variant is only supported starting with Cassandra 2.0.6.
    *
    * @author paouelle
    *
@@ -1049,6 +1048,19 @@ public abstract class StatementManager {
    * @throws IllegalArgumentException if {@code names.size() != values.size()}
    */
   protected abstract Clause.Equality eq(List<String> names, List<?> values);
+
+  /**
+   * Creates a "like" where clause stating the provided column must be like
+   * to the provided value.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  value the value
+   * @return the corresponding where clause.
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   */
+  protected abstract Clause like(CharSequence name, Object value);
 
   /**
    * Create an "in" where clause stating the provided column must be equal to
@@ -1132,6 +1144,34 @@ public abstract class StatementManager {
   protected abstract Clause.In in(CharSequence name, int from, int to);
 
   /**
+   * Creates a "contains" where clause stating the provided column must contain
+   * the value provided.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  value the value
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>name</code> or <code>value</code> is
+   *         <code>null</code>
+   */
+  protected abstract Clause contains(CharSequence name, Object value);
+
+  /**
+   * Creates a "contains key" where clause stating the provided column must contain
+   * the key provided.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name
+   * @param  key the key
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>name</code> or <code>key</code> is
+   *         <code>null</code>
+   */
+  protected abstract Clause containsKey(CharSequence name, Object key);
+
+  /**
    * Creates a "lesser than" where clause stating the provided column must be
    * less than the provided value.
    *
@@ -1140,9 +1180,26 @@ public abstract class StatementManager {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Clause lt(CharSequence name, Object value);
+
+  /**
+   * Creates a "lesser than" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code lt(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &lt; (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  protected abstract Clause lt(List<String> names, List<?> values);
 
   /**
    * Creates a "lesser than or equal" where clause stating the provided column
@@ -1153,9 +1210,26 @@ public abstract class StatementManager {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Clause lte(CharSequence name, Object value);
+
+  /**
+   * Creates a "lesser than or equal" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code lte(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &lt;= (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  protected abstract Clause lte(List<String> names, List<?> values);
 
   /**
    * Creates a "greater than" where clause stating the provided column must be
@@ -1166,9 +1240,26 @@ public abstract class StatementManager {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Clause gt(CharSequence name, Object value);
+
+  /**
+   * Creates a "greater than" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code gt(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &gt; (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  protected abstract Clause gt(List<String> names, List<?> values);
 
   /**
    * Creates a "greater than or equal" where clause stating the provided column
@@ -1179,31 +1270,48 @@ public abstract class StatementManager {
    * @param  name the column name
    * @param  value the value
    * @return the corresponding where clause.
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Clause gte(CharSequence name, Object value);
+
+  /**
+   * Creates a "greater than or equal" where clause for a group of clustering columns.
+   * <p>
+   * For instance, {@code gte(Arrays.asList("a", "b"), Arrays.asList(2, "test"))}
+   * will generate the CQL WHERE clause {@code (a, b) &gt;= (2, 'test') }.
+   *
+   * @author paouelle
+   *
+   * @param  names the column names
+   * @param  values the values
+   * @return the corresponding where clause
+   * @throws NullPointerException if <code>names</code> or <code>values</code>
+   *         is <code>null</code>
+   * @throws IllegalArgumentException if {@code names.size() != values.size()}
+   */
+  protected abstract Clause gte(List<String> names, List<?> values);
 
   /**
    * Ascending ordering for the provided column.
    *
    * @author paouelle
    *
-   * @param  columnName the column name
+   * @param  name the column name
    * @return the corresponding ordering
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  protected abstract Ordering asc(CharSequence columnName);
+  protected abstract Ordering asc(CharSequence name);
 
   /**
    * Descending ordering for the provided column.
    *
    * @author paouelle
    *
-   * @param  columnName the column name
+   * @param  name the column name
    * @return the corresponding ordering
-   * @throws NullPointerException if <code>columnName</code> is <code>null</code>
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
-  protected abstract Ordering desc(CharSequence columnName);
+  protected abstract Ordering desc(CharSequence name);
 
   /**
    * Option to set the timestamp for a modification statement (insert, update or
@@ -1670,6 +1778,37 @@ public abstract class StatementManager {
    * @throws NullPointerException if <code>name</code> is <code>null</code>
    */
   protected abstract Object fcall(String name, Object... parameters);
+
+  /**
+   * Creates a cast of a column using the given data type.
+   *
+   * @author paouelle
+   *
+   * @param  column the column to cast
+   * @param  dataType the data type to cast to
+   * @return the casted column
+   * @throws NullPointerException if <code>column</code> or <code>dataType</code>
+   *         is <code>null</code>
+   */
+  protected abstract Object cast(Object column, DataType dataType);
+
+  /**
+   * Creates a {@code now()} function call.
+   *
+   * @author paouelle
+   *
+   * @return the function call
+   */
+  protected abstract Object now();
+
+  /**
+   * Creates a {@code uuid()} function call.
+   *
+   * @author paouelle
+   *
+   * @return the function call
+   */
+  protected abstract Object uuid();
 
   /**
    * Declares that the name in argument should be treated as a column name.
