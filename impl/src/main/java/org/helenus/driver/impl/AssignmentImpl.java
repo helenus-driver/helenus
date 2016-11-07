@@ -1182,7 +1182,9 @@ public abstract class AssignmentImpl
             && ((finfo.getDataType().getMainType() == DataType.MAP)
                 || (finfo.getDataType().getMainType() == DataType.SORTED_MAP))) {
           table.validateMapColumnAndKeys(name, (Iterable<?>)collection);
-        } else if ((ctype == DataType.SET) || (ctype == DataType.ORDERED_SET)) {
+        } else if ((ctype == DataType.SET)
+                   || (ctype == DataType.ORDERED_SET)
+                   || (ctype == DataType.SORTED_SET)) {
           table.validateSetColumnAndValues(name, (Iterable<?>)collection);
         } else { // must be a list
           table.validateListColumnAndValues(name, (Iterable<?>)collection);

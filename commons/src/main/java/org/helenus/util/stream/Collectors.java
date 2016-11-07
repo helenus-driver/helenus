@@ -18,7 +18,6 @@ package org.helenus.util.stream;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
@@ -159,7 +158,7 @@ public class Collectors {
    *
    * @see #toTreeMap(Function, Function, BinaryOperator)
    */
-  public static <T, K, U> Collector<T, ?, SortedMap<K, U>> toTreeMap(
+  public static <T, K, U> Collector<T, ?, TreeMap<K, U>> toTreeMap(
     Function<? super T, ? extends K> keyMapper,
     Function<? super T, ? extends U> valueMapper
   ) {
@@ -199,7 +198,7 @@ public class Collectors {
    *
    * @see #toTreeMap(Function, Function)
    */
-  public static <T, K, U> Collector<T, ?, SortedMap<K, U>> toTreeMap(
+  public static <T, K, U> Collector<T, ?, TreeMap<K, U>> toTreeMap(
     Function<? super T, ? extends K> keyMapper,
     Function<? super T, ? extends U> valueMapper,
     BinaryOperator<U> mergeFunction

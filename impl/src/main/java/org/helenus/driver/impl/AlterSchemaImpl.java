@@ -15,7 +15,6 @@
  */
 package org.helenus.driver.impl;
 
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -192,19 +191,20 @@ public class AlterSchemaImpl<T>
       );
       yseq.add(at);
     }
-    // finish with initial objects
-    final Collection<T> objs = getContext().getInitialObjects();
-
-    if (!objs.isEmpty()) {
-      for (final T io: objs) {
-        group.add(init(new InsertImpl<>(
-          getContext().getClassInfo().newContext(io),
-          (String[])null,
-          mgr,
-          bridge
-        )));
-      }
-    }
+    // we do not do initial objects when altering since that can potentially override changes done to the DB since schema was created
+//    // finish with initial objects
+//    final Collection<T> objs = getContext().getInitialObjects();
+//
+//    if (!objs.isEmpty()) {
+//      for (final T io: objs) {
+//        group.add(init(new InsertImpl<>(
+//          getContext().getClassInfo().newContext(io),
+//          (String[])null,
+//          mgr,
+//          bridge
+//        )));
+//      }
+//    }
   }
 
   /**

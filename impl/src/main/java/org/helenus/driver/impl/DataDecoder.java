@@ -32,7 +32,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -910,6 +912,69 @@ public abstract class DataDecoder<V> {
           // get the element type from the row's metadata
           uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
           uval.isNull(name) ? null : uval.getList(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+    };
+  }
+
+  /**
+   * Gets a "set" to {@link SortedSet} decoder based on the given element class.
+   *
+   * @author paouelle
+   *
+   * @param  eclazz the non-<code>null</code> class of elements
+   * @param  mandatory if the field associated with the decoder is mandatory or
+   *         represents a primary key
+   * @return the non-<code>null</code> decoder for sets of the specified element
+   *         class
+   */
+  @SuppressWarnings("rawtypes")
+  public final static DataDecoder<SortedSet> sortedSet(
+    final Class<?> eclazz, final boolean mandatory
+  ) {
+    return new DataDecoder<SortedSet>(SortedSet.class) {
+      @SuppressWarnings("unchecked")
+      private SortedSet decodeImpl(Class<?> etype, Set<Object> set) {
+        if (set == null) {
+          // safe to return as is unless mandatory, that is because Cassandra
+          // returns null for empty lists and the schema definition requires
+          // that mandatory and primary keys be non null
+          if (mandatory) {
+            return new TreeSet();
+          }
+          return null;
+        }
+        final SortedSet nset = new TreeSet();
+
+        if (eclazz.isAssignableFrom(etype)) {
+          // we only need to store elements to make sure set is modifiable
+          nset.addAll(set);
+        } else {
+          // will need to do some conversion of each element
+          final ElementConverter converter = ElementConverter.getConverter(eclazz, etype);
+
+          for (final Object o: set) {
+            nset.add((o != null) ? converter.convert(o) : null);
+          }
+        }
+        return nset;
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected SortedSet decodeImpl(Row row, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          row.isNull(name) ? null : row.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+        );
+      }
+      @SuppressWarnings("unchecked")
+      @Override
+      protected SortedSet decodeImpl(UDTValue uval, String name, Class clazz) {
+        return decodeImpl(
+          // get the element type from the row's metadata
+          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
+          uval.isNull(name) ? null : uval.getSet(name, Object.class) // keeps things generic so we can handle our own errors
         );
       }
     };
