@@ -1106,7 +1106,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Gets a registered getter for the specified class or one of its base class.
+   * Gets a registered setter for the specified class or one of its base class.
    *
    * @author paouelle
    *
