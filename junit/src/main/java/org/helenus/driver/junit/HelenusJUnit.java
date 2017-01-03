@@ -905,7 +905,12 @@ public class HelenusJUnit implements MethodRule {
           Cluster
             .builder()
             .withPort(port)
-            .withQueryOptions(new QueryOptions().setRefreshSchemaIntervalMillis(0)) // disable debouncing schema updates since we are unit testing!
+            .withQueryOptions(
+              new QueryOptions()
+                .setRefreshSchemaIntervalMillis(0) // disable debouncing schema updates since we are unit testing!
+                .setRefreshNodeIntervalMillis(0) // disable debouncing node updates since we are unit testing!
+                .setRefreshNodeListIntervalMillis(0)
+            )
             .withRetryPolicy(new LoggingRetryPolicy(new RetryPolicy() {
               @Override
               public void init(Cluster cluster) {}
@@ -961,7 +966,6 @@ public class HelenusJUnit implements MethodRule {
               }
             }))
             .addContactPoint(host)
-            .withQueryOptions(null)
         );
         if (HelenusJUnit.fullTraces) {
           HelenusJUnit.manager.enableFullTraces();

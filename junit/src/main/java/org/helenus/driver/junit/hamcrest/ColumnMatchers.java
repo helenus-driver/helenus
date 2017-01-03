@@ -104,13 +104,30 @@ public abstract class ColumnMatchers {
    */
   public static <T> Matcher<T> columnsEqualTo(T operand, String... ignore) {
     final Set<String> found = new HashSet<>(ignore.length * 3 / 2);
-
+    final StringBuilder sb = new StringBuilder();
     final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
        .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), found, ignore))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), e.getValue()))
+       .peek(a -> {
+         if (sb.length() > 0) {
+           sb.append(", ");
+         }
+         sb.append(a.columns).append("=");
+         try {
+           final Object o = a.field.get(operand);
+
+           if ((o != null) && o.getClass().isArray()) {
+             sb.append(ArrayUtils.toString(o));
+           } else {
+             sb.append(o);
+           }
+         } catch (Exception e) {
+           sb.append("???");
+         }
+       })
        .collect(Collectors.toList());
 
     org.apache.commons.lang3.Validate.isTrue(
@@ -140,7 +157,7 @@ public abstract class ColumnMatchers {
           .appendText(operand.getClass().getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText("] are all equal");
+          .appendText("] are all equal to [" + sb + "]");
       }
     };
   }
@@ -160,12 +177,30 @@ public abstract class ColumnMatchers {
    * @return a corresponding matcher
    */
   public static <T> Matcher<T> columnsEqualTo(String column, T operand) {
+    final StringBuilder sb = new StringBuilder();
     final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
        .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), column))
+       .peek(a -> {
+         if (sb.length() > 0) {
+           sb.append(", ");
+         }
+         sb.append(a.columns).append("=");
+         try {
+           final Object o = a.field.get(operand);
+
+           if ((o != null) && o.getClass().isArray()) {
+             sb.append(ArrayUtils.toString(o));
+           } else {
+             sb.append(o);
+           }
+         } catch (Exception e) {
+           sb.append("???");
+         }
+       })
        .collect(Collectors.toList());
 
     org.apache.commons.lang3.Validate.isTrue(
@@ -189,7 +224,7 @@ public abstract class ColumnMatchers {
           .appendText(operand.getClass().getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText("] is equal");
+          .appendText("] is equal to [" + sb + "]");
       }
     };
   }
@@ -215,13 +250,30 @@ public abstract class ColumnMatchers {
     T operand, double epsilon, String... ignore
   ) {
     final Set<String> found = new HashSet<>(ignore.length * 3 / 2);
-
+    final StringBuilder sb = new StringBuilder();
     final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
        .filter(e -> !ColumnMatchers.ignoreField(e.getValue(), found, ignore))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), e.getValue(), epsilon))
+       .peek(a -> {
+         if (sb.length() > 0) {
+           sb.append(", ");
+         }
+         sb.append(a.columns).append("=");
+         try {
+           final Object o = a.field.get(operand);
+
+           if ((o != null) && o.getClass().isArray()) {
+             sb.append(ArrayUtils.toString(o));
+           } else {
+             sb.append(o);
+           }
+         } catch (Exception e) {
+           sb.append("???");
+         }
+       })
        .collect(Collectors.toList());
 
     org.apache.commons.lang3.Validate.isTrue(
@@ -251,7 +303,7 @@ public abstract class ColumnMatchers {
           .appendText(operand.getClass().getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText("] are all close within " + epsilon);
+          .appendText("] are all close within " + epsilon + " from [" + sb + "]");
       }
     };
   }
@@ -275,12 +327,30 @@ public abstract class ColumnMatchers {
   public static <T> Matcher<T> columnsCloseTo(
     String column, T operand, double epsilon
   ) {
+    final StringBuilder sb = new StringBuilder();
     final List<AreColumnsEqual<T>> matchers =
       ReflectionUtils.getAllAnnotationsForFieldsAnnotatedWith(
         operand.getClass(), Column.class, true
       ).entrySet().stream()
        .filter(e -> ColumnMatchers.acceptField(e.getValue(), column))
        .map(e -> new AreColumnsEqual<>(operand, e.getKey(), column, epsilon))
+       .peek(a -> {
+         if (sb.length() > 0) {
+           sb.append(", ");
+         }
+         sb.append(a.columns).append("=");
+         try {
+           final Object o = a.field.get(operand);
+
+           if ((o != null) && o.getClass().isArray()) {
+             sb.append(ArrayUtils.toString(o));
+           } else {
+             sb.append(o);
+           }
+         } catch (Exception e) {
+           sb.append("???");
+         }
+       })
        .collect(Collectors.toList());
 
     org.apache.commons.lang3.Validate.isTrue(
@@ -304,7 +374,7 @@ public abstract class ColumnMatchers {
           .appendText(operand.getClass().getSimpleName())
           .appendText("[")
           .appendText(matchers.stream().map(m -> m.columns).collect(Collectors.joining(", ")))
-          .appendText("] is close within " + epsilon);
+          .appendText("] is close within " + epsilon + " from [" + sb + "]");
       }
     };
   }

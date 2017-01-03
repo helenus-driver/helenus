@@ -49,7 +49,6 @@
       <groupId>org.glassfish</groupId>
       <artifactId>javax.json</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.helenus</groupId>
       <artifactId>helenus-commons</artifactId>
