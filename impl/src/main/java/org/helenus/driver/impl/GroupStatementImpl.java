@@ -349,4 +349,16 @@ public abstract class GroupStatementImpl<R, F extends ListenableFuture<R>, T>
     }
     return (H)this;
   }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#isIdempotent()
+   */
+  @Override
+  public Boolean isIdempotent() {
+    return false;
+  }
 }

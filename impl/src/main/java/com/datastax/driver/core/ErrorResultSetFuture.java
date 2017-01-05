@@ -31,7 +31,7 @@ import org.helenus.driver.StatementManager;
  * {@link ResultSetFuture} in order to provide an error result set when an
  * error occurred processing a intermediate query.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 26, 2016 - paouelle - Creation
@@ -73,7 +73,7 @@ public class ErrorResultSetFuture extends DefaultResultSetFuture {
   public ErrorResultSetFuture(StatementManager mgr, Throwable error) {
     super(
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!

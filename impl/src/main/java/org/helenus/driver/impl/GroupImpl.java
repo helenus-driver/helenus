@@ -472,4 +472,32 @@ public class GroupImpl
   public Group setParallelFactor(int factor) {
     return super.setParallelFactor(factor);
   }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.GroupStatementImpl#isIdempotent()
+   */
+  @Override
+  public Boolean isIdempotent() {
+    final Boolean idem = idempotent;
+
+    if (idem != null) {
+      return idem;
+    }
+    boolean nullFound = false;
+
+    for (final StatementImpl<?, ?, ?> s: statements) {
+      final Boolean iidem = s.isIdempotent();
+
+      if (iidem == null) {
+        nullFound = true;
+      } else if (!iidem) {
+        return false;
+      }
+    }
+    return (nullFound ? null : true);
+  }
 }

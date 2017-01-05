@@ -17,6 +17,7 @@ package org.helenus.driver;
 
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.DataType;
 
 
 /**
@@ -262,7 +263,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
      * @throws IllegalArgumentException if the specified column is not defined
      *         by the POJO
      */
-    public Selection<T> column(Object name);
+    public SelectionOrAlias<T> column(Object name);
 
     /**
      * Selects the write time of provided column.
@@ -277,7 +278,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
      * @throws IllegalArgumentException if the specified column is not defined
      *         by the POJO
      */
-    public Selection<T> writeTime(String name);
+    public SelectionOrAlias<T> writeTime(String name);
 
     /**
      * Selects the ttl of provided column.
@@ -292,7 +293,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
      * @throws IllegalArgumentException if the specified column is not defined
      *         by the POJO
      */
-    public Selection<T> ttl(String name);
+    public SelectionOrAlias<T> ttl(String name);
 
     /**
      * Creates a function call.
@@ -314,7 +315,70 @@ public interface Select<T> extends ObjectClassStatement<T> {
      * @throws IllegalArgumentException if any of specified column parameters are
      *         not defined by the POJO
      */
-    public Selection<T> fcall(String name, Object... parameters);
+    public SelectionOrAlias<T> fcall(String name, Object... parameters);
+
+    /**
+     * Creates a cast of an expression to a given CQL type.
+     *
+     * @param  column the expression to cast. It can be a complex expression like a
+     *         {@link StatementBuilder#fcall}
+     * @param  targetType the target CQL type to cast to
+     * @return this in-build SELECT statement
+     */
+    public SelectionOrAlias<T> cast(Object column, DataType targetType);
+
+    /**
+     * Selects the provided raw expression.
+     * <p/>
+     * The provided string will be appended to the query as-is, without any form
+     * of escaping or quoting.
+     *
+     * @param  rawString the raw expression to add
+     * @return this in-build SELECT statement
+     */
+    public SelectionOrAlias<T> raw(String rawString);
+
+    /**
+     * Creates a {@code toJson()} function call. This is a shortcut for
+     * {@code fcall("toJson", StatementManager.column(name))}.
+     * <p>
+     * Support for JSON functions has been added in Cassandra 2.2.
+     * The {@code toJson()} function is similar to {@code SELECT JSON} statements,
+     * but applies to a single column value instead of the entire row,
+     * and produces a JSON-encoded string representing the normal Cassandra column value.
+     * <p>
+     * It may only be used in the selection clause of a {@code SELECT} statement.
+     *
+     * @param  name the column name
+     * @return this in-build SELECT statement
+     */
+    public SelectionOrAlias<T> toJson(String name);
+  }
+
+  /**
+   * The <code>SelectionOrAlias</code> interface defines a selection clause for an
+   * in-construction SELECT statement that differs only in that you can add an
+   * alias for the previously selected item through {@link #as}.
+   *
+   * @copyright 2015-2017 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Jan 3, 2017 - paouelle - Creation
+   *
+   * @param <T> The type of POJO associated with the response from this statement.
+   *
+   * @since 1.0
+   */
+  public interface SelectionOrAlias<T> extends Selection<T> {
+    /**
+     * Adds an alias for the just selected item.
+     *
+     * @author paouelle
+     *
+     * @param  alias the name of the alias to use
+     * @return this in-build SELECT statement
+     */
+    public Selection<T> as(String alias);
   }
 
   /**

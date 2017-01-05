@@ -264,4 +264,16 @@ public abstract class SequenceStatementImpl<R, F extends ListenableFuture<R>, T>
       setDirty(true);
     }
   }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#isIdempotent()
+   */
+  @Override
+  public Boolean isIdempotent() {
+    return false;
+  }
 }

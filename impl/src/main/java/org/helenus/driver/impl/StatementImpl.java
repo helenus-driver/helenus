@@ -25,6 +25,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import java.nio.ByteBuffer;
+
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.logging.log4j.Level;
@@ -233,11 +235,39 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   private volatile int fetchSize;
 
   /**
+   * Holds the default timestamp for this statement.
+   *
+   * @author paouelle
+   */
+  private volatile long defaultTimestamp = Long.MIN_VALUE;
+
+  /**
+   * Holds the read timeout for this statement.
+   *
+   * @author paouelle
+   */
+  private volatile int readTimeoutMillis = Integer.MIN_VALUE;
+
+  /**
    * Holds the retry policy for this statement.
    *
    * @author paouelle
    */
   private volatile RetryPolicy retryPolicy;
+
+  /**
+   * Holds the paging state for this statement.
+   *
+   * @author paouelle
+   */
+  private volatile ByteBuffer pagingState;
+
+  /**
+   * Holds the idempotent flag for this statement.
+   *
+   * @author paouelle
+   */
+  protected volatile Boolean idempotent; // TODO
 
   /**
    * Holds a dirty bit for the cached query string.
@@ -384,7 +414,11 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.tracePrefix = statement.tracePrefix;
     this.errorTracePrefix = statement.errorTracePrefix;
     this.fetchSize = statement.fetchSize;
+    this.defaultTimestamp = statement.defaultTimestamp;
+    this.readTimeoutMillis = statement.readTimeoutMillis;
     this.retryPolicy = statement.retryPolicy;
+    this.pagingState = statement.pagingState;
+    this.idempotent = statement.idempotent;
     this.simpleSize = statement.simpleSize;
     this.dirty = statement.dirty;
     this.cache = statement.cache;
@@ -418,7 +452,11 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
     this.tracePrefix = statement.tracePrefix;
     this.errorTracePrefix = statement.errorTracePrefix;
     this.fetchSize = statement.fetchSize;
+    this.defaultTimestamp = statement.defaultTimestamp;
+    this.readTimeoutMillis = statement.readTimeoutMillis;
     this.retryPolicy = statement.retryPolicy;
+    this.pagingState = statement.pagingState;
+    this.idempotent = statement.idempotent;
     this.simpleSize = statement.simpleSize;
     this.dirty = statement.dirty;
     this.cache = statement.cache;
@@ -589,6 +627,15 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
      s.setRetryPolicy(getRetryPolicy());
     }
     s.setFetchSize(getFetchSize());
+    if (defaultTimestamp != Long.MIN_VALUE) {
+      s.setDefaultTimestamp(defaultTimestamp);
+    }
+    if (readTimeoutMillis > 0) {
+      s.setReadTimeoutMillis(readTimeoutMillis);
+    }
+    if (idempotent != null) {
+      s.setIdempotent(idempotent);
+    }
     s.setUserData(data);
     return s;
   }
@@ -620,6 +667,15 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
      s.setRetryPolicy(getRetryPolicy());
     }
     s.setFetchSize(getFetchSize());
+    if (defaultTimestamp != Long.MIN_VALUE) {
+      s.setDefaultTimestamp(defaultTimestamp);
+    }
+    if (readTimeoutMillis > 0) {
+      s.setReadTimeoutMillis(readTimeoutMillis);
+    }
+    if (idempotent != null) {
+      s.setIdempotent(idempotent);
+    }
     return s;
   }
 
@@ -1127,10 +1183,11 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
    * @see org.helenus.driver.GenericStatement#setSerialConsistencyLevel(com.datastax.driver.core.ConsistencyLevel)
    */
   @Override
-  public GenericStatement<R, F> setSerialConsistencyLevel(ConsistencyLevel serialConsistency) {
+  public GenericStatement<R, F> setSerialConsistencyLevel(
+    ConsistencyLevel serialConsistency
+  ) {
     org.apache.commons.lang3.Validate.isTrue(
-      (serialConsistency == ConsistencyLevel.SERIAL)
-      || (serialConsistency == ConsistencyLevel.LOCAL_SERIAL),
+      serialConsistency.isSerial(),
       "invalid serial consistency level: %s",
       serialConsistency
     );
@@ -1328,6 +1385,82 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   @Override
   public int getFetchSize() {
     return fetchSize;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#setDefaultTimestamp(long)
+   */
+  @Override
+  public GenericStatement<R, F> setDefaultTimestamp(long defaultTimestamp) {
+    this.defaultTimestamp = defaultTimestamp;
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @see org.helenus.driver.GenericStatement#getDefaultTimestamp()
+   */
+  @Override
+  public long getDefaultTimestamp() {
+    return defaultTimestamp;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#setReadTimeoutMillis(int)
+   */
+  @Override
+  public GenericStatement<R, F> setReadTimeoutMillis(int readTimeoutMillis) {
+    org.apache.commons.lang3.Validate.isTrue(readTimeoutMillis >= 0, "read timeout must be >= 0");
+    this.readTimeoutMillis = readTimeoutMillis;
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#getReadTimeoutMillis()
+   */
+  @Override
+  public int getReadTimeoutMillis() {
+    return readTimeoutMillis;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#setIdempotent(boolean)
+   */
+  @Override
+  public GenericStatement<R, F> setIdempotent(boolean idempotent) {
+    this.idempotent = idempotent;
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.GenericStatement#isIdempotent()
+   */
+  @Override
+  public Boolean isIdempotent() {
+    return idempotent;
   }
 
   /**

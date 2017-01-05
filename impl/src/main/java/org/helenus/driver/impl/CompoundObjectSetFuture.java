@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ import org.helenus.driver.StatementManager;
  * are created from a sequence of select statements and requires to be combined
  * together.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Mar 9, 2015 - paouelle - Creation
@@ -308,7 +308,7 @@ public class CompoundObjectSetFuture<T>
    * The <code>CompoundObjectSet</code> class is used to compound together
    * multiple object sets.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Mar 9, 2015 - paouelle - Creation
@@ -366,6 +366,18 @@ public class CompoundObjectSetFuture<T>
     @Override
     public ColumnDefinitions getColumnDefinitions() {
       return objects.get(0).getColumnDefinitions();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.ObjectSet#wasApplied()
+     */
+    @Override
+    public boolean wasApplied() {
+      return objects.stream().allMatch(os -> os.wasApplied());
     }
 
     /**
@@ -542,7 +554,7 @@ public class CompoundObjectSetFuture<T>
      * @see org.helenus.driver.ObjectSet#fetchMoreObjects()
      */
     @Override
-    public ListenableFuture<Void> fetchMoreObjects() {
+    public ListenableFuture<ObjectSet<T>> fetchMoreObjects() {
       if (!isExhausted()) {
         int j = i;
 

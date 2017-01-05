@@ -558,7 +558,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      return row.getDate(name);
+      return row.getTimestamp(name);
     }
     @Override
     protected Date decodeImpl(UDTValue uval, String name, Class<Date> clazz) {
@@ -567,7 +567,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      return uval.getDate(name);
+      return uval.getTimestamp(name);
     }
   };
 
@@ -584,7 +584,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      final Date date = row.getDate(name);
+      final Date date = row.getTimestamp(name);
 
       return (date != null) ? date.toInstant() : null;
     }
@@ -595,7 +595,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      final Date date = uval.getDate(name);
+      final Date date = uval.getTimestamp(name);
 
       return (date != null) ? date.toInstant() : null;
     }
@@ -614,7 +614,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      final Date date = row.getDate(name);
+      final Date date = row.getTimestamp(name);
 
       return (date != null) ? date.getTime() : null;
     }
@@ -625,7 +625,7 @@ public abstract class DataDecoder<V> {
         "unsupported class '%s' to decode to",
         clazz.getName()
       );
-      final Date date = uval.getDate(name);
+      final Date date = uval.getTimestamp(name);
 
       return (date != null) ? date.getTime() : null;
     }
@@ -735,7 +735,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<List>(List.class) {
       @SuppressWarnings("unchecked")
-      private List decodeImpl(Class<?> etype, List<Object> list) {
+      private List decodeImpl(Class<?> etype, List<?> list) {
         if (list == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty lists and the schema definition requires
@@ -763,19 +763,21 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected List decodeImpl(Row row, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          row.isNull(name) ? null : row.getList(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, row.isNull(name) ? null : row.getList(name, eclazz)
         );
       }
       @SuppressWarnings("unchecked")
       @Override
       protected List decodeImpl(UDTValue uval, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          uval.isNull(name) ? null : uval.getList(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, uval.isNull(name) ? null : uval.getList(name, eclazz)
         );
       }
     };
@@ -798,7 +800,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<Set>(Set.class) {
       @SuppressWarnings("unchecked")
-      private Set decodeImpl(Class<?> etype, Set<Object> set) {
+      private Set decodeImpl(Class<?> etype, Set<?> set) {
         if (set == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty sets and the schema definition requires
@@ -836,19 +838,21 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected Set decodeImpl(Row row, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          row.isNull(name) ? null : row.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, row.isNull(name) ? null : row.getSet(name, eclazz)
         );
       }
       @SuppressWarnings("unchecked")
       @Override
       protected Set decodeImpl(UDTValue uval, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          uval.isNull(name) ? null : uval.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, uval.isNull(name) ? null : uval.getSet(name, eclazz)
         );
       }
     };
@@ -871,7 +875,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<LinkedHashSet>(LinkedHashSet.class) {
       @SuppressWarnings("unchecked")
-      private LinkedHashSet decodeImpl(Class<?> etype, List<Object> set) {
+      private LinkedHashSet decodeImpl(Class<?> etype, List<?> set) {
         if (set == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty lists and the schema definition requires
@@ -899,19 +903,21 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected LinkedHashSet decodeImpl(Row row, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          row.isNull(name) ? null : row.getList(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, row.isNull(name) ? null : row.getList(name, eclazz)
         );
       }
       @SuppressWarnings("unchecked")
       @Override
       protected LinkedHashSet decodeImpl(UDTValue uval, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          uval.isNull(name) ? null : uval.getList(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, uval.isNull(name) ? null : uval.getList(name, eclazz)
         );
       }
     };
@@ -934,7 +940,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<SortedSet>(SortedSet.class) {
       @SuppressWarnings("unchecked")
-      private SortedSet decodeImpl(Class<?> etype, Set<Object> set) {
+      private SortedSet decodeImpl(Class<?> etype, Set<?> set) {
         if (set == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty lists and the schema definition requires
@@ -962,19 +968,21 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected SortedSet decodeImpl(Row row, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          row.isNull(name) ? null : row.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, row.isNull(name) ? null : row.getSet(name, eclazz)
         );
       }
       @SuppressWarnings("unchecked")
       @Override
       protected SortedSet decodeImpl(UDTValue uval, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> eclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(0).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          uval.isNull(name) ? null : uval.getSet(name, Object.class) // keeps things generic so we can handle our own errors
+          eclazz, uval.isNull(name) ? null : uval.getSet(name, eclazz)
         );
       }
     };
@@ -998,7 +1006,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<Map>(Map.class) {
       @SuppressWarnings("unchecked")
-      private Map decodeImpl(Class<?> ektype, Class<?> evtype, Map<Object, Object> map) {
+      private Map decodeImpl(Class<?> ektype, Class<?> evtype, Map<?, ?> map) {
         if (map == null) {
           // safe to return as is unless mandatory, that is because Cassandra
           // returns null for empty list and the schema definition requires
@@ -1039,21 +1047,27 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected Map decodeImpl(Row row, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> kclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName());
+        final Class<?> vclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName().asJavaClass(),
-          row.isNull(name) ? null : row.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+          kclazz,
+          vclazz,
+          row.isNull(name) ? null : row.getMap(name, kclazz, vclazz)
         );
       }
       @SuppressWarnings("unchecked")
       @Override
       protected Map decodeImpl(UDTValue uval, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> kclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(0).getName());
+        final Class<?> vclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(1).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          uval.getType().getFieldType(name).getTypeArguments().get(1).getName().asJavaClass(),
-          uval.isNull(name) ? null : uval.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+          kclazz,
+          vclazz,
+          uval.isNull(name) ? null : uval.getMap(name, kclazz, vclazz)
         );
       }
     };
@@ -1077,7 +1091,7 @@ public abstract class DataDecoder<V> {
   ) {
     return new DataDecoder<SortedMap>(SortedMap.class) {
       @SuppressWarnings("unchecked")
-      private SortedMap decodeImpl(Class<?> ektype, Class<?> evtype, Map<Object, Object> map) {
+      private SortedMap decodeImpl(Class<?> ektype, Class<?> evtype, Map<?, ?> map) {
         if (map == null) {
           // safe to return mull unless mandatory, that is because Cassandra
           // returns null for empty list and the schema definition requires
@@ -1108,21 +1122,27 @@ public abstract class DataDecoder<V> {
       @SuppressWarnings("unchecked")
       @Override
       protected SortedMap decodeImpl(Row row, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> kclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName());
+        final Class<?> vclazz = DataTypeImpl.getRawClass(row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          row.getColumnDefinitions().getType(name).getTypeArguments().get(1).getName().asJavaClass(),
-          row.isNull(name) ? null : row.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+          kclazz,
+          vclazz,
+          row.isNull(name) ? null : row.getMap(name, kclazz, vclazz)
         );
       }
       @SuppressWarnings("unchecked")
       @Override
       protected SortedMap decodeImpl(UDTValue uval, String name, Class clazz) {
+        // get the element type from the row's metadata
+        final Class<?> kclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(0).getName());
+        final Class<?> vclazz = DataTypeImpl.getRawClass(uval.getType().getFieldType(name).getTypeArguments().get(1).getName());
+
         return decodeImpl(
-          // get the element type from the row's metadata
-          uval.getType().getFieldType(name).getTypeArguments().get(0).getName().asJavaClass(),
-          uval.getType().getFieldType(name).getTypeArguments().get(1).getName().asJavaClass(),
-          uval.isNull(name) ? null : uval.getMap(name, Object.class, Object.class) // keeps things generic so we can handle our own errors
+          kclazz,
+          vclazz,
+          uval.isNull(name) ? null : uval.getMap(name, kclazz, vclazz)
         );
       }
     };

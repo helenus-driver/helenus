@@ -169,7 +169,11 @@ public class AlterCreateTableImpl<T> extends CreateTableImpl<T> {
       if (type == null) { // no longer exist
         columns0.add("DROP " + name0);
       } else { // still exist
-        final CQLDataType type0 = DataTypeParser.validatorToCQL(val0);
+        final CQLDataType type0 = DataTypeParser.validatorToCQL(
+          val0,
+          mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
+          mgr.getCluster().getConfiguration().getCodecRegistry()
+        );
         final String type0_cql = type0.toCQL();
         final String type_cql = type.toCQL();
 

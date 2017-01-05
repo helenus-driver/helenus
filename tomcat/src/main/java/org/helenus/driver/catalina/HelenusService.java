@@ -78,8 +78,8 @@ public class HelenusService extends StandardService {
    * @author paouelle
    */
   public HelenusService() {
-    logger.entry();
-    logger.exit();
+    logger.traceEntry();
+    logger.traceExit();
   }
 
   /**
@@ -92,7 +92,7 @@ public class HelenusService extends StandardService {
   public void setHosts(String hosts) {
     logger.entry(hosts);
     this.hosts = hosts.split(":");
-    logger.exit();
+    logger.traceExit();
   }
 
   /**
@@ -105,7 +105,7 @@ public class HelenusService extends StandardService {
   public void setPort(int port) {
     logger.entry(port);
     this.port = port;
-    logger.exit();
+    logger.traceExit();
   }
 
   /**
@@ -117,10 +117,10 @@ public class HelenusService extends StandardService {
    */
   @Override
   protected void startInternal() throws LifecycleException {
-    logger.entry();
+    logger.traceEntry();
     try {
       super.startInternal();
-      logger.exit();
+      logger.traceExit();
     } catch (LifecycleException e) {
       throw logger.throwing(e);
     }
@@ -135,10 +135,10 @@ public class HelenusService extends StandardService {
    */
   @Override
   protected void stopInternal() throws LifecycleException {
-    logger.entry();
+    logger.traceEntry();
     try {
       super.stopInternal();
-      logger.exit();
+      logger.traceExit();
     } catch (LifecycleException e) {
       throw logger.throwing(e);
     }
@@ -154,7 +154,7 @@ public class HelenusService extends StandardService {
   @Override
   protected void initInternal() throws LifecycleException {
     try {
-      logger.entry();
+      logger.traceEntry();
       if (mgr == null) {
         this.mgr = new StatementManagerImpl(
           Cluster
@@ -166,7 +166,7 @@ public class HelenusService extends StandardService {
         );
       }
       super.initInternal();
-      logger.exit();
+      logger.traceExit();
     } catch (LifecycleException e) {
       throw logger.throwing(e);
     }
@@ -181,13 +181,13 @@ public class HelenusService extends StandardService {
    */
   @Override
   protected void destroyInternal() throws LifecycleException {
-    logger.entry();
+    logger.traceEntry();
     try {
       super.destroyInternal();
       if (mgr != null) {
         mgr.close(); // shutdown and wait for its completion
       }
-      logger.exit();
+      logger.traceExit();
     } catch (LifecycleException e) {
       throw logger.throwing(e);
     }

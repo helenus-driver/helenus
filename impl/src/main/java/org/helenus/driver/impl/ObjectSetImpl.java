@@ -99,6 +99,18 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
   /**
    * {@inheritDoc}
    *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @see org.helenus.driver.ObjectSet#wasApplied()
+   */
+  @Override
+  public boolean wasApplied() {
+    return result.wasApplied();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
    * @author paouelle
    *
    * @see org.helenus.driver.ObjectSet#isExhausted()
@@ -268,8 +280,8 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    * @see org.helenus.driver.ObjectSet#fetchMoreObjects()
    */
   @Override
-  public ListenableFuture<Void> fetchMoreObjects() {
-    return result.fetchMoreResults();
+  public ListenableFuture<ObjectSet<T>> fetchMoreObjects() {
+    return new ListenableFutureImpl<>(context, result.fetchMoreResults());
   }
 
   /**

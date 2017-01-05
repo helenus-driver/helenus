@@ -34,7 +34,7 @@ import org.helenus.driver.impl.StatementManagerImpl;
  * which is designed to execute multiple statements in a sequence and return
  * only the result set from the last statement.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -182,7 +182,7 @@ public class LastResultSequentialSetFuture extends DefaultResultSetFuture {
   ) {
     super(
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(statements, "invalid null statements");

@@ -43,7 +43,7 @@ import org.helenus.util.stream.Collectors;
  * which is designed to execute multiple statements in parallel and return
  * only the result set from the last statement.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 26, 2016 - paouelle - Creation
@@ -260,7 +260,7 @@ public class LastResultParallelSetFuture extends DefaultResultSetFuture {
   ) {
     super(
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(statements, "invalid null statements");

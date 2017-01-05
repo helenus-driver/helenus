@@ -29,12 +29,14 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.UUID;
 
+import com.datastax.driver.core.DataType.Name;
+
 /**
  * The <code>DataType</code> enumeration defines Cassandra data types
  * for columns when one cannot rely on the default behavior where the type is
  * inferred from the field type.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -45,29 +47,29 @@ import java.util.UUID;
  */
 @SuppressWarnings("javadoc")
 public enum DataType implements CQLDataType {
-  INFERRED("?", 0, Object.class),
-  ASCII("ascii", 0, String.class),
-  BIGINT("bigint", 0, Long.class),
-  BLOB("blob", 0, byte[].class),
-  BOOLEAN("boolean", 0, Boolean.class),
-  COUNTER("counter", 0, Long.class),
-  DECIMAL("decimal", 0, BigDecimal.class),
-  DOUBLE("double", 0, Double.class),
-  FLOAT("float", 0, Float.class),
-  INET("inet", 0, InetAddress.class),
-  INT("int", 0, Integer.class),
-  TEXT("text", 0, String.class),
-  TIMESTAMP("timestamp", 0, Date.class),
-  UUID("uuid", 0, UUID.class),
-  VARCHAR("varchar", 0, String.class),
-  VARINT("varint", 0, BigInteger.class),
-  TIMEUUID("timeuuid", 0, UUID.class),
-  LIST("list", 1, List.class),
-  SET("set", 1, Set.class),
-  ORDERED_SET("list", 1, LinkedHashSet.class),
-  SORTED_SET("set", 1, SortedSet.class),
-  MAP("map", 2, Map.class),
-  SORTED_MAP("map", 2, NavigableMap.class);
+  INFERRED(Name.CUSTOM, "?", 0, Object.class),
+  ASCII(Name.ASCII, "ascii", 0, String.class),
+  BIGINT(Name.BIGINT, "bigint", 0, Long.class),
+  BLOB(Name.BLOB, "blob", 0, byte[].class),
+  BOOLEAN(Name.BOOLEAN, "boolean", 0, Boolean.class),
+  COUNTER(Name.COUNTER, "counter", 0, Long.class),
+  DECIMAL(Name.DECIMAL, "decimal", 0, BigDecimal.class),
+  DOUBLE(Name.DOUBLE, "double", 0, Double.class),
+  FLOAT(Name.FLOAT, "float", 0, Float.class),
+  INET(Name.INET, "inet", 0, InetAddress.class),
+  INT(Name.INT, "int", 0, Integer.class),
+  TEXT(Name.TEXT, "text", 0, String.class),
+  TIMESTAMP(Name.TIMESTAMP, "timestamp", 0, Date.class),
+  UUID(Name.UUID, "uuid", 0, UUID.class),
+  VARCHAR(Name.VARCHAR, "varchar", 0, String.class),
+  VARINT(Name.VARINT, "varint", 0, BigInteger.class),
+  TIMEUUID(Name.TIMEUUID, "timeuuid", 0, UUID.class),
+  LIST(Name.LIST, "list", 1, List.class),
+  SET(Name.SET, "set", 1, Set.class),
+  ORDERED_SET(Name.LIST, "list", 1, LinkedHashSet.class),
+  SORTED_SET(Name.SET, "set", 1, SortedSet.class),
+  MAP(Name.MAP, "map", 2, Map.class),
+  SORTED_MAP(Name.MAP, "map", 2, NavigableMap.class);
 
   /**
    * Checks if altering a column from a specified data type to a specified data
@@ -106,6 +108,31 @@ public enum DataType implements CQLDataType {
   }
 
   /**
+   * Gets a data type for a given data type name.
+   *
+   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   *
+   * @param  name the data type for which to get its corresponding data type
+   * @return the corresponding non-<code>null</code> data type
+   * @throws IllegalArgumentException if no data type corresponds to the provided name
+   */
+  public static DataType valueOf(Name name) {
+    for (final DataType type: DataType.values()) {
+      if (type.NAME.equals(name)) {
+        return type;
+      }
+    }
+    throw new IllegalArgumentException("unknown data type: " + name);
+  }
+
+  /**
+   * Holds the non-<code>null</code> Cassandra name for the data type.
+   *
+   * @author paouelle
+   */
+  public final Name NAME;
+
+  /**
    * Holds the non-<code>null</code> CQL name for the data type.
    *
    * @author paouelle
@@ -131,12 +158,14 @@ public enum DataType implements CQLDataType {
    *
    * @author paouelle
    *
+   * @param name the non-<code>null</code> Cassandra name for the data type
    * @param cql the non-<code>null</code> CQL name for the data type
    * @param num the number of arguments for this collection data type
    * @param clazz the non-<code>null</code> Java class corresponding to
    *        the data type
    */
-  private DataType(String cql, int num, Class<?> clazz) {
+  private DataType(Name name, String cql, int num, Class<?> clazz) {
+    this.NAME = name;
     this.CQL = cql;
     this.NUM_ARGUMENTS = num;
     this.CLASS = clazz;

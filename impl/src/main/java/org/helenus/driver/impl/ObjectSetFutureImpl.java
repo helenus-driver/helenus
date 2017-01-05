@@ -15,18 +15,12 @@
  */
 package org.helenus.driver.impl;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
-import com.datastax.driver.core.exceptions.NoHostAvailableException;
-import com.datastax.driver.core.exceptions.QueryExecutionException;
-import com.datastax.driver.core.exceptions.QueryValidationException;
-import com.google.common.util.concurrent.AbstractFuture;
 
 import org.helenus.driver.ObjectNotFoundException;
 import org.helenus.driver.ObjectSet;
@@ -48,15 +42,8 @@ import org.helenus.driver.StatementManager;
  * @since 1.0
  */
 public class ObjectSetFutureImpl<T>
-  extends AbstractFuture<ObjectSet<T>>
+  extends ListenableFutureImpl<T>
   implements ObjectSetFuture<T> {
-  /**
-   * Holds the statement context associated with this object set.
-   *
-   * @author paouelle
-   */
-  private final StatementManager.Context<T> context;
-
   /**
    * Holds the raw result set future.
    *
@@ -74,81 +61,8 @@ public class ObjectSetFutureImpl<T>
    * @param future the non-<code>null</code> result set future
    */
   ObjectSetFutureImpl(StatementManager.Context<T> context, ResultSetFuture future) {
-    this.context = context;
+    super(context, future);
     this.future = future;
-  }
-
-  /**
-   * Post-process the result set. The returned {@link ObjectSetImpl} will be based
-   * on what is left off in the result set after post-processing.
-   *
-   * @author paouelle
-   *
-   * @param  result the non-<code>null</code> result set to be post processed
-   */
-  protected void postProcess(ResultSet result) {}
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @throws NoHostAvailableException if no host in the cluster can be contacted
-   *         successfully to execute this query.
-   * @throws QueryExecutionException if the query triggered an execution
-   *         exception, that is an exception thrown by Cassandra when it
-   *         cannot execute the query with the requested consistency level
-   *         successfully.
-   * @throws ObjectNotFoundException if the statement is a select and the
-   *         keyspace specified doesn't exist
-   * @throws QueryValidationException if the query is invalid (syntax error,
-   *         unauthorized or any other validation problem).
-   *
-   * @see com.google.common.util.concurrent.AbstractFuture#get(long, java.util.concurrent.TimeUnit)
-   */
-  @Override
-  public ObjectSet<T> get(long timeout, TimeUnit unit)
-    throws InterruptedException, TimeoutException, ExecutionException {
-    try {
-      final ResultSet result = future.get(timeout, unit);
-
-      postProcess(result);
-      return new ObjectSetImpl<>(context, result);
-    } catch (InvalidQueryException e) {
-      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
-      throw e;
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @throws NoHostAvailableException if no host in the cluster can be contacted
-   *         successfully to execute this query.
-   * @throws QueryExecutionException if the query triggered an execution
-   *         exception, that is an exception thrown by Cassandra when it
-   *         cannot execute the query with the requested consistency level
-   *         successfully.
-   * @throws ObjectNotFoundException if the statement is a select and the
-   *         keyspace specified doesn't exist
-   * @throws QueryValidationException if the query is invalid (syntax error,
-   *         unauthorized or any other validation problem).
-   *
-   * @see com.google.common.util.concurrent.AbstractFuture#get()
-   */
-  @Override
-  public ObjectSet<T> get() throws InterruptedException, ExecutionException {
-    try {
-      final ResultSet result = future.get();
-
-      postProcess(result);
-      return new ObjectSetImpl<>(context, result);
-    } catch (InvalidQueryException e) {
-      ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
-      throw e;
-    }
   }
 
   /**
@@ -190,83 +104,5 @@ public class ObjectSetFutureImpl<T>
       ObjectNotFoundException.handleKeyspaceNotFound(context.getObjectClass(), e);
       throw e;
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * Attempts to cancel the execution of the request corresponding to this
-   * future. This attempt will fail if the request has already returned.
-   * <p>
-   * Please note that this only cancel the request driver side, but nothing
-   * is done to interrupt the execution of the request Cassandra side (and that even
-   * if {@code mayInterruptIfRunning} is true) since Cassandra does not
-   * support such interruption.
-   * <p>
-   * This method can be used to ensure no more work is performed driver side
-   * (which, while it doesn't include stopping a request already submitted
-   * to a Cassandra node, may include not retrying another Cassandra host on
-   * failure/timeout) if the object set is not going to be retried. Typically,
-   * the code to wait for a request result for a maximum of 1 second could
-   * look like:
-   * <pre>
-   *   final ObjectSetFuture&lt;T&gt; future = statement.executeAsync();
-   *
-   *   try {
-   *       final ObjectSet&lt;T&gt; result = future.get(1, TimeUnit.SECONDS);
-   *       ... process result ...
-   *   } catch (TimeoutException e) {
-   *       future.cancel(true); // Ensure any ressource used by this query driver
-   *                            // side is released immediately
-   *       ... handle timeout ...
-   *   }
-   * </pre>
-   *
-   * @param  mayInterruptIfRunning the value of this parameter is currently
-   *         ignored.
-   * @return <code>false</code> if the future could not be cancelled (it has already
-   *         completed normally); <code>true</code> otherwise.
-   *
-   * @see com.google.common.util.concurrent.AbstractFuture#cancel(boolean)
-   */
-  @Override
-  public boolean cancel(boolean mayInterruptIfRunning) {
-    return future.cancel(mayInterruptIfRunning);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see com.google.common.util.concurrent.AbstractFuture#isDone()
-   */
-  @Override
-  public boolean isDone() {
-    return future.isDone();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see com.google.common.util.concurrent.AbstractFuture#isCancelled()
-   */
-  @Override
-  public boolean isCancelled() {
-    return future.isCancelled();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see com.google.common.util.concurrent.AbstractFuture#addListener(Runnable, java.util.concurrent.Executor)
-   */
-  @Override
-  public void addListener(Runnable listener, Executor exec) {
-    future.addListener(listener, exec);
   }
 }

@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import com.datastax.driver.core.ColumnDefinitions;
-import com.datastax.driver.core.ExecutionInfo;
+import com.datastax.driver.core.PagingIterable;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
@@ -28,7 +28,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * {@link com.datastax.driver.core.ResultSet} class in order to provide support
  * for POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -37,7 +37,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  *
  * @since 1.0
  */
-public interface ObjectSet<T> extends Iterable<T> {
+public interface ObjectSet<T> extends PagingIterable<ObjectSet<T>, T> {
   /**
    * Gets the columns returned in this object set.
    *
@@ -48,13 +48,33 @@ public interface ObjectSet<T> extends Iterable<T> {
   public ColumnDefinitions getColumnDefinitions();
 
   /**
-   * Gets whether this object set has more POJOs.
+   * If the query that produced this object set was a conditional update,
+   * return whether it was successfully applied.
+   * <p>
+   * This is equivalent to calling:
+   * <p>
+   * <pre>
+   * os.one().getBool("[applied]");
+   * </pre>
+   * <p>
+   * For consistency, this method always returns <code>true</code> for
+   * non-conditional queries (although there is no reason to call the method
+   * in that case). This is also the case for conditional DDL statements
+   * ({@code CREATE KEYSPACE... IF NOT EXISTS}, {@code CREATE TABLE... IF NOT EXISTS}),
+   * for which Cassandra doesn't return an {@code [applied]} column.
+   * <p>
+   * Note that, for versions of Cassandra strictly lower than 2.0.9 and 2.1.0-rc2,
+   * a server-side bug (CASSANDRA-7337) causes this method to always return
+   * <code>true</code> for batches containing conditional queries.
    *
    * @author paouelle
    *
-   * @return whether this object set has more POJOs.
+   * @return if the query was a conditional update, whether it was applied.
+   *         <code>true</code> for other types of queries
+   *
+   * @see <a href="https://issues.apache.org/jira/browse/CASSANDRA-7337">CASSANDRA-7337</a>
    */
-  public boolean isExhausted();
+  public boolean wasApplied();
 
   /**
    * Gets the the next POJO from this object set.
@@ -64,7 +84,10 @@ public interface ObjectSet<T> extends Iterable<T> {
    * @return the next POJO in this object set or <code>null</code> if this
    *         object set is exhausted
    * @throws ObjectConversionException if unable to convert to a POJO
+   *
+   * @see com.datastax.driver.core.PagingIterable#one()
    */
+  @Override
   public T one();
 
   /**
@@ -100,7 +123,10 @@ public interface ObjectSet<T> extends Iterable<T> {
    *         this object set. The returned list is empty if and only the result
    *         set is exhausted
    * @throws ObjectConversionException if unable to convert to POJOs
+   *
+   * @see com.datastax.driver.core.PagingIterable#all()
    */
+  @Override
   public List<T> all();
 
   /**
@@ -119,39 +145,10 @@ public interface ObjectSet<T> extends Iterable<T> {
    *
    * @author paouelle
    *
-   * @see java.lang.Iterable#iterator()
+   * @see com.datastax.driver.core.PagingIterable#iterator()
    */
   @Override
   public Iterator<T> iterator();
-
-  /**
-   * Gets the number of POJOs that can be retrieved from this object set without
-   * blocking to fetch.
-   *
-   * @author paouelle
-   *
-   * @return the number of POJOs readily available in this object set. If
-   *         {@link #isFullyFetched()}, this is the total number of POJOs
-   *         remaining in this object set (after which the object set will be
-   *         exhausted)
-   */
-  public int getAvailableWithoutFetching();
-
-  /**
-   * Checks whether all POJOs from this object set has been fetched from the
-   * database.
-   * <p>
-   * Note that if {@code isFullyFetched()}, then
-   * {@link #getAvailableWithoutFetching} will return how many POJOs remains in
-   * the object set before exhaustion. But please note that
-   * {@code !isFullyFetched()} never guarantees that the object set is not
-   * exhausted (you should call {@code isExhausted()} to make sure of it).
-   *
-   * @author paouelle
-   *
-   * @return whether all POJOs have been fetched
-   */
-  public boolean isFullyFetched();
 
   /**
    * Force the fetching the next page of POJOs for this object set, if any.
@@ -197,42 +194,19 @@ public interface ObjectSet<T> extends Iterable<T> {
    *         {@code isFullyFetched() == true}), then the returned future will
    *         return immediately but not particular error will be thrown (you
    *         should thus call {@code isFullyFetched() to know if calling this
-   *          method can be of any use}).
+   *         method can be of any use}).
    */
-  public ListenableFuture<Void> fetchMoreObjects();
+  public ListenableFuture<ObjectSet<T>> fetchMoreObjects();
 
   /**
-   * Gets information on the execution of the last query made for this object
-   * set.
-   * <p>
-   * Note that in most cases, an object set is fetched with only one query, but
-   * large object sets can be paged and thus be retrieved by multiple queries.
-   * If that is the case, that method return that {@code ExecutionInfo} for the
-   * last query performed. To retrieve the informations for all queries, use
-   * {@link #getAllExecutionInfo}.
-   * <p>
-   * The returned object includes basic information such as the queried hosts,
-   * but also the Cassandra query trace if tracing was enabled for the query.
+   * {@inheritDoc}
    *
    * @author paouelle
    *
-   * @return the execution info for the last query made for this object set
+   * @see com.datastax.driver.core.PagingIterable#fetchMoreResults()
    */
-  public ExecutionInfo getExecutionInfo();
-
-  /**
-   * Gets the execution informations for all queries made to retrieve this
-   * object set.
-   * <p>
-   * Unless the object set is large enough to get paged underneath, the returned
-   * list will be a singleton. If paging has been used however, the returned list
-   * contains the {@code ExecutionInfo} for all the queries done to obtain this
-   * object set (at the time of the call) in the order those queries were made.
-   *
-   * @author paouelle
-   *
-   * @return a list of the execution info for all the queries made for this
-   *         object set
-   */
-  public List<ExecutionInfo> getAllExecutionInfo();
+  @Override
+  public default ListenableFuture<ObjectSet<T>> fetchMoreResults() {
+    return fetchMoreObjects();
+  }
 }

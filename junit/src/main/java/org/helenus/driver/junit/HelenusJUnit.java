@@ -73,6 +73,7 @@ import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.SocketOptions;
 import com.datastax.driver.core.WriteType;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
@@ -165,6 +166,14 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    */
   public final static long DEFAULT_STARTUP_TIMEOUT = 60000L;
+
+  /**
+   * Constant for the default timeout for read operations to the Cassandra daemon
+   * before failing.
+   *
+   * @author paouelle
+   */
+  public final static long DEFAULT_READ_TIMEOUT = 12000L;
 
   /**
    * Constant for the default Cassandra configuration file which starts the
@@ -776,11 +785,15 @@ public class HelenusJUnit implements MethodRule {
    * @author paouelle
    *
    * @param  cfgname the non-<code>null</code> cassandra config resource name
-   * @param  timeout the timeout to wait for the Cassandra daemon to start
+   * @param  startupTimeout the timeout to wait for the Cassandra daemon to start
    *         before failing
+   * @param  readTimeout the maximum amount of time in milliseconds to wait for
+   *         read operations on the Cassandra daemon before failing
    * @throws AssertionError if an error occurs while starting everything
    */
-  private static synchronized void start0(String cfgname, long timeout) {
+  private static synchronized void start0(
+    String cfgname, long startupTimeout, long readTimeout
+  ) {
     if (HelenusJUnit.config != null) {
       // check if we are starting it with the same config
       if (HelenusJUnit.config.equals(cfgname)) {
@@ -862,10 +875,10 @@ public class HelenusJUnit implements MethodRule {
       thread.start();
       // wait for the Cassandra daemon to start properly
       try {
-        if (!latch.await(timeout, TimeUnit.MILLISECONDS)) {
+        if (!latch.await(startupTimeout, TimeUnit.MILLISECONDS)) {
           logger.error(
             "Cassandra daemon failed to start within "
-            + timeout
+            + startupTimeout
             + "ms; increase the timeout"
           );
           Thread.getAllStackTraces().forEach((t, se) -> {
@@ -876,7 +889,7 @@ public class HelenusJUnit implements MethodRule {
               }
             }
           });
-          logger.error("Cassandra daemon failed to start within timeout");
+          logger.error("Cassandra daemon failed to start within %d ms", startupTimeout);
           throw new AssertionError(
             "cassandra daemon failed to start within timeout"
           );
@@ -904,13 +917,13 @@ public class HelenusJUnit implements MethodRule {
         HelenusJUnit.manager = new StatementManagerUnitImpl(
           Cluster
             .builder()
-            .withPort(port)
             .withQueryOptions(
               new QueryOptions()
                 .setRefreshSchemaIntervalMillis(0) // disable debouncing schema updates since we are unit testing!
                 .setRefreshNodeIntervalMillis(0) // disable debouncing node updates since we are unit testing!
                 .setRefreshNodeListIntervalMillis(0)
             )
+            .withSocketOptions(new SocketOptions().setReadTimeoutMillis((int)readTimeout))
             .withRetryPolicy(new LoggingRetryPolicy(new RetryPolicy() {
               @Override
               public void init(Cluster cluster) {}
@@ -966,6 +979,7 @@ public class HelenusJUnit implements MethodRule {
               }
             }))
             .addContactPoint(host)
+            .withPort(port)
         );
         if (HelenusJUnit.fullTraces) {
           HelenusJUnit.manager.enableFullTraces();
@@ -1127,6 +1141,8 @@ public class HelenusJUnit implements MethodRule {
 
           if (!"system".equals(kname)
               && !"system_auth".equals(kname)
+              && !"system_distributed".equals(kname)
+              && !"system_schema".equals(kname)
               && !"system_traces".equals(kname)) {
             mgr.getSession().execute("DROP KEYSPACE " + kname);
           }
@@ -1487,32 +1503,49 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    */
-  private final long timeout;
+  private final long startupTimeout;
+
+  /**
+   * Holds the timeout for read operations on the Cassandra daemon before failing.
+   *
+   * @author paouelle
+   */
+  private final long readTimeout;
 
   /**
    * Instantiates a new <code>HelenusJUnit</code> object.
    * <p>
    * <i>Note:</i> Defaults to 60 seconds timeout to wait for the Cassandra
-   * daemon to start on a free port before failing.
+   * daemon to start on a free port and 12 seconds for read operations
+   * before failing.
    *
    * @author paouelle
    */
   public HelenusJUnit() {
-    this(HelenusJUnit.DEFAULT_STARTUP_TIMEOUT);
+    this(
+      HelenusJUnit.DEFAULT_CFG_FILE,
+      HelenusJUnit.DEFAULT_STARTUP_TIMEOUT,
+      HelenusJUnit.DEFAULT_READ_TIMEOUT
+    );
   }
 
   /**
    * Instantiates a new <code>HelenusJUnit</code> object.
    * <p>
-   * <i>Note:</i> Starts the Cassandra daemon on a free port before failing.
+   * <i>Note:</i> Defaults to 12 seconds for read operations on the Cassandra
+   * daemon before failing.
    *
    * @author paouelle
    *
-   * @param timeout the maximum amount of time in milliseconds to wait for
+   * @param startupTimeout the maximum amount of time in milliseconds to wait for
    *        Cassandra daemon to start before failing
    */
-  public HelenusJUnit(long timeout) {
-    this(HelenusJUnit.DEFAULT_CFG_FILE, timeout);
+  public HelenusJUnit(long startupTimeout) {
+    this(
+      HelenusJUnit.DEFAULT_CFG_FILE,
+      startupTimeout,
+      HelenusJUnit.DEFAULT_READ_TIMEOUT
+    );
   }
 
   /**
@@ -1520,16 +1553,51 @@ public class HelenusJUnit implements MethodRule {
    *
    * @author paouelle
    *
-   * @param cfgname the config file resource name to use to initialize the
-   *        Cassandra daemon
-   * @param timeout the maximum amount of time in milliseconds to wait for
+   * @param startupTimeout the maximum amount of time in milliseconds to wait for
    *        Cassandra daemon to start before failing
+   * @param readTimeout the maximum amount of time in milliseconds to wait for
+   *        read operations on the Cassandra daemon before failing
+   */
+  public HelenusJUnit(long startupTimeout, long readTimeout) {
+    this(HelenusJUnit.DEFAULT_CFG_FILE, startupTimeout, readTimeout);
+  }
+
+  /**
+   * Instantiates a new <code>HelenusJUnit</code> object.
+   * <p>
+   * <i>Note:</i> Defaults to 12 seconds for read operations on the Cassandra
+   * daemon before failing.
+   *
+   * @author paouelle
+   *
+   * @param  cfgname the config file resource name to use to initialize the
+   *         Cassandra daemon
+   * @param  startupTimeout the maximum amount of time in milliseconds to wait for
+   *         Cassandra daemon to start before failing
    * @throws NullPointerException if <code>cfgname</code> is <code>null</code>
    */
-  public HelenusJUnit(String cfgname, long timeout) {
+  public HelenusJUnit(String cfgname, long startupTimeout) {
+    this(cfgname, startupTimeout, HelenusJUnit.DEFAULT_READ_TIMEOUT);
+  }
+
+  /**
+   * Instantiates a new <code>HelenusJUnit</code> object.
+   *
+   * @author paouelle
+   *
+   * @param  cfgname the config file resource name to use to initialize the
+   *         Cassandra daemon
+   * @param  startupTimeout the maximum amount of time in milliseconds to wait for
+   *         Cassandra daemon to start before failing
+   * @param readTimeout the maximum amount of time in milliseconds to wait for
+   *        read operations on the Cassandra daemon before failing
+   * @throws NullPointerException if <code>cfgname</code> is <code>null</code>
+   */
+  public HelenusJUnit(String cfgname, long startupTimeout, long readTimeout) {
     org.apache.commons.lang3.Validate.notNull(cfgname, "invalid null config file");
     this.cfgname = cfgname;
-    this.timeout = timeout;
+    this.startupTimeout = startupTimeout;
+    this.readTimeout = readTimeout;
   }
 
   /**
@@ -1559,7 +1627,7 @@ public class HelenusJUnit implements MethodRule {
       try {
         HelenusJUnit.capturing.set(Integer.MAX_VALUE);
         // start embedded cassandra daemon
-        HelenusJUnit.start0(cfgname, timeout);
+        HelenusJUnit.start0(cfgname, startupTimeout, readTimeout);
         HelenusJUnit.method = method;
         HelenusJUnit.target = target;
         for (final PartitionKeyValues skvs: ReflectionJUnitUtils.getAnnotationsByType(

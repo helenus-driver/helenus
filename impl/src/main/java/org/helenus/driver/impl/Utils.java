@@ -380,6 +380,12 @@ public abstract class Utils {
     } else if (value instanceof CName) {
       appendName(((CName)value).getName(), sb);
       return true;
+    } else if (value instanceof Cast) {
+      final Cast c = (Cast)value;
+      sb.append("CAST(");
+      appendName(c.column, sb);
+      sb.append(" AS ").append(c.targetType).append(')');
+      return true;
     } else if (value instanceof JsonObject) {
       // convert all ' in " and vice versa as Cassandra doesn't like ""
       sb.append(
@@ -639,6 +645,20 @@ public abstract class Utils {
         appendValue(fcall.parameters[i], null, sb);
       }
       sb.append(")");
+    } else if (name instanceof Alias) {
+      final Alias a = (Alias)name;
+
+      sb.append("AS(");
+      appendName(a.column, sb);
+      sb.append(" AS ").append(a.alias);
+    } else if (name instanceof Cast) {
+      final Cast c = (Cast)name;
+
+      sb.append("CAST(");
+      appendName(c.column, sb);
+      sb.append(" AS ").append(c.targetType).append(')');
+    } else if (name instanceof RawString) {
+      sb.append(((RawString)name).str);
     } else {
       appendName((String)name, sb);
     }

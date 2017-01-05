@@ -49,13 +49,6 @@ import org.helenus.driver.junit.HelenusJUnit;
 )
 public class CassandraDaemonThreadFilter extends AbstractFilter {
   /**
-   * Holds the serialVersionUID.
-   *
-   * @author paouelle
-   */
-  private static final long serialVersionUID = -1128269232208515069L;
-
-  /**
    * Create a new <code>CassandraDaemonThreadFilter</code> object.
    *
    * @author paouelle

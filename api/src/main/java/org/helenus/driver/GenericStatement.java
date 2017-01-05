@@ -16,20 +16,19 @@
 package org.helenus.driver;
 
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.ExecutionInfo;
-import com.datastax.driver.core.PagingState;
+import com.datastax.driver.core.PreparedStatement;
+import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
+import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SocketOptions;
-import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.TimestampGenerator;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
-import com.datastax.driver.core.exceptions.PagingStateException;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.datastax.driver.core.policies.RetryPolicy;
+import com.datastax.driver.core.querybuilder.BuiltStatement;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
@@ -389,70 +388,174 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    */
   public int getReadTimeoutMillis();
 
+//  /**
+//   * Sets the paging state.
+//   * <p>
+//   * This will cause the next execution of this statement to fetch results from
+//   * a given page, rather than restarting from the beginning.
+//   * <p>
+//   * You get the paging state from a previous execution of the statement (see
+//   * {@link ExecutionInfo#getPagingState()}. This is typically used to iterate
+//   * in a "stateless" manner (e.g. across HTTP requests):
+//   * <pre>
+//   *   final GenericStatement st = new SimpleStatement("your query");
+//   *   final ResultSet rs = session.execute(st.setFetchSize(20));
+//   *   final int available = rs.getAvailableWithoutFetching();
+//   *
+//   *   for (int i = 0; i < available; i++) {
+//   *     Row row = rs.one();
+//   *     // Do something with row (e.g. display it to the user...)
+//   *   }
+//   *   // Get state and serialize as string or byte[] to store it for the next execution
+//   *   // (e.g. pass it as a parameter in the "next page" URI)
+//   *   final PagingState pagingState = rs.getExecutionInfo().getPagingState();
+//   *   final String savedState = pagingState.toString();
+//   *
+//   *   // Next execution:
+//   *   // Get serialized state back (e.g. get URI parameter)
+//   *   final String savedState = ...
+//   *   final GenericStatement st = new SimpleStatement("your query");
+//   *
+//   *   st.setPagingState(PagingState.fromString(savedState));
+//   *   final ResultSet rs = session.execute(st.setFetchSize(20));
+//   *   final int available = rs.getAvailableWithoutFetching();
+//   *
+//   *   for (int i = 0; i < available; i++) {
+//   *     ...
+//   *   }
+//   * }
+//   * </pre>
+//   * <p>
+//   * The paging state can only be reused between perfectly identical statements
+//   * (same query string, same bound parameters). Altering the contents of the
+//   * paging state or trying to set it on a different statement will cause this
+//   * method to fail.
+//   * <p>
+//   * Note that, due to internal implementation details, the paging state is not
+//   * portable across native protocol versions (see the
+//   * <a href="http://datastax.github.io/java-driver/features/native_protocol">online documentation</a>
+//   * for more explanations about the native protocol). This means that
+//   * {@code PagingState} instances generated with an old version won't work with
+//   * a higher version. If that is a problem for you, consider using the "unsafe"
+//   * API (see {@link #setPagingStateUnsafe(byte[])}).
+//   *
+//   * @author paouelle
+//   *
+//   * @param  pagingState the paging state to set, or {@code null} to remove any
+//   *         state that was previously set on this statement
+//   * @param  codecRegistry the codec registry that will be used if this method
+//   *         needs to serialize the statement's values in order to check that
+//   *         the paging state matches
+//   * @return this {@code GenericStatement} object
+//   * @throws PagingStateException if the paging state does not match this
+//   *         statement
+//   *
+//   * @see #setPagingState(PagingState)
+//   */
+//  public GenericStatement<R, F> setPagingState(
+//    PagingState pagingState, CodecRegistry codecRegistry
+//  );
+//
+//  /**
+//   * Sets the paging state.
+//   * <p>
+//   * This method calls {@link #setPagingState(PagingState, CodecRegistry)} with
+//   * {@link CodecRegistry#DEFAULT_INSTANCE}. Whether you should use this or the
+//   * other variant depends on the type of statement this is called on:
+//   * <ul>
+//   * <li>for a {@link BoundStatement}, the codec registry isn't actually needed,
+//   *     so it's always safe to use this method;</li>
+//   * <li>for a {@link SimpleStatement} or {@link BuiltStatement}, you can use
+//   *     this method if you use no custom codecs, or if your custom codecs are
+//   *     registered with the default registry. Otherwise, use the other method
+//   *     and provide the registry that contains your codecs.</li>
+//   * </ul>
+//   *
+//   * @author paouelle
+//   *
+//   * @param  pagingState the paging state to set, or {@code null} to remove any
+//   *         state that was previously set on this statement
+//   * @return this {@code GenericStatement} object
+//   * @throws PagingStateException if the paging state does not match this
+//   *         statement
+//   *
+//   * @see #setPagingState(PagingState)
+//   */
+//  public GenericStatement<R, F> setPagingState(PagingState pagingState);
+//
+//  /**
+//   * Sets the paging state.
+//   * <p/>
+//   * Contrary to {@link #setPagingState(PagingState)}, this method takes the
+//   * "raw" form of the paging state (previously extracted with
+//   * {@link ExecutionInfo#getPagingStateUnsafe()}. It won't validate that this
+//   * statement matches the one that the paging state was extracted from.
+//   * If the paging state was altered in any way, you will get unpredictable
+//   * behavior from Cassandra (ranging from wrong results to a query failure).
+//   * If you decide to use this variant, it is strongly recommended to add your
+//   * own validation (for example, signing the raw state with a private key).
+//   *
+//   * @param  pagingState the paging state to set, or {@code null} to remove any
+//   *         state that was previously set on this statement
+//   * @return this {@code GenericStatement} object
+//   */
+//  public GenericStatement<R, F> setPagingStateUnsafe(byte[] pagingState);
+
   /**
-   * Sets the paging state.
+   * Sets whether this statement is idempotent.
    * <p>
-   * This will cause the next execution of this statement to fetch results from
-   * a given page, rather than restarting from the beginning.
-   * <p>
-   * You get the paging state from a previous execution of the statement (see
-   * {@link ExecutionInfo#getPagingState()}. This is typically used to iterate
-   * in a "stateless" manner (e.g. across HTTP requests):
-   * <pre>
-   *   final GenericStatement st = new SimpleStatement("your query");
-   *   final ResultSet rs = session.execute(st.setFetchSize(20));
-   *   final int available = rs.getAvailableWithoutFetching();
+   * See {@link #isIdempotent()} for more explanations about this property.
    *
-   *   for (int i = 0; i < available; i++) {
-   *     Row row = rs.one();
-   *     // Do something with row (e.g. display it to the user...)
-   *   }
-   *   // Get state and serialize as string or byte[] to store it for the next execution
-   *   // (e.g. pass it as a parameter in the "next page" URI)
-   *   final PagingState pagingState = rs.getExecutionInfo().getPagingState();
-   *   final String savedState = pagingState.toString();
-   *
-   *   // Next execution:
-   *   // Get serialized state back (e.g. get URI parameter)
-   *   final String savedState = ...
-   *   final GenericStatement st = new SimpleStatement("your query");
-   *
-   *   st.setPagingState(PagingState.fromString(savedState));
-   *   final ResultSet rs = session.execute(st.setFetchSize(20));
-   *   final int available = rs.getAvailableWithoutFetching();
-   *
-   *   for (int i = 0; i < available; i++) {
-   *     ...
-   *   }
-   * }
-   * </pre>
-   * <p>
-   * The paging state can only be reused between perfectly identical statements
-   * (same query string, same bound parameters). Altering the contents of the
-   * paging state or trying to set it on a different statement will cause this
-   * method to fail.
-   * <p>
-   * Note that, due to internal implementation details, the paging state is not
-   * portable across native protocol versions (see the
-   * <a href="http://datastax.github.io/java-driver/features/native_protocol">online documentation</a>
-   * for more explanations about the native protocol). This means that
-   * {@code PagingState} instances generated with an old version won't work with
-   * a higher version. If that is a problem for you, consider using the "unsafe"
-   * API (see {@link #setPagingStateUnsafe(byte[])}).
-   *
-   * @author paouelle
-   *
-   * @param pagingState the paging state to set, or {@code null} to remove any state that was
-   *        previously set on this statement.
-   * @param codecRegistry the codec registry that will be used if this method needs to serialize the
-   *                      statement's values in order to check that the paging state matches.
+   * @param  idempotent the new value
    * @return this {@code GenericStatement} object
-   * @throws PagingStateException if the paging state does not match this
-   *         statement
-   *
-   * @see #setPagingState(PagingState)
    */
-  public Statement setPagingState(PagingState pagingState, CodecRegistry codecRegistry);
+  public GenericStatement<R, F> setIdempotent(boolean idempotent);
+
+  /**
+   * Whether this statement is idempotent, i.e. whether it can be applied
+   * multiple times without changing the result beyond the initial application.
+   * <p/>
+   * If a statement is <em>not idempotent</em>, the driver will ensure that it
+   * never gets executed more than once, which means:
+   * <ul>
+   * <li>avoiding {@link RetryPolicy retries} on write timeouts or request errors;</li>
+   * <li>never scheduling {@link com.datastax.driver.core.policies.SpeculativeExecutionPolicy speculative executions}.
+   * </li>
+   * </ul>
+   * (this behavior is implemented in the driver internals, the corresponding
+   * policies will not even be invoked).
+   * <p/>
+   * Note that this method can return {@code null}, in which case the driver
+   * will default to {@link QueryOptions#getDefaultIdempotence()}.
+   * <p/>
+   * By default, this method returns {@code null} for all statements, except for
+   * <ul>
+   * <li>{@link BuiltStatement} - value will be inferred from the query: if it
+   * updates counters, prepends/appends to a list, or uses a function call or
+   * {@link StatementBuilder#raw(String)} anywhere in an inserted value, the
+   * result will be <code>false</code>; otherwise it will be <code>true</code>.
+   * </li>
+   * <li>
+   * For all {@link Group} statements:
+   * <ol>
+   * <li>If any statement in group has isIdempotent() false - return false</li>
+   * <li>If no statements with isIdempotent() false, but some have isIdempotent()
+   *     null - return null</li>
+   * <li>Otherwise - return true</li>
+   * </ol>
+   * </li>
+   * </ul>
+   * In all cases, calling {@link #setIdempotent(boolean)} forces a value that
+   * overrides calculated value.
+   * <p/>
+   * Note that when a statement is prepared ({@link Session#prepare(String)}),
+   * its idempotence flag will be propagated to all {@link PreparedStatement}s
+   * created from it.
+   *
+   * @return whether this statement is idempotent, or <code>null</code> to use
+   *         {@link QueryOptions#getDefaultIdempotence()}.
+   */
+ public Boolean isIdempotent();
 
   /**
    * Gets user-defined data attached to this statement.

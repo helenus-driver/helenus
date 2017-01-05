@@ -452,4 +452,32 @@ public class SequenceImpl
       }
     }
   }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.SequenceStatementImpl#isIdempotent()
+   */
+  @Override
+  public Boolean isIdempotent() {
+    final Boolean idem = idempotent;
+
+    if (idem != null) {
+      return idem;
+    }
+    boolean nullFound = false;
+
+    for (final StatementImpl<?, ?, ?> s: statements) {
+      final Boolean iidem = s.isIdempotent();
+
+      if (iidem == null) {
+        nullFound = true;
+      } else if (!iidem) {
+        return false;
+      }
+    }
+    return (nullFound ? null : true);
+  }
 }

@@ -22,7 +22,7 @@ import org.helenus.driver.info.ClassInfo;
  * the {@link GenericStatement} interface for statements that are associated with a
  * POJO and returns no data.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation

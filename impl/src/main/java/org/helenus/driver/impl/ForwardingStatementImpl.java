@@ -489,6 +489,78 @@ public abstract class ForwardingStatementImpl<R, F extends ListenableFuture<R>, 
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.impl.StatementImpl#setDefaultTimestamp(long)
+   */
+  @Override
+  public GenericStatement<R, F> setDefaultTimestamp(long defaultTimestamp) {
+    return statement.setDefaultTimestamp(defaultTimestamp);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#getDefaultTimestamp()
+   */
+  @Override
+  public long getDefaultTimestamp() {
+    return statement.getDefaultTimestamp();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#setReadTimeoutMillis(int)
+   */
+  @Override
+  public GenericStatement<R, F> setReadTimeoutMillis(int readTimeoutMillis) {
+    return statement.setReadTimeoutMillis(readTimeoutMillis);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#getReadTimeoutMillis()
+   */
+  @Override
+  public int getReadTimeoutMillis() {
+    return statement.getReadTimeoutMillis();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#setIdempotent(boolean)
+   */
+  @Override
+  public GenericStatement<R, F> setIdempotent(boolean idempotent) {
+    return statement.setIdempotent(idempotent);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.StatementImpl#isIdempotent()
+   */
+  @Override
+  public Boolean isIdempotent() {
+    return statement.isIdempotent();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.impl.StatementImpl#getQueryString()
    */
   @Override

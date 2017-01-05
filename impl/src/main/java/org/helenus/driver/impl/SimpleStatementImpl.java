@@ -158,7 +158,7 @@ public class SimpleStatementImpl
    *         <code>false</code> otherwise
    */
   public boolean isSelect() {
-    // don't any better ways to do this
+    // don't know any better ways to do this
     return StringUtils.startsWithIgnoreCase(query, "select");
   }
 
@@ -171,7 +171,7 @@ public class SimpleStatementImpl
    *         <code>false</code> otherwise
    */
   public boolean isBatch() {
-    // don't any better ways to do this
+    // don't know any better ways to do this
     return StringUtils.startsWithIgnoreCase(query, "begin batch");
   }
 }

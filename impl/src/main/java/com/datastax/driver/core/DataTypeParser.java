@@ -24,7 +24,7 @@ import org.helenus.driver.persistence.Ordering;
 
 /**
  * The <code>DataTypeParser</code> provides access to the
- * {@link CassandraTypeParser} package private class functionality.
+ * {@link DataTypeClassNameParser} package private class functionality.
  *
  * @copyright 2015-2015 The Helenus Driver Project Authors
  *
@@ -33,7 +33,7 @@ import org.helenus.driver.persistence.Ordering;
  *
  * @since 1.0
  */
-public class DataTypeParser extends CassandraTypeParser {
+public class DataTypeParser extends DataTypeClassNameParser {
   /**
    * Converts the specified data type to a cql data type.
    *
@@ -143,10 +143,16 @@ public class DataTypeParser extends CassandraTypeParser {
    * @author paouelle
    *
    * @param  validator the validator to be converted
+   * @param  protocolVersion the protocol version being used
+   * @param  codecRegistry the codec registry to be used
    * @return the corresponding CQL data type
    */
-  public static CQLDataType validatorToCQL(String validator) {
-    return DataTypeParser.toCQL(CassandraTypeParser.parseOne(validator));
+  public static CQLDataType validatorToCQL(
+    String validator, ProtocolVersion protocolVersion, CodecRegistry codecRegistry
+  ) {
+    return DataTypeParser.toCQL(
+      DataTypeClassNameParser.parseOne(validator, protocolVersion, codecRegistry)
+    );
   }
 
   /**
@@ -155,13 +161,19 @@ public class DataTypeParser extends CassandraTypeParser {
    * @author paouelle
    *
    * @param  type the type to be converted
+   * @param  protocolVersion the protocol version being used
+   * @param  codecRegistry the codec registry to be used
    * @return the corresponding CQL data type
    */
-  public static CQLDataType typeToCQL(String type) {
+  public static CQLDataType typeToCQL(
+    String type, ProtocolVersion protocolVersion, CodecRegistry codecRegistry
+  ) {
     if (type.startsWith("org.apache.cassandra.db.marshal.FrozenType(")) {
       type = type.substring(43, type.length() - 1);
     }
-    return DataTypeParser.toCQL(CassandraTypeParser.parseOne(type));
+    return DataTypeParser.toCQL(
+      DataTypeClassNameParser.parseOne(type, protocolVersion, codecRegistry)
+    );
   }
 
   /**
@@ -174,7 +186,7 @@ public class DataTypeParser extends CassandraTypeParser {
    *         otherwise
    */
   public static boolean isReversed(String validator) {
-    return CassandraTypeParser.isReversed(validator);
+    return DataTypeClassNameParser.isReversed(validator);
   }
 
   /**
@@ -187,7 +199,7 @@ public class DataTypeParser extends CassandraTypeParser {
    */
   public static Ordering getOrderingFrom(String validator) {
     return (
-      CassandraTypeParser.isReversed(validator)
+      DataTypeClassNameParser.isReversed(validator)
       ? Ordering.DESCENDING
       : Ordering.ASCENDING
     );
@@ -203,7 +215,7 @@ public class DataTypeParser extends CassandraTypeParser {
    *         otherwise
    */
   public static boolean isUserType(String validator) {
-    return CassandraTypeParser.isUserType(validator);
+    return DataTypeClassNameParser.isUserType(validator);
   }
 
   /**
@@ -216,7 +228,7 @@ public class DataTypeParser extends CassandraTypeParser {
    *         otherwise
    */
   public static boolean isTupleType(String validator) {
-    return CassandraTypeParser.isTupleType(validator);
+    return DataTypeClassNameParser.isTupleType(validator);
   }
 
   /**

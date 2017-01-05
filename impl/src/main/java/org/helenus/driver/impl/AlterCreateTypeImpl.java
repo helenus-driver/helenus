@@ -104,7 +104,11 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
       final CQLDataType type = columns.remove(name0);
 
       if (type != null) {
-        final CQLDataType type0 = DataTypeParser.typeToCQL(utype0);
+        final CQLDataType type0 = DataTypeParser.typeToCQL(
+          utype0,
+          mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
+          mgr.getCluster().getConfiguration().getCodecRegistry()
+        );
         final String type0_cql = type0.toCQL();
         final String type_cql = type.toCQL();
 

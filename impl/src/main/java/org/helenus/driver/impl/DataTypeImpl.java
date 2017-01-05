@@ -50,6 +50,8 @@ import java.time.ZoneId;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import com.datastax.driver.core.DataType.Name;
+
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.persistence.CQLDataType;
@@ -82,34 +84,48 @@ public class DataTypeImpl {
     = new EnumMap<>(DataType.class);
 
   /**
+   * Holds the expected raw Java classes from Cassandra for each possible data
+   * type names.
+   *
+   * @author paouelle
+   */
+  private static final Map<Name, Class<?>> rawClasses
+    = new EnumMap<>(Name.class);
+
+  /**
    * Initializes the decoders map for the specified data type.
    *
    * @author paouelle
    *
    * @param type the non-<code>null</code> data type
+   * @param rawClass the non-<code>null</code> expected raw Java class for the
+   *        data type
    * @param decoders valid decoders supporting to decode from this data type
    */
-  private static void init(DataType type, DataDecoder<?>... decoders) {
+  private static void init(
+    DataType type, Class<?> rawClass, DataDecoder<?>... decoders
+  ) {
     DataTypeImpl.decoders.put(type, decoders);
+    DataTypeImpl.rawClasses.put(type.NAME, rawClass);
   }
 
   static {
-    DataTypeImpl.init(DataType.ASCII, DataDecoder.asciiToEnum, DataDecoder.asciiToClass, DataDecoder.asciiToLocale, DataDecoder.asciiToZoneId, DataDecoder.asciiToString);
-    DataTypeImpl.init(DataType.BIGINT, DataDecoder.bigintToLong);
-    DataTypeImpl.init(DataType.BLOB, DataDecoder.blobToByteArray, DataDecoder.blobToByteBuffer);
-    DataTypeImpl.init(DataType.BOOLEAN, DataDecoder.booleanToBoolean);
-    DataTypeImpl.init(DataType.COUNTER, DataDecoder.counterToLong, DataDecoder.counterToAtomicLong);
-    DataTypeImpl.init(DataType.DECIMAL, DataDecoder.decimalToBigDecimal);
-    DataTypeImpl.init(DataType.DOUBLE, DataDecoder.doubleToDouble);
-    DataTypeImpl.init(DataType.FLOAT, DataDecoder.floatToFloat);
-    DataTypeImpl.init(DataType.INET, DataDecoder.inetToInetAddress);
-    DataTypeImpl.init(DataType.INT, DataDecoder.intToInteger);
-    DataTypeImpl.init(DataType.TEXT, DataDecoder.textToString);
-    DataTypeImpl.init(DataType.TIMESTAMP, DataDecoder.timestampToLong, DataDecoder.timestampToDate, DataDecoder.timestampToInstant);
-    DataTypeImpl.init(DataType.UUID, DataDecoder.uuidToUUID);
-    DataTypeImpl.init(DataType.VARCHAR, DataDecoder.varcharToString);
-    DataTypeImpl.init(DataType.VARINT, DataDecoder.varintToBigInteger);
-    DataTypeImpl.init(DataType.TIMEUUID, DataDecoder.timeuuidToUUID);
+    DataTypeImpl.init(DataType.ASCII, String.class, DataDecoder.asciiToEnum, DataDecoder.asciiToClass, DataDecoder.asciiToLocale, DataDecoder.asciiToZoneId, DataDecoder.asciiToString);
+    DataTypeImpl.init(DataType.BIGINT, Long.class, DataDecoder.bigintToLong);
+    DataTypeImpl.init(DataType.BLOB, ByteBuffer.class, DataDecoder.blobToByteArray, DataDecoder.blobToByteBuffer);
+    DataTypeImpl.init(DataType.BOOLEAN, Boolean.class, DataDecoder.booleanToBoolean);
+    DataTypeImpl.init(DataType.COUNTER, Long.class, DataDecoder.counterToLong, DataDecoder.counterToAtomicLong);
+    DataTypeImpl.init(DataType.DECIMAL, BigDecimal.class, DataDecoder.decimalToBigDecimal);
+    DataTypeImpl.init(DataType.DOUBLE, Double.class, DataDecoder.doubleToDouble);
+    DataTypeImpl.init(DataType.FLOAT, Float.class, DataDecoder.floatToFloat);
+    DataTypeImpl.init(DataType.INET, InetAddress.class, DataDecoder.inetToInetAddress);
+    DataTypeImpl.init(DataType.INT, Integer.class, DataDecoder.intToInteger);
+    DataTypeImpl.init(DataType.TEXT, String.class, DataDecoder.textToString);
+    DataTypeImpl.init(DataType.TIMESTAMP, Date.class, DataDecoder.timestampToLong, DataDecoder.timestampToDate, DataDecoder.timestampToInstant);
+    DataTypeImpl.init(DataType.UUID, UUID.class, DataDecoder.uuidToUUID);
+    DataTypeImpl.init(DataType.VARCHAR, String.class, DataDecoder.varcharToString);
+    DataTypeImpl.init(DataType.VARINT, BigInteger.class, DataDecoder.varintToBigInteger);
+    DataTypeImpl.init(DataType.TIMEUUID, UUID.class, DataDecoder.timeuuidToUUID);
   }
 
   /**
@@ -1253,6 +1269,50 @@ public class DataTypeImpl {
 
     DataTypeImpl.inferDataTypeFrom(field, field.getType(), types);
     return new Definition(types);
+  }
+
+  /**
+   * Gets the expected raw Java class from Cassandra for a given data type.
+   *
+   * @author paouelle
+   *
+   * @param  type the data type
+   * @return the corresponding non-<code>null</code> expected Java raw class
+   */
+  public static Class<?> getRawClass(DataType type) {
+    if (type == null) { // assume custom :-(
+      return ByteBuffer.class;
+    }
+    final Class<?> rawClass = DataTypeImpl.rawClasses.get(type.NAME);
+
+    if (rawClass != null) {
+      return rawClass;
+    }
+    return type.CLASS;
+  }
+
+  /**
+   * Gets the expected raw Java class from Cassandra for a given data type name.
+   *
+   * @author paouelle
+   *
+   * @param  name the data type name
+   * @return the corresponding non-<code>null</code> expected Java raw class
+   */
+  public static Class<?> getRawClass(Name name) {
+    if (name == null) { // assume custom :-(
+      return ByteBuffer.class;
+    }
+    final Class<?> rawClass = DataTypeImpl.rawClasses.get(name);
+
+    if (rawClass != null) {
+      return rawClass;
+    }
+    try {
+      return DataType.valueOf(name).CLASS;
+    } catch (IllegalArgumentException e) { // ignore and assume custom :-(
+      return ByteBuffer.class;
+    }
   }
 
   /**

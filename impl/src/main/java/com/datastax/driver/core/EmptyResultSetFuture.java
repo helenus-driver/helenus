@@ -29,7 +29,7 @@ import org.helenus.driver.StatementManager;
  * {@link ResultSetFuture} in order to provide an empty result set when no
  * query needed to be sent.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -69,14 +69,14 @@ public class EmptyResultSetFuture extends DefaultResultSetFuture {
   public EmptyResultSetFuture(StatementManager mgr) {
     super(
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!
     this.empty = ArrayBackedResultSet.fromMessage(
       new Responses.Result(Responses.Result.Kind.VOID) {}, // VOID to force an empty result
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
       null,
       null
     );

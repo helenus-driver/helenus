@@ -38,7 +38,7 @@ import org.helenus.driver.impl.StatementManagerImpl;
  * are created from a sequence of select statements and requires to be combined
  * together.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Mar 8, 2015 - paouelle - Creation
@@ -82,7 +82,7 @@ public class CompoundResultSetFuture extends DefaultResultSetFuture {
   ) {
     super(
       null,
-      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersionEnum(),
+      mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
       null
     );
     org.apache.commons.lang3.Validate.notNull(mgr, "invalid null mgr"); // will never be reached!
@@ -242,7 +242,7 @@ public class CompoundResultSetFuture extends DefaultResultSetFuture {
    * The <code>CompoundResultSet</code> class is used to compound together
    * multiple result sets.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Mar 8, 2015 - paouelle - Creation
@@ -426,7 +426,7 @@ public class CompoundResultSetFuture extends DefaultResultSetFuture {
      * @see com.datastax.driver.core.ResultSet#fetchMoreResults()
      */
     @Override
-    public ListenableFuture<Void> fetchMoreResults() {
+    public ListenableFuture<ResultSet> fetchMoreResults() {
       if (!isExhausted()) {
         int j = i;
 

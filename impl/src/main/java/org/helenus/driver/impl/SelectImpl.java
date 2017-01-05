@@ -44,16 +44,18 @@ import org.helenus.driver.ObjectSetFuture;
 import org.helenus.driver.Ordering;
 import org.helenus.driver.Select;
 import org.helenus.driver.StatementBridge;
+import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.impl.Utils.CName;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
+import org.helenus.driver.persistence.DataType;
 
 /**
  * The <code>SelectImpl</code> class extends the functionality of Cassandra's
  * {@link com.datastax.driver.core.querybuilder.Select} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -1130,7 +1132,14 @@ public class SelectImpl<T>
    */
   public static class SelectionImpl<T>
     extends BuilderImpl<T>
-    implements Selection<T> {
+    implements SelectionOrAlias<T> {
+    /**
+     * Holds the previous selection.
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     */
+    private Object previous;
+
     /**
      * Instantiates a new <code>SelectionImpl</code> object.
      *
@@ -1170,6 +1179,42 @@ public class SelectImpl<T>
     }
 
     /**
+     * Queues up the specified column name as one to be added.
+     *
+     * @author paouelle
+     *
+     * @param  name the non-<code>null</code> column name to be added
+     * @return this for chaining
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     * @throws IllegalArgumentException if any of the specified columns are not defined
+     *         by the POJO
+     */
+    private SelectionOrAlias<T> queueName(Object name) {
+      context.getClassInfo().validateColumn(name);
+      if (previous != null) {
+        addName(previous);
+      }
+      this.previous = name;
+      return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.SelectionOrAlias#as(java.lang.String)
+     */
+    @Override
+    public Selection<T> as(String alias) {
+      assert previous != null;
+      final Object a = new Utils.Alias(previous, alias);
+
+      this.previous = null;
+      return addName(a);
+    }
+
+    /**
      * {@inheritDoc}
      *
      * @author paouelle
@@ -1182,6 +1227,11 @@ public class SelectImpl<T>
         columnNames == null,
         "some columns (%s) have already been selected",
         StringUtils.join(columnNames, ", ")
+      );
+      org.apache.commons.lang3.Validate.validState(
+        previous == null,
+        "some columns ([%s]) have already been selected",
+        previous
       );
       super.countOrAllSelected = true;
       return this;
@@ -1201,6 +1251,11 @@ public class SelectImpl<T>
         "some columns (%s) have already been selected",
         StringUtils.join(columnNames, ", ")
       );
+      org.apache.commons.lang3.Validate.validState(
+        previous == null,
+        "some columns ([%s]) have already been selected",
+        previous
+      );
       super.columnNames = SelectImpl.COUNT_ALL;
       super.countOrAllSelected = true;
       return this;
@@ -1214,8 +1269,8 @@ public class SelectImpl<T>
      * @see org.helenus.driver.Select.Selection#column(java.lang.Object)
      */
     @Override
-    public Selection<T> column(Object name) {
-      return addName(name);
+    public SelectionOrAlias<T> column(Object name) {
+      return queueName(name);
     }
 
     /**
@@ -1226,8 +1281,8 @@ public class SelectImpl<T>
      * @see org.helenus.driver.Select.Selection#writeTime(java.lang.String)
      */
     @Override
-    public Selection<T> writeTime(String name) {
-      return addName(new Utils.FCall("writetime", new Utils.CName(name)));
+    public SelectionOrAlias<T> writeTime(String name) {
+      return queueName(new Utils.FCall("writetime", new Utils.CName(name)));
     }
 
     /**
@@ -1238,8 +1293,8 @@ public class SelectImpl<T>
      * @see org.helenus.driver.Select.Selection#ttl(java.lang.String)
      */
     @Override
-    public Selection<T> ttl(String name) {
-      return addName(new Utils.FCall("ttl", new Utils.CName(name)));
+    public SelectionOrAlias<T> ttl(String name) {
+      return queueName(new Utils.FCall("ttl", new Utils.CName(name)));
     }
 
     /**
@@ -1250,8 +1305,74 @@ public class SelectImpl<T>
      * @see org.helenus.driver.Select.Selection#fcall(java.lang.String, java.lang.Object[])
      */
     @Override
-    public Selection<T> fcall(String name, Object... parameters) {
-      return addName(new Utils.FCall(name, parameters));
+    public SelectionOrAlias<T> fcall(String name, Object... parameters) {
+      return queueName(new Utils.FCall(name, parameters));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.Select.Selection#cast(java.lang.Object, org.helenus.driver.persistence.DataType)
+     */
+    @Override
+    public SelectionOrAlias<T> cast(Object column, DataType targetType) {
+      return queueName(new Utils.Cast(column, targetType));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     *
+     * @see org.helenus.driver.Select.Selection#raw(java.lang.String)
+     */
+    @Override
+    public SelectionOrAlias<T> raw(String rawString) {
+      return queueName(StatementBuilder.raw(rawString));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     *
+     * @see org.helenus.driver.Select.Selection#toJson(java.lang.String)
+     */
+    @Override
+    public org.helenus.driver.Select.SelectionOrAlias<T> toJson(String name) {
+      return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     *
+     * @see org.helenus.driver.impl.SelectImpl.BuilderImpl#from(java.lang.String)
+     */
+    @Override
+    public Select<T> from(String table) {
+      if (previous != null) {
+        addName(previous);
+      }
+      return super.from(table);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     *
+     * @see org.helenus.driver.impl.SelectImpl.BuilderImpl#from(org.helenus.driver.info.TableInfo)
+     */
+    @Override
+    public Select<T> from(TableInfo<T> table) {
+      if (previous != null) {
+        addName(previous);
+      }
+      return super.from(table);
     }
   }
 
