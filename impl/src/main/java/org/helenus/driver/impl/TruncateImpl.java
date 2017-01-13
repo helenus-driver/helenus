@@ -122,12 +122,12 @@ public class TruncateImpl<T>
     builder.append("TRUNCATE ");
     try {
       if (getKeyspace() != null) {
-        Utils.appendName(getKeyspace(), builder).append(".");
+        Utils.appendName(builder, getKeyspace()).append(".");
       }
     } catch (ExcludedKeyspaceKeyException e) { // just skip this one since we were asked to skip the current keyspace key
       return null;
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     builder.append(';');
     return builder;
   }

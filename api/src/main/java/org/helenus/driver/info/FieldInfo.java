@@ -21,7 +21,6 @@ import org.helenus.driver.persistence.ClusteringKey;
 import org.helenus.driver.persistence.Index;
 import org.helenus.driver.persistence.KeyspaceKey;
 import org.helenus.driver.persistence.PartitionKey;
-import org.helenus.driver.persistence.Persisted;
 import org.helenus.driver.persistence.TypeKey;
 
 /**
@@ -285,16 +284,6 @@ public interface FieldInfo<T> {
    *         <code>false</code> otherwise
    */
   public boolean isMultiKey();
-
-  /**
-   * Checks if this field is persisted (i.e. annotated with {@link Persisted}).
-   *
-   * @author paouelle
-   *
-   * @return <code>true</code> if this field is persisted; <code>false</code>
-   *         otherwise
-   */
-  public boolean isPersisted();
 
   /**
    * Gets this field's annotation for the specified type if such an annotation

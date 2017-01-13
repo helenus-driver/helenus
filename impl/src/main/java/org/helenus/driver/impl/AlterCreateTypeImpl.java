@@ -104,11 +104,7 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
       final CQLDataType type = columns.remove(name0);
 
       if (type != null) {
-        final CQLDataType type0 = DataTypeParser.typeToCQL(
-          utype0,
-          mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
-          mgr.getCluster().getConfiguration().getCodecRegistry()
-        );
+        final CQLDataType type0 = DataTypeParser.typeToCQL(mgr, utype0);
         final String type0_cql = type0.toCQL();
         final String type_cql = type.toCQL();
 
@@ -131,9 +127,9 @@ public class AlterCreateTypeImpl<T> extends CreateTypeImpl<T> {
 
     builder.append("ALTER TYPE ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(builder, getKeyspace()).append(".");
     }
-    Utils.appendName(ucinfo.getName(), builder);
+    Utils.appendName(builder, ucinfo.getName());
     builder.append(' ');
     return columns0.stream()
       .map(inst -> new StringBuilder(builder).append(inst))

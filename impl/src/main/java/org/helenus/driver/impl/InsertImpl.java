@@ -28,20 +28,21 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.Insert;
 import org.helenus.driver.ObjectExistException;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
 
@@ -188,11 +189,10 @@ public class InsertImpl<T>
    *         and cannot be computed with the provided keyspace keys yet or if the
    *         POJO is missing primary, clustering, or mandatory columns defined
    *         by the specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings({"cast", "unchecked", "rawtypes"})
   void buildQueryStrings(TableInfoImpl<T> table, List<StringBuilder> builders) {
-    final Map<String, Pair<Object, CQLDataType>> columns;
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> columns;
 
     try {
       if (allValuesAdded || this.columns.isEmpty()) {
@@ -201,7 +201,7 @@ public class InsertImpl<T>
         columns = getPOJOContext().getColumnValues(table.getName());
       } else {
         // we need to make sure all primary and mandatory columns are in there first
-        final Map<String, Pair<Object, CQLDataType>> mpkcolumns
+        final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> mpkcolumns
           = getPOJOContext().getMandatoryAndPrimaryKeyColumnValues(table.getName());
 
         columns = new LinkedHashMap<>(mpkcolumns.size() + this.columns.size());
@@ -214,7 +214,11 @@ public class InsertImpl<T>
         values.forEach((n, v) -> {
           final FieldInfoImpl finfo = table.getColumnImpl(n);
 
-          columns.put(n, Pair.of(v, (finfo != null) ? finfo.getDataType() : null));
+          if (finfo != null) {
+            columns.put(n, Triple.of(v, finfo.getDataType(), finfo.getCodec()));
+          } else {
+            columns.put(n, Triple.of(v, null, null));
+          }
         });
       }
     } catch (EmptyOptionalPrimaryKeyException e) {
@@ -236,15 +240,16 @@ public class InsertImpl<T>
         if (finfo.isMultiKey()) { // will be handled separately after this
           continue;
         }
-        final Pair<Object, CQLDataType> pset = columns.get(finfo.getColumnName()); // we need to leave the original column there as is
+        final Triple<Object, CQLDataType, TypeCodec<?>> pset = columns.get(finfo.getColumnName()); // we need to leave the original column there as is
 
         if (pset != null) {
           final Object v = pset.getLeft();
 
           columns.put(
             StatementImpl.CI_PREFIX + finfo.getColumnName(),
-            Pair.of(
+            Triple.of(
               (v != null) ? StringUtils.lowerCase(v.toString()) : null,
+              pset.getMiddle(),
               pset.getRight()
             )
           );
@@ -257,7 +262,7 @@ public class InsertImpl<T>
       int j = -1;
 
       for (final FieldInfoImpl<T> finfo: multiKeys) {
-        final Pair<Object, CQLDataType> pset = columns.get(finfo.getColumnName());
+        final Triple<Object, CQLDataType, TypeCodec<?>> pset = columns.get(finfo.getColumnName());
 
         if (pset != null) {
           final boolean ci = finfo.isCaseInsensitiveKey();
@@ -282,7 +287,7 @@ public class InsertImpl<T>
         for (final FieldInfoImpl<T> finfo: multiKeys) {
           columns.put(
             StatementImpl.MK_PREFIX + finfo.getColumnName(),
-            Pair.of(ckeys.get(++j), finfo.getDataType().getElementType())
+            Triple.of(ckeys.get(++j), finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec()).codec(0))
           );
         }
         // finally build the query for this combination
@@ -320,30 +325,37 @@ public class InsertImpl<T>
    *         and cannot be computed with the provided keyspace keys yet or if the
    *         POJO is missing primary, clustering, or mandatory columns defined
    *         by the specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   private void buildQueryString(
-    TableInfoImpl<T> table, Map<String, Pair<Object, CQLDataType>> columns, List<StringBuilder> builders
+    TableInfoImpl<T> table,
+    Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> columns,
+    List<StringBuilder> builders
   ) {
     final StringBuilder builder = new StringBuilder();
 
     builder.append("INSERT INTO ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(builder, getKeyspace()).append(".");
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     builder.append("(");
-    Utils.joinAndAppendNames(builder, ",", columns.keySet());
+    Utils.joinAndAppendNames(
+      table, null, mgr.getCodecRegistry(), builder, ",", columns.keySet()
+    );
     builder.append(") VALUES (");
-    Utils.joinAndAppendValues(builder, ",", columns.values());
+    Utils.joinAndAppendValues(
+      null, mgr.getCodecRegistry(), builder, ",", columns.values(), null
+    );
     builder.append(")");
     if (ifNotExists) {
       builder.append(" IF NOT EXISTS");
     }
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
-      Utils.joinAndAppend(table, builder, " AND ", usings.usings);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
+      );
     }
     builders.add(builder);
   }

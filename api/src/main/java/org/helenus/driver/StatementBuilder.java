@@ -1620,7 +1620,7 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  timestamp the timestamp (in microseconds) to use.
+   * @param  timestamp the timestamp (in microseconds) to use
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>timestamp</code> is negative
    */
@@ -1629,12 +1629,27 @@ public final class StatementBuilder {
   }
 
   /**
+   * Option to prepare the timestamp in microseconds for a modification statement
+   * (insert, update or delete).
+   *
+   * @author paouelle
+   *
+   * @param  marker the bind marker to use for the timestamp
+   * @return the corresponding option
+   * @throws NullPointerException if <code>marker</code> is <code>null</code>
+   */
+  public static Using<BindMarker> timestamp(BindMarker marker) {
+    org.apache.commons.lang3.Validate.notNull(marker, "invalid null marker");
+    return StatementManager.getManager().timestamp(marker);
+  }
+
+  /**
    * Option to set the timestamp for a modification statement (insert, update or
    * delete).
    *
    * @author paouelle
    *
-   * @param  timestamp the timestamp (in milliseconds) to use.
+   * @param  timestamp the timestamp (in milliseconds) to use
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>timestamp</code> is negative
    */
@@ -1647,12 +1662,27 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  ttl the ttl (in seconds) to use.
+   * @param  ttl the ttl (in seconds) to use
    * @return the corresponding option
    * @throws IllegalArgumentException if <code>ttl</code> is negative
    */
   public static Using<Integer> ttl(int ttl) {
     return StatementManager.getManager().ttl(ttl);
+  }
+
+  /**
+   * Option to prepare the ttl (in seconds) for a modification statement
+   * (insert, update or delete).
+   *
+   * @author paouelle
+   *
+   * @param  marker bind marker to use for the ttl
+   * @return the corresponding option
+   * @throws NullPointerException if <code>marker</code> is <code>null</code>
+   */
+  public static Using<BindMarker> ttl(BindMarker marker) {
+    org.apache.commons.lang3.Validate.notNull(marker, "invalid null marker");
+    return StatementManager.getManager().ttl(marker);
   }
 
   /**
@@ -1875,6 +1905,24 @@ public final class StatementBuilder {
   }
 
   /**
+   * Incrementation of a counter column by a provided value.
+   * <p>
+   * This will generate: {@code name = name + value}.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to increment
+   * @param  marker a bind marker representing the value by which to increment
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> or <code>marker</code> is
+   *         <code>null</code>
+   */
+  public static Assignment incr(CharSequence name, BindMarker marker) {
+    org.apache.commons.lang3.Validate.notNull(marker, "invalid null marker");
+    return StatementManager.getManager().incr(name, marker);
+  }
+
+  /**
    * Decrementation of a counter column.
    * <p>
    * This will generate: {@code name = name - 1}.
@@ -1906,16 +1954,38 @@ public final class StatementBuilder {
   }
 
   /**
-   * Prepend a value to a list column.
+   * Decrementation of a counter column by a provided value.
    * <p>
-   * This will generate: {@code name = [ value ] + name}.
+   * This will generate: {@code name = name - value}.
    *
    * @author paouelle
    *
-   * @param  name the column name (must be of type list).
+   * @param  name the column name to decrement
+   * @param  marker a bind marker representing the value by which to decrement
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> or <code>marker</code> is
+   *         <code>null</code>
+   */
+  public static Assignment decr(CharSequence name, BindMarker marker) {
+    org.apache.commons.lang3.Validate.notNull(marker, "invalid null marker");
+    return StatementManager.getManager().decr(name, marker);
+  }
+
+  /**
+   * Prepend a value to a list column.
+   * <p>
+   * This will generate: {@code name = [ value ] + name}.
+   * <p>
+   * <i>Note:</i> Using a bind marker here is not supported. To use a bind marker
+   * use {@link #prependAll} with a singleton list.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name (must be of type list)
    * @param  value the value to prepend
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if a bind marker is specified
    */
   public static Assignment prepend(CharSequence name, Object value) {
     return StatementManager.getManager().prepend(name, value);
@@ -1928,7 +1998,7 @@ public final class StatementBuilder {
    *
    * @author paouelle
    *
-   * @param  name the column name (must be of type list).
+   * @param  name the column name (must be of type list)
    * @param  values the list of values to prepend
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> or <code>values</code> is
@@ -1939,9 +2009,30 @@ public final class StatementBuilder {
   }
 
   /**
+   * Prepend a list of values to a list column.
+   * <p>
+   * This will generate: {@code name = list + name}.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name (must be of type list)
+   * @param  marker the bind marker representing the list of values to prepend
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> or <code>marker</code> is
+   *         <code>null</code>
+   */
+  public static Assignment prependAll(CharSequence name, BindMarker marker) {
+    org.apache.commons.lang3.Validate.notNull(marker, "invalid null marker");
+    return StatementManager.getManager().prependAll(name, marker);
+  }
+
+  /**
    * Append a value to a list column.
    * <p>
    * This will generate: {@code name = name + [value]}.
+   * <p>
+   * <i>Note:</i> Using a bind marker here is not supported. To use a bind marker
+   * use {@link #appendAll} with a singleton list.
    *
    * @author paouelle
    *
@@ -1949,6 +2040,7 @@ public final class StatementBuilder {
    * @param  value the value to append
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if a bind marker is specified
    */
   public static Assignment append(CharSequence name, Object value) {
     return StatementManager.getManager().append(name, value);

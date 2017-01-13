@@ -1403,7 +1403,7 @@ public abstract class StatementImpl<R, F extends ListenableFuture<R>, T>
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.GenericStatement#getDefaultTimestamp()
    */

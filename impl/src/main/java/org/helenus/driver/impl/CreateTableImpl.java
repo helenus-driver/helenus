@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 import org.helenus.driver.Clause;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.CreateTable;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.TableWith;
@@ -151,7 +150,6 @@ public class CreateTableImpl<T>
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
@@ -234,9 +232,9 @@ public class CreateTableImpl<T>
       builder.append("IF NOT EXISTS ");
     }
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append('.');
+      Utils.appendName(builder, getKeyspace()).append('.');
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     builder
       .append(" (")
       .append(StringUtils.join(columns, ","))
@@ -257,7 +255,9 @@ public class CreateTableImpl<T>
     }
     if (!with.options.isEmpty() ) {
       builder.append(withAdded ? " AND " : " WITH ");
-      Utils.joinAndAppend(table, builder, " AND ", with.options);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", with.options, null
+      );
     }
     builder.append(';');
     return new StringBuilder[] { builder };

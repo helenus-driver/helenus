@@ -16,6 +16,7 @@
 package org.helenus.driver.impl;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.json.Json;
@@ -25,7 +26,12 @@ import javax.json.JsonObjectBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.ParseUtils;
+import com.datastax.driver.core.TypeCodec;
+
 import org.helenus.driver.KeyspaceWith;
+import org.helenus.driver.codecs.provider.VarCharCodecProvider;
 import org.helenus.driver.persistence.Keyspace;
 import org.helenus.driver.persistence.StrategyClass;
 
@@ -79,12 +85,49 @@ public class KeyspaceWithImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
    */
   @Override
-  void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-    sb.append(name).append("=");
-    Utils.appendValue(value, null, sb);
+  void appendTo(
+    TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    List<Object> variables
+  ) {
+    sb.append(name).append('=');
+    if ((codec == null) && (value instanceof JsonObject)) {
+      // special case for keyspace options as we want to convert the Json object
+      // into a Cassandra map and not in a varchar
+      final StringBuilder vsb = new StringBuilder(80);
+
+      Utils.appendValue(
+        null, VarCharCodecProvider.JSON_CODEC, codecRegistry, vsb, value, variables
+      );
+      // strip surrounding quotes and
+      // convert all ' in " and vice versa as Cassandra doesn't like "" inside maps
+      sb.append(
+        ParseUtils.unquote(vsb.toString())
+          .replaceAll("'", "'QUOTE'")
+          .replaceAll("\"", "'")
+          .replaceAll("\\\\'", "\"")
+          .replaceAll("'QUOTE'", "\\\\'")
+      );
+    } else {
+      Utils.appendValue(null, codec, codecRegistry, sb, value, variables);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+   */
+  @Override
+  boolean containsBindMarker() {
+    return false;
   }
 
   /**

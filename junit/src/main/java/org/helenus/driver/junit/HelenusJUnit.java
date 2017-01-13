@@ -3299,7 +3299,7 @@ class SchemaFuture {
     throw new AssertionError(
       "failed to "
       + (creating ? "create" : "reset")
-      + " for "
+      + " schema for "
       + clazz.getSimpleName(),
       t
     );

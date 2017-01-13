@@ -32,9 +32,11 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
+
+import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.info.TableInfo;
@@ -282,7 +284,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       FieldInfoImpl<T> field = fields.get(pf);
 
       if (field == null) {
-        field = new FieldInfoImpl<>(this, f);
+        field = new FieldInfoImpl<>(mgr, this, f);
         if (!field.isColumn()) {
           // not annotated as a column for this table so skip it
           continue;
@@ -663,10 +665,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all column/value pairs for the POJO
    * @throws IllegalArgumentException if a mandatory column is missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getColumnValues(T object) {
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(columns.size());
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(T object) {
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(columns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: columns.entrySet()) {
       final String name = e.getKey();
@@ -715,7 +717,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           );
         }
       }
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -729,13 +731,13 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @return a non-<code>null</code> map of all partition key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(T object) {
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(T object) {
     if (table == null) {
       return Collections.emptyMap();
     }
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(primaryKeyColumns.size());
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(primaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: partitionKeyColumns.entrySet()) {
       final String name = e.getKey();
@@ -749,7 +751,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         table.name(),
         clazz.getSimpleName()
       );
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -776,9 +778,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         column/value pairs for the POJO
    * @throws IllegalArgumentException if a column or a keyspace key is missing
    *         from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(
     T object
   ) {
     if (table == null) {
@@ -793,7 +794,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     keys.putAll(skeys);
     // now add partition keys (overriding keyspace keys if names clashes!!!)
     keys.putAll(partitionKeyColumns);
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(keys.size());
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(keys.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: keys.entrySet()) {
       final String name = e.getKey();
@@ -807,7 +809,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         table.name(),
         clazz.getSimpleName()
       );
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -821,13 +823,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @return a non-<code>null</code> map of all primary key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(T object) {
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
+    T object
+  ) {
     if (table == null) {
       return Collections.emptyMap();
     }
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(primaryKeyColumns.size());
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values = new LinkedHashMap<>(primaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: primaryKeyColumns.entrySet()) {
       final String name = e.getKey();
@@ -856,7 +859,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + "'"
         );
       }
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -873,15 +876,15 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @return a non-<code>null</code> map of all primary key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
     T object, Map<String, Object> pkeys_override
   ) {
     if (table == null) {
       return Collections.emptyMap();
     }
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(primaryKeyColumns.size());
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(primaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: primaryKeyColumns.entrySet()) {
       final String name = e.getKey();
@@ -913,7 +916,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + "'"
         );
       }
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -928,9 +931,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         column/value pairs for the POJO
    * @throws IllegalArgumentException if a column or a keyspace key is missing
    *         from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(T object) {
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(
+    T object
+  ) {
     if (table == null) {
       return Collections.emptyMap();
     }
@@ -943,7 +947,8 @@ public class TableInfoImpl<T> implements TableInfo<T> {
     keys.putAll(skeys);
     // now add primary keys (overriding keyspace keys if names clashes!!!)
     keys.putAll(primaryKeyColumns);
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(keys.size());
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(keys.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: keys.entrySet()) {
       final String name = e.getKey();
@@ -957,7 +962,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         table.name(),
         clazz.getSimpleName()
       );
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -972,10 +977,11 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @return a non-<code>null</code> map of all mandatory and primary key
    *         column/value pairs for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(T object) {
-    final Map<String, Pair<Object, CQLDataType>> values
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getMandatoryAndPrimaryKeyColumnValues(
+    T object
+  ) {
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
       = new LinkedHashMap<>(mandatoryAndPrimaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: mandatoryAndPrimaryKeyColumns.entrySet()) {
@@ -1025,32 +1031,32 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           );
         }
       }
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
 
   /**
-   * Retrieves all non primary key columns and their non-encoded values from
-   * the POJO.
-   * <p>
-   * <i>Note:</i> The returned values should not be encoded.
+   * Retrieves all non primary key columns and their values from the POJO.
    *
    * @author paouelle
    *
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all non primary key column/value
-   *         (non-encoded) pairs for the POJO
+   *         pairs for the POJO
    * @throws IllegalArgumentException if a mandatory column is missing from
    *         the POJO
    */
-  Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(T object) {
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(nonPrimaryKeyColumns.size());
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getNonPrimaryKeyColumnValues(
+    T object
+  ) {
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(nonPrimaryKeyColumns.size());
 
     for (final Map.Entry<String, FieldInfoImpl<T>> e: nonPrimaryKeyColumns.entrySet()) {
       final String name = e.getKey();
       final FieldInfoImpl<T> field = e.getValue();
-      final Object value = field.getNonEncodedValue(object);
+      final Object value = field.getValue(object);
 
       if (table != null) {
         org.apache.commons.lang3.Validate.isTrue(
@@ -1067,7 +1073,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           name, clazz.getSimpleName()
         );
       }
-      values.put(name, Pair.of(value, field.getDataType()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
     }
     return values;
   }
@@ -1082,9 +1088,10 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @return the column value for the POJO
    * @throws IllegalArgumentException if the column name is not defined by the
    *         POJO or is mandatory and missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Pair<Object, CQLDataType> getColumnValue(T object, CharSequence name) {
+  Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(
+    T object, CharSequence name
+  ) {
     final String n;
 
     if (name instanceof Utils.CNameSequence) {
@@ -1154,92 +1161,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         );
       }
     }
-    return Pair.of(value, field.getDataType());
-  }
-
-  /**
-   * Retrieves the specified column non-encoded value from the POJO.
-   *
-   * @author paouelle
-   *
-   * @param  object the non-<code>null</code> POJO object
-   * @param  name the name of the column to retrieve
-   * @return the column non-encoded value for the POJO
-   * @throws IllegalArgumentException if the column name is not defined by the
-   *         POJO or is mandatory and missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
-   */
-  Pair<Object, CQLDataType> getColumnNonEncodedValue(T object, CharSequence name) {
-    final String n;
-
-    if (name instanceof Utils.CNameSequence) {
-      n = ((Utils.CNameSequence)name).getName();
-    } else {
-      n = name.toString();
-    }
-    final FieldInfoImpl<T> field = columns.get(n);
-
-    if (table != null) {
-      org.apache.commons.lang3.Validate.isTrue(
-        field != null,
-        "pojo '%s' doesn't define column '%s' in table '%s'",
-        clazz.getSimpleName(),
-        n,
-        table.name()
-      );
-    } else {
-      org.apache.commons.lang3.Validate.isTrue(
-        field != null,
-        "udt '%s' doesn't define column '%s'",
-        clazz.getSimpleName(),
-        n
-      );
-    }
-    final Object value = field.getNonEncodedValue(object);
-
-    if (value == null) {
-      if (table != null) {
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isMandatory(),
-          "missing mandatory column '%s' in table '%s' for pojo '%s'",
-          n, table.name(), clazz.getSimpleName()
-        );
-        if (field.isPartitionKey() || field.isClusteringKey()) {
-          if (field.isOptional()) {
-            throw new EmptyOptionalPrimaryKeyException(
-              "missing primary key column '"
-              + n
-              + "' in table '"
-              + table.name()
-              + "' for pojo '"
-              + clazz.getSimpleName()
-              + "'"
-            );
-          }
-          throw new IllegalArgumentException(
-            "missing primary key column '"
-            + n
-            + "' in table '"
-            + table.name()
-            + "' for pojo '"
-            + clazz.getSimpleName()
-            + "'"
-          );
-        }
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isTypeKey(),
-          "missing type key column '%s' in table '%s' for pojo '%s'",
-          n, table.name(), clazz.getSimpleName()
-        );
-      } else {
-        org.apache.commons.lang3.Validate.isTrue(
-          !field.isMandatory(),
-          "missing mandatory column '%s' for udt '%s'",
-          n, clazz.getSimpleName()
-        );
-      }
-    }
-    return Pair.of(value, field.getDataType());
+    return Triple.of(value, field.getDataType(), field.getCodec());
   }
 
   /**
@@ -1253,10 +1175,12 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         for the POJO
    * @throws IllegalArgumentException if any of the column names are not defined
    *         by the POJO or is mandatory and missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getColumnValues(T object, Iterable<CharSequence> names) {
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(columns.size());
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+    T object, Iterable<CharSequence> names
+  ) {
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(columns.size());
 
     for (final CharSequence name: names) {
       final String n;
@@ -1282,10 +1206,12 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         for the POJO
    * @throws IllegalArgumentException if any of the column names are not defined
    *         by the POJO or is mandatory and missing from the POJO
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
-  Map<String, Pair<Object, CQLDataType>> getColumnValues(T object, CharSequence... names) {
-    final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(columns.size());
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+    T object, CharSequence... names
+  ) {
+    final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+      = new LinkedHashMap<>(columns.size());
 
     for (final CharSequence name: names) {
       final String n;
@@ -1307,7 +1233,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @return a non-<code>null</code> set of all column fields
    */
-  protected Collection<FieldInfoImpl<T>> getColumnsImpl() {
+  public Collection<FieldInfoImpl<T>> getColumnsImpl() {
     return columns.values();
   }
 

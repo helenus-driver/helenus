@@ -22,11 +22,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
-import org.helenus.driver.BindMarker;
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.TypeCodec;
+
 import org.helenus.driver.Clause;
-import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.persistence.CQLDataType;
 
 /**
@@ -200,7 +202,6 @@ public abstract class ClauseImpl
      * @return a non-<code>null</code> list of new clause(s) corresponding to
      *         this one
      * @throws IllegalArgumentException if missing mandatory columns are processed
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
@@ -286,6 +287,13 @@ public abstract class ClauseImpl
     protected final CQLDataType definition;
 
     /**
+     * Holds the codec associated with the value if any.
+     *
+     * @author paouelle
+     */
+    protected final TypeCodec<?>codec;
+
+    /**
      * Instantiates a new <code>SimpleClauseImpl</code> object.
      *
      * @author paouelle
@@ -307,20 +315,22 @@ public abstract class ClauseImpl
      *
      * @param  name the column name for this clause
      * @param  op the operator for this clause
-     * @param  pvalue the value and its associated definition for this clause
+     * @param  tvalue the value and its associated definition for this clause
      * @throws NullPointerException if <code>name</code> or <code>op</code>
      *         is <code>null</code>
      */
-    SimpleClauseImpl(CharSequence name, String op, Pair<Object, CQLDataType> pvalue) {
+    SimpleClauseImpl(CharSequence name, String op, Triple<Object, CQLDataType, TypeCodec<?>> tvalue) {
       super(name);
       org.apache.commons.lang3.Validate.notNull(op, "invalid null operation");
       this.op = op;
-      if (pvalue != null) {
-        this.value = pvalue.getLeft();
-        this.definition = pvalue.getRight();
+      if (tvalue != null) {
+        this.value = tvalue.getLeft();
+        this.definition = tvalue.getMiddle();
+        this.codec = tvalue.getRight();
       } else {
         this.value = null;
         this.definition = null;
+        this.codec = null;
       }
     }
 
@@ -342,6 +352,7 @@ public abstract class ClauseImpl
       this.op = op;
       this.value = value;
       this.definition = definition;
+      this.codec = null;
     }
 
     /**
@@ -349,11 +360,17 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append(op);
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      Utils.appendName(tinfo, null, codecRegistry, sb, name).append(op);
       FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       if (finfo == null) { // check if the field is the multi-key
@@ -363,20 +380,53 @@ public abstract class ClauseImpl
           sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
-            Utils.appendValue(finfo.encodeElementValue(value), (definition != null) ? definition : finfo.getDataType().getElementType(), sb);
+            Utils.appendValue(
+              (definition != null) ? definition : finfo.getDataType().getElementType(),
+              (codec != null) ? codec : ((this.codec != null) ? this.codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0)),
+              codecRegistry,
+              sb,
+              value,
+              variables
+            );
             return;
           }
         } else if (sname.startsWith(StatementImpl.CI_PREFIX)) {
           sname = sname.substring(StatementImpl.CI_PREFIX.length()); // strip ci prefix
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
-            Utils.appendValue(finfo.encodeValue(value), (definition != null) ? definition : finfo.getDataType(), sb);
+            Utils.appendValue(
+              (definition != null) ? definition : finfo.getDataType(),
+              (codec != null) ? codec : ((this.codec != null) ? this.codec : finfo.getCodec()),
+              codecRegistry,
+              sb,
+              value,
+              variables
+            );
             return;
           }
         }
         throw new IllegalStateException("unknown column '" + name + "'");
       }
-      Utils.appendValue(finfo.encodeValue(value), (definition != null) ? definition : finfo.getDataType(), sb);
+      Utils.appendValue(
+        (definition != null) ? definition : finfo.getDataType(),
+        (codec != null) ? codec : ((this.codec != null) ? this.codec : finfo.getCodec()),
+        codecRegistry,
+        sb,
+        value,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(value);
     }
 
     /**
@@ -473,11 +523,11 @@ public abstract class ClauseImpl
      * @author paouelle
      *
      * @param  name the column name for this clause
-     * @param  pvalue the value and its associated definition for this clause
+     * @param  tvalue the value and its associated definition for this clause
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
-    EqClauseImpl(CharSequence name, Pair<Object, CQLDataType> pvalue) {
-      super(name, "=", pvalue);
+    EqClauseImpl(CharSequence name, Triple<Object, CQLDataType, TypeCodec<?>> tvalue) {
+      super(name, "=", tvalue);
     }
 
     /**
@@ -549,10 +599,16 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
       if (values.size() == 1) {
         // We special case the case of just one bind marker because there is
         // little
@@ -565,13 +621,12 @@ public abstract class ClauseImpl
         // which binds the variable to the full list the IN is on.
         final Object fv = firstValue();
 
-        if ((fv instanceof BindMarker)
-            || (fv instanceof com.datastax.driver.core.querybuilder.BindMarker)) {
-          Utils.appendName(name, sb).append(" IN ").append(fv);
+        if (Utils.isBindMarker(fv)) {
+          Utils.appendName(tinfo, null, codecRegistry, sb, name).append(" IN ").append(fv);
           return;
         }
       }
-      Utils.appendName(name, sb).append(" IN (");
+      Utils.appendName(tinfo, null, codecRegistry, sb, name).append(" IN (");
       FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
       if (finfo == null) { // check if the name reference a multi-key
@@ -581,47 +636,56 @@ public abstract class ClauseImpl
           sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
-            if (finfo.isPersisted()) {
-              final List<Object> pvals = new ArrayList<>(values.size());
-
-              for (final Object val: values) {
-                pvals.add(finfo.encodeElementValue(val));
-              }
-              Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType().getElementType()).append(")");
-            } else {
-              Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType().getElementType()).append(")");
-            }
+            Utils.joinAndAppendValues(
+              (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+              codecRegistry,
+              sb,
+              ",",
+              values,
+              finfo.getDataType().getElementType(),
+              variables
+            ).append(")");
             return;
           }
         } else if (sname.startsWith(StatementImpl.CI_PREFIX)) {
           sname = sname.substring(StatementImpl.CI_PREFIX.length()); // strip ci prefix
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
-            if (finfo.isPersisted()) {
-              final List<Object> pvals = new ArrayList<>(values.size());
-
-              for (final Object val: values) {
-                pvals.add(finfo.encodeElementValue(val));
-              }
-              Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType()).append(")");
-            } else {
-              Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType()).append(")");
-            }
+            Utils.joinAndAppendValues(
+              (codec != null) ? codec : finfo.getCodec(),
+              codecRegistry,
+              sb,
+              ",",
+              values,
+              finfo.getDataType(),
+              variables
+            ).append(")");
             return;
           }
         }
         throw new IllegalStateException("unknown column '" + sname + "'");
       }
-      if (finfo.isPersisted()) {
-        final List<Object> pvals = new ArrayList<>(values.size());
+      Utils.joinAndAppendValues(
+        (codec != null) ? codec : finfo.getCodec(),
+        codecRegistry,
+        sb,
+        ",",
+        values,
+        finfo.getDataType(),
+        variables
+      ).append(")");
+    }
 
-        for (final Object val: values) {
-          pvals.add(finfo.encodeValue(val));
-        }
-        Utils.joinAndAppendValues(sb, ",", pvals, finfo.getDataType()).append(")");
-      } else {
-        Utils.joinAndAppendValues(sb, ",", values, finfo.getDataType()).append(")");
-      }
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(values);
     }
 
     /**
@@ -724,14 +788,39 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append(" CONTAINS ");
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      Utils.appendName(tinfo, null, codecRegistry, sb, name).append(" CONTAINS ");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(finfo.encodeValue(value), finfo.getDataType().getElementType(), sb);
+      Utils.appendValue(
+        finfo.getDataType().getElementType(),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        codecRegistry,
+        sb,
+        value,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(value);
     }
 
     /**
@@ -834,14 +923,39 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append(" CONTAINS KEY ");
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      Utils.appendName(tinfo, null, codecRegistry, sb, name).append(" CONTAINS KEY ");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(finfo.encodeValue(key), finfo.getDataType().getFirstArgumentType(), sb);
+      Utils.appendValue(
+        finfo.getDataType().getFirstArgumentType(),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        codecRegistry,
+        sb,
+        key,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(key);
     }
 
     /**
@@ -974,12 +1088,12 @@ public abstract class ClauseImpl
 //     * @param  op the operator for this clause
 //     * @param  pvalue the value and its associated definition for this clause
 //     * @throws NullPointerException if <code>names</code>, <code>op</code>, or
-//     *         <code>pvalues</code> is <code>null</code>
+//     *         <code>tvalues</code> is <code>null</code>
 //     * @throws IllegalArgumentException if the there is not the same number of
 //     *         values and column names
 //     */
 //    CompoundClauseImpl(
-//      List<String> names, String op, List<Pair<Object, CQLDataType>> pvalues
+//      List<String> names, String op, List<Triple<Object, CQLDataType, TypeCodec<?>>> tvalues
 //    ) {
 //      super("");
 //      org.apache.commons.lang3.Validate.notNull(op, "invalid null operation");
@@ -994,9 +1108,9 @@ public abstract class ClauseImpl
 //      }
 //      this.names = names;
 //      this.op = op;
-//      this.definitions = new ArrayList<>(pvalues.size());
+//      this.definitions = new ArrayList<>(tvalues.size());
 //      this.values = pvalues.stream()
-//        .peek(p -> definitions.add(p.getRight()))
+//        .peek(t -> definitions.add(t.getRight()))
 //        .map(Pair::getLeft)
 //        .collect(Collectors.toList());
 //    }
@@ -1097,10 +1211,16 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
       final StringBuilder vsb = new StringBuilder(300);
 
       sb.append('(');
@@ -1114,7 +1234,7 @@ public abstract class ClauseImpl
           sb.append(',');
           vsb.append(',');
         }
-        Utils.appendName(sname, sb);
+        Utils.appendName(sb, sname);
         FieldInfoImpl<?> finfo = tinfo.getColumnImpl(sname);
 
         if (finfo == null) { // check if the field is the multi-key
@@ -1122,22 +1242,55 @@ public abstract class ClauseImpl
             sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
             finfo = tinfo.getColumnImpl(sname);
             if ((finfo != null) && finfo.isMultiKey()) {
-              Utils.appendValue(finfo.encodeElementValue(value), (definition != null) ? definition : finfo.getDataType().getElementType(), vsb);
+              Utils.appendValue(
+                (definition != null) ? definition : finfo.getDataType().getElementType(),
+                (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+                codecRegistry,
+                vsb,
+                value,
+                variables
+              );
               continue;
             }
           } else if (sname.startsWith(StatementImpl.CI_PREFIX)) {
             sname = sname.substring(StatementImpl.CI_PREFIX.length()); // strip ci prefix
             finfo = tinfo.getColumnImpl(sname);
             if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
-              Utils.appendValue(finfo.encodeValue(value), (definition != null) ? definition : finfo.getDataType(), vsb);
+              Utils.appendValue(
+                (definition != null) ? definition : finfo.getDataType(),
+                (codec != null) ? codec : finfo.getCodec(),
+                codecRegistry,
+                vsb,
+                value,
+                variables
+              );
               continue;
             }
           }
           throw new IllegalStateException("unknown column '" + sname + "'");
         }
-        Utils.appendValue(finfo.encodeValue(value), (definition != null) ? definition : finfo.getDataType(), vsb);
+        Utils.appendValue(
+          (definition != null) ? definition : finfo.getDataType(),
+          (codec != null) ? codec : finfo.getCodec(),
+          codecRegistry,
+          vsb,
+          value,
+          variables
+        );
       }
       sb.append(')').append(op).append(vsb).append(')');
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(values);
     }
 
     /**
@@ -1289,12 +1442,12 @@ public abstract class ClauseImpl
 //     * @param  name the column name for this clause
 //     * @param  pvalue the value and its associated definition for this clause
 //     * @throws NullPointerException if <code>names</code>  or
-//     *         <code>pvalues</code> is <code>null</code>
+//     *         <code>tvalues</code> is <code>null</code>
 //     * @throws IllegalArgumentException if the there is not the same number of
 //     *         values and column names
 //     */
-//    CompoundEqClauseImpl(List<String> names, List<Pair<Object, CQLDataType>> pvalues) {
-//      super(names, "=", pvalues);
+//    CompoundEqClauseImpl(List<String> names, List<Triple<Object, CQLDataType, TypeCodec<?>>> tvalues) {
+//      super(names, "=", tvalues);
 //    }
 
     /**
@@ -1430,10 +1583,16 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
       final StringBuilder vsb = new StringBuilder(300);
       int j = 0;
 
@@ -1462,14 +1621,13 @@ public abstract class ClauseImpl
           // which binds the variable to the full list the IN is on.
           final Object fv = firstValue();
 
-          if ((fv instanceof BindMarker)
-              || (fv instanceof com.datastax.driver.core.querybuilder.BindMarker)) {
-            Utils.appendName(sname, sb);
+          if (Utils.isBindMarker(fv)) {
+            Utils.appendName(sb, sname);
             vsb.append(fv);
             continue;
           }
         }
-        Utils.appendName(sname, sb);
+        Utils.appendName(sb, sname);
         vsb.append('(');
         FieldInfoImpl<?> finfo = tinfo.getColumnImpl(sname);
 
@@ -1478,49 +1636,58 @@ public abstract class ClauseImpl
             sname = sname.substring(StatementImpl.MK_PREFIX.length()); // strip mk prefix
             finfo = tinfo.getColumnImpl(sname);
             if ((finfo != null) && finfo.isMultiKey()) {
-              if (finfo.isPersisted()) {
-                final List<Object> pvals = new ArrayList<>(values.size());
-
-                for (final Object val: values) {
-                  pvals.add(finfo.encodeElementValue(val));
-                }
-                Utils.joinAndAppendValues(vsb, ",", pvals, finfo.getDataType().getElementType()).append(")");
-              } else {
-                Utils.joinAndAppendValues(vsb, ",", values, finfo.getDataType().getElementType()).append(")");
-              }
+              Utils.joinAndAppendValues(
+                (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+                codecRegistry,
+                vsb,
+                ",",
+                values,
+                finfo.getDataType().getElementType(),
+                variables
+              ).append(")");
               continue;
             }
           } else if (sname.startsWith(StatementImpl.CI_PREFIX)) {
             sname = sname.substring(StatementImpl.CI_PREFIX.length()); // strip ci prefix
             finfo = tinfo.getColumnImpl(sname);
             if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
-              if (finfo.isPersisted()) {
-                final List<Object> pvals = new ArrayList<>(values.size());
-
-                for (final Object val: values) {
-                  pvals.add(finfo.encodeElementValue(val));
-                }
-                Utils.joinAndAppendValues(vsb, ",", pvals, finfo.getDataType()).append(")");
-              } else {
-                Utils.joinAndAppendValues(vsb, ",", values, finfo.getDataType()).append(")");
-              }
+              Utils.joinAndAppendValues(
+                (codec != null) ? codec : finfo.getCodec(),
+                codecRegistry,
+                vsb,
+                ",",
+                values,
+                finfo.getDataType(),
+                variables
+              ).append(")");
               continue;
             }
           }
           throw new IllegalStateException("unknown column '" + sname + "'");
         }
-        if (finfo.isPersisted()) {
-          final List<Object> pvals = new ArrayList<>(values.size());
-
-          for (final Object val: values) {
-            pvals.add(finfo.encodeValue(val));
-          }
-          Utils.joinAndAppendValues(vsb, ",", pvals, finfo.getDataType()).append(")");
-        } else {
-          Utils.joinAndAppendValues(vsb, ",", values, finfo.getDataType()).append(")");
-        }
+        Utils.joinAndAppendValues(
+          (codec != null) ? codec : finfo.getCodec(),
+          codecRegistry,
+          vsb,
+          ",",
+          values,
+          finfo.getDataType(),
+          variables
+        ).append(")");
       }
       sb.append(") IN ").append(vsb).append(')');
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(values);
     }
 
     /**
@@ -1767,10 +1934,30 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {}
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      throw new IllegalStateException("should not be called");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      throw new IllegalStateException("should not be called");
+    }
 
     /**
      * {@inheritDoc}
@@ -1962,10 +2149,10 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getKeyspaceAndPrimaryKeyColumnValues(table.getName());
+      final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys = context.getKeyspaceAndPrimaryKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
-      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
+      for (final Map.Entry<String, Triple<Object, CQLDataType, TypeCodec<?>>> e: pkeys.entrySet()) {
         clauses.add(new ClauseImpl.EqClauseImpl(e.getKey(), e.getValue()));
       }
       return clauses;
@@ -2012,10 +2199,30 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {}
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      throw new IllegalStateException("should not be called");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      throw new IllegalStateException("should not be called");
+    }
 
     /**
      * {@inheritDoc}
@@ -2075,10 +2282,11 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getKeyspaceAndPartitionKeyColumnValues(table.getName());
+      final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys
+        = context.getKeyspaceAndPartitionKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
-      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
+      for (final Map.Entry<String, Triple<Object, CQLDataType, TypeCodec<?>>> e: pkeys.entrySet()) {
         clauses.add(new ClauseImpl.EqClauseImpl(e.getKey(), e.getValue()));
       }
       return clauses;
@@ -2125,10 +2333,30 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {}
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      throw new IllegalStateException("should not be called");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      throw new IllegalStateException("should not be called");
+    }
 
     /**
      * {@inheritDoc}
@@ -2188,10 +2416,11 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Pair<Object, CQLDataType>> pkeys = context.getKeyspaceKeyValues();
+      final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys
+        = context.getKeyspaceKeyValues();
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
-      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: pkeys.entrySet()) {
+      for (final Map.Entry<String, Triple<Object, CQLDataType, TypeCodec<?>>> e: pkeys.entrySet()) {
         clauses.add(new ClauseImpl.EqClauseImpl(e.getKey(), e.getValue()));
       }
       return clauses;
@@ -2238,10 +2467,30 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {}
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      throw new IllegalStateException("should not be called");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      throw new IllegalStateException("should not be called");
+    }
 
     /**
      * {@inheritDoc}

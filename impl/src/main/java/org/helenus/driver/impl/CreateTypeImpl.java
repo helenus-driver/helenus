@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 import org.helenus.driver.Clause;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.CreateType;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
@@ -92,7 +91,6 @@ public class CreateTypeImpl<T>
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   protected StringBuilder[] buildQueryStrings(UDTClassInfoImpl<T> ucinfo) {
@@ -113,9 +111,9 @@ public class CreateTypeImpl<T>
       builder.append("IF NOT EXISTS ");
     }
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(builder, getKeyspace()).append(".");
     }
-    Utils.appendName(ucinfo.getName(), builder);
+    Utils.appendName(builder, ucinfo.getName());
     builder
       .append(" (")
       .append(StringUtils.join(columns, ","))

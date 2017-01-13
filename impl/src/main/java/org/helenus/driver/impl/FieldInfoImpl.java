@@ -24,9 +24,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-import java.io.IOException;
-
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,17 +40,18 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.text.WordUtils;
 
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.ObjectConversionException;
+import org.helenus.driver.ObjectMissingException;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.FieldInfo;
 import org.helenus.driver.info.TableInfo;
-import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.ClusteringKey;
 import org.helenus.driver.persistence.Column;
 import org.helenus.driver.persistence.DataType;
@@ -61,8 +59,6 @@ import org.helenus.driver.persistence.Index;
 import org.helenus.driver.persistence.KeyspaceKey;
 import org.helenus.driver.persistence.Mandatory;
 import org.helenus.driver.persistence.PartitionKey;
-import org.helenus.driver.persistence.Persisted;
-import org.helenus.driver.persistence.Persister;
 import org.helenus.driver.persistence.Table;
 import org.helenus.driver.persistence.TypeKey;
 
@@ -149,25 +145,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final Column column;
 
   /**
-   * Holds the persisted annotation for this field. If <code>null</code> then
-   * there is no persister required and standard mapping to Cassandra data
-   * types should be used.
-   *
-   * @author paouelle
-   */
-  private final Persisted persisted;
-
-  /**
-   * Holds the persister to use to encode/decode the value in this field
-   * (or the elements of the collection). If <code>null</code> then there is
-   * no persister required and standard mapping to Cassandra data types should
-   * be used.
-   *
-   * @author paouelle
-   */
-  private final Persister<?, ?> persister;
-
-  /**
    * Keyspace key annotation for this field if any.
    *
    * @author vasu
@@ -221,14 +198,14 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    */
-  private final DataTypeImpl.Definition definition;
+  protected final DataTypeImpl.Definition definition;
 
   /**
-   * Holds the data decoder for this field (if it is a column).
+   * Holds the codec for this field (if it is a column).
    *
    * @author paouelle
    */
-  private final DataDecoder<?> decoder;
+  private final TypeCodec<?> codec;
 
   /**
    * Flag indicating if the field is final.
@@ -317,8 +294,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.type = field.type;
     this.isOptional = field.isOptional;
     this.column = field.column;
-    this.persisted = field.persisted;
-    this.persister = field.persister;
     this.keyspaceKey = field.keyspaceKey;
     this.mandatory = mandatory;
     this.index = field.index;
@@ -327,7 +302,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = field.typeKey;
     this.multiKeyType = field.multiKeyType;
     this.definition = field.definition;
-    this.decoder = field.decoder;
+    this.codec = field.codec;
     this.isFinal = field.isFinal;
     this.finalValue = field.finalValue;
     this.setters = new HashMap<>(field.setters);
@@ -360,8 +335,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     );
     this.isOptional = Optional.class.isAssignableFrom(field.getType());
     this.column = null;
-    this.persisted = null;
-    this.persister = null;
     this.keyspaceKey = field.getAnnotation(KeyspaceKey.class);
     this.mandatory = true; // keyspace keys are mandatory fields
     this.index = null; // we don't care about this for keyspace keys
@@ -370,7 +343,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = null; // we don't care about this for keyspace keys
     this.multiKeyType = null; // we don't care about this for keyspace keys
     this.definition = null; // we don't care about this for keyspace keys
-    this.decoder = null; // we don't care about this for keyspace keys
+    this.codec = null; // we don't care about this for keyspace keys
     this.getters = new HashMap<>(6);
     this.setters = new HashMap<>(6);
     findGetter(declaringClass);
@@ -384,12 +357,15 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author vasu
    *
+   * @param  mgr the non-<code>null</code> statement manager
    * @param  tinfo the table info for the field
    * @param  field the non-<code>null</code> field to create an info object for
    * @throws IllegalArgumentException if unable to find a getter or setter
    *         method for the field of if improperly annotated
    */
-  FieldInfoImpl(TableInfoImpl<T> tinfo, Field field) {
+  FieldInfoImpl(
+    StatementManagerImpl mgr, TableInfoImpl<T> tinfo, Field field
+  ) {
     this.clazz = tinfo.getObjectClass();
     this.cinfo = (ClassInfoImpl<T>)tinfo.getClassInfo();
     this.tinfo = tinfo;
@@ -402,19 +378,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       DataTypeImpl.unwrapOptionalIfPresent(field.getType(), field.getGenericType())
     );
     this.isOptional = Optional.class.isAssignableFrom(field.getType());
-    this.persisted = field.getAnnotation(Persisted.class);
-    if (persisted != null) {
-      org.apache.commons.lang3.Validate.isTrue(
-        (persisted.as() != DataType.INFERRED) && !persisted.as().isCollection(),
-        "@Persisted annotation cannot be of type '%s': %s.%s",
-        persisted.as(),
-        declaringClass.getName(),
-        field.getName()
-      );
-      this.persister = newPersister();
-    } else {
-      this.persister = null;
-    }
     this.keyspaceKey = field.getAnnotation(KeyspaceKey.class);
     this.mandatory = (
       // primitive types for fields must be mandatory since null is not possible
@@ -533,9 +496,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
     }
     if (isColumn()) {
-      this.definition = DataTypeImpl.inferDataTypeFrom(field);
-      this.decoder = definition.getDecoder(
-        field, isMandatory() || isPartitionKey() || isClusteringKey()
+      this.definition = DataTypeImpl.inferDataTypeFrom(mgr, field);
+      this.codec = definition.getCodec(
+        field,
+        isMandatory() || isPartitionKey() || isClusteringKey(),
+        cinfo.mgr.getCodecRegistry()
       );
       if (isInTable
           && ((clusteringKey != null) || (partitionKey != null))
@@ -564,7 +529,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
     } else {
       this.definition = null;
-      this.decoder = null;
+      this.codec = null;
       this.multiKeyType = null;
     }
     this.getters = new HashMap<>(6);
@@ -719,8 +684,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.type = String.class;
     this.isOptional = false;
     this.column = null;
-    this.persisted = null;
-    this.persister = null;
     this.keyspaceKey = kkey;
     this.mandatory = true; // keyspace keys are mandatory fields
     this.index = null; // we don't care about this for keyspace keys
@@ -729,7 +692,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = null; // we don't care about this for keyspace keys
     this.multiKeyType = null; // we don't care about this for keyspace keys
     this.definition = null; // we don't care about this for keyspace keys
-    this.decoder = null; // we don't care about this for keyspace keys
+    this.codec = null; // we don't care about this for keyspace keys
     this.getters = null;
     this.setters = null;
     this.finalValue = null;
@@ -742,6 +705,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    *
+   * @param  mgr the non-<code>null</code> statement manager
    * @param  cinfo the non-<code>null</code> class info for the POJO
    * @param  type the non-<code>null</code> data type for the collection for the
    *         POJO
@@ -749,6 +713,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         collection values stored in Cassandra back into the instance
    */
   FieldInfoImpl(
+    StatementManagerImpl mgr,
     ClassInfoImpl<T> cinfo,
     DataType type,
     BiConsumer<Object, Object> setter
@@ -780,8 +745,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         return false;
       }
     };
-    this.persisted = null;
-    this.persister = null;
     this.keyspaceKey = null;
     this.mandatory = true; // collection column is mandatory
     this.index = null;
@@ -789,69 +752,13 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.clusteringKey = null;
     this.typeKey = null;
     this.multiKeyType = null;
-    this.definition = DataTypeImpl.inferDataTypeFrom(type, clazz);
-    this.decoder = definition.getDecoder(clazz);
+    this.definition = DataTypeImpl.inferDataTypeFrom(mgr, type, clazz);
+    this.codec = definition.getCodec(clazz, cinfo.mgr.getCodecRegistry());
     this.getters = new HashMap<>(6);
     this.setters = new HashMap<>(6);
     getters.put(cinfo.getObjectClass(), obj -> obj); // return the instance itself as the value for the field
     setters.put(cinfo.getObjectClass(), setter);
     this.finalValue = null;
-  }
-
-  /**
-   * Instantiates a new persister object based on the @Persisted annotation.
-   *
-   * @author paouelle
-   *
-   * @return a non-<code>null</code> persister object corresponding to the
-   *         @Persisted annotation
-   * @throws IllegalArgumentException if unable to instantiate a persister or
-   *         the persister is not compatible with the @Persisted annotation
-   */
-  private Persister<?, ?> newPersister() {
-    final Persister<?, ?> persister;
-
-    if (persisted.arguments().length == 0) { // use default ctor
-      try {
-        persister = persisted.using().newInstance();
-      } catch (IllegalAccessException|InstantiationException e) {
-        throw new IllegalArgumentException(
-          "unable to instantiate persister: " + persisted.using().getName(), e
-        );
-      }
-    } else { // use a String[] ctor
-      try {
-        persister = persisted.using().getConstructor(String[].class).newInstance(
-          (Object)persisted.arguments()
-        );
-      } catch (NoSuchMethodException|IllegalAccessException|InstantiationException e) {
-        throw new IllegalArgumentException(
-          "unable to instantiate persister: "
-          + persisted.using().getName()
-          + ", using arguments: "
-          + Arrays.toString(persisted.arguments()), e
-        );
-      } catch (InvocationTargetException e) {
-        throw new IllegalArgumentException(
-          "unable to instantiate persister: "
-          + persisted.using().getName()
-          + ", using arguments: "
-          + Arrays.toString(persisted.arguments()), e.getTargetException()
-        );
-      }
-    }
-    org.apache.commons.lang3.Validate.isTrue(
-      persister.getDecodedClass() != null,
-      "@Persisted annotation's persister must be defined with a decoded class: %s",
-      persisted.using().getName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      persister.getPersistedClass() == persisted.as().CLASS,
-      "@Persisted annotation's persister must be defined with persisted class '%s': %s",
-      persisted.as().CLASS.getName(),
-      persisted.using().getName()
-    );
-    return persister;
   }
 
   /**
@@ -1062,23 +969,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
               "unable to instantiate object: " + clazz.getName(), t
             );
           }
-        }
-      }
-      if (persister != null) { // must encode it using the persister
-        final String fname = declaringClass.getName() + "." + name;
-
-        try {
-          val = definition.encode(val, persisted, persister, fname);
-        } catch (IOException e) {
-          throw new IllegalArgumentException(
-            "failed to encode final field '"
-            + fname
-            + "' to "
-            + persisted.as().CQL
-            + "' with persister: "
-            + persister.getClass().getName(),
-            e
-          );
         }
       }
       return val;
@@ -1465,18 +1355,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.info.FieldInfo#isPersisted()
-   */
-  @Override
-  public boolean isPersisted() {
-    return (persister != null);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
    * @see org.helenus.driver.info.FieldInfo#getAnnotation(java.lang.Class)
    */
   @Override
@@ -1527,8 +1405,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     }
     if (isColumn()) {
       if (value != null) {
-        if (!((definition.getMainType() == DataType.BLOB) && !isPersisted() // persisted columns will be serialized later
-              ? byte[].class : type).isInstance(value)) {
+        if (!((definition.getMainType() == DataType.BLOB) ? byte[].class : type).isInstance(value)) { // persisted columns will be serialized later
           if (isMultiKey()) {
             // in such case, the value can also be an element of the set
             if (!multiKeyType.isInstance(value)) {
@@ -1583,24 +1460,15 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *
    * @author paouelle
    *
+   * @param  codec the codec to use to decode the element
    * @param  value the element value to be validated
-   * @param  type the collection data type of the column to validate
    * @throws IllegalArgumentException if the specified value is not of the
    *         right type or is <code>null</code> when the field is mandatory
    */
-  private void validateCollectionValue(CQLDataType type, Object value) {
-    if (persister != null) { // will be persisted anyway so no need to check
-      return;
-    }
-    final CQLDataType dtype = definition.getMainType();
-
+  private void validateCollectionValue(TypeCodec<?> codec, Object value) {
     org.apache.commons.lang3.Validate.isTrue(
-      dtype.isCollection(),
+      definition.isCollection(),
       "column '%s' is not a collection", getColumnName()
-    );
-    org.apache.commons.lang3.Validate.isTrue(
-      type.equals(dtype),
-      "column '%s' is not a %s", getColumnName(), type.name()
     );
     if (value == null) {
       org.apache.commons.lang3.Validate.isTrue(
@@ -1614,13 +1482,22 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         getColumnName()
       );
     }
-    final CQLDataType etype = definition.getElementType();
-
     org.apache.commons.lang3.Validate.isTrue(
-      DataTypeImpl.isInstance(etype, value),
+      codec.accepts(value),
       "invalid element value for column '%s'; expecting type '%s': %s",
-      getColumnName(), etype.name(), value
+      getColumnName(), codec.getCqlType().getName(), value
     );
+  }
+
+  /**
+   * Gets a codec for this field.
+   *
+   * @author paouelle
+   *
+   * @return a suitable codec for this field
+   */
+  public TypeCodec<?> getCodec() {
+    return codec;
   }
 
   /**
@@ -1633,7 +1510,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         right type or is <code>null</code> when the column is mandatory
    */
   public void validateCollectionValue(Object value) {
-    validateCollectionValue(definition.getMainType(), value);
+    if (codec instanceof ArgumentsCodec) {
+      validateCollectionValue(((ArgumentsCodec<?>)codec).codec(0), value);
+    }
   }
 
   /**
@@ -1647,7 +1526,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         column is mandatory
    */
   public void validateListValue(Object value) {
-    validateCollectionValue(definition.getMainType(), value);
+    validateCollectionValue(value);
   }
 
   /**
@@ -1661,7 +1540,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         column is mandatory
    */
   public void validateSetValue(Object value) {
-    validateCollectionValue(definition.getMainType(), value);
+    validateCollectionValue(value);
   }
 
   /**
@@ -1676,7 +1555,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         when the column is mandatory
    */
   public void validateMapKeyValue(Object key, Object value) {
-    validateCollectionValue(definition.getMainType(), value);
+    if (codec instanceof ArgumentsCodec) {
+      validateCollectionValue(((ArgumentsCodec<?>)codec).codec(1), value);
+    }
     validateMapKey(key);
   }
 
@@ -1690,13 +1571,15 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         of the right mapping types
    */
   public void validateMapKey(Object key) {
-    final CQLDataType ktype = definition.getArgumentTypes().get(0); // #0 is the data type for the key
+    if (codec instanceof ArgumentsCodec) {
+      final TypeCodec<?> kcodec = ((ArgumentsCodec<?>)codec).codec(0);
 
-    org.apache.commons.lang3.Validate.isTrue(
-      DataTypeImpl.isInstance(ktype, key),
-      "invalid element key for column '%s'; expecting type '%s': %s",
-      getColumnName(), ktype.name(), key
-    );
+      org.apache.commons.lang3.Validate.isTrue(
+        kcodec.accepts(key),
+        "invalid element key for column '%s'; expecting type '%s': %s",
+        getColumnName(), kcodec.getCqlType().getName(), key
+      );
+    }
   }
 
   /**
@@ -1731,23 +1614,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @param  object the POJO from which to retrieve the field's value
    * @return the POJO's field value
    * @throws NullPointerException if <code>object</code> is <code>null</code>
-   * @throws ColumnPersistenceException if unable to persist the field's value
    */
   public Object getValue(T object) {
     return getValue(Object.class, object);
-  }
-
-  /**
-   * Retrieves the non-encoded field's value from the specified POJO.
-   *
-   * @author paouelle
-   *
-   * @param  object the POJO from which to retrieve the field's value
-   * @return the POJO's field non-encoded value
-   * @throws NullPointerException if <code>object</code> is <code>null</code>
-   */
-  public Object getNonEncodedValue(T object) {
-    return getNonEncodedValue(Object.class, object);
   }
 
   /**
@@ -1761,26 +1630,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws NullPointerException if <code>object</code> is <code>null</code>
    * @throws ClassCastException if the field value from the given object
    *         cannot be type casted to the specified class
-   * @throws ColumnPersistenceException if unable to persist the field's value
-   */
-  public Object getValue(Class<?> clazz, T object) {
-    return encodeValue(getNonEncodedValue(clazz, object));
-  }
-
-  /**
-   * Retrieves the field's non-encoded value from the specified POJO.
-   *
-   * @author paouelle
-   *
-   * @param  clazz the class for the expected value
-   * @param  object the POJO from which to retrieve the field's value
-   * @return the POJO's field non-encoded value
-   * @throws NullPointerException if <code>object</code> is <code>null</code>
-   * @throws ClassCastException if the field value from the given object
-   *         cannot be type casted to the specified class
    */
   @SuppressWarnings("unchecked")
-  public Object getNonEncodedValue(Class<?> clazz, T object) {
+  public Object getValue(Class<?> clazz, T object) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
     final Function<Object, Object> getter = getGetter(object.getClass());
     Object val = (getter != null) ? getter.apply(object) : null;
@@ -1805,95 +1657,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       if (!type.equals(val)) { // force value to the type and re-update in pojo
         setValue(object, type);
         val = clazz.cast(type);
-      }
-    }
-    return val;
-  }
-
-  /**
-   * Encodes the specified value based on any configured persister.
-   *
-   * @author paouelle
-   *
-   * @param  val the value to be encoded
-   * @return the corresponding encoded value or <code>val</code> if no encoding
-   *         was required
-   * @throws ColumnPersistenceException if unable to persist the field's value
-   */
-  @SuppressWarnings("unchecked")
-  public Object encodeValue(Object val) {
-    if ((val != null)
-        && (definition != null)
-        && definition.isUserDefined()) {
-      final UDTClassInfoImpl<?> udtcinfo = (UDTClassInfoImpl<?>)definition.getMainType();
-
-      if (udtcinfo.getObjectClass().isInstance(val)) {
-        // if this field represents a UDT, then we need to convert its value to a
-        // UDTValue to start with
-        val = new UDTValueWrapper<>(udtcinfo, val);
-      }
-    }
-    if (persister != null) { // must encode it using the persister
-      final String fname = declaringClass.getName() + "." + name;
-
-      try {
-        val = definition.encode(val, persisted, persister, fname);
-      } catch (IOException e) {
-        throw new ColumnPersistenceException(
-          declaringClass,
-          name,
-          "failed to encode field '"
-          + fname
-          + "' to "
-          + persisted.as().CQL
-          + " with persister: "
-          + persister.getClass().getName(),
-          e
-        );
-      }
-    }
-    return val;
-  }
-
-  /**
-   * Encodes the specified value as an element based on any configured persister.
-   *
-   * @author paouelle
-   *
-   * @param  val the value to be encoded
-   * @return the corresponding encoded value or <code>val</code> if no encoding
-   *         was required
-   * @throws ColumnPersistenceException if unable to persist the field's value
-   */
-  public Object encodeElementValue(Object val) {
-    if ((val != null)
-        && (definition != null)
-        && definition.getElementType().isUserDefined()) {
-      final UDTClassInfoImpl<?> udtcinfo = (UDTClassInfoImpl<?>)definition.getElementType();
-
-      if (udtcinfo.getObjectClass().isInstance(val)) {
-        // if the element of this field represents a UDT, then we need to convert
-        // its value to a UDTValue to start with
-        val = new UDTValueWrapper<>(udtcinfo, val);
-      }
-    }
-    if (persister != null) { // must encode it using the persister
-      final String fname = declaringClass.getName() + "." + name;
-
-      try {
-        val = definition.encodeElement(val, persisted, persister, fname);
-      } catch (IOException e) {
-        throw new ColumnPersistenceException(
-          declaringClass,
-          name,
-          "failed to encode field '"
-          + fname
-          + "' to "
-          + persisted.as().CQL
-          + " with persister: "
-          + persister.getClass().getName(),
-          e
-        );
       }
     }
     return val;
@@ -1952,13 +1715,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws ObjectConversionException if unable to decode the column or if the
    *         column is not defined in the given row
    */
-  @SuppressWarnings({"rawtypes", "unchecked"})
   public Object decodeValue(Row row) {
     org.apache.commons.lang3.Validate.notNull(row, "invalid null row");
     // check if the column is defined in the row
     if (!row.getColumnDefinitions().contains(getColumnName())) {
       if (isPartitionKey()) {
-        throw new ObjectConversionException(
+        throw new ObjectMissingException(
           clazz,
           row,
           "missing partition key '"
@@ -1971,7 +1733,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         );
       }
       if (isClusteringKey()) {
-        throw new ObjectConversionException(
+        throw new ObjectMissingException(
           clazz,
           row,
           "missing clustering key '"
@@ -1984,7 +1746,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         );
       }
       if (isTypeKey()) {
-        throw new ObjectConversionException(
+        throw new ObjectMissingException(
           clazz,
           row,
           "missing type key '"
@@ -1997,7 +1759,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         );
       }
       if (isMandatory()) {
-        throw new ObjectConversionException(
+        throw new ObjectMissingException(
           clazz,
           row,
           "missing mandatory column '"
@@ -2009,7 +1771,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
           + "'"
         );
       }
-      throw new ObjectConversionException(
+      throw new ObjectMissingException(
         clazz,
         row,
         "missing column '"
@@ -2024,12 +1786,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     Object val;
 
     try {
-      // if we have a persister then we need to decode to persisted.as() first
-      val = decoder.decode(
-        row,
-        getColumnName(),
-        (persister != null) ? (Class)persisted.as().CLASS : (Class)this.type
-      );
+      val = row.get(getColumnName(), codec);
     } catch (IllegalArgumentException|InvalidTypeException e) {
       throw new ObjectConversionException(
         clazz,
@@ -2041,25 +1798,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         + "'",
         e
       );
-    }
-    if (persister != null) { // must decode it using the persister
-      final String fname = declaringClass.getName() + "." + name;
-
-      try {
-        val = definition.decode(val, persisted, persister, fname);
-      } catch (Exception e) {
-        throw new ObjectConversionException(
-          clazz,
-          row,
-          "unable to decode persisted "
-          + persisted.as().CQL
-          + " for field '"
-          + fname
-          + "' with persister: "
-          + persister.getClass().getName(),
-          e
-        );
-      }
     }
     return val;
   }
@@ -2079,106 +1817,18 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         a primary key, type key, or mandatory and not defined in the given
    *         row
    */
-  @SuppressWarnings({"rawtypes", "unchecked"})
   public void decodeAndSetValue(T object, Row row) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
-    org.apache.commons.lang3.Validate.notNull(row, "invalid null row");
-    // check if the column is defined in the row
-    if (!row.getColumnDefinitions().contains(getColumnName())) {
-      if (isPartitionKey()) {
-        throw new ObjectConversionException(
-          clazz,
-          row,
-          "missing partition key '"
-          + getColumnName()
-          +  "' from result set for field '"
-          + declaringClass.getName()
-          + "."
-          + name
-          + "'"
-        );
-      }
-      if (isClusteringKey()) {
-        throw new ObjectConversionException(
-          clazz,
-          row,
-          "missing clustering key '"
-          + getColumnName()
-          +  "' from result set for field '"
-          + declaringClass.getName()
-          + "."
-          + name
-          + "'"
-        );
-      }
-      if (isTypeKey()) {
-        throw new ObjectConversionException(
-          clazz,
-          row,
-          "missing type key '"
-          + getColumnName()
-          +  "' from result set for field '"
-          + declaringClass.getName()
-          + "."
-          + name
-          + "'"
-        );
-      }
-      if (isMandatory()) {
-        throw new ObjectConversionException(
-          clazz,
-          row,
-          "missing mandatory column '"
-          + getColumnName()
-          + "' from result set for field '"
-          + declaringClass.getName()
-          + "."
-          + name
-          + "'"
-        );
-      }
-      // not defined in the row so skip it
-      return;
-    }
     Object val;
 
     try {
-      // if we have a persister then we need to decode to persisted.as() first
-      val = decoder.decode(
-        row,
-        getColumnName(),
-        (persister != null) ? (Class)persisted.as().CLASS : (Class)this.type
-      );
-    } catch (IllegalArgumentException|InvalidTypeException e) {
-      throw new ObjectConversionException(
-        clazz,
-        row,
-        "unable to decode value for field '"
-        + declaringClass.getName()
-        + "."
-        + name
-        + "'",
-        e
-      );
-    }
-    if (persister != null) { // must decode it using the persister
-      final String fname = declaringClass.getName() + "." + name;
-
-      try {
-        val = definition.decode(val, persisted, persister, fname);
-      } catch (Exception e) {
-        throw new ObjectConversionException(
-          clazz,
-          row,
-          "unable to decode persisted "
-          + persisted.as().CQL
-          + " for field '"
-          + fname
-          + "' with persister: "
-          + persister.getClass().getName(),
-          e
-        );
-      }
+      val = decodeValue(row);
+    } catch (ObjectMissingException e) {
+      // verify if the column is not mandatory in which case we just skip it
+      if (isPartitionKey() || isClusteringKey() || isTypeKey() || isMandatory()) {
+        throw e;
+      } // else - not mandatory and not defined in the row so skip it
+      return;
     }
     try {
       setValue(object, val);
@@ -2208,13 +1858,12 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws ObjectConversionException if unable to decode the column or if the
    *         column is not defined in the given UDT value
    */
-  @SuppressWarnings({"rawtypes", "unchecked"})
   public Object decodeValue(UDTValue uval) {
     org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
     // check if the column is defined in the row
     if (!uval.getType().contains(getColumnName())) {
       if (isMandatory()) {
-        throw new ObjectConversionException(
+        throw new ObjectMissingException(
           clazz,
           uval,
           "missing mandatory column '"
@@ -2226,7 +1875,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
           + "'"
         );
       }
-      throw new ObjectConversionException(
+      throw new ObjectMissingException(
         clazz,
         uval,
         "missing column '"
@@ -2241,12 +1890,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     Object val;
 
     try {
-      // if we have a persister then we need to decode to persisted.as() first
-      val = decoder.decode(
-        uval,
-        getColumnName(),
-        (persister != null) ? (Class)persisted.as().CLASS : (Class)this.type
-      );
+      val = uval.get(getColumnName(), codec);
     } catch (IllegalArgumentException|InvalidTypeException e) {
       throw new ObjectConversionException(
         clazz,
@@ -2258,25 +1902,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         + "'",
         e
       );
-    }
-    if (persister != null) { // must decode it using the persister
-      final String fname = declaringClass.getName() + "." + name;
-
-      try {
-        val = definition.decode(val, persisted, persister, fname);
-      } catch (Exception e) {
-        throw new ObjectConversionException(
-          clazz,
-          uval,
-          "unable to decode persisted "
-          + persisted.as().CQL
-          + " for field '"
-          + fname
-          + "' with persister: "
-          + persister.getClass().getName(),
-          e
-        );
-      }
     }
     return val;
   }
@@ -2295,67 +1920,18 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         the corresponding value into the POJO object or if the column is
    *         mandatory and not defined in the given UDT value
    */
-  @SuppressWarnings({"rawtypes", "unchecked"})
   public void decodeAndSetValue(T object, UDTValue uval) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
-    org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
-    // check if the column is defined in the row
-    if (!uval.getType().contains(getColumnName())) {
-      if (isMandatory()) {
-        throw new ObjectConversionException(
-          clazz,
-          uval,
-          "missing mandatory column '"
-          + getColumnName()
-          + "' from UDT value for field '"
-          + declaringClass.getName()
-          + "."
-          + name
-          + "'"
-        );
-      }
-      // not defined in the UDT value so skip it
-      return;
-    }
     Object val;
 
     try {
-      // if we have a persister then we need to decode to persisted.as() first
-      val = decoder.decode(
-        uval,
-        getColumnName(),
-        (persister != null) ? (Class)persisted.as().CLASS : (Class)this.type
-      );
-    } catch (IllegalArgumentException|InvalidTypeException e) {
-      throw new ObjectConversionException(
-        clazz,
-        uval,
-        "unable to decode value for field '"
-        + declaringClass.getName()
-        + "."
-        + name
-        + "'",
-        e
-      );
-    }
-    if (persister != null) { // must decode it using the persister
-      final String fname = declaringClass.getName() + "." + name;
-
-      try {
-        val = definition.decode(val, persisted, persister, fname);
-      } catch (Exception e) {
-        throw new ObjectConversionException(
-          clazz,
-          uval,
-          "unable to decode persisted "
-          + persisted.as().CQL
-          + " for field '"
-          + fname
-          + "' with persister: "
-          + persister.getClass().getName(),
-          e
-        );
-      }
+      val = decodeValue(uval);
+    } catch (ObjectMissingException e) {
+      // verify if the column is not mandatory in which case we just skip it
+      if (isMandatory()) {
+        throw e;
+      } // else - not mandatory and not defined in the row so skip it
+      return;
     }
     try {
       setValue(object, val);

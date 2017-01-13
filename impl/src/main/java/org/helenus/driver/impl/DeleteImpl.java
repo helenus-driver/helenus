@@ -28,11 +28,12 @@ import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
+
+import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.Clause;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.Delete;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
@@ -327,7 +328,6 @@ public class DeleteImpl<T>
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   void buildQueryString(
@@ -350,17 +350,21 @@ public class DeleteImpl<T>
       if (cns.isEmpty()) {
         return;
       }
-      Utils.joinAndAppendNames(builder, ",", cns);
+      Utils.joinAndAppendNames(
+        table, null, mgr.getCodecRegistry(), builder, ",", cns
+      );
       builder.append(" ");
     }
     builder.append("FROM ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(builder, getKeyspace()).append(".");
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
-      Utils.joinAndAppend(table, builder, " AND ", usings.usings);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
+      );
     }
     // check if the table has multi-keys in which case we need to iterate all
     // possible combinations/values for all keys and generate separate delete
@@ -462,7 +466,9 @@ public class DeleteImpl<T>
             final StringBuilder sb = new StringBuilder(builder);
 
             // add the multi-key clause values from this combination to the list of clauses
-            Utils.joinAndAppend(table, sb, " AND ", i.next(), cs);
+            Utils.joinAndAppend(
+              table, null, mgr.getCodecRegistry(), sb, " AND ", i.next(), cs, null
+            );
             builders.add(finishBuildingQueryString(table, sb));
           }
           return;
@@ -470,10 +476,12 @@ public class DeleteImpl<T>
       }
       // we didn't have any multi-keys in the clauses so just delete it based
       // on the given clauses
-      Utils.joinAndAppend(table, builder, " AND ", cs);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", cs, null
+      );
     } else { // no clauses provided, so add where clauses for all primary key columns
       try {
-        final Map<String, Pair<Object, CQLDataType>> pkeys;
+        final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys;
 
         try {
           if (pkeys_override == null) {
@@ -495,15 +503,16 @@ public class DeleteImpl<T>
                 continue;
               }
               final String name = finfo.getColumnName();
-              final Pair<Object, CQLDataType> pset = pkeys.remove(name);
+              final Triple<Object, CQLDataType, TypeCodec<?>> pset = pkeys.remove(name);
 
               if (pset != null) {
                 final Object v = pset.getLeft();
 
                 pkeys.put(
                   StatementImpl.CI_PREFIX + name,
-                  Pair.of(
+                  Triple.of(
                     (v != null) ? StringUtils.lowerCase(v.toString()) : null,
+                    pset.getMiddle(),
                     pset.getRight()
                   )
                 );
@@ -516,7 +525,7 @@ public class DeleteImpl<T>
             final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
 
             for (final FieldInfoImpl<T> finfo: multiKeys) {
-              final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
+              final Triple<Object, CQLDataType, TypeCodec<?>> pset = pkeys.remove(finfo.getColumnName());
 
               if (pset != null) {
                 @SuppressWarnings("unchecked")
@@ -549,12 +558,12 @@ public class DeleteImpl<T>
 
                   pkeys.put(
                     StatementImpl.MK_PREFIX + finfo.getColumnName(),
-                    Pair.of(k, finfo.getDataType().getElementType())
+                    Triple.of(k, finfo.getDataType().getElementType(), finfo.getCodec())
                   );
                 }
                 final StringBuilder sb = new StringBuilder(builder);
 
-                Utils.joinAndAppendNamesAndValues(sb, " AND ", "=", pkeys);
+                Utils.joinAndAppendNamesAndValues(null, mgr.getCodecRegistry(), sb, " AND ", "=", pkeys, null);
                 builders.add(finishBuildingQueryString(table, sb));
               }
               return;
@@ -562,7 +571,7 @@ public class DeleteImpl<T>
           }
           // we didn't have any multi-keys in the list (unlikely) so just delete it
           // based on the provided list
-          Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
+          Utils.joinAndAppendNamesAndValues(null, mgr.getCodecRegistry(), builder, " AND ", "=", pkeys, null);
         }
       } catch (EmptyOptionalPrimaryKeyException e) {
         // ignore and continue without updating this table
@@ -582,7 +591,6 @@ public class DeleteImpl<T>
    * @param  builder the non-<code>null</code> builder where to add the rest of
    *         the query string to build
    * @return <code>builder</code>
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   private StringBuilder finishBuildingQueryString(
@@ -597,7 +605,9 @@ public class DeleteImpl<T>
         c.validate(table);
       }
       builder.append(" IF ");
-      Utils.joinAndAppend(table, builder, " AND ", conditions.conditions);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", conditions.conditions, null
+      );
     }
     return builder;
   }

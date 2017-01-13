@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,21 +31,22 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.commons.collections.iterators.CombinationIterator;
 import org.helenus.driver.Assignment;
 import org.helenus.driver.Clause;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.StatementBuilder;
 import org.helenus.driver.Update;
 import org.helenus.driver.UpdateNotAppliedException;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.impl.AssignmentImpl.CounterAssignmentImpl;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
@@ -56,7 +57,7 @@ import org.helenus.driver.persistence.Table;
  * {@link com.datastax.driver.core.querybuilder.Update} class to provide support
  * for POJOs.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-20176 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -192,7 +193,6 @@ public class UpdateImpl<T>
    * @throws IllegalArgumentException if assignments reference invalid values
    *         or if missing mandatory columns are referenced for the specified
    *         table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   private void andAssignment(
     TableInfoImpl<T> table,
@@ -292,7 +292,6 @@ public class UpdateImpl<T>
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   private void buildQueryStrings(
@@ -302,12 +301,14 @@ public class UpdateImpl<T>
 
     builder.append("UPDATE ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append(".");
+      Utils.appendName(builder, getKeyspace()).append(".");
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
-      Utils.joinAndAppend(table, builder, " AND ", usings.usings);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
+      );
     }
     final Collection<FieldInfoImpl<T>> multiKeys = table.getMultiKeys();
     final Collection<FieldInfoImpl<T>> caseInsensitiveKeys = table.getCaseInsensitiveKeys();
@@ -506,7 +507,7 @@ public class UpdateImpl<T>
       }
       builder.append(" SET ");
       // make sure we do not add any duplicates
-      Utils.joinAndAppendWithNoDuplicates(table, builder, ",", as);
+      Utils.joinAndAppendWithNoDuplicates(table, null, mgr.getCodecRegistry(), builder, ",", as, null);
     } else { // nothing to set for this table
       return;
     }
@@ -602,7 +603,9 @@ public class UpdateImpl<T>
             final StringBuilder sb = new StringBuilder(builder);
 
             // add the multi-key clause values from this combination to the list of clauses
-            Utils.joinAndAppend(table, sb, " AND ", i.next(), cs);
+            Utils.joinAndAppend(
+              table, null, mgr.getCodecRegistry(), sb, " AND ", i.next(), cs, null
+            );
             builders.add(finishBuildingQueryString(table, sb));
           }
           return;
@@ -610,10 +613,12 @@ public class UpdateImpl<T>
       }
       // we didn't have any multi-keys in the clauses so just update it based
       // on the given clause
-      Utils.joinAndAppend(table, builder, " AND ", cs);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", cs, null
+      );
     } else { // no clauses provided, so add where clauses for all primary key columns
       try {
-        final Map<String, Pair<Object, CQLDataType>> pkeys
+        final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys
           = getPOJOContext().getPrimaryKeyColumnValues(table.getName());
 
         if (!pkeys.isEmpty()) {
@@ -626,15 +631,16 @@ public class UpdateImpl<T>
                 continue;
               }
               final String name = finfo.getColumnName();
-              final Pair<Object, CQLDataType> pset = pkeys.remove(name);
+              final Triple<Object, CQLDataType, TypeCodec<?>> pset = pkeys.remove(name);
 
               if (pset != null) {
                 final Object v = pset.getLeft();
 
                 pkeys.put(
                   StatementImpl.CI_PREFIX + name,
-                  Pair.of(
+                  Triple.of(
                     (v != null) ? StringUtils.lowerCase(v.toString()) : null,
+                    pset.getMiddle(),
                     pset.getRight()
                   )
                 );
@@ -647,7 +653,7 @@ public class UpdateImpl<T>
             final List<Collection<Object>> sets = new ArrayList<>(multiKeys.size());
 
             for (final FieldInfoImpl<T> finfo: multiKeys) {
-              final Pair<Object, CQLDataType> pset = pkeys.remove(finfo.getColumnName());
+              final Triple<Object, CQLDataType, TypeCodec<?>> pset = pkeys.remove(finfo.getColumnName());
 
               if (pset != null) {
                 @SuppressWarnings("unchecked")
@@ -680,12 +686,12 @@ public class UpdateImpl<T>
 
                   pkeys.put(
                     StatementImpl.MK_PREFIX + finfo.getColumnName(),
-                    Pair.of(k, finfo.getDataType().getElementType())
+                    Triple.of(k, finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec()).codec(0))
                   );
                 }
                 final StringBuilder sb = new StringBuilder(builder);
 
-                Utils.joinAndAppendNamesAndValues(sb, " AND ", "=", pkeys);
+                Utils.joinAndAppendNamesAndValues(null, mgr.getCodecRegistry(), sb, " AND ", "=", pkeys, null);
                 builders.add(finishBuildingQueryString(table, sb));
               }
               return;
@@ -693,7 +699,7 @@ public class UpdateImpl<T>
           }
           // we didn't have any multi-keys in the list (unlikely) so just update it
           // based on the provided list
-          Utils.joinAndAppendNamesAndValues(builder, " AND ", "=", pkeys);
+          Utils.joinAndAppendNamesAndValues(null, mgr.getCodecRegistry(), builder, " AND ", "=", pkeys, null);
         }
       } catch (EmptyOptionalPrimaryKeyException e) {
         // ignore and continue without updating this table
@@ -713,7 +719,6 @@ public class UpdateImpl<T>
    * @param  builder the non-<code>null</code> builder where to add the rest of
    *         the query string to build
    * @return <code>builder</code>
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   @SuppressWarnings("synthetic-access")
   private StringBuilder finishBuildingQueryString(
@@ -728,7 +733,9 @@ public class UpdateImpl<T>
         c.validate(table);
       }
       builder.append(" IF ");
-      Utils.joinAndAppend(table, builder, " AND ", conditions.conditions);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", conditions.conditions, null
+      );
     }
     return builder;
   }

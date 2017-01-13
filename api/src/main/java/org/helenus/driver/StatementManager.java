@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import java.util.stream.Stream;
 import javax.json.JsonObject;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 
@@ -39,7 +41,7 @@ import org.helenus.driver.persistence.DataType;
  * The <code>StatementManager</code> abstract class is used to maintain and
  * manage Cassandra statements defined in the system.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -1326,6 +1328,17 @@ public abstract class StatementManager {
   protected abstract Using<Long> timestamp(long timestamp);
 
   /**
+   * Option to prepare the timestamp in microseconds for a modification statement
+   * (insert, update or delete).
+   *
+   * @author paouelle
+   *
+   * @param  marker the non-<code>null</code> bind marker to use for the timestamp
+   * @return the corresponding option
+   */
+  protected abstract Using<BindMarker> timestamp(BindMarker marker);
+
+  /**
    * Option to set the ttl for a modification statement (insert, update or delete).
    *
    * @author paouelle
@@ -1335,6 +1348,17 @@ public abstract class StatementManager {
    * @throws IllegalArgumentException if <code>ttl</code> is negative
    */
   protected abstract Using<Integer> ttl(int ttl);
+
+  /**
+   * Option to prepare the ttl (in seconds) for a modification statement
+   * (insert, update or delete).
+   *
+   * @author paouelle
+   *
+   * @param  marker non-<code>null</code> bind marker to use for the ttl
+   * @return the corresponding option
+   */
+  protected abstract Using<BindMarker> ttl(BindMarker marker);
 
   /**
    * Appends the specified string as a CQL name to the given string builder.
@@ -1492,6 +1516,21 @@ public abstract class StatementManager {
   protected abstract Assignment incr(CharSequence name, long value);
 
   /**
+   * Incrementation of a counter column by a provided value.
+   * <p>
+   * This will generate: {@code name = name + value}.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to increment
+   * @param  marker a non-<code>null</code> bind marker representing the value
+   *         by which to increment
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   */
+  protected abstract Assignment incr(CharSequence name, BindMarker marker);
+
+  /**
    * Decrementation of a counter column by a provided value.
    * <p>
    * This will generate: {@code name = name - value}.
@@ -1506,9 +1545,27 @@ public abstract class StatementManager {
   protected abstract Assignment decr(CharSequence name, long value);
 
   /**
+   * Decrementation of a counter column by a provided value.
+   * <p>
+   * This will generate: {@code name = name - value}.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name to decrement
+   * @param  marker a non-<code>null</code> bind marker representing the value
+   *         by which to decrement
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   */
+  protected abstract Assignment decr(CharSequence name, BindMarker marker);
+
+  /**
    * Prepend a value to a list column.
    * <p>
    * This will generate: {@code name = [ value ] + name}.
+   * <p>
+   * <i>Note:</i> Using a bind marker here is not supported. To use a bind marker
+   * use {@link #prependAll} with a singleton list.
    *
    * @author paouelle
    *
@@ -1516,6 +1573,7 @@ public abstract class StatementManager {
    * @param  value the value to prepend
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if a bind marker is specified
    */
   protected abstract Assignment prepend(CharSequence name, Object value);
 
@@ -1535,9 +1593,27 @@ public abstract class StatementManager {
   protected abstract Assignment prependAll(CharSequence name, List<?> values);
 
   /**
+   * Prepend a list of values to a list column.
+   * <p>
+   * This will generate: {@code name = list + name}.
+   *
+   * @author paouelle
+   *
+   * @param  name the column name (must be of type list).
+   * @param  marker non-<code>null</code> bind marker representing the list of
+   *         values to prepend
+   * @return the correspond assignment (to use in an update statement)
+   * @throws NullPointerException if <code>name</code> is <code>null</code>
+   */
+  protected abstract Assignment prependAll(CharSequence name, BindMarker marker);
+
+  /**
    * Append a value to a list column.
    * <p>
    * This will generate: {@code name = name + [value]}.
+   * <p>
+   * <i>Note:</i> Using a bind marker here is not supported. To use a bind marker
+   * use {@link #appendAll} with a singleton list.
    *
    * @author paouelle
    *
@@ -1545,6 +1621,7 @@ public abstract class StatementManager {
    * @param  value the value to append
    * @return the correspond assignment (to use in an update statement)
    * @throws NullPointerException if <code>name</code> is <code>null</code>
+   * @throws IllegalArgumentException if a bind marker is specified
    */
   protected abstract Assignment append(CharSequence name, Object value);
 
@@ -1862,4 +1939,29 @@ public abstract class StatementManager {
    * @return the non-<code>null</code> Cassandra cluster
    */
   public abstract Cluster getCluster();
+
+  /**
+   * Gets the {@link CodecRegistry} instance associated with the Cassandra cluster.
+   * <p/>
+   * <i>Note:</i> This method could return {@link CodecRegistry#DEFAULT_INSTANCE}
+   * if no specific codec registry has been set on the {@link Cluster}. In this
+   * case, care should be taken when registering new codecs as they would be
+   * immediately available to other {@link Cluster} instances sharing the same
+   * default instance.
+   *
+   * @author paouelle
+   *
+   * @return the {@link CodecRegistry} instance associated with the Cassandra
+   *         cluster
+   */
+  public abstract CodecRegistry getCodecRegistry();
+
+  /**
+   * Gets the protocol version used by the Cassandra cluster.
+   *
+   * @author paouelle
+   *
+   * @return the protocol version in use
+   */
+  public abstract ProtocolVersion getProtocolVersion();
 }

@@ -24,10 +24,14 @@ import java.util.Optional;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
+
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.driver.Assignment;
-import org.helenus.driver.ColumnPersistenceException;
+import org.helenus.driver.BindMarker;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.DataType;
 
@@ -97,6 +101,20 @@ public abstract class AssignmentImpl
   abstract void validate(TableInfoImpl<?> table);
 
   /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(
+      this, ToStringStyle.SHORT_PREFIX_STYLE, true
+    );
+  }
+
+  /**
    * The <code>DelayedWithObject</code> interface is used by assignments that
    * do not have all their content defined at the time of creation but instead
    * at the time the assignment is added to the UPDATE statement initialized with
@@ -124,7 +142,6 @@ public abstract class AssignmentImpl
      * @return a non-<code>null</code> list of new assignment(s) corresponding to
      *         this one
      * @throws IllegalArgumentException if missing mandatory columns are processed
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     public <T> List<AssignmentImpl> processWith(
       TableInfoImpl<?> table, ClassInfoImpl<T>.POJOContext context
@@ -180,6 +197,13 @@ public abstract class AssignmentImpl
     private final CQLDataType definition;
 
     /**
+     * Holds the codec associated with the value if any.
+     *
+     * @author paouelle
+     */
+    private final TypeCodec<?> codec;
+
+    /**
      * Instantiates a new <code>SetAssignmentImpl</code> object.
      * <p>
      * <i>Note:</i> This constructor is meant to be called by derived POJO
@@ -214,22 +238,24 @@ public abstract class AssignmentImpl
      * @author paouelle
      *
      * @param  name the column name for this assignment
-     * @param  pvalue the value and its associated definition for this assignment
+     * @param  tvalue the value and its associated definition for this assignment
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
-    SetAssignmentImpl(CharSequence name, Pair<Object, CQLDataType> pvalue) {
+    SetAssignmentImpl(CharSequence name, Triple<Object, CQLDataType, TypeCodec<?>> tvalue) {
       super(name);
-      if (pvalue != null) {
-        Object value = pvalue.getLeft();
+      if (tvalue != null) {
+        Object value = tvalue.getLeft();
 
         if (value instanceof Optional) {
           value = ((Optional<?>)value).orElse(null);
         }
         this.value = value;
-        this.definition = pvalue.getRight();
+        this.definition = tvalue.getMiddle();
+        this.codec = tvalue.getRight();
       } else {
         this.value = null;
         this.definition = null;
+        this.codec = null;
       }
     }
 
@@ -250,6 +276,7 @@ public abstract class AssignmentImpl
       }
       this.value = value;
       this.definition = definition;
+      this.codec = null;
     }
 
     /**
@@ -257,15 +284,40 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb);
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      Utils.appendName(tinfo, null, codecRegistry, sb, name);
       sb.append("=");
       final FieldInfoImpl<?> field = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(field.encodeValue(value), (definition != null) ? definition : field.getDataType(), sb);
+      Utils.appendValue(
+        (definition != null) ? definition : field.getDataType(),
+        (codec != null) ? codec : ((this.codec != null) ? this.codec : field.getCodec()),
+        codecRegistry,
+        sb,
+        value,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(value);
     }
 
     /**
@@ -349,16 +401,42 @@ public abstract class AssignmentImpl
      * @author paouelle
      *
      * @param  name the column name for this assignment
-     * @param  pvalue the value and its definition for this assignment
+     * @param  tvalue the value and its definition for this assignment
      * @param  old the old value to replace for this assignment
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
-    ReplaceAssignmentImpl(CharSequence name, Pair<Object, CQLDataType> pvalue, Object old) {
-      super(name, pvalue);
+    ReplaceAssignmentImpl(
+      CharSequence name, Triple<Object, CQLDataType, TypeCodec<?>> tvalue, Object old
+    ) {
+      super(name, tvalue);
       if (old instanceof Optional) {
         old = ((Optional<?>)old).orElse(null);
       }
       this.old = old;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return super.containsBindMarker() || Utils.containsBindMarker(old);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return super.isIdempotent() || Utils.isIdempotent(old);
     }
 
     /**
@@ -431,10 +509,28 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {}
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {}
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return false; // this statement is never used towards Cassandra
+    }
 
     /**
      * {@inheritDoc}
@@ -549,8 +645,20 @@ public abstract class AssignmentImpl
         return Collections.emptyList();
       }
       return (List<AssignmentImpl>)(List)Arrays.asList(
-        new SetAssignmentImpl(name, context.getColumnNonEncodedValue(table.getName(), name))
+        new SetAssignmentImpl(name, context.getColumnValue(table.getName(), name))
       );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return false; // the value will be extracted from the pojo and that doesn't have bind markers by design
     }
 
     /**
@@ -660,10 +768,10 @@ public abstract class AssignmentImpl
       if (table.getColumnImpl(name) == null) { // column not defined in the table
         return Collections.emptyList();
       }
-      Pair<Object, CQLDataType> neval;
+      Triple<Object, CQLDataType, TypeCodec<?>> neval;
 
       try {
-        neval = context.getColumnNonEncodedValue(table.getName(), name);
+        neval = context.getColumnValue(table.getName(), name);
       } catch (EmptyOptionalPrimaryKeyException e) {
         // special case where we still want to let the assignment go through
         // as we will at least generate a delete for the previous value
@@ -672,6 +780,30 @@ public abstract class AssignmentImpl
       return (List<AssignmentImpl>)(List)Arrays.asList(
         new ReplaceAssignmentImpl(name, neval, old)
       );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(old);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.AssignmentImpl#isIdempotent()
+     */
+    @Override
+    boolean isIdempotent() {
+      return Utils.isIdempotent(old);
     }
 
     /**
@@ -738,10 +870,16 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
       throw new IllegalStateException("should not be called");
     }
 
@@ -769,12 +907,24 @@ public abstract class AssignmentImpl
         // get a POJO context for the POJO passed on the setAllFrom()
         context = context.getClassInfo().newContext((T)object);
       }
-      for (final Map.Entry<String, Pair<Object, CQLDataType>> e: context.getNonPrimaryKeyColumnNonEncodedValues(
+      for (final Map.Entry<String, Triple<Object, CQLDataType, TypeCodec<?>>> e: context.getNonPrimaryKeyColumnValues(
         table.getName()
       ).entrySet()) {
         assignments.add(new SetAssignmentImpl(e.getKey(), e.getValue()));
       }
       return assignments;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return false; // the values will be extracted from the pojo and that doesn't contain bind markers by design
     }
 
     /**
@@ -815,11 +965,11 @@ public abstract class AssignmentImpl
    */
   static class CounterAssignmentImpl extends AssignmentImpl {
     /**
-     * Holds the increment value.
+     * Holds the increment/decrement value or a bind marker representing the value.
      *
      * @author paouelle
      */
-    private final long value;
+    private final Object value;
 
     /**
      * Flag indicating if it is an increment (<code>true</code>) or a decrement
@@ -852,16 +1002,62 @@ public abstract class AssignmentImpl
     }
 
     /**
+     * Instantiates a new <code>CounterAssignmentImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  name the counter column name for this assignment
+     * @param  marker bind marker for the increment value
+     * @param  isIncr <code>true</code> if it is an increment; <code>false</code>
+     *         if it is a decrement
+     * @throws NullPointerException if <code>name</code> is <code>null</code>
+     */
+    CounterAssignmentImpl(CharSequence name, BindMarker marker, boolean isIncr) {
+      super(name);
+      this.value = marker;
+      this.isIncr = isIncr;
+    }
+
+    /**
      * {@inheritDoc}
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append("=");
-      Utils.appendName(name, sb).append(isIncr ? "+" : "-").append(value);
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
+      final StringBuilder nsb = new StringBuilder(80);
+
+      Utils.appendName(tinfo, null, codecRegistry, nsb, name);
+      sb.append(nsb).append('=').append(nsb).append(isIncr ? '+' : '-');
+      Utils.appendValue(
+        finfo.getDataType(),
+        (codec != null) ? codec : finfo.getCodec(),
+        codecRegistry,
+        sb,
+        value,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(value);
     }
 
     /**
@@ -902,11 +1098,12 @@ public abstract class AssignmentImpl
    */
   static class ListPrependAssignmentImpl extends AssignmentImpl {
     /**
-     * Holds the elements to prepend to the list.
+     * Holds the elements to prepend to the list or a bind marker representing
+     * them.
      *
      * @author paouelle
      */
-    private final List<?> value;
+    private final Object value;
 
     /**
      * Instantiates a new <code>ListPrependAssignmentImpl</code> object.
@@ -914,10 +1111,10 @@ public abstract class AssignmentImpl
      * @author paouelle
      *
      * @param  name the column name for this assignment
-     * @param  value the elements to prepend
+     * @param  value the elements to prepend or a bind marker representing them
      * @throws NullPointerException if <code>name</code> is <code>null</code>
      */
-    ListPrependAssignmentImpl(CharSequence name, List<?> value) {
+    ListPrependAssignmentImpl(CharSequence name, Object value) {
       super(name);
       this.value = value;
     }
@@ -927,16 +1124,42 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append("=");
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
+      final StringBuilder nsb = new StringBuilder(80);
 
-      Utils.appendList((List<?>)finfo.encodeValue(value), finfo.getDataType(), sb);
-      sb.append("+");
-      Utils.appendName(name, sb);
+      Utils.appendName(tinfo, null, codecRegistry, nsb, name);
+      sb.append(nsb).append('=');
+      Utils.appendList(
+        finfo.getDataType(),
+        (codec != null) ? codec : finfo.getCodec(),
+        codecRegistry,
+        sb,
+        (List<?>)value,
+        variables
+      );
+      sb.append('+').append(nsb);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(value);
     }
 
     /**
@@ -1011,14 +1234,40 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append("[").append(idx).append("]=");
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      Utils.appendName(tinfo, null, codecRegistry, sb, name)
+        .append('[').append(idx).append("]=");
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(finfo.encodeElementValue(value), finfo.getDataType(), sb);
+      Utils.appendValue(
+        finfo.getDataType().getElementType(),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        codecRegistry,
+        sb,
+        value,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(value);
     }
 
     /**
@@ -1141,15 +1390,41 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append("=");
-      Utils.appendName(name, sb).append(isAdd ? "+" : "-");
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
+      final StringBuilder nsb = new StringBuilder(80);
 
-      Utils.appendCollection(finfo.encodeValue(collection), finfo.getDataType(), sb, null);
+      Utils.appendName(tinfo, null, codecRegistry, nsb, name);
+      sb.append(nsb).append('=').append(nsb).append(isAdd ? '+' : '-');
+      Utils.appendValue(
+        finfo.getDataType(),
+        (codec != null) ? codec : finfo.getCodec(),
+        codecRegistry,
+        sb,
+        collection,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(collection);
     }
 
     /**
@@ -1173,18 +1448,26 @@ public abstract class AssignmentImpl
      */
     @Override
     void validate(TableInfoImpl<?> table) {
-      if ((ctype == DataType.MAP) || (ctype == DataType.SORTED_MAP)) {
+      if ((ctype == DataType.MAP)
+          || (ctype == DataType.SORTED_MAP)
+          || (ctype == DataType.FROZEN_MAP)
+          || (ctype == DataType.FROZEN_SORTED_MAP)) {
         table.validateMapColumnAndKeyValues(name, (Map<?, ?>)collection);
       } else {
         final FieldInfoImpl<?> finfo = table.getColumnImpl(name);
 
         if ((finfo != null)
             && ((finfo.getDataType().getMainType() == DataType.MAP)
-                || (finfo.getDataType().getMainType() == DataType.SORTED_MAP))) {
+                || (finfo.getDataType().getMainType() == DataType.SORTED_MAP)
+                || (finfo.getDataType().getMainType() == DataType.FROZEN_MAP)
+                || (finfo.getDataType().getMainType() == DataType.FROZEN_SORTED_MAP))) {
           table.validateMapColumnAndKeys(name, (Iterable<?>)collection);
         } else if ((ctype == DataType.SET)
                    || (ctype == DataType.ORDERED_SET)
-                   || (ctype == DataType.SORTED_SET)) {
+                   || (ctype == DataType.SORTED_SET)
+                   || (ctype == DataType.FROZEN_SET)
+                   || (ctype == DataType.FROZEN_ORDERED_SET)
+                   || (ctype == DataType.FROZEN_SORTED_SET)) {
           table.validateSetColumnAndValues(name, (Iterable<?>)collection);
         } else { // must be a list
           table.validateListColumnAndValues(name, (Iterable<?>)collection);
@@ -1240,21 +1523,48 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
-    void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-      Utils.appendName(name, sb).append("[");
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    ) {
+      Utils.appendName(tinfo, null, codecRegistry, sb, name).append('[');
       final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(name);
 
-      Utils.appendValue(key, finfo.getDataType().getFirstArgumentType(), sb);
+      Utils.appendValue(
+        finfo.getDataType().getFirstArgumentType(),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        codecRegistry,
+        sb,
+        key,
+        variables
+      );
       sb.append("]=");
-      // paouelle: 03/06/15 - I think this is a bug, it should be encoded as an
-      // element of the map and not the type of the map as such, it should be
-      // using the encodeElementValue and we should make sure that the
-      // encodeElementValue, properly support MAP in to the definition.encodeElement()
-      // --> Utils.appendValue(finfo.encodeValue(value), sb);
-      Utils.appendValue(finfo.encodeElementValue(value), finfo.getDataType().getElementType(), sb);
+      Utils.appendValue(
+        finfo.getDataType().getElementType(),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(1),
+        codecRegistry,
+        sb,
+        value,
+        variables
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+     */
+    @Override
+    boolean containsBindMarker() {
+      return Utils.containsBindMarker(key) || Utils.containsBindMarker(value);
     }
 
     /**
@@ -1280,19 +1590,5 @@ public abstract class AssignmentImpl
     void validate(TableInfoImpl<?> table) {
       table.validateMapColumnAndKeyValue(name, key, value);
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @author paouelle
-   *
-   * @see java.lang.Object#toString()
-   */
-  @Override
-  public String toString() {
-    return ToStringBuilder.reflectionToString(
-      this, ToStringStyle.SHORT_PREFIX_STYLE, true
-    );
   }
 }

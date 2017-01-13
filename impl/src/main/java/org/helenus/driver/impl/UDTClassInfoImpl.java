@@ -28,15 +28,22 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import java.nio.ByteBuffer;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Triple;
+
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
+import com.datastax.driver.core.UserTypeBridge;
+import com.datastax.driver.core.exceptions.InvalidTypeException;
+import com.google.common.reflect.TypeToken;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
@@ -68,9 +75,11 @@ public abstract class UDTClassInfoImpl<T>
   private final static String[] RESERVED_UDT_NAMES = {
     "byte",
     "smallint",
+    "tinyint",
     "complex",
     "enum",
     "date",
+    "time",
     "interval",
     "macaddr",
     "bitstring"
@@ -119,10 +128,9 @@ public abstract class UDTClassInfoImpl<T>
      *
      * @return a non-<code>null</code> map of all column/value pairs for the POJO
      * @throws IllegalArgumentException if a mandatory column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues() {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues() {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -137,7 +145,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -149,7 +157,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -161,7 +169,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -173,7 +181,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -185,7 +193,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -197,10 +205,9 @@ public abstract class UDTClassInfoImpl<T>
      * @return a non-<code>null</code> map of all mandatory column/value pairs
      *         for the POJO
      * @throws IllegalArgumentException if a column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Pair<Object, CQLDataType>> getMandatoryColumnValues() {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getMandatoryColumnValues() {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -215,21 +222,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getMandatoryAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getMandatoryAndPrimaryKeyColumnValues(
       String tname
     ) {
-      throw new IllegalArgumentException("user-defined types do not define tables");
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @author paouelle
-     *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
-     */
-    @Override
-    public final Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -242,12 +237,11 @@ public abstract class UDTClassInfoImpl<T>
      * @return the column value for the POJO
      * @throws IllegalArgumentException if the column name is not defined by the
      *         POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Pair<Object, CQLDataType> getColumnValue(CharSequence name) {
+    public Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(CharSequence name) {
       if (table == null) { // table not defined so nothing to return; should not happen
-        return Pair.of(null, null);
+        return Triple.of(null, null, null);
       }
       return table.getColumnValue(object, name);
     }
@@ -260,7 +254,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
      */
     @Override
-    public final Pair<Object, CQLDataType> getColumnValue(String tname, CharSequence name) {
+    public final Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(String tname, CharSequence name) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -274,10 +268,9 @@ public abstract class UDTClassInfoImpl<T>
      *         for the POJO
      * @throws IllegalArgumentException if any of the column names are not defined
      *         by the POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(Iterable<CharSequence> names) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(Iterable<CharSequence> names) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -292,7 +285,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.Iterable)
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getColumnValues(
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -308,10 +301,9 @@ public abstract class UDTClassInfoImpl<T>
      *         for the POJO
      * @throws IllegalArgumentException if any of the column names are not defined
      *         by the POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(CharSequence... names) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(CharSequence... names) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
@@ -326,7 +318,7 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.CharSequence[])
      */
     @Override
-    public final Map<String, Pair<Object, CQLDataType>> getColumnValues(
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
       String tname, CharSequence... names
     ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
@@ -346,6 +338,13 @@ public abstract class UDTClassInfoImpl<T>
    * @author paouelle
    */
   private final TableInfoImpl<T> table;
+
+  /**
+   * Holds the corresponding Cassandra data type.
+   *
+   * @author paouelle
+   */
+  private volatile UserType dtype = null;
 
   /**
    * Instantiates a new <code>UDTClassInfoImpl</code> object.
@@ -372,7 +371,7 @@ public abstract class UDTClassInfoImpl<T>
     // handle special UDT types that extends List, Set, or Map
     if (List.class.isAssignableFrom(clazz)) {
       table.addNonPrimaryColumn(
-        new FieldInfoImpl<>(this, DataType.LIST, (obj, val) -> {
+        new FieldInfoImpl<>(mgr, this, DataType.LIST, (obj, val) -> {
           final List l = (List)obj;
 
           l.clear();
@@ -382,6 +381,7 @@ public abstract class UDTClassInfoImpl<T>
     } else if (Set.class.isAssignableFrom(clazz)) {
       table.addNonPrimaryColumn(
         new FieldInfoImpl<>(
+          mgr,
           this,
           (LinkedHashSet.class.isAssignableFrom(clazz)
            ? DataType.ORDERED_SET
@@ -397,6 +397,7 @@ public abstract class UDTClassInfoImpl<T>
     } else if (Map.class.isAssignableFrom(clazz)) {
       table.addNonPrimaryColumn(
         new FieldInfoImpl<>(
+          mgr,
           this,
           SortedMap.class.isAssignableFrom(clazz) ? DataType.SORTED_MAP : DataType.MAP,
           (obj, val) -> {
@@ -508,6 +509,43 @@ public abstract class UDTClassInfoImpl<T>
   }
 
   /**
+   * Gets a codec for this user data type.
+   *
+   * @author paouelle
+   *
+   * @param  token the type to decode to
+   * @param  codecRegistry the codec registry to use when finding codecs
+   * @return a suitable codec for this user data type
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  protected TypeCodec<T> getCodec(
+    TypeToken<T> token, CodecRegistry codecRegistry
+  ) {
+    final TypeCodec<UDTValue> ucodec = TypeCodec.userType(dtype);
+
+    return new TypeCodec(dtype, token) {
+      @Override
+      public T parse(String value) throws InvalidTypeException {
+        return getObject(ucodec.parse(value));
+      }
+      @Override
+      public String format(Object value) throws InvalidTypeException {
+        return ucodec.format(getUDTValue((T)value, codecRegistry));
+      }
+      @Override
+      public ByteBuffer serialize(Object value, ProtocolVersion protocolVersion)
+        throws InvalidTypeException {
+        return ucodec.serialize(getUDTValue((T)value, codecRegistry), protocolVersion);
+      }
+      @Override
+      public T deserialize(ByteBuffer bytes, ProtocolVersion protocolVersion)
+        throws InvalidTypeException {
+        return getObject(ucodec.deserialize(bytes, protocolVersion));
+      }
+    };
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -535,10 +573,34 @@ public abstract class UDTClassInfoImpl<T>
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.persistence.CQLDataType#isFrozen()
+   */
+  @Override
+  public boolean isFrozen() {
+    return true;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.persistence.CQLDataType#isCollection()
    */
   @Override
   public boolean isCollection() {
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#isTuple()
+   */
+  @Override
+  public boolean isTuple() {
     return false;
   }
 
@@ -552,6 +614,24 @@ public abstract class UDTClassInfoImpl<T>
   @Override
   public boolean isUserDefined() {
     return true;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getDataType()
+   */
+  @Override
+  public com.datastax.driver.core.DataType getDataType() {
+    UserType dtype = this.dtype;
+
+    if (dtype == null) { // lazily instantiate it
+      dtype = UserTypeBridge.instantiate(mgr, this);
+      this.dtype = dtype;
+    }
+    return dtype;
   }
 
   /**
@@ -623,7 +703,7 @@ public abstract class UDTClassInfoImpl<T>
    */
   @Override
   public String toCQL() {
-    return "frozen<" + name + ">";
+    return "frozen<" + name + '>';
   }
 
   /**
@@ -774,6 +854,46 @@ public abstract class UDTClassInfoImpl<T>
         );
       }
     }
+  }
+
+  /**
+   * Gets a {@link UDTValue} corresponding to the given object based on this
+   * user defined type class information.
+   *
+   * @author paouelle
+   *
+   * @param  object the pojo object from which to retrieve the column values
+   * @param  codecRegistry the codec registry to use when finding codecs
+   * @return the {@link UDTValue} corresponding to the specified pojo
+   * @throws IllegalArgumentException if the combination of fields and data types
+   *         is not supported
+   */
+  @SuppressWarnings("unchecked")
+  public UDTValue getUDTValue(T object, CodecRegistry codecRegistry) {
+    if (object == null) {
+      return null;
+    }
+    // get the table for this UDT
+    final TableInfoImpl<T> table = getTableImpl();
+
+    if (table == null) {
+      return null;
+    }
+    final UDTValue uval = dtype.newValue();
+    int i = -1;
+
+    for (final UserType.Field coldef: uval.getType()) {
+      i++;
+      // find the field in the table for this column
+      final String cname = coldef.getName();
+      final FieldInfoImpl<T> field = table.getColumnImpl(cname);
+
+      if (field != null) {
+        // now let's set the value for this column
+        uval.set(i, field.getValue(object), (TypeCodec<Object>)field.getCodec());
+      }
+    }
+    return uval;
   }
 
   /**

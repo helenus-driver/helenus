@@ -26,9 +26,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
 
@@ -155,7 +156,7 @@ public class UDTRootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceKeyValues()
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceKeyValues() {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceKeyValues() {
       return tcontext.getKeyspaceKeyValues();
     }
 

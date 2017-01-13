@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 import org.helenus.driver.Clause;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.CreateIndex;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
@@ -150,9 +149,9 @@ public class CreateIndexImpl<T>
     }
     builder.append(" ON ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append('.');
+      Utils.appendName(builder, getKeyspace()).append('.');
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     builder
       .append(" (")
       .append(field.getColumnName())
@@ -178,7 +177,6 @@ public class CreateIndexImpl<T>
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
-   * @throws ColumnPersistenceException if unable to persist a column's value
    */
   List<StringBuilder> buildQueryStrings(TableInfoImpl<T> table) {
     final List<StringBuilder> builders = new ArrayList<>(2);

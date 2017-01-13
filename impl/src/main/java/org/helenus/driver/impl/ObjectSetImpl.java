@@ -99,10 +99,10 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
   /**
    * {@inheritDoc}
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @see org.helenus.driver.ObjectSet#wasApplied()
-   */
+     */
   @Override
   public boolean wasApplied() {
     return result.wasApplied();

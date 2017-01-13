@@ -43,8 +43,10 @@ import org.apache.logging.log4j.Logger;
 
 import com.datastax.driver.core.CloseFuture;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
@@ -57,6 +59,7 @@ import org.helenus.driver.AlterSchemas;
 import org.helenus.driver.Assignment;
 import org.helenus.driver.Batch;
 import org.helenus.driver.BatchableStatement;
+import org.helenus.driver.BindMarker;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateIndex;
 import org.helenus.driver.CreateKeyspace;
@@ -364,7 +367,7 @@ public class StatementManagerImpl extends StatementManager {
     this(initializer, connect);
     if (cnames != null) {
       for (final String cname: cnames) {
-        final Class<?> clazz = DataDecoder.findClass(cname);
+        final Class<?> clazz = DataTypeImpl.findClass(cname);
 
         org.apache.commons.lang3.Validate.isTrue(
           EntityFilter.class.isAssignableFrom(clazz),
@@ -1075,7 +1078,7 @@ public class StatementManagerImpl extends StatementManager {
     final StringBuilder sb = new StringBuilder(name.length() + 7);
 
     sb.append("token(");
-    Utils.appendName(name, sb);
+    Utils.appendName(sb, name);
     sb.append(")");
     return new CNameSequence(sb.toString(), name);
   }
@@ -1092,7 +1095,9 @@ public class StatementManagerImpl extends StatementManager {
     final StringBuilder sb = new StringBuilder();
 
     sb.append("token(");
-    Utils.joinAndAppendNames(sb, ",", Arrays.asList((Object[])names));
+    Utils.joinAndAppendNames(
+      null, null, getCodecRegistry(), sb, ",", Arrays.asList((Object[])names)
+    );
     sb.append(")");
     return new CNameSequence(sb.toString(), names);
   }
@@ -1432,6 +1437,18 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#timestamp(org.helenus.driver.BindMarker)
+   */
+  @Override
+  protected Using<BindMarker> timestamp(BindMarker marker) {
+    return new UsingImpl<>(Using.TIMESTAMP, marker);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#ttl(int)
    */
   @Override
@@ -1448,11 +1465,23 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#ttl(org.helenus.driver.BindMarker)
+   */
+  @Override
+  protected Using<BindMarker> ttl(BindMarker marker) {
+    return new UsingImpl<>(Using.TTL, marker);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#appendName(java.lang.String, java.lang.StringBuilder)
    */
   @Override
   protected StringBuilder appendName(String name, StringBuilder sb) {
-    return Utils.appendName(name, sb);
+    return Utils.appendName(sb, name);
   }
 
   /**
@@ -1564,6 +1593,18 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#incr(java.lang.CharSequence, org.helenus.driver.BindMarker)
+   */
+  @Override
+  protected Assignment incr(CharSequence name, BindMarker marker) {
+    return new AssignmentImpl.CounterAssignmentImpl(name, marker, true);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#decr(java.lang.CharSequence, long)
    */
   @Override
@@ -1576,10 +1617,25 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#decr(java.lang.CharSequence, org.helenus.driver.BindMarker)
+   */
+  @Override
+  protected Assignment decr(CharSequence name, BindMarker marker) {
+    return new AssignmentImpl.CounterAssignmentImpl(name, marker, false);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#prepend(java.lang.CharSequence, java.lang.Object)
    */
   @Override
   protected Assignment prepend(CharSequence name, Object value) {
+    org.apache.commons.lang3.Validate.isTrue(
+      Utils.isBindMarker(value), "binding a value is not supported"
+    );
     return new AssignmentImpl.ListPrependAssignmentImpl(
       name,
       Collections.singletonList(value)
@@ -1603,10 +1659,25 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#prependAll(java.lang.CharSequence, org.helenus.driver.BindMarker)
+   */
+  @Override
+  protected Assignment prependAll(CharSequence name, BindMarker marker) {
+    return new AssignmentImpl.ListPrependAssignmentImpl(name, marker);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#append(java.lang.CharSequence, java.lang.Object)
    */
   @Override
   protected Assignment append(CharSequence name, Object value) {
+    org.apache.commons.lang3.Validate.isTrue(
+      Utils.isBindMarker(value), "binding a value is not supported"
+    );
     return appendAll(name, Collections.singletonList(value));
   }
 
@@ -2130,6 +2201,30 @@ public class StatementManagerImpl extends StatementManager {
   @Override
   public Cluster getCluster() {
     return cluster;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#getCodecRegistry()
+   */
+  @Override
+  public CodecRegistry getCodecRegistry() {
+    return cluster.getConfiguration().getCodecRegistry();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#getProtocolVersion()
+   */
+  @Override
+  public ProtocolVersion getProtocolVersion() {
+    return cluster.getConfiguration().getProtocolOptions().getProtocolVersion();
   }
 
   /**

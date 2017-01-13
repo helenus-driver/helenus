@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,11 @@
  */
 package org.helenus.driver.impl;
 
+import java.util.List;
+
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.TypeCodec;
+
 import org.helenus.driver.Ordering;
 
 /**
@@ -22,7 +27,7 @@ import org.helenus.driver.Ordering;
  * {@link com.datastax.driver.core.querybuilder.Ordering} to provide support for
  * POJOs.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -67,12 +72,30 @@ public class OrderingImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
    */
   @Override
-  void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
-    Utils.appendName(name, sb);
+  void appendTo(
+    TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    List<Object> variables
+  ) {
+    Utils.appendName(tinfo, null, codecRegistry, sb, name);
     sb.append(isDesc ? " DESC" : " ASC");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+   */
+  @Override
+  boolean containsBindMarker() {
+    return false;
   }
 
   /**

@@ -80,7 +80,7 @@ public class AlterCreateKeyspaceImpl<T> extends CreateKeyspaceImpl<T> {
     final StringBuilder builder = new StringBuilder();
 
     builder.append("ALTER KEYSPACE ");
-    Utils.appendName(getKeyspace(), builder);
+    Utils.appendName(builder, getKeyspace());
     KeyspaceWithImpl.ReplicationWithImpl replication = with.replication;
 
     if (replication == null) { // default to POJO's details
@@ -93,7 +93,9 @@ public class AlterCreateKeyspaceImpl<T> extends CreateKeyspaceImpl<T> {
     options.add(replication);
     options.addAll(with.options);
     builder.append(" WITH ");
-    Utils.joinAndAppend(null, builder, " AND ", options);
+    Utils.joinAndAppend(
+      null, null, mgr.getCodecRegistry(), builder, " AND ", options, null
+    );
     builder
       .append(" AND DURABLE_WRITES = ")
       .append(getContext().getClassInfo().getKeyspace().durableWrites());

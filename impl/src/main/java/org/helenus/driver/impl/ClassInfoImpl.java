@@ -43,14 +43,14 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.UDTValue;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
-import org.helenus.driver.ColumnPersistenceException;
 import org.helenus.driver.ExcludedKeyspaceKeyException;
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.ObjectNotFoundException;
@@ -354,9 +354,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @param  tname the name of the table from which to retrieve columns
      * @return a non-<code>null</code> map of all column/value pairs for the POJO
      * @throws IllegalArgumentException if a mandatory column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -375,9 +376,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return a non-<code>null</code> map of all partition key column/value pairs
      *         for the POJO
      * @throws IllegalArgumentException if a column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -397,9 +399,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         column/value pairs for the POJO
      * @throws IllegalArgumentException if a column or a keyspace key is missing from
      *         the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(
       String tname
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -420,9 +421,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return a non-<code>null</code> map of all primary key column/value pairs
      *         for the POJO
      * @throws IllegalArgumentException if a column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -444,9 +446,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return a non-<code>null</code> map of all primary key column/value pairs
      *         for the POJO
      * @throws IllegalArgumentException if a column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
       String tname, Map<String, Object> pkeys_override
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -465,10 +466,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return a non-<code>null</code> map of all keyspace key name/value pairs
      *         for the POJO
      * @throws IllegalArgumentException if a keyspace key is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a keyspace key's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceKeyValues() {
-      final Map<String, Pair<Object, CQLDataType>> values = new LinkedHashMap<>(keyspaceKeys.size());
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceKeyValues() {
+      final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
+        = new LinkedHashMap<>(keyspaceKeys.size());
 
       for (final Map.Entry<String, FieldInfoImpl<T>> e: getKeyspaceKeys().entrySet()) {
         final String name = e.getKey();
@@ -478,7 +479,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         org.apache.commons.lang3.Validate.isTrue(
           value != null, "missing keyspace key '%s'", name
         );
-        values.put(name, Pair.of(value, field.getDataType()));
+        values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
       }
       return values;
     }
@@ -494,9 +495,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         column/value pairs for the POJO
      * @throws IllegalArgumentException if a column or a keyspace key is missing from
      *         the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(
       String tname
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -517,9 +517,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return a non-<code>null</code> map of all mandatory and primary key
      *         column/value pairs for the POJO
      * @throws IllegalArgumentException if a column is missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getMandatoryAndPrimaryKeyColumnValues(
+      String tname
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
@@ -529,20 +530,18 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     }
 
     /**
-     * Retrieves all non primary key columns and their non-encoded values from
+     * Retrieves all non primary key columns and their values from
      * the POJO from the specified table.
-     * <p>
-     * <i>Note:</i> The returned values should not be encoded.
      *
      * @author paouelle
      *
      * @param  tname the name of the table from which to retrieve columns
      * @return a non-<code>null</code> map of all non primary key column/value
-     *         (non-encoded) pairs for the POJO
+     *         pairs for the POJO
      * @throws IllegalArgumentException if a mandatory column is missing from
      *         the POJO
      */
-    public Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getNonPrimaryKeyColumnValues(
       String tname
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -550,32 +549,10 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getNonPrimaryKeyColumnNonEncodedValues(object);
+      return table.getNonPrimaryKeyColumnValues(object);
     }
 
     /**
-     * Retrieves the specified column non-encoded value from the POJO and the
-     * specified table.
-     *
-     * @author paouelle
-     *
-     * @param  tname the name of the table from which to retrieve the column
-     * @param  name the name of the column to retrieve
-     * @return the column non-encoded value for the POJO
-     * @throws IllegalArgumentException if the column name is not defined by the
-     *         POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
-     */
-    public Pair<Object, CQLDataType> getColumnNonEncodedValue(String tname, CharSequence name) {
-      final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
-
-      if (table == null) { // table not defined so nothing to return
-        return Pair.of(null, null);
-      }
-      return table.getColumnNonEncodedValue(object, name);
-    }
-
-   /**
      * Retrieves the specified column value from the POJO and the specified
      * table.
      *
@@ -586,13 +563,14 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      * @return the column value for the POJO
      * @throws IllegalArgumentException if the column name is not defined by the
      *         POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Pair<Object, CQLDataType> getColumnValue(String tname, CharSequence name) {
+    public Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(
+      String tname, CharSequence name
+    ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
 
       if (table == null) { // table not defined so nothing to return
-        return Pair.of(null, null);
+        return Triple.of(null, null, null);
       }
       return table.getColumnValue(object, name);
     }
@@ -609,9 +587,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         for the POJO
      * @throws IllegalArgumentException if any of the column names are not defined
      *         by the POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -634,9 +611,8 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
      *         for the POJO
      * @throws IllegalArgumentException if any of the column names are not defined
      *         by the POJO or is mandatory and missing from the POJO
-     * @throws ColumnPersistenceException if unable to persist a column's value
      */
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
       String tname, CharSequence... names
     ) {
       final TableInfoImpl<T> table = (TableInfoImpl<T>)getTable(tname);
@@ -759,6 +735,13 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
   protected final Map<String, FieldInfoImpl<T>> keyspaceKeysByType;
 
   /**
+   * Holds the statement manager.
+   *
+   * @author paouelle
+   */
+  protected final StatementManagerImpl mgr;
+
+  /**
    * Instantiates a new <code>ClassInfo</code> object.
    *
    * @author paouelle
@@ -777,6 +760,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     Class<? extends Annotation> entityAnnotationClass
   ) {
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null POJO class");
+    this.mgr = mgr;
     this.columns = new LinkedHashSet<>(25);
     this.tables = new LinkedHashMap<>(12);
     this.keyspaceKeysByName = new LinkedHashMap<>(8);
@@ -823,6 +807,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
    *         a valid POJO class
    */
   ClassInfoImpl(ClassInfoImpl<T> cinfo, Class<T> clazz) {
+    this.mgr = cinfo.mgr;
     this.entityAnnotationClass = cinfo.entityAnnotationClass;
     this.clazz = clazz;
     this.constructor = cinfo.constructor;

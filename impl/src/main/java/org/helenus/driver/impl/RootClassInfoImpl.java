@@ -26,10 +26,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.RootClassInfo;
@@ -153,7 +154,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(String tname) {
       return tcontext.getColumnValues(tname);
     }
 
@@ -165,7 +166,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getPartitionKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(String tname) {
       return tcontext.getPartitionKeyColumnValues(tname);
     }
 
@@ -177,7 +178,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
       return tcontext.getKeyspaceAndPartitionKeyColumnValues(tname);
     }
 
@@ -189,7 +190,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getPrimaryKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(String tname) {
       return tcontext.getPrimaryKeyColumnValues(tname);
     }
 
@@ -201,7 +202,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceKeyValues()
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceKeyValues() {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceKeyValues() {
       return tcontext.getKeyspaceKeyValues();
     }
 
@@ -213,7 +214,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
       return tcontext.getKeyspaceAndPrimaryKeyColumnValues(tname);
     }
 
@@ -225,7 +226,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getMandatoryAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getMandatoryAndPrimaryKeyColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getMandatoryAndPrimaryKeyColumnValues(
       String tname
     ) {
       return tcontext.getMandatoryAndPrimaryKeyColumnValues(tname);
@@ -236,22 +237,10 @@ public class RootClassInfoImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getNonPrimaryKeyColumnNonEncodedValues(java.lang.String)
-     */
-    @Override
-    public Map<String, Pair<Object, CQLDataType>> getNonPrimaryKeyColumnNonEncodedValues(String tname) {
-      return tcontext.getNonPrimaryKeyColumnNonEncodedValues(tname);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @author paouelle
-     *
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
      */
     @Override
-    public Pair<Object, CQLDataType> getColumnValue(String tname, CharSequence name) {
+    public Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(String tname, CharSequence name) {
       return tcontext.getColumnValue(tname, name);
     }
 
@@ -263,7 +252,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.Iterable)
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
       String tname, Iterable<CharSequence> names
     ) {
       return tcontext.getColumnValues(tname, names);
@@ -277,7 +266,7 @@ public class RootClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String, java.lang.CharSequence[])
      */
     @Override
-    public Map<String, Pair<Object, CQLDataType>> getColumnValues(
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
       String tname, CharSequence... names
     ) {
       return tcontext.getColumnValues(tname, names);

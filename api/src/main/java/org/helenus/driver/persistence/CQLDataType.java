@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import java.util.List;
 /**
  * The <code>CQLDataType</code> interface is used to identify CQL data types.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author The Helenus Driver Project Authors
  * @version 1 - Mar 4, 2015 - paouelle - Creation
@@ -39,6 +39,20 @@ public interface CQLDataType {
   public String name();
 
   /**
+   * Checks whether this data type is frozen.
+   * <p/>
+   * This applies to user defined types, tuples and nested collections. Frozen
+   * types are serialized as a single value in Cassandra's storage engine,
+   * whereas non-frozen types are stored in a form that allows updates to
+   * individual subfields.
+   *
+   * @author paouelle
+   *
+   * @return whether this data type is frozen
+   */
+  public boolean isFrozen();
+
+  /**
    * Checks if this data type represents a collection.
    *
    * @author paouelle
@@ -49,6 +63,16 @@ public interface CQLDataType {
   public boolean isCollection();
 
   /**
+   * Checks if this data type represents a tuple.
+   *
+   * @author paouelle
+   *
+   * @return <code>true</code> if this data type represent a tuple;
+   *         <code>false</code> otherwise
+   */
+  public boolean isTuple();
+
+  /**
    * Checks if this data type represents a user-defined type.
    *
    * @author paouelle
@@ -57,6 +81,15 @@ public interface CQLDataType {
    *         type; <code>false</code> otherwise
    */
   public boolean isUserDefined();
+
+  /**
+   * Gets the corresponding Cassandra data type.
+   *
+   * @author paouelle
+   *
+   * @return the non-<code>null</code> corresponding Cassandra data type
+   */
+  public com.datastax.driver.core.DataType getDataType();
 
   /**
    * Gets the main data type for this definition.

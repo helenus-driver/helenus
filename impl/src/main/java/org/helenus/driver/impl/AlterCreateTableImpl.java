@@ -169,11 +169,7 @@ public class AlterCreateTableImpl<T> extends CreateTableImpl<T> {
       if (type == null) { // no longer exist
         columns0.add("DROP " + name0);
       } else { // still exist
-        final CQLDataType type0 = DataTypeParser.validatorToCQL(
-          val0,
-          mgr.getCluster().getConfiguration().getProtocolOptions().getProtocolVersion(),
-          mgr.getCluster().getConfiguration().getCodecRegistry()
-        );
+        final CQLDataType type0 = DataTypeParser.validatorToCQL(mgr, val0);
         final String type0_cql = type0.toCQL();
         final String type_cql = type.toCQL();
 
@@ -233,9 +229,9 @@ public class AlterCreateTableImpl<T> extends CreateTableImpl<T> {
 
     builder.append("ALTER TABLE ");
     if (getKeyspace() != null) {
-      Utils.appendName(getKeyspace(), builder).append('.');
+      Utils.appendName(builder, getKeyspace()).append('.');
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     builder.append(' ');
     return columns0.stream()
       .map(inst -> new StringBuilder(builder).append(inst))

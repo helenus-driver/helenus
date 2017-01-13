@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.helenus.driver.impl.DataTypeImpl.Definition;
+import org.helenus.driver.impl.StatementManagerImpl;
 import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.Ordering;
 
@@ -39,10 +40,11 @@ public class DataTypeParser extends DataTypeClassNameParser {
    *
    * @author paouelle
    *
+   * @param  mgr the non-<code>null</code> statement manager
    * @param  t the data type to convert
    * @return the corresponding CQL data type
    */
-  private static CQLDataType toCQL(DataType t) {
+  private static CQLDataType toCQL(StatementManagerImpl mgr, DataType t) {
     if (t instanceof UserType) {
       final UserType ut = (UserType)t;
 
@@ -52,12 +54,24 @@ public class DataTypeParser extends DataTypeClassNameParser {
           return ut.getTypeName();
         }
         @Override
+        public boolean isFrozen() {
+          return true;
+        }
+        @Override
         public boolean isCollection() {
+          return false;
+        }
+        @Override
+        public boolean isTuple() {
           return false;
         }
         @Override
         public boolean isUserDefined() {
           return true;
+        }
+        @Override
+        public DataType getDataType() {
+          return ut;
         }
         @Override
         public CQLDataType getMainType() {
@@ -93,12 +107,24 @@ public class DataTypeParser extends DataTypeClassNameParser {
           return "tuple";
         }
         @Override
+        public boolean isFrozen() {
+          return true;
+        }
+        @Override
         public boolean isCollection() {
           return false;
         }
         @Override
+        public boolean isTuple() {
+          return true;
+        }
+        @Override
         public boolean isUserDefined() {
           return false;
+        }
+        @Override
+        public DataType getDataType() {
+          return tt;
         }
         @Override
         public CQLDataType getMainType() {
@@ -118,21 +144,22 @@ public class DataTypeParser extends DataTypeClassNameParser {
         }
         @Override
         public boolean isAlterableTo(CQLDataType to) {
-          return false; // never alterable - TODO: fix tuples
+          return false; // never alterable
         }
         @SuppressWarnings("synthetic-access")
         @Override
         public String toCQL() {
           return tt.getComponentTypes().stream()
-            .map(ct -> DataTypeParser.toCQL(ct).toCQL())
+            .map(ct -> DataTypeParser.toCQL(mgr, ct).toCQL())
             .collect(Collectors.joining(",", "frozen<tuple<", ">>"));
         }
       };
     }
     return new Definition(
+      mgr,
       org.helenus.driver.persistence.DataType.valueOf(t.getName().name()),
       t.getTypeArguments().stream()
-        .map(ta -> DataTypeParser.toCQL(ta))
+        .map(ta -> DataTypeParser.toCQL(mgr, ta))
         .collect(Collectors.toList())
     );
   }
@@ -142,16 +169,20 @@ public class DataTypeParser extends DataTypeClassNameParser {
    *
    * @author paouelle
    *
+   * @param  mgr the non-<code>null</code> statement manager
    * @param  validator the validator to be converted
-   * @param  protocolVersion the protocol version being used
-   * @param  codecRegistry the codec registry to be used
    * @return the corresponding CQL data type
    */
   public static CQLDataType validatorToCQL(
-    String validator, ProtocolVersion protocolVersion, CodecRegistry codecRegistry
+    StatementManagerImpl mgr, String validator
   ) {
     return DataTypeParser.toCQL(
-      DataTypeClassNameParser.parseOne(validator, protocolVersion, codecRegistry)
+      mgr,
+      DataTypeClassNameParser.parseOne(
+        validator,
+        mgr.getProtocolVersion(),
+        mgr.getCodecRegistry()
+      )
     );
   }
 
@@ -160,19 +191,23 @@ public class DataTypeParser extends DataTypeClassNameParser {
    *
    * @author paouelle
    *
+   * @param  mgr the non-<code>null</code> statement manager
    * @param  type the type to be converted
-   * @param  protocolVersion the protocol version being used
-   * @param  codecRegistry the codec registry to be used
    * @return the corresponding CQL data type
    */
   public static CQLDataType typeToCQL(
-    String type, ProtocolVersion protocolVersion, CodecRegistry codecRegistry
+    StatementManagerImpl mgr, String type
   ) {
     if (type.startsWith("org.apache.cassandra.db.marshal.FrozenType(")) {
       type = type.substring(43, type.length() - 1);
     }
     return DataTypeParser.toCQL(
-      DataTypeClassNameParser.parseOne(type, protocolVersion, codecRegistry)
+      mgr,
+      DataTypeClassNameParser.parseOne(
+        type,
+        mgr.getProtocolVersion(),
+        mgr.getCodecRegistry()
+      )
     );
   }
 

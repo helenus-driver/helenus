@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,15 +21,48 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 
 import java.util.Date;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.SortedSet;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+
+import javax.json.JsonStructure;
+
+import org.apache.commons.lang3.ClassUtils;
 
 import com.datastax.driver.core.DataType.Name;
+import com.datastax.driver.core.TypeCodec;
+import com.datastax.driver.core.exceptions.CodecNotFoundException;
+import com.google.common.reflect.TypeToken;
+
+import org.helenus.driver.codecs.provider.AsciiCodecProvider;
+import org.helenus.driver.codecs.provider.BigIntCodecProvider;
+import org.helenus.driver.codecs.provider.BlobCodecProvider;
+import org.helenus.driver.codecs.provider.BooleanCodecProvider;
+import org.helenus.driver.codecs.provider.CodecProvider;
+import org.helenus.driver.codecs.provider.CounterCodecProvider;
+import org.helenus.driver.codecs.provider.DateCodecProvider;
+import org.helenus.driver.codecs.provider.DecimalCodecProvider;
+import org.helenus.driver.codecs.provider.DoubleCodecProvider;
+import org.helenus.driver.codecs.provider.FloatCodecProvider;
+import org.helenus.driver.codecs.provider.InetCodecProvider;
+import org.helenus.driver.codecs.provider.IntCodecProvider;
+import org.helenus.driver.codecs.provider.SmallIntCodecProvider;
+import org.helenus.driver.codecs.provider.TextCodecProvider;
+import org.helenus.driver.codecs.provider.TimeCodecProvider;
+import org.helenus.driver.codecs.provider.TimeUUIDCodecProvider;
+import org.helenus.driver.codecs.provider.TimestampCodecProvider;
+import org.helenus.driver.codecs.provider.TinyIntCodecProvider;
+import org.helenus.driver.codecs.provider.UUIDCodecProvider;
+import org.helenus.driver.codecs.provider.VarCharCodecProvider;
+import org.helenus.driver.codecs.provider.VarIntCodecProvider;
 
 /**
  * The <code>DataType</code> enumeration defines Cassandra data types
@@ -47,29 +80,113 @@ import com.datastax.driver.core.DataType.Name;
  */
 @SuppressWarnings("javadoc")
 public enum DataType implements CQLDataType {
-  INFERRED(Name.CUSTOM, "?", 0, Object.class),
-  ASCII(Name.ASCII, "ascii", 0, String.class),
-  BIGINT(Name.BIGINT, "bigint", 0, Long.class),
-  BLOB(Name.BLOB, "blob", 0, byte[].class),
-  BOOLEAN(Name.BOOLEAN, "boolean", 0, Boolean.class),
-  COUNTER(Name.COUNTER, "counter", 0, Long.class),
-  DECIMAL(Name.DECIMAL, "decimal", 0, BigDecimal.class),
-  DOUBLE(Name.DOUBLE, "double", 0, Double.class),
-  FLOAT(Name.FLOAT, "float", 0, Float.class),
-  INET(Name.INET, "inet", 0, InetAddress.class),
-  INT(Name.INT, "int", 0, Integer.class),
-  TEXT(Name.TEXT, "text", 0, String.class),
-  TIMESTAMP(Name.TIMESTAMP, "timestamp", 0, Date.class),
-  UUID(Name.UUID, "uuid", 0, UUID.class),
-  VARCHAR(Name.VARCHAR, "varchar", 0, String.class),
-  VARINT(Name.VARINT, "varint", 0, BigInteger.class),
-  TIMEUUID(Name.TIMEUUID, "timeuuid", 0, UUID.class),
-  LIST(Name.LIST, "list", 1, List.class),
-  SET(Name.SET, "set", 1, Set.class),
-  ORDERED_SET(Name.LIST, "list", 1, LinkedHashSet.class),
-  SORTED_SET(Name.SET, "set", 1, SortedSet.class),
-  MAP(Name.MAP, "map", 2, Map.class),
-  SORTED_MAP(Name.MAP, "map", 2, NavigableMap.class);
+  INFERRED(Name.CUSTOM, "?", false, 0),
+
+  ASCII(Name.ASCII, "ascii", false, 0, AsciiCodecProvider.INSTANCE),
+  BIGINT(Name.BIGINT, "bigint", false, 0, BigIntCodecProvider.INSTANCE),
+  BLOB(Name.BLOB, "blob", false, 0, BlobCodecProvider.INSTANCE),
+  BOOLEAN(Name.BOOLEAN, "boolean", false, 0, BooleanCodecProvider.INSTANCE),
+  COUNTER(Name.COUNTER, "counter", false, 0, CounterCodecProvider.INSTANCE),
+  DECIMAL(Name.DECIMAL, "decimal", false, 0, DecimalCodecProvider.INSTANCE),
+  DOUBLE(Name.DOUBLE, "double", false, 0, DoubleCodecProvider.INSTANCE),
+  FLOAT(Name.FLOAT, "float", false, 0, FloatCodecProvider.INSTANCE),
+  INET(Name.INET, "inet", false, 0, InetCodecProvider.INSTANCE),
+  INT(Name.INT, "int", false, 0, IntCodecProvider.INSTANCE),
+  TEXT(Name.TEXT, "text", false, 0, TextCodecProvider.INSTANCE),
+  TIMESTAMP(Name.TIMESTAMP, "timestamp", false, 0, TimestampCodecProvider.INSTANCE),
+  UUID(Name.UUID, "uuid", false, 0, UUIDCodecProvider.INSTANCE),
+  VARCHAR(Name.VARCHAR, "varchar", false, 0, VarCharCodecProvider.INSTANCE),
+  VARINT(Name.VARINT, "varint", false, 0, VarIntCodecProvider.INSTANCE),
+  TIMEUUID(Name.TIMEUUID, "timeuuid", false, 0, TimeUUIDCodecProvider.INSTANCE),
+  SMALLINT(Name.SMALLINT, "smallint", false, 0, SmallIntCodecProvider.INSTANCE),
+  TINYINT(Name.TINYINT, "tinyint", false, 0, TinyIntCodecProvider.INSTANCE),
+  DATE(Name.DATE, "date", false, 0, DateCodecProvider.INSTANCE),
+  TIME(Name.TIME, "time", false, 0, TimeCodecProvider.INSTANCE),
+
+  TUPLE(Name.TUPLE, "tuple", true, -1),
+
+  FROZEN_LIST(Name.LIST, "list", true, 1),
+  FROZEN_SET(Name.SET, "set", true, 1),
+  FROZEN_ORDERED_SET(Name.LIST, "list", true, 1),
+  FROZEN_SORTED_SET(Name.SET, "set", true, 1),
+  FROZEN_MAP(Name.MAP, "map", true, 2),
+  FROZEN_SORTED_MAP(Name.MAP, "map", true, 2),
+
+  LIST(Name.LIST, "list", false, 1),
+  SET(Name.SET, "set", false, 1),
+  ORDERED_SET(Name.LIST, "list", false, 1),
+  SORTED_SET(Name.SET, "set", false, 1),
+  MAP(Name.MAP, "map", false, 2),
+  SORTED_MAP(Name.MAP, "map", false, 2);
+
+  /**
+   * Gets a suitable default data type for the specified class.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class for which to get a default data type
+   * @return the corresponding default data type or <code>null</code> if no
+   *         default data type is defined for the specified class
+   */
+  public static DataType valueOf(Class<?> clazz) {
+    if (clazz == null) {
+      return null;
+    }
+    clazz = ClassUtils.primitiveToWrapper(clazz);
+    if (String.class == clazz) {
+      return DataType.TEXT;
+    } else if (Boolean.class == clazz) {
+      return DataType.BOOLEAN;
+    } else if (Integer.class == clazz) {
+      return DataType.INT;
+    } else if (Long.class == clazz) {
+      return DataType.BIGINT;
+    } else if (Short.class == clazz) {
+      return DataType.SMALLINT;
+    } else if (Byte.class == clazz) {
+      return DataType.TINYINT;
+    } else if (Double.class == clazz) {
+      return DataType.DOUBLE;
+    } else if (Float.class == clazz) {
+      return DataType.FLOAT;
+    } else if (UUID.class.isAssignableFrom(clazz)) {
+      return DataType.UUID;
+    } else if ((clazz.isArray() && (Byte.TYPE == clazz.getComponentType()))
+               || ByteBuffer.class.isAssignableFrom(clazz)) {
+      return DataType.BLOB;
+    } else if (clazz.isEnum()) {
+      return DataType.ASCII;
+    } else if (Class.class == clazz) {
+      return DataType.ASCII;
+    } else if (Locale.class == clazz) {
+      return DataType.ASCII;
+    } else if (ZoneId.class.isAssignableFrom(clazz)) {
+      return DataType.ASCII;
+    } else if (Date.class.isAssignableFrom(clazz)
+               || Instant.class.isAssignableFrom(clazz)) {
+      return DataType.TIMESTAMP;
+    } else if (BigDecimal.class.isAssignableFrom(clazz)) {
+      return DataType.DECIMAL;
+    } else if (BigInteger.class.isAssignableFrom(clazz)) {
+      return DataType.VARINT;
+    } else if (AtomicLong.class.isAssignableFrom(clazz)) {
+      return DataType.COUNTER;
+    } else if (Instant.class == clazz) {
+      return DataType.TIMESTAMP;
+    } else if (AtomicInteger.class.isAssignableFrom(clazz)) {
+      return DataType.COUNTER;
+    } else if (LocalDate.class.isAssignableFrom(clazz)
+               || com.datastax.driver.core.LocalDate.class.isAssignableFrom(clazz)) {
+      return DataType.DATE;
+    } else if (LocalTime.class.isAssignableFrom(clazz)) {
+      return DataType.TIME;
+    } else if (InetAddress.class.isAssignableFrom(clazz)) {
+      return DataType.INET;
+    } else if (JsonStructure.class.isAssignableFrom(clazz)) {
+      return DataType.VARCHAR;
+    }
+    return null;
+  }
 
   /**
    * Checks if altering a column from a specified data type to a specified data
@@ -93,7 +210,9 @@ public enum DataType implements CQLDataType {
       case ASCII:
         return (to == TEXT) || (to == VARCHAR);
       case BIGINT:
-        return (to == TIMESTAMP);
+        return (to == TIMESTAMP) || (to == TIME);
+      case INT:
+        return (to == DATE);
       case TEXT:
         return (to == VARCHAR);
       case TIMESTAMP:
@@ -110,7 +229,7 @@ public enum DataType implements CQLDataType {
   /**
    * Gets a data type for a given data type name.
    *
-   * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+   * @author paouelle
    *
    * @param  name the data type for which to get its corresponding data type
    * @return the corresponding non-<code>null</code> data type
@@ -133,6 +252,14 @@ public enum DataType implements CQLDataType {
   public final Name NAME;
 
   /**
+   * Holds the corresponding Cassandra primitive data type if this is a primitive
+   * data type; <code>null</code> otherwise.
+   *
+   * @author paouelle
+   */
+  public final com.datastax.driver.core.DataType TYPE;
+
+  /**
    * Holds the non-<code>null</code> CQL name for the data type.
    *
    * @author paouelle
@@ -140,18 +267,29 @@ public enum DataType implements CQLDataType {
   public final String CQL;
 
   /**
+   * Holds a flag indicating if this data type is frozen or not.
+   *
+   * @author paouelle
+   */
+  public final boolean FROZEN;
+
+  /**
    * Holds the number of arguments for this collection data type.
+   * <p>
+   * <i>Note:</i> Will be <code>-1</code> if supports a variable number of
+   * arguments (at least one).
    *
    * @author paouelle
    */
   public final int NUM_ARGUMENTS;
 
   /**
-   * Holds the corresponding Java class
+   * Holds the codec provider that can be used to decode this data type. May
+   * be <code>null</code>.
    *
    * @author paouelle
    */
-  public final Class<?> CLASS;
+  private final CodecProvider provider;
 
   /**
    * Instantiates a new <code>DataType</code> object.
@@ -160,15 +298,59 @@ public enum DataType implements CQLDataType {
    *
    * @param name the non-<code>null</code> Cassandra name for the data type
    * @param cql the non-<code>null</code> CQL name for the data type
+   * @param frozen whether this type is frozen or not
    * @param num the number of arguments for this collection data type
-   * @param clazz the non-<code>null</code> Java class corresponding to
-   *        the data type
+   * @param a set of codec providers for this data type
    */
-  private DataType(Name name, String cql, int num, Class<?> clazz) {
+  private DataType(
+    Name name,
+    String cql,
+    boolean frozen,
+    int num
+  ) {
+    this(name, cql, frozen, num, null);
+  }
+
+  /**
+   * Instantiates a new <code>DataType</code> object.
+   *
+   * @author paouelle
+   *
+   * @param name the non-<code>null</code> Cassandra name for the data type
+   * @param cql the non-<code>null</code> CQL name for the data type
+   * @param frozen whether this type is frozen or not
+   * @param num the number of arguments for this collection data type (<code>-1</code>
+   *        for a variable number of arguments greater than <code>0</code>)
+   * @param provider a codec provider for this data type (may be <code>null</code>)
+   */
+  private DataType(
+    Name name,
+    String cql,
+    boolean frozen,
+    int num,
+    CodecProvider provider
+  ) {
     this.NAME = name;
+    this.TYPE = com.datastax.driver.core.DataType.allPrimitiveTypes().stream()
+      .filter(dt -> name.equals(dt.getName()))
+      .findFirst()
+      .orElse(null);
     this.CQL = cql;
+    this.FROZEN = frozen;
     this.NUM_ARGUMENTS = num;
-    this.CLASS = clazz;
+    this.provider = provider;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#isFrozen()
+   */
+  @Override
+  public boolean isFrozen() {
+    return FROZEN;
   }
 
   /**
@@ -180,7 +362,19 @@ public enum DataType implements CQLDataType {
    */
   @Override
   public boolean isCollection() {
-    return NUM_ARGUMENTS != 0;
+    return (NUM_ARGUMENTS != 0) && !isTuple();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#isTuple()
+   */
+  @Override
+  public boolean isTuple() {
+    return (this == DataType.TUPLE);
   }
 
   /**
@@ -193,6 +387,23 @@ public enum DataType implements CQLDataType {
   @Override
   public boolean isUserDefined() { // this enum only represents system types
     return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @throws IllegalArgumentException if this data type is not a primitive one
+   *
+   * @see org.helenus.driver.persistence.CQLDataType#getDataType()
+   */
+  @Override
+  public com.datastax.driver.core.DataType getDataType() {
+    org.apache.commons.lang3.Validate.isTrue(
+      TYPE != null, "not a primitive data type: " + name()
+    );
+    return TYPE;
   }
 
   /**
@@ -256,6 +467,32 @@ public enum DataType implements CQLDataType {
       return DataType.isAlterable(this, (DataType)to);
     }
     return false;
+  }
+
+  /**
+   * Gets a {@link TypeCodec codec} that accepts the given class from this data
+   * type.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class the codec should accept
+   * @return a suitable codec
+   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws CodecNotFoundException if a suitable codec cannot be found
+   */
+  public <T> TypeCodec<T> codecFor(Class<T> clazz) throws CodecNotFoundException {
+    org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
+    if (provider == null) {
+      throw new CodecNotFoundException(
+        "unsupported codec from '"
+        + toCQL()
+        + "' to class: "
+        + clazz.getName(),
+        getDataType(),
+        TypeToken.of(clazz)
+      );
+    }
+    return provider.codecFor(clazz);
   }
 
   /**

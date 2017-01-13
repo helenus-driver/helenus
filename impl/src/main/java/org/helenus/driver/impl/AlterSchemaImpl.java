@@ -173,9 +173,9 @@ public class AlterSchemaImpl<T>
               final StringBuilder builder = new StringBuilder("DROP INDEX ");
 
               if (getKeyspace() != null) {
-                Utils.appendName(getKeyspace(), builder).append('.');
+                Utils.appendName(builder, getKeyspace()).append('.');
               }
-              Utils.appendName(i, builder);
+              Utils.appendName(builder, i);
               builder.append(';');
               // add to the table group
               tgroup.add(new SimpleStatementImpl(builder.toString(), mgr, bridge));

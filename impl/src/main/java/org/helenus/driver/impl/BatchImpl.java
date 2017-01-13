@@ -422,7 +422,7 @@ public class BatchImpl
   protected void appendOptions(StringBuilder builder) {
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
-      Utils.joinAndAppend(null, builder, " AND ", usings.usings);
+      Utils.joinAndAppend(null, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null);
     }
   }
 

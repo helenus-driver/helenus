@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -313,7 +313,9 @@ public class SelectImpl<T>
       builder.append("*");
     } else {
       if (countOrAllSelected) {
-        Utils.joinAndAppendNames(builder, ",", columnNames);
+        Utils.joinAndAppendNames(
+          table, null, mgr.getCodecRegistry(), builder, ",", columnNames
+        );
       } else {
         // prepend all mandatory and primary key columns if it is not the special COUNT()
         final Set<String> set = new HashSet<>(25);
@@ -333,25 +335,31 @@ public class SelectImpl<T>
           }
         }
         names.addAll(columnNames);
-        Utils.joinAndAppendNames(builder, ",", names);
+        Utils.joinAndAppendNames(
+          table, null, mgr.getCodecRegistry(), builder, ",", names
+        );
       }
     }
     builder.append(" FROM ");
     try {
       if (getKeyspace() != null) {
-        Utils.appendName(getKeyspace(), builder).append(".");
+        Utils.appendName(builder, getKeyspace()).append(".");
       }
     } catch (ExcludedKeyspaceKeyException e) { // just skip this one since we were asked to skip the current keyspace key
       return null;
     }
-    Utils.appendName(table.getName(), builder);
+    Utils.appendName(builder, table.getName());
     if (!where.clauses.isEmpty()) {
       builder.append(" WHERE ");
-      Utils.joinAndAppend(table, builder, " AND ", where.getClauses(table));
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, " AND ", where.getClauses(table), null
+      );
     }
     if (orderings != null) {
       builder.append(" ORDER BY ");
-      Utils.joinAndAppend(table, builder, ",", orderings);
+      Utils.joinAndAppend(
+        table, null, mgr.getCodecRegistry(), builder, ",", orderings, null
+      );
     }
     if (limit > 0) {
       builder.append(" LIMIT ").append(limit);
@@ -1136,7 +1144,7 @@ public class SelectImpl<T>
     /**
      * Holds the previous selection.
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      */
     private Object previous;
 
@@ -1324,7 +1332,7 @@ public class SelectImpl<T>
     /**
      * {@inheritDoc}
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      *
      * @see org.helenus.driver.Select.Selection#raw(java.lang.String)
      */
@@ -1336,7 +1344,7 @@ public class SelectImpl<T>
     /**
      * {@inheritDoc}
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      *
      * @see org.helenus.driver.Select.Selection#toJson(java.lang.String)
      */
@@ -1348,7 +1356,7 @@ public class SelectImpl<T>
     /**
      * {@inheritDoc}
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      *
      * @see org.helenus.driver.impl.SelectImpl.BuilderImpl#from(java.lang.String)
      */
@@ -1363,7 +1371,7 @@ public class SelectImpl<T>
     /**
      * {@inheritDoc}
      *
-     * @author <a href="mailto:paouelle@enlightedinc.com">paouelle</a>
+     * @author paouelle
      *
      * @see org.helenus.driver.impl.SelectImpl.BuilderImpl#from(org.helenus.driver.info.TableInfo)
      */

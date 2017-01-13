@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,47 +18,31 @@ package org.helenus.driver.impl;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import java.net.InetAddress;
-
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.time.ZoneId;
-
-import javax.json.JsonObject;
-
 import org.apache.commons.collections4.iterators.ObjectArrayIterator;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
-import com.datastax.driver.core.TupleValue;
-import com.datastax.driver.core.UDTValue;
-import com.datastax.driver.core.utils.Bytes;
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.TypeCodec;
 
-import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.BindMarker;
 import org.helenus.driver.Keywords;
-import org.helenus.driver.StatementBuilder;
-import org.helenus.driver.info.ClassInfo;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.persistence.CQLDataType;
 import org.helenus.driver.persistence.DataType;
-import org.helenus.driver.persistence.UDTEntity;
-import org.helenus.driver.persistence.UDTTypeEntity;
 
 /**
  * The <code>Utils</code> class is a copy of the
  * <i>com.datastax.driver.core.querybuilder.Utils</i> which is package private
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -72,30 +56,43 @@ public abstract class Utils {
   );
 
   public static StringBuilder joinAndAppendNamesAndValues(
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
     String keySeparator,
-    Map<String, Pair<Object, CQLDataType>> mappings
+    Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> mappings,
+    List<Object> variables
   ) {
     boolean first = true;
 
-    for (final Map.Entry<String, Pair<Object, CQLDataType>> e: mappings.entrySet()) {
+    for (final Map.Entry<String, Triple<Object, CQLDataType, TypeCodec<?>>> e: mappings.entrySet()) {
       if (!first) {
         sb.append(separator);
       } else {
         first = false;
       }
-      Utils.appendName(e.getKey(), sb).append(keySeparator);
-      Utils.appendValue(e.getValue().getLeft(), e.getValue().getRight(), sb);
+      Utils.appendName(sb, e.getKey()).append(keySeparator);
+      Utils.appendValue(
+        e.getValue().getMiddle(),
+        ((codec != null) ? codec : e.getValue().getRight()),
+        codecRegistry,
+        sb,
+        e.getValue().getLeft(),
+        variables
+      );
     }
     return sb;
   }
 
   public static StringBuilder joinAndAppendWithNoDuplicates(
     TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
-    Collection<? extends Appendeable> values
+    Collection<? extends Appendeable> values,
+    List<Object> variables
   ) {
     final Set<String> done = new HashSet<>(values.size() * 3 / 2);
     boolean first = true;
@@ -103,7 +100,7 @@ public abstract class Utils {
     for (final Appendeable value: values) {
       final StringBuilder vsb = new StringBuilder(10);
 
-      value.appendTo(tinfo, vsb);
+      value.appendTo(tinfo, codec, codecRegistry, vsb, variables);
       final String vs = vsb.toString();
 
       if (done.add(vs)) {
@@ -120,9 +117,12 @@ public abstract class Utils {
 
   public static StringBuilder joinAndAppend(
     TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
-    Collection<? extends Appendeable> values
+    Collection<? extends Appendeable> values,
+    List<Object> variables
   ) {
     boolean first = true;
 
@@ -132,17 +132,20 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      value.appendTo(tinfo, sb);
+      value.appendTo(tinfo, codec, codecRegistry, sb, variables);
     }
     return sb;
   }
 
   public static StringBuilder joinAndAppend(
     TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
     Collection<? extends Appendeable> values,
-    Collection<? extends Appendeable> moreValues
+    Collection<? extends Appendeable> moreValues,
+    List<Object> variables
   ) {
     boolean first = true;
 
@@ -152,7 +155,7 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      value.appendTo(tinfo, sb);
+      value.appendTo(tinfo, codec, codecRegistry, sb, variables);
     }
     for (final Appendeable value: moreValues) {
       if (!first) {
@@ -160,12 +163,15 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      value.appendTo(tinfo, sb);
+      value.appendTo(tinfo, codec, codecRegistry, sb, variables);
     }
     return sb;
   }
 
   public static StringBuilder joinAndAppendNames(
+    TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
     Iterable<?> values
@@ -178,34 +184,47 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      appendName(value, sb);
+      Utils.appendName(tinfo, codec, codecRegistry, sb, value);
     }
     return sb;
   }
 
   public static StringBuilder joinAndAppendValues(
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
-    Iterable<Pair<Object, CQLDataType>> values
+    Iterable<Triple<Object, CQLDataType, TypeCodec<?>>> values,
+    List<Object> variables
   ) {
     boolean first = true;
 
-    for (final Pair<Object, CQLDataType> value: values) {
+    for (final Triple<Object, CQLDataType, TypeCodec<?>> value: values) {
       if (!first) {
         sb.append(separator);
       } else {
         first = false;
       }
-      appendValue(value.getLeft(), value.getRight(), sb);
+      Utils.appendValue(
+        value.getMiddle(),
+        (codec != null) ? codec : value.getRight(),
+        codecRegistry,
+        sb,
+        value.getLeft(),
+        variables
+      );
     }
     return sb;
   }
 
   public static StringBuilder joinAndAppendValues(
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
     StringBuilder sb,
     String separator,
     Iterable<?> values,
-    CQLDataType definition
+    CQLDataType definition,
+    List<Object> variables
   ) {
     boolean first = true;
 
@@ -215,24 +234,85 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      appendValue(value, definition, sb);
+      Utils.appendValue(definition, codec, codecRegistry, sb, value, variables);
     }
     return sb;
   }
 
-  // Returns false if it's not really serializable (function call, bind markers, ...)
-  public static boolean isSerializable(Object value) {
-    if ((value instanceof BindMarker)
-        || (value instanceof com.datastax.driver.core.querybuilder.BindMarker)
-        || (value instanceof FCName)) {
+  public static boolean isBindMarker(Object value) {
+    return (
+      (value instanceof BindMarker)
+      || (value instanceof com.datastax.driver.core.querybuilder.BindMarker)
+    );
+  }
+
+  @SuppressWarnings("synthetic-access")
+  public static boolean containsBindMarker(Object value) {
+      if (Utils.isBindMarker(value)) {
+        return true;
+      } else if (value instanceof FCall) {
+        for (final Object p : ((FCall)value).parameters) {
+          if (Utils.containsBindMarker(p)) {
+            return true;
+          }
+        }
+      } else if (value instanceof Collection) {
+        return (((Collection<?>)value).stream())
+          .anyMatch(e -> Utils.containsBindMarker(value));
+      } else if (value instanceof Map) {
+        return ((Map<?, ?>)value).entrySet().stream()
+          .anyMatch(e -> Utils.containsBindMarker(e.getKey())
+                         || Utils.containsBindMarker(e.getValue()));
+      }
       return false;
+  }
+
+  public static boolean containsSpecialValue(Object value) {
+    if (Utils.isBindMarker(value)
+        || (value instanceof FCName)
+        || (value instanceof RawString)) {
+        return true;
     }
-    // We also don't serialize fixed size number types. The reason is that if we do it, we will
-    // force a particular size (4 bytes for ints, ...) and for the statement builder, we don't want
-    // users to have to bother with that.
-    if ((value instanceof Number)
-        && !((value instanceof BigInteger) || (value instanceof BigDecimal))) {
+    if (value instanceof Collection) {
+      return ((Collection<?>)value).stream()
+        .anyMatch(e -> Utils.containsSpecialValue(e));
+    }
+    if (value instanceof Map) {
+      return ((Map<?, ?>)value).entrySet().stream()
+        .anyMatch(e -> Utils.containsSpecialValue(e.getKey())
+                       || Utils.containsSpecialValue(e.getValue()));
+    }
+    return false;
+}
+
+  /**
+   * Return <code>true</code> if the given value is likely to find a suitable
+   * codec to be serialized as a query parameter. If the value is not serializable,
+   * it must be included in the query string. Non serializable values include
+   * special values such as function calls, column names and bind markers, and
+   * collections thereof. We also don't serialize fixed size number types. The
+   * reason is that if we do it, we will force a particular size (4 bytes for
+   * ints, ...) and for the query builder, we don't want users to have to bother
+   * with that.
+   *
+   * @author paouelle
+   *
+   * @param  value the value to inspect
+   * @return <code>true</code> if the value is serializable, <code>false</code>
+   *         otherwise
+   */
+  public static boolean isSerializable(Object value) {
+    if (Utils.containsSpecialValue(value)
+        || ((value instanceof Number)
+            && !((value instanceof BigInteger) || (value instanceof BigDecimal)))) {
       return false;
+    } else if (value instanceof Collection) {
+      return ((Collection<?>)value).stream()
+        .allMatch(e -> Utils.isSerializable(e));
+    } else if (value instanceof Map) {
+      return ((Map<?, ?>)value).entrySet().stream()
+        .allMatch(e -> Utils.isSerializable(e.getKey())
+                       && Utils.isSerializable(e.getValue()));
     }
     return true;
   }
@@ -251,7 +331,8 @@ public abstract class Utils {
         .allMatch(v -> Utils.isIdempotent(v));
     } else if (value instanceof Map) {
       return ((Map<?, ?>)value).entrySet().stream()
-        .allMatch(e -> Utils.isIdempotent(e.getKey()) && Utils.isIdempotent(e.getValue()));
+        .allMatch(e -> Utils.isIdempotent(e.getKey())
+                       && Utils.isIdempotent(e.getValue()));
     } else if (value instanceof ClauseImpl) {
       return ((ClauseImpl)value).values().stream()
         .allMatch(v -> Utils.isIdempotent(v));
@@ -259,236 +340,143 @@ public abstract class Utils {
     return true;
   }
 
+  @SuppressWarnings({
+    "synthetic-access", "unchecked"
+  })
   static StringBuilder appendValue(
-    Object value, CQLDataType definition, StringBuilder sb, List<Object> variables
-  ) {
-    if (variables == null || !isSerializable(value)) {
-      return appendValue(value, definition, sb);
-    }
-    sb.append('?');
-    variables.add(value);
-    return sb;
-  }
-
-  public static StringBuilder appendValue(
-    Object value, CQLDataType definition, StringBuilder sb
-  ) {
-    if (value instanceof PersistedValue) {
-      value = ((PersistedValue<?,?>)value).getEncodedValue();
-    }
-    // That is kind of lame but lacking a better solution
-    if (appendValueIfLiteral(value, sb)) {
-      return sb;
-    }
-    if (appendValueIfCollection(value, definition, sb)) {
-      return sb;
-    }
-    if (appendValueIfUdt(value, definition, sb)) {
-      return sb;
-    }
-    if (appendValueIfTuple(value, definition, sb)) {
-      return sb;
-    }
-    appendStringIfValid(value, sb);
-    return sb;
-  }
-
-  public static StringBuilder appendFlatValue(
-    Object value,
     CQLDataType definition,
-    StringBuilder sb
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    Object value,
+    List<Object> variables
   ) {
-    if (value instanceof PersistedValue) {
-      value = ((PersistedValue<?,?>)value).getEncodedValue();
-    }
-    if (appendValueIfLiteral(value, sb)) {
-      return sb;
-    }
-    if (appendValueIfUdt(value, definition, sb)) {
-      return sb;
-    }
-    if (appendValueIfTuple(value, definition, sb)) {
-      return sb;
-    }
-    appendStringIfValid(value, sb);
-    return sb;
-  }
-
-  private static void appendStringIfValid(Object value, StringBuilder sb) {
-    if (value instanceof Enum) {
-      value = ((Enum<?>)value).name();
-    } else if (value instanceof Locale) {
-      value = ((Locale)value).toString();
-    } else if (value instanceof ZoneId) {
-      value = ((ZoneId)value).getId();
-    } else if (value instanceof Instant) {
-      value = String.valueOf(((Instant)value).toEpochMilli());
-    } else if (value instanceof Class) {
-      value = ((Class<?>)value).getName();
-    }
-    if (value instanceof RawString) {
-      sb.append(value.toString());
-    } else {
-      org.apache.commons.lang3.Validate.isTrue(
-        value instanceof String,
-        "invalid value %s of type unknown to the statement builder: %s",
-        value,
-        !(value instanceof byte[])
-          ? ""
-          : " (for blob values, make sure to use a ByteBuffer)"
-      );
-      appendValueString((String)value, sb);
-    }
-  }
-
-  @SuppressWarnings("synthetic-access")
-  private static boolean appendValueIfLiteral(Object value, StringBuilder sb) {
-    if ((value instanceof Number)
-        || (value instanceof UUID)
-        || (value instanceof Boolean)) {
+    if (value == null) {
+      sb.append("null");
+    } else if (Utils.isBindMarker(value)) {
       sb.append(value);
-      return true;
-    } else if (value instanceof InetAddress) {
-      sb.append("'").append(((InetAddress)value).getHostAddress()).append("'");
-      return true;
-    } else if (value instanceof Date) {
-      sb.append(((Date)value).getTime());
-      return true;
-    } else if (value instanceof ByteBuffer) {
-      sb.append(Bytes.toHexString((ByteBuffer)value));
-      return true;
-    } else if (value instanceof byte[]) {
-      sb.append(Bytes.toHexString((byte[])value));
-      return true;
-    } else if (value instanceof BindMarker) {
-      sb.append(value);
-      return true;
-    } else if (value instanceof com.datastax.driver.core.querybuilder.BindMarker) {
-      sb.append(value);
-      return true;
     } else if (value instanceof FCall) {
-      FCall fcall = (FCall)value;
+      final FCall fcall = (FCall)value;
+
       sb.append(fcall.getName()).append("(");
       for (int i = 0; i < fcall.parameters.length; i++ ) {
         if (i > 0) {
           sb.append(",");
         }
-        appendValue(fcall.parameters[i], null, sb);
+        Utils.appendValue(
+          null, codec, codecRegistry, sb, fcall.parameters[i], variables
+        );
       }
       sb.append(")");
-      return true;
-    } else if (value instanceof CName) {
-      appendName(((CName)value).getName(), sb);
-      return true;
+    } else if (value instanceof FCName) {
+      Utils.appendName(null, codec, codecRegistry, sb, ((FCName)value).getName());
     } else if (value instanceof Cast) {
       final Cast c = (Cast)value;
+
       sb.append("CAST(");
-      appendName(c.column, sb);
+      Utils.appendName(null, codec, codecRegistry, sb, c.column);
       sb.append(" AS ").append(c.targetType).append(')');
-      return true;
-    } else if (value instanceof JsonObject) {
-      // convert all ' in " and vice versa as Cassandra doesn't like ""
-      sb.append(
-        value.toString()
-          .replaceAll("'", "'QUOTE'")
-          .replaceAll("\"", "'")
-          .replaceAll("\\\\'", "\"")
-          .replaceAll("'QUOTE'", "\\\\'")
-      );
-      return true;
-    } else if (value == null) {
-      sb.append("null");
-      return true;
+    } else if (value instanceof RawString) {
+      sb.append(value.toString());
     } else {
-      return false;
-    }
-  }
+      final boolean serializable = isSerializable(value);
 
-  @SuppressWarnings("rawtypes")
-  private static boolean appendValueIfCollection(
-    Object value,
-    CQLDataType definition,
-    StringBuilder sb
-  ) {
-    if (value instanceof List) {
-      appendList((List)value, definition, sb);
-      return true;
-    } else if ((definition != null)
-               && (definition.getMainType() == DataType.ORDERED_SET)
-               && (value instanceof Collection)) {
-      appendList((Collection)value, definition, sb);
-      return true;
-    } else if (value instanceof Set) {
-      appendSet((Set)value, definition, sb);
-      return true;
-    } else if (value instanceof Map) {
-      appendMap((Map)value, definition, sb);
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  static StringBuilder appendCollection(
-    Object value,
-    CQLDataType definition,
-    StringBuilder sb,
-    List<Object> variables
-  ) {
-    if (variables == null || !isSerializable(value)) {
-      boolean wasCollection = appendValueIfCollection(value, definition, sb);
-      assert wasCollection;
-    } else {
-      sb.append('?');
-      variables.add(value);
+      if (!serializable) {
+        if ((value instanceof List)) {
+          Utils.appendList(
+            definition, codec, codecRegistry, sb, (List<?>)value, null
+          );
+        } else if ((definition != null)
+                   && ((definition.getMainType() == DataType.ORDERED_SET)
+                       || (definition.getMainType() == DataType.FROZEN_ORDERED_SET))
+                   && (value instanceof Collection)) {
+          Utils.appendList(
+            definition, codec, codecRegistry, sb, (Collection<?>)value, null
+          );
+        } else if (value instanceof Set) {
+          Utils.appendSet(
+            definition, codec, codecRegistry, sb, (Set<?>)value, null
+          );
+        } else if (value instanceof Map) {
+          Utils.appendMap(
+            definition, codec, codecRegistry, sb, (Map<?, ?>)value, null
+          );
+        } else {
+          // the value is meant to be forcefully appended to the query string:
+          // format it with the appropriate codec and append it now
+          if (codec != null) {
+            sb.append(((TypeCodec<Object>)codec).format(value));
+          } else {
+            sb.append(codecRegistry.codecFor(value).format(value));
+          }
+        }
+      } else if (variables == null) {
+        // we are not collecting statement values (variables == null):
+        // format it with the appropriate codec and append it now
+        if (codec != null) {
+          sb.append(((TypeCodec<Object>)codec).format(value));
+        } else {
+          sb.append(codecRegistry.codecFor(value).format(value));
+        }
+      } else {
+        // do not format the value nor append it to the query string:
+        // use a bind marker instead,
+        // but add the value the the statement's variables list
+        sb.append('?');
+        variables.add(value);
+      }
     }
     return sb;
   }
 
   static StringBuilder appendList(
-    Collection<?> l,
     CQLDataType definition,
-    StringBuilder sb
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    Collection<?> l,
+    List<Object> variables
   ) {
     final CQLDataType vdef = definition.getElementType();
+    final TypeCodec<?> ecodec = (codec instanceof ArgumentsCodec) ? ((ArgumentsCodec<?>)codec).codec(0) : codec;
 
     sb.append('[');
     boolean first = true;
 
-    if (l instanceof PersistedList) {
-      l = ((PersistedList<?,?>)l).getPersistedList();
-    }
     for (final Object elt: l) {
-      org.apache.commons.lang3.Validate.isTrue(
-        elt != null,
-        "null are not supported in %s",
-        (l instanceof List) ? "lists" : ((l instanceof Set) ? "sets" : "collections")
-      );
+      if (elt == null) {
+        throw new IllegalArgumentException(
+          "null are not supported in "
+          + ((l instanceof List)
+             ? "lists" : ((l instanceof Set) ? "sets" : "collections"))
+        );
+      }
       if (first) {
         first = false;
       } else {
         sb.append(',');
       }
-      appendFlatValue(elt, vdef, sb);
+      Utils.appendValue(vdef, ecodec, codecRegistry, sb, elt, variables);
     }
     sb.append(']');
     return sb;
   }
 
   static StringBuilder appendSet(
-    Set<?> s,
     CQLDataType definition,
-    StringBuilder sb
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    Set<?> s,
+    List<Object> variables
   ) {
     final CQLDataType vdef = definition.getElementType();
+    final TypeCodec<?> ecodec = (codec instanceof ArgumentsCodec) ? ((ArgumentsCodec<?>)codec).codec(0) : codec;
 
     sb.append('{');
     boolean first = true;
 
-    if (s instanceof PersistedSet) {
-      s = ((PersistedSet<?,?>)s).getPersistedSet();
-    }
-    for (final Object elt : s) {
+    for (final Object elt: s) {
       org.apache.commons.lang3.Validate.isTrue(
         elt != null, "null are not supported in sets"
       );
@@ -497,27 +485,38 @@ public abstract class Utils {
       } else {
         sb.append(',');
       }
-      appendFlatValue(elt, vdef, sb);
+      Utils.appendValue(vdef, ecodec, codecRegistry, sb, elt, variables);
     }
     sb.append('}');
     return sb;
   }
 
   static StringBuilder appendMap(
-    Map<?, ?> m,
     CQLDataType definition,
-    StringBuilder sb
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    Map<?, ?> m,
+    List<Object> variables
   ) {
     final CQLDataType kdef = definition.getFirstArgumentType();
+    final TypeCodec<?> kcodec;
     final CQLDataType vdef = definition.getElementType();
+    final TypeCodec<?> vcodec;
 
+    if (codec instanceof ArgumentsCodec) {
+      final ArgumentsCodec<?> acodec = (ArgumentsCodec<?>)codec;
+
+      kcodec = acodec.codec(0);
+      vcodec = acodec.codec(1);
+    } else {
+      kcodec = null;
+      vcodec = codec;
+    }
     sb.append('{');
     boolean first = true;
 
-    if (m instanceof PersistedMap) {
-      m = ((PersistedMap<?,?,?>)m).getPersistedMap();
-    }
-    for (final Map.Entry<?, ?> entry : m.entrySet()) {
+    for (final Map.Entry<?, ?> entry: m.entrySet()) {
       final Object eval = entry.getValue();
 
       org.apache.commons.lang3.Validate.isTrue(
@@ -528,91 +527,17 @@ public abstract class Utils {
       } else {
         sb.append(',');
       }
-      appendFlatValue(entry.getKey(), kdef, sb);
+      Utils.appendValue(
+        kdef, kcodec, codecRegistry, sb, entry.getKey(), variables
+      );
       sb.append(':');
-      appendFlatValue(eval, vdef, sb);
+      Utils.appendValue(vdef, vcodec, codecRegistry, sb, eval, variables);
     }
     sb.append('}');
     return sb;
   }
 
-  private static boolean appendValueIfUdt(
-    Object value, CQLDataType definition, StringBuilder sb
-  ) {
-    if (value instanceof UDTValue) {
-      sb.append(((UDTValue)value).toString());
-      return true;
-    } else if (value instanceof UDTValueWrapper) {
-      sb.append(((UDTValueWrapper<?>)value).toString());
-      return true;
-    } else if (value != null) {
-      // let's check if the value is annotated with @UDTEntity
-      // in which case it is a udt pojo
-      final Class<?> uclass = ReflectionUtils.findFirstClassAnnotatedWith(
-        value.getClass(), UDTEntity.class
-      );
-
-      if (uclass != null) { // we have a UDT type
-        final ClassInfo<?> cinfo = (definition instanceof ClassInfo) ? (ClassInfo<?>)definition : StatementBuilder.getClassInfo(uclass);
-
-        org.apache.commons.lang3.Validate.isTrue(
-          cinfo instanceof UDTClassInfoImpl,
-          "unsupported element conversion from: %s to: %s; unknown user-defined type",
-          uclass.getName(), UDTValue.class.getName()
-        );
-        sb.append(
-          new UDTValueWrapper<>((UDTClassInfoImpl<?>)cinfo, value).toString()
-        );
-        return true;
-      }
-      // let's check if the value is annotated with @UDTTypeEntity
-      // in which case it is a udt pojo
-      final Class<?> utclass = ReflectionUtils.findFirstClassAnnotatedWith(
-        value.getClass(), UDTTypeEntity.class
-      );
-
-      if (utclass != null) { // we have a UDT type
-        final ClassInfo<?> cinfo = (definition instanceof ClassInfo) ? (ClassInfo<?>)definition : StatementBuilder.getClassInfo(utclass);
-
-        org.apache.commons.lang3.Validate.isTrue(
-          cinfo instanceof UDTClassInfoImpl,
-          "unsupported element conversion from: %s to: %s; unknown user-defined type",
-          utclass.getName(), UDTValue.class.getName()
-        );
-        sb.append(
-          new UDTValueWrapper<>((UDTClassInfoImpl<?>)cinfo, value).toString()
-        );
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean appendValueIfTuple(
-    Object value,
-    @SuppressWarnings("unused") CQLDataType definition,
-    StringBuilder sb
-  ) {
-    if (value instanceof TupleValue) {
-      sb.append(((TupleValue)value).toString());
-      return true;
-    }
-    return false;
-  }
-
-  private static StringBuilder appendValueString(String value, StringBuilder sb) {
-    return sb.append('\'').append(replace(value, '\'', "''")).append('\'');
-  }
-
-  static boolean isRawValue(Object value) {
-    return value != null
-           && !(value instanceof FCall)
-           && !(value instanceof CName)
-           && !(value instanceof BindMarker)
-           && !(value instanceof com.datastax.driver.core.querybuilder.BindMarker);
-  }
-
-  public static StringBuilder appendName(String name, StringBuilder sb) {
+  public static StringBuilder appendName(StringBuilder sb, String name) {
     name = name.trim();
     // FIXME: checking for token( specifically is uber ugly, we'll need some
     // better solution.
@@ -630,79 +555,68 @@ public abstract class Utils {
   }
 
   @SuppressWarnings("synthetic-access")
-  static StringBuilder appendName(Object name, StringBuilder sb) {
+  static StringBuilder appendName(
+    TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    Object name
+  ) {
     if (name instanceof String) {
-      appendName((String)name, sb);
-    } else if (name instanceof CName) {
-      appendName(((CName)name).getName(), sb);
+      Utils.appendName(sb, (String)name);
+    } else if (name instanceof CNameKey) {
+      ((CNameKey)name).appendTo(tinfo, sb, codec, codecRegistry);
+    } else if (name instanceof FCName) {
+      Utils.appendName(sb, ((FCName)name).getName());
     } else if (name instanceof FCall) {
-      FCall fcall = (FCall)name;
-      sb.append(fcall.getName()).append("(");
+      final FCall fcall = (FCall)name;
+
+      sb.append(fcall.getName()).append('(');
       for (int i = 0; i < fcall.parameters.length; i++ ) {
         if (i > 0) {
-          sb.append(",");
+          sb.append(',');
         }
-        appendValue(fcall.parameters[i], null, sb);
+        Utils.appendValue(
+          null, codec, codecRegistry, sb, fcall.parameters[i], null
+        );
       }
       sb.append(")");
     } else if (name instanceof Alias) {
       final Alias a = (Alias)name;
 
       sb.append("AS(");
-      appendName(a.column, sb);
+      Utils.appendName(tinfo, codec, codecRegistry, sb, a.column);
       sb.append(" AS ").append(a.alias);
     } else if (name instanceof Cast) {
       final Cast c = (Cast)name;
 
       sb.append("CAST(");
-      appendName(c.column, sb);
+      Utils.appendName(tinfo, codec, codecRegistry, sb, c.column);
       sb.append(" AS ").append(c.targetType).append(')');
     } else if (name instanceof RawString) {
       sb.append(((RawString)name).str);
+    } else if (name instanceof CharSequence) {
+      Utils.appendName(sb, ((CharSequence)name).toString());
     } else {
-      appendName((String)name, sb);
+      throw new IllegalArgumentException(
+        "invalid column '"
+        + name
+        + "' of unknown type: "
+        + ((name != null) ? name.getClass().getName() : "null")
+      );
     }
     return sb;
   }
 
   static abstract class Appendeable {
-    abstract void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb);
-  }
-
-  // Simple method to replace a single character. String.replace is a bit too
-  // inefficient (see JAVA-67)
-  static String replace(String text, char search, String replacement) {
-    if (text == null || text.isEmpty()) {
-      return text;
-    }
-
-    int nbMatch = 0;
-    int start = -1;
-    do {
-      start = text.indexOf(search, start + 1);
-      if (start != -1) {
-        ++nbMatch;
-      }
-    } while (start != -1);
-
-    if (nbMatch == 0) {
-      return text;
-    }
-
-    int newLength = text.length() + nbMatch * (replacement.length() - 1);
-    char[] result = new char[newLength];
-    int newIdx = 0;
-    for (int i = 0; i < text.length(); i++ ) {
-      char c = text.charAt(i);
-      if (c == search) {
-        for (int r = 0; r < replacement.length(); r++ ) {
-          result[newIdx++ ] = replacement.charAt(r);
-        }
-      } else {
-        result[newIdx++ ] = c;
-      }
-    }
-    return new String(result);
+    abstract void appendTo(
+      TableInfoImpl<?> tinfo,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry,
+      StringBuilder sb,
+      List<Object> variables
+    );
+    abstract boolean containsBindMarker();
   }
 
   public static class RawString {
@@ -718,7 +632,7 @@ public abstract class Utils {
     }
   }
 
-  static abstract class FCName {
+  static abstract class FCName  {
     private final String name;
 
     FCName(String name) {
@@ -793,7 +707,7 @@ public abstract class Utils {
     public String toString() {
       final StringBuilder sb = new StringBuilder();
 
-      Utils.appendName(getColumnName(), sb);
+      Utils.appendName(sb, getColumnName());
       return sb.append('[').append(idx).append(']').toString();
     }
   }
@@ -806,13 +720,61 @@ public abstract class Utils {
       this.key = key;
     }
 
+    void appendTo(
+      TableInfoImpl<?> tinfo,
+      StringBuilder sb,
+      TypeCodec<?> codec,
+      CodecRegistry codecRegistry
+    ) {
+      TypeCodec<?> kcodec;
+      TypeCodec<?> vcodec;
+
+      if (codec instanceof ArgumentsCodec) {
+        final ArgumentsCodec<?> acodec = (ArgumentsCodec<?>)codec;
+
+        kcodec = acodec.codec(0);
+        vcodec = acodec.codec(1);
+      } else {
+        kcodec = null;
+        vcodec = codec;
+      }
+      Utils.appendName(sb, getColumnName());
+      sb.append('[');
+      if (tinfo != null) {
+        final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(getColumnName());
+
+        if (finfo != null) {
+          codec = finfo.getCodec();
+          if (codec instanceof ArgumentsCodec) {
+            final ArgumentsCodec<?> acodec = (ArgumentsCodec<?>)codec;
+
+            if (kcodec == null) {
+              kcodec = acodec.codec(0);
+            }
+            if (vcodec == null) {
+              vcodec = acodec.codec(1);
+            }
+          } else if (vcodec == null) {
+            vcodec = codec;
+          }
+          Utils.appendValue(
+            finfo.getDataType(), kcodec, codecRegistry, sb, key, null
+          );
+          sb.append(']');
+          return;
+        }
+      }
+      Utils.appendValue(null, vcodec, codecRegistry, sb, key, null);
+      sb.append(']');
+    }
+
     @Override
     public String toString() {
       final StringBuilder sb = new StringBuilder();
 
-      Utils.appendName(getColumnName(), sb);
+      Utils.appendName(sb, getColumnName());
       sb.append('[');
-      Utils.appendFlatValue(key, null, sb);
+      Utils.appendValue(null, null, null, sb, key, null);
       return sb.append(']').toString();
     }
   }

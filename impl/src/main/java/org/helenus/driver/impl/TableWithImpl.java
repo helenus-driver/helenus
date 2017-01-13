@@ -15,6 +15,11 @@
  */
 package org.helenus.driver.impl;
 
+import java.util.List;
+
+import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.TypeCodec;
+
 import org.helenus.driver.TableWith;
 
 /**
@@ -67,12 +72,30 @@ public class TableWithImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, java.lang.StringBuilder)
+   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
    */
   @Override
-  void appendTo(TableInfoImpl<?> tinfo, StringBuilder sb) {
+  void appendTo(
+    TableInfoImpl<?> tinfo,
+    TypeCodec<?> codec,
+    CodecRegistry codecRegistry,
+    StringBuilder sb,
+    List<Object> variables
+  ) {
     sb.append(name).append("=");
-    Utils.appendValue(value, null, sb);
+    Utils.appendValue(null, codec, codecRegistry, sb, value, variables);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.Utils.Appendeable#containsBindMarker()
+   */
+  @Override
+  boolean containsBindMarker() {
+    return false;
   }
 
   /**
