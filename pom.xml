@@ -586,6 +586,16 @@
 	<groupId>org.reflections</groupId>
 	<artifactId>reflections</artifactId>
 	<version>${reflections-version}</version>
+        <exclusions>
+          <exclusion> <!-- since this pulls in an old 2.6.0 version -->
+	    <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion> <!-- version 0.9.10 pulls in an old 15.0 version -->
+	    <groupId>com.google.guava</groupId>
+	    <artifactId>guava</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <!--dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
@@ -601,12 +611,6 @@
 	<groupId>com.fasterxml.jackson.module</groupId>
 	<artifactId>jackson-module-jsonSchema</artifactId>
 	<version>${fasterxml-jackson-version}</version>
-        <exclusions>
-          <exclusion> <!-- since this pulls in an old 2.6.0 version -->
-	    <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
 	<groupId>com.datastax.cassandra</groupId>

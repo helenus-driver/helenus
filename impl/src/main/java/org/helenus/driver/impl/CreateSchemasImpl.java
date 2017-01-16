@@ -727,11 +727,8 @@ public class CreateSchemasImpl
         "unsupported clause '%s' for a CREATE SCHEMAS statement",
         clause
       );
-      final ClassInfoImpl<?>.Context context = getContext();
-      final ClassInfoImpl<?> cinfo = context.getClassInfo();
-
       if (clause instanceof ClauseImpl.Delayed) {
-        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(cinfo)) {
+        for (final Clause c: ((ClauseImpl.Delayed)clause).processWith(statement.getContext().getClassInfo())) {
           and(c); // recurse to add the processed clause
         }
       } else {
