@@ -379,9 +379,10 @@ public abstract class Utils {
     } else if (value instanceof RawString) {
       sb.append(value.toString());
     } else {
-      final boolean serializable = isSerializable(value);
-
-      if (!serializable) {
+      // if the definition is a UDT then do not check treat the value as a collection
+      // even if it is as the UDT might actually extends a collection and in that
+      // case, we want to rely on its registered codec instead
+      if (!(definition instanceof UDTClassInfoImpl) && !isSerializable(value)) {
         if ((value instanceof List)) {
           Utils.appendList(
             definition, codec, codecRegistry, sb, (List<?>)value, null
