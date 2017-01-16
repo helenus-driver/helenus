@@ -38,6 +38,7 @@ import org.helenus.driver.Delete;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.Using;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.codecs.ArgumentsCodec;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.TableInfo;
 import org.helenus.driver.persistence.CQLDataType;
@@ -558,7 +559,7 @@ public class DeleteImpl<T>
 
                   pkeys.put(
                     StatementImpl.MK_PREFIX + finfo.getColumnName(),
-                    Triple.of(k, finfo.getDataType().getElementType(), finfo.getCodec())
+                    Triple.of(k, finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec()).codec(0))
                   );
                 }
                 final StringBuilder sb = new StringBuilder(builder);
