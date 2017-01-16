@@ -244,7 +244,7 @@ public class DataTypeImpl {
       try { // next try the codec registry directly
         return codecRegistry.codecFor(dtype.getDataType(), token);
       } catch (CodecNotFoundException e) { // ignore and continue with our internal ones
-      } // else - oh well try to get our own
+      } // else - oh well try to get our own codecs from our internal codec providers
       if (dtype instanceof DataType) {
         try {
           return ((DataType)dtype).codecFor(ReflectionUtils.getRawClass(type));
@@ -544,7 +544,7 @@ public class DataTypeImpl {
               final TypeCodec<?> codec = new AbstractMapCodec(kcodec, vcodec) {
                 @Override
                 protected Map<?, ?> newInstance(int size) {
-                    return new EnumMap(kclazz);
+                  return new EnumMap(kclazz);
                 }
               };
               return new ArgumentsCodec(
@@ -555,7 +555,11 @@ public class DataTypeImpl {
             } // else - standard maps
             final TypeCodec<?> codec = TypeCodec.map(kcodec, vcodec);
 
-            return !mandatory ? codec : new MandatoryMapCodec(codec, () -> new HashMap<>(8));
+            return new ArgumentsCodec(
+              !mandatory ? codec : new MandatoryMapCodec(codec, () -> new HashMap<>(8)),
+              kcodec,
+              vcodec
+            );
           }
           throw new IllegalArgumentException(
             "unable to determine key & value type for " + trace
