@@ -17,8 +17,12 @@ package org.helenus.driver.codecs.provider;
 
 import java.nio.ByteBuffer;
 
+import org.apache.commons.lang3.StringUtils;
+
+import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.exceptions.CodecNotFoundException;
+import com.datastax.driver.core.utils.Bytes;
 import com.google.common.reflect.TypeToken;
 
 import org.helenus.driver.persistence.DataType;
@@ -43,6 +47,18 @@ public final class BlobCodecProvider implements CodecProvider {
   public final static CodecProvider INSTANCE = new BlobCodecProvider();
 
   /**
+   * Gets a codec to decode <code>byte[]</code> objects.
+   *
+   * @author paouelle
+   *
+   * @return a non-<code>null</code> codec to decode <code>byte[]</code> objects
+   */
+  @SuppressWarnings("synthetic-access")
+  public static TypeCodec<byte[]> bytearray() {
+    return ByteArrayCodec.instance;
+  }
+
+  /**
    * Instantiates a new <code>BlobCodecProvider</code> object.
    *
    * @author paouelle
@@ -61,7 +77,7 @@ public final class BlobCodecProvider implements CodecProvider {
   public <T> TypeCodec<T> codecFor(Class<T> clazz)
     throws CodecNotFoundException {
     if (clazz.isArray() && (Byte.TYPE == clazz.getComponentType())) {
-      return (TypeCodec<T>)TypeCodec.blob();
+      return (TypeCodec<T>)BlobCodecProvider.bytearray();
     } else if (ByteBuffer.class.isAssignableFrom(clazz)) {
       return (TypeCodec<T>)TypeCodec.blob();
     }
@@ -73,5 +89,102 @@ public final class BlobCodecProvider implements CodecProvider {
       com.datastax.driver.core.DataType.blob(),
       TypeToken.of(clazz)
     );
+  }
+
+  /**
+   * The <code>ByteArrayCodec</code> class provides an implementation for a codec
+   * capable of handling <code>byte[]</code> objects.
+   *
+   * @copyright 2015-2017 The Helenus Driver Project Authors
+   *
+   * @author The Helenus Driver Project Authors
+   * @version 1 - Jan 13, 2017 - paouelle - Creation
+   *
+   * @since 3.0
+   */
+  private static class ByteArrayCodec extends TypeCodec<byte[]> {
+    /**
+     * Holds the instance for this codec.
+     *
+     * @author paouelle
+     */
+    private final static TypeCodec<byte[]> instance = new ByteArrayCodec();
+
+    /**
+     * Instantiates a new <code>ByteArrayCodec</code> object.
+     *
+     * @author paouelle
+     */
+    private ByteArrayCodec() {
+      super(com.datastax.driver.core.DataType.blob(), byte[].class);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.datastax.driver.core.TypeCodec#parse(java.lang.String)
+     */
+    @Override
+    public byte[] parse(String value) {
+      if (StringUtils.isEmpty(value) || value.equalsIgnoreCase("NULL")) {
+        return null;
+      }
+      if ((value.length() & 1) == 1) {
+        throw new IllegalArgumentException(
+          "a CQL blob string must have an even length (since one byte is always 2 hexadecimal character)"
+        );
+      }
+      if ((value.charAt(0) != '0') || (value.charAt(1) != 'x')) {
+        throw new IllegalArgumentException("a CQL blob string must start with \"0x\"");
+      }
+      return Bytes.fromRawHexString(value, 2);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.datastax.driver.core.TypeCodec#format(java.lang.Object)
+     */
+    @Override
+    public String format(byte[] value) {
+      if (value == null) {
+        return "NULL";
+      }
+      return Bytes.toHexString(value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.datastax.driver.core.TypeCodec#serialize(java.lang.Object, com.datastax.driver.core.ProtocolVersion)
+     */
+    @Override
+    public ByteBuffer serialize(byte[] value, ProtocolVersion protocolVersion) {
+      return (value == null) ? null : ByteBuffer.wrap(value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see com.datastax.driver.core.TypeCodec#deserialize(java.nio.ByteBuffer, com.datastax.driver.core.ProtocolVersion)
+     */
+    @Override
+    public byte[] deserialize(ByteBuffer bytes, ProtocolVersion protocolVersion) {
+      if (bytes == null) {
+        return null;
+      }
+      final byte[] bs = new byte[bytes.remaining()];
+
+      bytes.get(bs);
+      return bs;
+    }
   }
 }

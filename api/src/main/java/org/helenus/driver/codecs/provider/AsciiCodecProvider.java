@@ -188,7 +188,7 @@ public final class AsciiCodecProvider implements CodecProvider {
      *
      * @author paouelle
      */
-    private static LocaleCodec instance = new LocaleCodec();
+    private final static LocaleCodec instance = new LocaleCodec();
 
     /**
      * Instantiates a new <code>LocaleCodec</code> object.
@@ -247,7 +247,7 @@ public final class AsciiCodecProvider implements CodecProvider {
      *
      * @author paouelle
      */
-    private static ZoneIdCodec instance = new ZoneIdCodec();
+    private final static ZoneIdCodec instance = new ZoneIdCodec();
 
     /**
      * Instantiates a new <code>ZoneIdCodec</code> object.
