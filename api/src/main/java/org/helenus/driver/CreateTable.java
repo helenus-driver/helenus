@@ -74,7 +74,7 @@ public interface CreateTable<T>
    *         added
    * @throws NullPointerException if <code>option</code> is <code>null</code>
    */
-  public Options<T> with(TableWith option);
+  public Options<T> with(WithOptions option);
 
   /**
    * Returns a WITH option for this statement.
@@ -135,7 +135,7 @@ public interface CreateTable<T>
      * @return this WITH options
      * @throws NullPointerException if <code>option</code> is <code>null</code>
      */
-    public Options<T> and(TableWith option);
+    public Options<T> and(WithOptions option);
 
     /**
      * Adds a WHERE clause to this statement used to specify keyspace keys when required.

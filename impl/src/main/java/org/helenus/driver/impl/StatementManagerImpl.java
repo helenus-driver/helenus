@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,6 @@ import org.helenus.driver.Delete.Builder;
 import org.helenus.driver.Group;
 import org.helenus.driver.GroupableStatement;
 import org.helenus.driver.Insert;
-import org.helenus.driver.KeyspaceWith;
 import org.helenus.driver.Ordering;
 import org.helenus.driver.Recorder;
 import org.helenus.driver.RegularStatement;
@@ -85,6 +84,7 @@ import org.helenus.driver.StatementManager;
 import org.helenus.driver.Truncate;
 import org.helenus.driver.Update;
 import org.helenus.driver.Using;
+import org.helenus.driver.WithOptions;
 import org.helenus.driver.impl.Utils.CNameSequence;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.EntityFilter;
@@ -101,7 +101,7 @@ import org.helenus.driver.persistence.UDTTypeEntity;
  * The <code>StatementManagerImpl</code> class provides an implementation
  * for the {@link StatementManager}.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -1207,7 +1207,7 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected Clause like(CharSequence name, Object value) {
-    return new ClauseImpl.SimpleClauseImpl(name, "LIKE", value);
+    return new ClauseImpl.SimpleClauseImpl(name, " LIKE ", value);
   }
 
   /**
@@ -1815,11 +1815,23 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.StatementManager#options(javax.json.JsonObject)
+   */
+  @Override
+  protected WithOptions options(JsonObject map) {
+    return new WithOptionsImpl("OPTIONS", map);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.StatementManager#replication(javax.json.JsonObject)
    */
   @Override
-  protected KeyspaceWith replication(JsonObject map) {
-    return new KeyspaceWithImpl("REPLICATION", map);
+  protected WithOptions replication(JsonObject map) {
+    return new WithOptionsImpl("REPLICATION", map);
   }
 
   /**
@@ -1830,8 +1842,8 @@ public class StatementManagerImpl extends StatementManager {
    * @see org.helenus.driver.StatementManager#durableWrites(boolean)
    */
   @Override
-  protected KeyspaceWith durableWrites(boolean value) {
-    return new KeyspaceWithImpl("DURABLE_WRITES", value);
+  protected WithOptions durableWrites(boolean value) {
+    return new WithOptionsImpl("DURABLE_WRITES", value);
   }
 
   /**

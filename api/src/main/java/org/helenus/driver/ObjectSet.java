@@ -17,6 +17,7 @@ package org.helenus.driver;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import com.datastax.driver.core.ColumnDefinitions;
@@ -77,7 +78,7 @@ public interface ObjectSet<T> extends PagingIterable<ObjectSet<T>, T> {
   public boolean wasApplied();
 
   /**
-   * Gets the the next POJO from this object set.
+   * Gets the next POJO from this object set.
    *
    * @author paouelle
    *
@@ -91,7 +92,7 @@ public interface ObjectSet<T> extends PagingIterable<ObjectSet<T>, T> {
   public T one();
 
   /**
-   * Gets the the next POJO from this object set.
+   * Gets the next POJO from this object set.
    *
    * @author paouelle
    *
@@ -100,6 +101,34 @@ public interface ObjectSet<T> extends PagingIterable<ObjectSet<T>, T> {
    * @throws ObjectNotFoundException if this object set is exhausted
    */
   public T oneRequired();
+
+  /**
+   * Gets the next POJO from this object set.
+   *
+   * @author paouelle
+   *
+   * @return the next POJO in this object set
+   * @throws ObjectConversionException if unable to convert to a POJO
+   * @throws ObjectNotFoundException if this object set is exhausted
+   * @throws TooManyMatchesFoundException if more than one object is found
+   */
+  public T onlyOneRequired();
+
+  /**
+   * Filters the POJOs founds to return only those that matches the specified
+   * filter from any of the available methods.
+   * <p>
+   * <i>Note:</i> Only one filter can be installed with an object set. Calling
+   * this method twice will result in the second filter to be registered and the
+   * first one to be dropped.
+   *
+   * @author paouelle
+   *
+   * @param  filter the filter to apply to the pojos found
+   * @return this object set for chaining
+   * @throws NullPointerException if <code>filter</code> is <code>null</code>
+   */
+  public ObjectSet<T> filter(Predicate<? super T> filter);
 
   /**
    * Gets a stream of all the remaining POJOs in this object set.

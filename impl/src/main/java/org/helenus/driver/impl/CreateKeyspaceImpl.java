@@ -20,9 +20,10 @@ import java.util.List;
 
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateKeyspace;
-import org.helenus.driver.KeyspaceWith;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.WithOptions;
+import org.helenus.driver.impl.WithOptionsImpl.ReplicationWithImpl;
 
 /**
  * The <code>CreateKeyspaceImpl</code> class defines a CREATE KEYSPACE statement.
@@ -134,14 +135,14 @@ public class CreateKeyspaceImpl<T>
       builder.append("IF NOT EXISTS ");
     }
     Utils.appendName(builder, getKeyspace());
-    KeyspaceWithImpl.ReplicationWithImpl replication = with.replication;
+    ReplicationWithImpl replication = with.replication;
 
     if (replication == null) { // default to POJO's details
-      replication = new KeyspaceWithImpl.ReplicationWithImpl(
+      replication = new ReplicationWithImpl(
         getContext().getClassInfo(), mgr
       );
     }
-    final List<KeyspaceWithImpl> options = new ArrayList<>(with.options.size() + 1);
+    final List<WithOptionsImpl> options = new ArrayList<>(with.options.size() + 1);
 
     options.add(replication);
     options.addAll(with.options);
@@ -174,10 +175,10 @@ public class CreateKeyspaceImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.CreateKeyspace#with(org.helenus.driver.KeyspaceWith)
+   * @see org.helenus.driver.CreateKeyspace#with(org.helenus.driver.WithOptions)
    */
   @Override
-  public Options<T> with(KeyspaceWith option) {
+  public Options<T> with(WithOptions option) {
     return with.and(option);
   }
 
@@ -238,14 +239,14 @@ public class CreateKeyspaceImpl<T>
      *
      * @author paouelle
      */
-    protected KeyspaceWithImpl.ReplicationWithImpl replication;
+    protected ReplicationWithImpl replication;
 
     /**
      * Holds options for this statement.
      *
      * @author paouelle
      */
-    protected final List<KeyspaceWithImpl> options = new ArrayList<>(2);
+    protected final List<WithOptionsImpl> options = new ArrayList<>(2);
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -264,20 +265,20 @@ public class CreateKeyspaceImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.CreateKeyspace.Options#and(org.helenus.driver.KeyspaceWith)
+     * @see org.helenus.driver.CreateKeyspace.Options#and(org.helenus.driver.WithOptions)
      */
     @Override
-    public Options<T> and(KeyspaceWith option) {
+    public Options<T> and(WithOptions option) {
       org.apache.commons.lang3.Validate.notNull(option, "invalid null with");
       org.apache.commons.lang3.Validate.isTrue(
-        option instanceof KeyspaceWithImpl,
+        option instanceof WithOptionsImpl,
         "unsupported class of withs: %s",
         option.getClass().getName()
       );
-      if (option instanceof KeyspaceWithImpl.ReplicationWithImpl) {
-        this.replication = (KeyspaceWithImpl.ReplicationWithImpl)option;
+      if (option instanceof ReplicationWithImpl) {
+        this.replication = (ReplicationWithImpl)option;
       } else {
-        options.add((KeyspaceWithImpl)option);
+        options.add((WithOptionsImpl)option);
       }
       setDirty();
       return this;

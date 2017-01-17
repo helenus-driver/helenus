@@ -98,7 +98,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
    * The <code>Where</code> interface defines a WHERE clause for a SELECT
    * statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -113,8 +113,8 @@ public interface Select<T> extends ObjectClassStatement<T> {
      *
      * @author paouelle
      *
-     * @param  clause the clause to add.
-     * @return this WHERE clause.
+     * @param  clause the clause to add
+     * @return this WHERE clause
      * @throws IllegalArgumentException if the clause referenced a
      *         column which is not a primary key or an index column in the POJO
      */
@@ -126,8 +126,8 @@ public interface Select<T> extends ObjectClassStatement<T> {
      *
      * @author paouelle
      *
-     * @param  orderings the orderings to add.
-     * @return the select statement this Where clause if part of.
+     * @param  orderings the orderings to add
+     * @return the select statement this Where clause if part of
      * @throws IllegalStateException if an ORDER BY clause has already been
      *         provided.
      * @throws IllegalArgumentException if any of the column names are not defined
@@ -140,11 +140,11 @@ public interface Select<T> extends ObjectClassStatement<T> {
      *
      * @author paouelle
      *
-     * @param limit the limit to set.
-     * @return the select statement this Where clause if part of.
-     * @throws IllegalArgumentException if {@code limit &gte; 0}.
+     * @param  limit the limit to set
+     * @return the select statement this Where clause if part of
+     * @throws IllegalArgumentException if {@code limit &gte; 0}
      * @throws IllegalStateException if a LIMIT clause has already been
-     *           provided.
+     *         provided
      */
     public Select<T> limit(int limit);
   }
@@ -153,7 +153,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
    * The <code>Builder</code> interface defines an in-construction SELECT
    * statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation

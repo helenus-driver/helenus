@@ -1777,6 +1777,18 @@ public abstract class StatementManager {
   protected abstract Assignment putAll(CharSequence name, Map<?, ?> mappings);
 
   /**
+   * Puts index properties together for index creation. This will generate:
+   * {@code OPTIONS = map}.
+   *
+   * @author paouelle
+   *
+   * @param  map the map of replication properties in json format
+   * @return the corresponding option (to use in a create index statement)
+   * @throws NullPointerException if <code>map</code> is <code>null</code>
+   */
+  protected abstract WithOptions options(JsonObject map);
+
+  /**
    * Puts a replication set of properties together for keyspace creation. This
    * will generate: {@code REPLICATION = map}.
    *
@@ -1786,7 +1798,7 @@ public abstract class StatementManager {
    * @return the corresponding option (to use in a create keyspace statement)
    * @throws NullPointerException if <code>map</code> is <code>null</code>
    */
-  protected abstract KeyspaceWith replication(JsonObject map);
+  protected abstract WithOptions replication(JsonObject map);
 
   /**
    * Sets the durable write option for a keyspace. This will generate:
@@ -1797,7 +1809,7 @@ public abstract class StatementManager {
    * @param  value the keyspace durable writes option value
    * @return the corresponding option (to use in a create keyspace statement)
    */
-  protected abstract KeyspaceWith durableWrites(boolean value);
+  protected abstract WithOptions durableWrites(boolean value);
 
   /**
    * Protects a value from any interpretation by the query builder.

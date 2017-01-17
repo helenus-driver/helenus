@@ -388,8 +388,7 @@ public abstract class Utils {
             definition, codec, codecRegistry, sb, (List<?>)value, null
           );
         } else if ((definition != null)
-                   && ((definition.getMainType() == DataType.ORDERED_SET)
-                       || (definition.getMainType() == DataType.FROZEN_ORDERED_SET))
+                   && (definition.getMainType() == DataType.ORDERED_SET)
                    && (value instanceof Collection)) {
           Utils.appendList(
             definition, codec, codecRegistry, sb, (Collection<?>)value, null

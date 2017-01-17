@@ -80,44 +80,37 @@ import org.helenus.driver.codecs.provider.VarIntCodecProvider;
  */
 @SuppressWarnings("javadoc")
 public enum DataType implements CQLDataType {
-  INFERRED(Name.CUSTOM, "?", false, 0),
+  INFERRED(Name.CUSTOM, "?", 0),
 
-  ASCII(Name.ASCII, "ascii", false, 0, AsciiCodecProvider.INSTANCE),
-  BIGINT(Name.BIGINT, "bigint", false, 0, BigIntCodecProvider.INSTANCE),
-  BLOB(Name.BLOB, "blob", false, 0, BlobCodecProvider.INSTANCE),
-  BOOLEAN(Name.BOOLEAN, "boolean", false, 0, BooleanCodecProvider.INSTANCE),
-  COUNTER(Name.COUNTER, "counter", false, 0, CounterCodecProvider.INSTANCE),
-  DECIMAL(Name.DECIMAL, "decimal", false, 0, DecimalCodecProvider.INSTANCE),
-  DOUBLE(Name.DOUBLE, "double", false, 0, DoubleCodecProvider.INSTANCE),
-  FLOAT(Name.FLOAT, "float", false, 0, FloatCodecProvider.INSTANCE),
-  INET(Name.INET, "inet", false, 0, InetCodecProvider.INSTANCE),
-  INT(Name.INT, "int", false, 0, IntCodecProvider.INSTANCE),
-  TEXT(Name.TEXT, "text", false, 0, TextCodecProvider.INSTANCE),
-  TIMESTAMP(Name.TIMESTAMP, "timestamp", false, 0, TimestampCodecProvider.INSTANCE),
-  UUID(Name.UUID, "uuid", false, 0, UUIDCodecProvider.INSTANCE),
-  VARCHAR(Name.VARCHAR, "varchar", false, 0, VarCharCodecProvider.INSTANCE),
-  VARINT(Name.VARINT, "varint", false, 0, VarIntCodecProvider.INSTANCE),
-  TIMEUUID(Name.TIMEUUID, "timeuuid", false, 0, TimeUUIDCodecProvider.INSTANCE),
-  SMALLINT(Name.SMALLINT, "smallint", false, 0, SmallIntCodecProvider.INSTANCE),
-  TINYINT(Name.TINYINT, "tinyint", false, 0, TinyIntCodecProvider.INSTANCE),
-  DATE(Name.DATE, "date", false, 0, DateCodecProvider.INSTANCE),
-  TIME(Name.TIME, "time", false, 0, TimeCodecProvider.INSTANCE),
+  ASCII(Name.ASCII, "ascii", 0, AsciiCodecProvider.INSTANCE),
+  BIGINT(Name.BIGINT, "bigint", 0, BigIntCodecProvider.INSTANCE),
+  BLOB(Name.BLOB, "blob", 0, BlobCodecProvider.INSTANCE),
+  BOOLEAN(Name.BOOLEAN, "boolean", 0, BooleanCodecProvider.INSTANCE),
+  COUNTER(Name.COUNTER, "counter", 0, CounterCodecProvider.INSTANCE),
+  DECIMAL(Name.DECIMAL, "decimal", 0, DecimalCodecProvider.INSTANCE),
+  DOUBLE(Name.DOUBLE, "double", 0, DoubleCodecProvider.INSTANCE),
+  FLOAT(Name.FLOAT, "float", 0, FloatCodecProvider.INSTANCE),
+  INET(Name.INET, "inet", 0, InetCodecProvider.INSTANCE),
+  INT(Name.INT, "int", 0, IntCodecProvider.INSTANCE),
+  TEXT(Name.TEXT, "text", 0, TextCodecProvider.INSTANCE),
+  TIMESTAMP(Name.TIMESTAMP, "timestamp", 0, TimestampCodecProvider.INSTANCE),
+  UUID(Name.UUID, "uuid", 0, UUIDCodecProvider.INSTANCE),
+  VARCHAR(Name.VARCHAR, "varchar", 0, VarCharCodecProvider.INSTANCE),
+  VARINT(Name.VARINT, "varint", 0, VarIntCodecProvider.INSTANCE),
+  TIMEUUID(Name.TIMEUUID, "timeuuid", 0, TimeUUIDCodecProvider.INSTANCE),
+  SMALLINT(Name.SMALLINT, "smallint", 0, SmallIntCodecProvider.INSTANCE),
+  TINYINT(Name.TINYINT, "tinyint", 0, TinyIntCodecProvider.INSTANCE),
+  DATE(Name.DATE, "date", 0, DateCodecProvider.INSTANCE),
+  TIME(Name.TIME, "time", 0, TimeCodecProvider.INSTANCE),
 
-  TUPLE(Name.TUPLE, "tuple", true, -1),
+  TUPLE(Name.TUPLE, "tuple", -1),
 
-  FROZEN_LIST(Name.LIST, "list", true, 1),
-  FROZEN_SET(Name.SET, "set", true, 1),
-  FROZEN_ORDERED_SET(Name.LIST, "list", true, 1),
-  FROZEN_SORTED_SET(Name.SET, "set", true, 1),
-  FROZEN_MAP(Name.MAP, "map", true, 2),
-  FROZEN_SORTED_MAP(Name.MAP, "map", true, 2),
-
-  LIST(Name.LIST, "list", false, 1),
-  SET(Name.SET, "set", false, 1),
-  ORDERED_SET(Name.LIST, "list", false, 1),
-  SORTED_SET(Name.SET, "set", false, 1),
-  MAP(Name.MAP, "map", false, 2),
-  SORTED_MAP(Name.MAP, "map", false, 2);
+  LIST(Name.LIST, "list", 1),
+  SET(Name.SET, "set", 1),
+  ORDERED_SET(Name.LIST, "list", 1),
+  SORTED_SET(Name.SET, "set", 1),
+  MAP(Name.MAP, "map", 2),
+  SORTED_MAP(Name.MAP, "map", 2);
 
   /**
    * Gets a suitable default data type for the specified class.
@@ -267,13 +260,6 @@ public enum DataType implements CQLDataType {
   public final String CQL;
 
   /**
-   * Holds a flag indicating if this data type is frozen or not.
-   *
-   * @author paouelle
-   */
-  public final boolean FROZEN;
-
-  /**
    * Holds the number of arguments for this collection data type.
    * <p>
    * <i>Note:</i> Will be <code>-1</code> if supports a variable number of
@@ -298,17 +284,15 @@ public enum DataType implements CQLDataType {
    *
    * @param name the non-<code>null</code> Cassandra name for the data type
    * @param cql the non-<code>null</code> CQL name for the data type
-   * @param frozen whether this type is frozen or not
    * @param num the number of arguments for this collection data type
    * @param a set of codec providers for this data type
    */
   private DataType(
     Name name,
     String cql,
-    boolean frozen,
     int num
   ) {
-    this(name, cql, frozen, num, null);
+    this(name, cql, num, null);
   }
 
   /**
@@ -318,7 +302,6 @@ public enum DataType implements CQLDataType {
    *
    * @param name the non-<code>null</code> Cassandra name for the data type
    * @param cql the non-<code>null</code> CQL name for the data type
-   * @param frozen whether this type is frozen or not
    * @param num the number of arguments for this collection data type (<code>-1</code>
    *        for a variable number of arguments greater than <code>0</code>)
    * @param provider a codec provider for this data type (may be <code>null</code>)
@@ -326,7 +309,6 @@ public enum DataType implements CQLDataType {
   private DataType(
     Name name,
     String cql,
-    boolean frozen,
     int num,
     CodecProvider provider
   ) {
@@ -336,7 +318,6 @@ public enum DataType implements CQLDataType {
       .findFirst()
       .orElse(null);
     this.CQL = cql;
-    this.FROZEN = frozen;
     this.NUM_ARGUMENTS = num;
     this.provider = provider;
   }
@@ -350,7 +331,7 @@ public enum DataType implements CQLDataType {
    */
   @Override
   public boolean isFrozen() {
-    return FROZEN;
+    return isTuple();
   }
 
   /**

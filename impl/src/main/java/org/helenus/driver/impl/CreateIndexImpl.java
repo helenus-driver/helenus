@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,13 +26,14 @@ import org.helenus.driver.Clause;
 import org.helenus.driver.CreateIndex;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.WithOptions;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.persistence.Index;
 
 /**
  * The <code>CreateIndexImpl</code> class defines a CREATE INDEX statement.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 19, 2015 - paouelle - Creation
@@ -57,6 +58,13 @@ public class CreateIndexImpl<T>
    * @author paouelle
    */
   private final List<TableInfoImpl<T>> tables = new ArrayList<>(8);
+
+  /**
+   * Holds the "WITH" options.
+   *
+   * @author paouelle
+   */
+  private WithOptionsImpl with;
 
   /**
    * Flag indicating if the "IF NOT EXIST" option has been selected.
@@ -127,6 +135,7 @@ public class CreateIndexImpl<T>
    *         query string
    * @return the the string builder used to build the index query string
    */
+  @SuppressWarnings("synthetic-access")
   private StringBuilder buildIndexQueryString(
     FieldInfoImpl<T> field, TableInfoImpl<T> table
   ) {
@@ -157,7 +166,22 @@ public class CreateIndexImpl<T>
       .append(field.getColumnName())
       .append(')');
     if (!StringUtils.isEmpty(customClass)) {
-      builder.append(" USING ").append(customClass);
+      builder.append(" USING ");
+      Utils.appendValue(null, null, mgr.getCodecRegistry(), builder, customClass, null);
+    }
+    final List<WithOptionsImpl> options = new ArrayList<>(2);
+
+    if (with != null) {
+      options.add(with);
+    }
+    if (StringUtils.isNoneEmpty(index.options())) {
+      options.add(new WithOptionsImpl("OPTIONS", new Utils.RawString(index.options())));
+    }
+    if (!options.isEmpty()) {
+      builder.append(" WITH ");
+      Utils.joinAndAppend(
+        null, null, mgr.getCodecRegistry(), builder, " AND ", options, null
+      );
     }
     builder.append(';');
     return builder;
@@ -228,6 +252,26 @@ public class CreateIndexImpl<T>
   @Override
   public CreateIndex<T> ifNotExists() {
     this.ifNotExists = true;
+    setDirty();
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.CreateIndex#with(org.helenus.driver.WithOptions)
+   */
+  @Override
+  public CreateIndex<T> with(WithOptions option) {
+    org.apache.commons.lang3.Validate.notNull(option, "invalid null with");
+    org.apache.commons.lang3.Validate.isTrue(
+      option instanceof WithOptionsImpl,
+      "unsupported class of withs: %s",
+      option.getClass().getName()
+    );
+    this.with = (WithOptionsImpl)option;
     setDirty();
     return this;
   }

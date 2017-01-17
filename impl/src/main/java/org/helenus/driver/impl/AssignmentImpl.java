@@ -1449,25 +1449,18 @@ public abstract class AssignmentImpl
     @Override
     void validate(TableInfoImpl<?> table) {
       if ((ctype == DataType.MAP)
-          || (ctype == DataType.SORTED_MAP)
-          || (ctype == DataType.FROZEN_MAP)
-          || (ctype == DataType.FROZEN_SORTED_MAP)) {
+          || (ctype == DataType.SORTED_MAP)) {
         table.validateMapColumnAndKeyValues(name, (Map<?, ?>)collection);
       } else {
         final FieldInfoImpl<?> finfo = table.getColumnImpl(name);
 
         if ((finfo != null)
             && ((finfo.getDataType().getMainType() == DataType.MAP)
-                || (finfo.getDataType().getMainType() == DataType.SORTED_MAP)
-                || (finfo.getDataType().getMainType() == DataType.FROZEN_MAP)
-                || (finfo.getDataType().getMainType() == DataType.FROZEN_SORTED_MAP))) {
+                || (finfo.getDataType().getMainType() == DataType.SORTED_MAP))) {
           table.validateMapColumnAndKeys(name, (Iterable<?>)collection);
         } else if ((ctype == DataType.SET)
                    || (ctype == DataType.ORDERED_SET)
-                   || (ctype == DataType.SORTED_SET)
-                   || (ctype == DataType.FROZEN_SET)
-                   || (ctype == DataType.FROZEN_ORDERED_SET)
-                   || (ctype == DataType.FROZEN_SORTED_SET)) {
+                   || (ctype == DataType.SORTED_SET)) {
           table.validateSetColumnAndValues(name, (Iterable<?>)collection);
         } else { // must be a list
           table.validateListColumnAndValues(name, (Iterable<?>)collection);

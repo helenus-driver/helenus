@@ -2218,6 +2218,20 @@ public final class StatementBuilder {
   }
 
   /**
+   * Puts index properties together for index creation. This will generate:
+   * {@code OPTIONS = map}.
+   *
+   * @author paouelle
+   *
+   * @param  map the map of replication properties in json format
+   * @return the corresponding option (to use in a create index statement)
+   * @throws NullPointerException if <code>map</code> is <code>null</code>
+   */
+  public static WithOptions options(JsonObject map) {
+    return StatementManager.getManager().options(map);
+  }
+
+  /**
    * Puts a replication set of properties together for keyspace creation. This
    * will generate: {@code REPLICATION = map}.
    *
@@ -2227,7 +2241,7 @@ public final class StatementBuilder {
    * @return the corresponding option (to use in a create keyspace statement)
    * @throws NullPointerException if <code>map</code> is <code>null</code>
    */
-  public static KeyspaceWith replication(JsonObject map) {
+  public static WithOptions replication(JsonObject map) {
     return StatementManager.getManager().replication(map);
   }
 
@@ -2239,7 +2253,7 @@ public final class StatementBuilder {
    *
    * @return the corresponding option (to use in a create keyspace statement)
    */
-  public static KeyspaceWith durableWrites() {
+  public static WithOptions durableWrites() {
     return StatementBuilder.durableWrites(true);
   }
 
@@ -2252,7 +2266,7 @@ public final class StatementBuilder {
    * @param  value the keyspace durable writes option value
    * @return the corresponding option (to use in a create keyspace statement)
    */
-  public static KeyspaceWith durableWrites(boolean value) {
+  public static WithOptions durableWrites(boolean value) {
     return StatementManager.getManager().durableWrites(value);
   }
 

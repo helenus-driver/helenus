@@ -839,7 +839,7 @@ public class InsertImpl<T>
    * The <code>OptionsImpl</code> class defines the options of an INSERT
    * statement.
    *
-   * @copyright 2015-2016 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation

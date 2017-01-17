@@ -164,44 +164,6 @@ public class DataTypeImpl {
   }
 
   /**
-   * Checks all arguments and switches all non-frozen collections to their
-   * frozen counterparts.
-   *
-   * @author paouelle
-   *
-   * @param args the list of arguments to check
-   */
-  public static void freezeAllCollectionArguments(List<CQLDataType> args) {
-    for (int i = 0; i < args.size(); i++) {
-      final CQLDataType a = args.get(i);
-
-      if (a instanceof DataType) {
-        switch ((DataType)a) {
-          case LIST:
-            args.set(i, DataType.FROZEN_LIST);
-            break;
-          case SET:
-            args.set(i, DataType.FROZEN_SET);
-            break;
-          case ORDERED_SET:
-            args.set(i, DataType.FROZEN_ORDERED_SET);
-            break;
-          case SORTED_SET:
-            args.set(i, DataType.FROZEN_SORTED_SET);
-            break;
-          case MAP:
-            args.set(i, DataType.FROZEN_MAP);
-            break;
-          case SORTED_MAP:
-            args.set(i, DataType.FROZEN_SORTED_MAP);
-            break;
-          default:
-        }
-      }
-    }
-  }
-
-  /**
    * The <code>Definition</code> class provides a data type definition for a CQL
    * data type.
    *
@@ -318,6 +280,15 @@ public class DataTypeImpl {
     public final com.datastax.driver.core.DataType dtype;
 
     /**
+     * Holds a flag indicating if this definition is frozen or not.
+     * <p>
+     * <i>Note:</i> Only applies to collections.
+     *
+     * @author paouelle
+     */
+    public final boolean isFrozen;
+
+    /**
      * Instantiates a new <code>Definition</code> object.
      *
      * @author paouelle
@@ -330,6 +301,7 @@ public class DataTypeImpl {
       this.type = type;
       this.arguments = Collections.emptyList();
       this.dtype = type.getDataType();
+      this.isFrozen = false;
     }
 
     /**
@@ -341,14 +313,20 @@ public class DataTypeImpl {
      * @param  type the non-<code>null</code> data type for this definition
      * @param  arguments the non-<code>null</code> list of arguments' data types
      *         if the type represents a collection (may be empty)
+     * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+     *         otherwise
      * @throws IllegalArgumentException if the argument list is empty and the
      *         data type is not a primitive one
      */
     public Definition(
-      StatementManagerImpl mgr, DataType type, List<CQLDataType> arguments
+      StatementManagerImpl mgr,
+      DataType type,
+      List<CQLDataType> arguments,
+      boolean isFrozen
     ) {
       this.type = type;
       this.arguments = arguments;
+      this.isFrozen = isCollection() ? isFrozen : false;
       this.dtype = resolveDataType(mgr);
     }
 
@@ -361,12 +339,19 @@ public class DataTypeImpl {
      * @param  types the non-<code>null</code> list of data types for this
      *         definition (the first one correspond to the data type and the
      *         remaining are the argument data types)
+     * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+     *         otherwise
      * @throws IllegalArgumentException if remaining argument list is empty and
      *         the data type is not a primitive one
      */
-    public Definition(StatementManagerImpl mgr, List<CQLDataType> types) {
+    public Definition(
+      StatementManagerImpl mgr,
+      List<CQLDataType> types,
+      boolean isFrozen
+    ) {
       this.type = types.remove(0);
       this.arguments = Collections.unmodifiableList(types);
+      this.isFrozen = isCollection() ? isFrozen : false;
       this.dtype = resolveDataType(mgr);
     }
 
@@ -385,17 +370,17 @@ public class DataTypeImpl {
         switch (((DataType)type).NAME) {
           case LIST:
             return com.datastax.driver.core.DataType.list(
-              arguments.get(0).getDataType(), type.isFrozen()
+              arguments.get(0).getDataType(), isFrozen()
             );
           case SET:
             return com.datastax.driver.core.DataType.set(
-              arguments.get(0).getDataType(), type.isFrozen()
+              arguments.get(0).getDataType(), isFrozen()
             );
           case MAP:
             return com.datastax.driver.core.DataType.map(
               arguments.get(0).getDataType(),
               arguments.get(1).getDataType(),
-              type.isFrozen()
+              isFrozen()
             );
           default:
         }
@@ -446,8 +431,7 @@ public class DataTypeImpl {
           throw new IllegalArgumentException("unable to determine element type for " + trace);
         } else if (LinkedHashSet.class.isAssignableFrom(clazz)
                   || (Set.class.equals(clazz)
-                      && ((this.type.getMainType() == DataType.ORDERED_SET)
-                          || (this.type.getMainType() == DataType.FROZEN_ORDERED_SET)))) {
+                      && (this.type.getMainType() == DataType.ORDERED_SET))) {
           if (type instanceof ParameterizedType) {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
@@ -466,8 +450,7 @@ public class DataTypeImpl {
           );
         } else if (SortedSet.class.isAssignableFrom(clazz)
                    || (Set.class.equals(clazz)
-                       && ((this.type.getMainType() == DataType.SORTED_SET)
-                           || (this.type.getMainType() == DataType.FROZEN_SORTED_SET)))) {
+                       && (this.type.getMainType() == DataType.SORTED_SET))) {
           if (type instanceof ParameterizedType) {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
@@ -503,8 +486,7 @@ public class DataTypeImpl {
           );
         } else if (SortedMap.class.isAssignableFrom(clazz)
                    || (Map.class.equals(clazz)
-                       && ((this.type.getMainType() == DataType.SORTED_MAP)
-                           || (this.type.getMainType() == DataType.FROZEN_SORTED_MAP)))) {
+                       && (this.type.getMainType() == DataType.SORTED_MAP))) {
           if (type instanceof ParameterizedType) {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
@@ -637,7 +619,7 @@ public class DataTypeImpl {
      */
     @Override
     public boolean isFrozen() {
-      return type.isFrozen();
+      return type.isFrozen() || (isCollection() && isFrozen);
     }
 
     /**
@@ -898,17 +880,20 @@ public class DataTypeImpl {
    *         data type for the field
    * @param  types the non-<code>null</code> list where to add the inferred type and
    *         its arguments
+   * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+   *         otherwise
    * @throws IllegalArgumentException if the data type cannot be inferred from
    *         the field
    */
   private static void inferDataTypeFrom(
-    Field field, Class<?> clazz, List<CQLDataType> types
+    Field field, Class<?> clazz, List<CQLDataType> types, boolean isFrozen
   ) {
     DataTypeImpl.inferDataTypeFrom(
       "field: " + field.getDeclaringClass().getName() + "." + field.getName(),
       field.getGenericType(),
       clazz,
-      types
+      types,
+      isFrozen
     );
   }
 
@@ -921,11 +906,13 @@ public class DataTypeImpl {
    *         data type for
    * @param  types the non-<code>null</code> list where to add the inferred type and
    *         its arguments
+   * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+   *         otherwise
    * @throws IllegalArgumentException if the data type cannot be inferred from
    *         the class
    */
   private static void inferDataTypeFrom(
-    Class<?> clazz, List<CQLDataType> types
+    Class<?> clazz, List<CQLDataType> types, boolean isFrozen
   ) {
     // at this point we are trying to infer the type from the superclass in
     // order to generate a fake field, so make sure to continue on with the
@@ -934,7 +921,8 @@ public class DataTypeImpl {
       "class: " + clazz.getName(),
       clazz.getGenericSuperclass(),
       clazz.getSuperclass(),
-      types
+      types,
+      isFrozen
     );
   }
 
@@ -951,6 +939,8 @@ public class DataTypeImpl {
    *         data type for
    * @param  types the non-<code>null</code> list where to add the inferred type and
    *         its arguments
+   * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+   *         otherwise
    * @throws IllegalArgumentException if the data type cannot be inferred from
    *         the field or class
    */
@@ -958,7 +948,8 @@ public class DataTypeImpl {
     String trace,
     Type type,
     Class<?> clazz,
-    List<CQLDataType> types
+    List<CQLDataType> types,
+    boolean isFrozen
   ) {
     // check if the class is annotated as a UDT in which case we kind of allow
     // collections of collections since clazz is actually a udt
@@ -977,7 +968,7 @@ public class DataTypeImpl {
         final ParameterizedType ptype = (ParameterizedType)type;
         final Type atype = ptype.getActualTypeArguments()[0]; // optional will always have 1 argument
 
-        DataTypeImpl.inferDataTypeFrom(trace, atype, ReflectionUtils.getRawClass(atype), types);
+        DataTypeImpl.inferDataTypeFrom(trace, atype, ReflectionUtils.getRawClass(atype), types, true);
         return;
       }
     } else if (List.class.isAssignableFrom(clazz)) {
@@ -992,7 +983,7 @@ public class DataTypeImpl {
         final Type atype = ptype.getActualTypeArguments()[0]; // lists will always have 1 argument
 
         types.add(DataType.LIST);
-        DataTypeImpl.inferDataTypeFrom(trace, atype, ReflectionUtils.getRawClass(atype), types);
+        DataTypeImpl.inferDataTypeFrom(trace, atype, ReflectionUtils.getRawClass(atype), types, true);
         return;
       }
     } else if (Set.class.isAssignableFrom(clazz)) {
@@ -1007,7 +998,7 @@ public class DataTypeImpl {
         final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
 
         types.add(LinkedHashSet.class.isAssignableFrom(clazz) ? DataType.ORDERED_SET : DataType.SET);
-        DataTypeImpl.inferDataTypeFrom(trace, atype, ReflectionUtils.getRawClass(atype), types);
+        DataTypeImpl.inferDataTypeFrom(trace, atype, ReflectionUtils.getRawClass(atype), types, true);
         return;
       }
     } else if (SortedMap.class.isAssignableFrom(clazz)) {
@@ -1023,8 +1014,8 @@ public class DataTypeImpl {
         final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
 
         types.add(DataType.SORTED_MAP);
-        DataTypeImpl.inferDataTypeFrom(trace, ktype, ReflectionUtils.getRawClass(ktype), types);
-        DataTypeImpl.inferDataTypeFrom(trace, vtype, ReflectionUtils.getRawClass(vtype), types);
+        DataTypeImpl.inferDataTypeFrom(trace, ktype, ReflectionUtils.getRawClass(ktype), types, true);
+        DataTypeImpl.inferDataTypeFrom(trace, vtype, ReflectionUtils.getRawClass(vtype), types, true);
         return;
       }
     } else if (Map.class.isAssignableFrom(clazz)) {
@@ -1041,8 +1032,8 @@ public class DataTypeImpl {
 
         types.add(DataType.MAP);
         // don't consider the @Persister annotation for the key
-        DataTypeImpl.inferDataTypeFrom(trace, ktype, ReflectionUtils.getRawClass(ktype), types);
-        DataTypeImpl.inferDataTypeFrom(trace, vtype, ReflectionUtils.getRawClass(vtype), types);
+        DataTypeImpl.inferDataTypeFrom(trace, ktype, ReflectionUtils.getRawClass(ktype), types, true);
+        DataTypeImpl.inferDataTypeFrom(trace, vtype, ReflectionUtils.getRawClass(vtype), types, true);
         return;
       }
     } else if (Pair.class.isAssignableFrom(clazz)) {
@@ -1052,8 +1043,8 @@ public class DataTypeImpl {
         final Type a2type = ptype.getActualTypeArguments()[1];
 
         types.add(DataType.TUPLE);
-        DataTypeImpl.inferDataTypeFrom(trace, a1type, ReflectionUtils.getRawClass(a1type), types);
-        DataTypeImpl.inferDataTypeFrom(trace, a2type, ReflectionUtils.getRawClass(a2type), types);
+        DataTypeImpl.inferDataTypeFrom(trace, a1type, ReflectionUtils.getRawClass(a1type), types, true);
+        DataTypeImpl.inferDataTypeFrom(trace, a2type, ReflectionUtils.getRawClass(a2type), types, true);
         return;
       }
     } else if (Triple.class.isAssignableFrom(clazz)) {
@@ -1064,9 +1055,9 @@ public class DataTypeImpl {
         final Type a3type = ptype.getActualTypeArguments()[2];
 
         types.add(DataType.TUPLE);
-        DataTypeImpl.inferDataTypeFrom(trace, a1type, ReflectionUtils.getRawClass(a1type), types);
-        DataTypeImpl.inferDataTypeFrom(trace, a2type, ReflectionUtils.getRawClass(a2type), types);
-        DataTypeImpl.inferDataTypeFrom(trace, a3type, ReflectionUtils.getRawClass(a3type), types);
+        DataTypeImpl.inferDataTypeFrom(trace, a1type, ReflectionUtils.getRawClass(a1type), types, true);
+        DataTypeImpl.inferDataTypeFrom(trace, a2type, ReflectionUtils.getRawClass(a2type), types, true);
+        DataTypeImpl.inferDataTypeFrom(trace, a3type, ReflectionUtils.getRawClass(a3type), types, true);
         return;
       }
     }
@@ -1122,13 +1113,15 @@ public class DataTypeImpl {
    *
    * @param  mgr the non-<code>null</code> statement manager
    * @param  field the field from which to infer the data type
+   * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+   *         otherwise
    * @return a non-<code>null</code> data type definition
    * @throws NullPointerException if <code>field</code> is <code>null</code>
    * @throws IllegalArgumentException if the data type cannot be inferred from
    *         the field or it is persisted but the persister cannot be instantiate
    */
   public static Definition inferDataTypeFrom(
-    StatementManagerImpl mgr, Field field
+    StatementManagerImpl mgr, Field field, boolean isFrozen
   ) {
     org.apache.commons.lang3.Validate.notNull(field, "invalid null field");
     final Column.Data cdata = field.getAnnotation(Column.Data.class);
@@ -1142,7 +1135,7 @@ public class DataTypeImpl {
       if (!atypes.isEmpty() && (type == DataType.INFERRED)) {
         // we have an inferred type for the collection or tuple so calculate as
         // if it was all inferred and extract only the part we need
-        DataTypeImpl.inferDataTypeFrom(field, field.getType(), itypes);
+        DataTypeImpl.inferDataTypeFrom(field, field.getType(), itypes, isFrozen);
         org.apache.commons.lang3.Validate.isTrue(
           itypes.get(0) instanceof DataType,
           "missing data type value in field: %s.%s",
@@ -1184,12 +1177,11 @@ public class DataTypeImpl {
           );
         }
         if (type.NUM_ARGUMENTS != 0) {
-          DataTypeImpl.freezeAllCollectionArguments(atypes);
           if (DataTypeImpl.anyArgumentsInferred(atypes)) {
             // we have an inferred part for the collection/tuple so calculate as
             // if it was all inferred and extract only the part we need
             if (itypes.isEmpty()) { // only do it if not already done!!!
-              DataTypeImpl.inferDataTypeFrom(field, field.getType(), itypes);
+              DataTypeImpl.inferDataTypeFrom(field, field.getType(), itypes, isFrozen);
             }
             for (int i = 0; i < atypes.size(); i++) {
               if (atypes.get(i) == DataType.INFERRED) {
@@ -1199,7 +1191,7 @@ public class DataTypeImpl {
           }
         }
         // TODO: should probably check that the CQL specified matches a supported class for it
-        return new Definition(mgr, type, atypes);
+        return new Definition(mgr, type, atypes, isFrozen);
       } // else - the type was either not inferred
       // only type supported here is either INFERRED which falls through as if
       // no data type specified or BLOB
@@ -1216,8 +1208,8 @@ public class DataTypeImpl {
     } // else - no Column.Data specified so infer completely
     final List<CQLDataType> types = new ArrayList<>(3);
 
-    DataTypeImpl.inferDataTypeFrom(field, field.getType(), types);
-    return new Definition(mgr, types);
+    DataTypeImpl.inferDataTypeFrom(field, field.getType(), types, isFrozen);
+    return new Definition(mgr, types, isFrozen);
   }
 
   /**
@@ -1227,6 +1219,8 @@ public class DataTypeImpl {
    *
    * @param  mgr the non-<code>null</code> statement manager
    * @param  type the collection type being inferred
+   * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+   *         otherwise
    * @param  clazz the class from which to infer the data type of its superclass
    * @return a non-<code>null</code> data type definition
    * @throws NullPointerException if <code>type</code> or <code>clazz</code> is
@@ -1235,7 +1229,7 @@ public class DataTypeImpl {
    *         from the superclass or the specified type is not a collection data type
    */
   public static Definition inferDataTypeFrom(
-    StatementManagerImpl mgr, DataType type, Class<?> clazz
+    StatementManagerImpl mgr, DataType type, boolean isFrozen, Class<?> clazz
   ) {
     org.apache.commons.lang3.Validate.notNull(type, "invalid null type");
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
@@ -1273,13 +1267,12 @@ public class DataTypeImpl {
         );
       }
       if (type.NUM_ARGUMENTS != 0) {
-        DataTypeImpl.freezeAllCollectionArguments(atypes);
         if (DataTypeImpl.anyArgumentsInferred(atypes)) {
           // we have an inferred part for the collection so calculate as
           // if it was all inferred and extract only the part we need
           final List<CQLDataType> types = new ArrayList<>(3);
 
-          DataTypeImpl.inferDataTypeFrom(clazz, types);
+          DataTypeImpl.inferDataTypeFrom(clazz, types, isFrozen);
           for (int i = 0; i < atypes.size(); i++) {
             if (atypes.get(i) == DataType.INFERRED) {
               atypes.set(i, types.get(i + 1)); // since index 1 corresponds to the collection type
@@ -1287,13 +1280,13 @@ public class DataTypeImpl {
           }
         }
       }
-      return new Definition(mgr, type, atypes);
+      return new Definition(mgr, type, atypes, isFrozen);
     }
     // if we get here then the type was either not inferred or there was no
     // UDTEntity.Data annotation
     final List<CQLDataType> types = new ArrayList<>(3);
 
-    DataTypeImpl.inferDataTypeFrom(clazz, types);
-    return new Definition(mgr, types);
+    DataTypeImpl.inferDataTypeFrom(clazz, types, isFrozen);
+    return new Definition(mgr, types, isFrozen);
   }
 }

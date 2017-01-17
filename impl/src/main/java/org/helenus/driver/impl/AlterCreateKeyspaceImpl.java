@@ -22,6 +22,7 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.SimpleStatement;
 
 import org.helenus.driver.StatementBridge;
+import org.helenus.driver.impl.WithOptionsImpl.ReplicationWithImpl;
 
 /**
  * The <code>AlterCreateKeyspaceImpl</code> class defines a ALTER KEYSPACE or a
@@ -81,14 +82,14 @@ public class AlterCreateKeyspaceImpl<T> extends CreateKeyspaceImpl<T> {
 
     builder.append("ALTER KEYSPACE ");
     Utils.appendName(builder, getKeyspace());
-    KeyspaceWithImpl.ReplicationWithImpl replication = with.replication;
+    ReplicationWithImpl replication = with.replication;
 
     if (replication == null) { // default to POJO's details
-      replication = new KeyspaceWithImpl.ReplicationWithImpl(
+      replication = new ReplicationWithImpl(
         getContext().getClassInfo(), mgr
       );
     }
-    final List<KeyspaceWithImpl> options = new ArrayList<>(with.options.size() + 1);
+    final List<WithOptionsImpl> options = new ArrayList<>(with.options.size() + 1);
 
     options.add(replication);
     options.addAll(with.options);

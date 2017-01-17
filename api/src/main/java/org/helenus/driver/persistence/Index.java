@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.helenus.annotation.Keyable;
  * The <code>Index</code> annotation provides a way to annotate a {@link Column}
  * annotated field or property such that an index will be created for it.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -41,6 +41,27 @@ import org.helenus.annotation.Keyable;
 @Keyable("table")
 @Documented
 public @interface Index {
+  /**
+   * Constant for SASI indexes.
+   *
+   * @author paouelle
+   */
+  public final static String SASI = "org.apache.cassandra.index.sasi.SASIIndex";
+
+  /**
+   * Constant for SASI CONTAINS indexes.
+   *
+   * @author paouelle
+   */
+  public final static String CONTAINS_MODE = "CONTAINS";
+
+  /**
+   * Constant for SASI SPARSE indexes.
+   *
+   * @author paouelle
+   */
+  public final static String SPARSE_MODE = "SPARSE";
+
   /**
    * The name of the table as defined in {@link Table#name} this index is
    * associated with.
@@ -65,11 +86,20 @@ public @interface Index {
   String name() default "";
 
   /**
-   * Specified a custom indexing class.
+   * Specifies a custom indexing class.
    *
    * @author paouelle
    *
    * @return the custom indexing class
    */
   String customClass() default "";
+
+  /**
+   * Specifies options for the index.
+   *
+   * @author paouelle
+   *
+   * @return the options for this index
+   */
+  String options() default "";
 }

@@ -159,7 +159,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   private final boolean mandatory;
 
   /**
-   * Index annotation for the field if any..
+   * Index annotation for the field if any.
    *
    * @author paouelle
    */
@@ -496,7 +496,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
     }
     if (isColumn()) {
-      this.definition = DataTypeImpl.inferDataTypeFrom(mgr, field);
+      this.definition = DataTypeImpl.inferDataTypeFrom(mgr, field, column.isFrozen());
       this.codec = definition.getCodec(
         field,
         isMandatory() || isPartitionKey() || isClusteringKey(),
@@ -741,6 +741,10 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
         return getName();
       }
       @Override
+      public boolean isFrozen() {
+        return false;
+      }
+      @Override
       public boolean isStatic() {
         return false;
       }
@@ -752,7 +756,7 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.clusteringKey = null;
     this.typeKey = null;
     this.multiKeyType = null;
-    this.definition = DataTypeImpl.inferDataTypeFrom(mgr, type, clazz);
+    this.definition = DataTypeImpl.inferDataTypeFrom(mgr, type, column.isFrozen(), clazz);
     this.codec = definition.getCodec(clazz, cinfo.mgr.getCodecRegistry());
     this.getters = new HashMap<>(6);
     this.setters = new HashMap<>(6);

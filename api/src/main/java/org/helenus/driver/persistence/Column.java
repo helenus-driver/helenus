@@ -91,6 +91,17 @@ public @interface Column {
   String name();
 
   /**
+   * Flag indicating if the column should be frozen.
+   * <p>
+   * <i>Note:</i> Only applies to collection-based columns.
+   *
+   * @author paouelle
+   *
+   * @return a flag indicating if the column should be frozen
+   */
+  boolean isFrozen() default false;
+
+  /**
    * Flag indicating if the column should be a static column. A static column is
    * common to all clustered rows of a given partition.
    * <p>
@@ -190,14 +201,12 @@ public @interface Column {
     /**
      * Optionally indicates the argument types for a collection or a tuple type.
      * <p>
-     * Only used when {@link DataType#LIST}, {@link DataType#FROZEN_LIST},
-     * {@link DataType#SET}, {@link DataType#FROZEN_SET}, {@link DataType#ORDERED_SET},
-     * {@link DataType#FROZEN_ORDERED_SET}, {@link DataType#SORTED_SET},
-     * {@link DataType#FROZEN_SORTED_SET}, {@link DataType#MAP},
-     * {@link DataType#FROZEN_MAP}, {@link DataType#SORTED_MAP},
-     * {@link DataType#FROZEN_SORTED_MAP}, {@link DataType#TUPLE} is defined as
-     * {@link #type}. If set to collection types, it must be set to the frozen
-     * versions otherwise it will automatically be set to their frozen counterparts.
+     * Only used when {@link DataType#LIST}, {@link DataType#SET},
+     * {@link DataType#ORDERED_SET}, {@link DataType#SORTED_SET},
+     * {@link DataType#MAP}, {@link DataType#SORTED_MAP},
+     * {@link DataType#TUPLE} is defined as {@link #type}.
+     * <p>
+     * <i>Note:</i> All internal collections will automatically be frozen.
      *
      * @author paouelle
      *

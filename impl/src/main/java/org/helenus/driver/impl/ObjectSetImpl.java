@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -33,6 +34,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import org.helenus.driver.ObjectNotFoundException;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.StatementManager;
+import org.helenus.driver.TooManyMatchesFoundException;
 
 /**
  * The <code>ObjectSetImpl</code> class extends on Cassandra's
@@ -62,6 +64,13 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    * @author paouelle
    */
   private final com.datastax.driver.core.ResultSet result;
+
+  /**
+   * Holds the filter to apply.
+   *
+   * @author paouelle
+   */
+  private volatile Predicate<? super T> filter = t -> true;
 
   /**
    * Holds the next object to be returned.
@@ -121,7 +130,11 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
     // get's further filtered by the context (e.g. it is an object of a different
     // type than requested)
     while ((next == null) && !result.isExhausted()) {
-      this.next = context.getObject(result.one());
+      final T n = context.getObject(result.one());
+
+      if (filter.test(n)) {
+        this.next = n;
+      }
     }
     return next == null;
   }
@@ -169,6 +182,40 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
    *
    * @author paouelle
    *
+   * @see org.helenus.driver.ObjectSet#onlyOneRequired()
+   */
+  @Override
+  public T onlyOneRequired() {
+    final T next = oneRequired();
+
+    if (one() != null) {
+      throw new TooManyMatchesFoundException(
+        context.getObjectClass(),
+        "only one object was required, more than one found"
+      );
+    }
+    return next;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.ObjectSet#filter(java.util.function.Predicate)
+   */
+  @Override
+  public ObjectSet<T> filter(Predicate<? super T> filter) {
+    org.apache.commons.lang3.Validate.notNull(filter, "invalid null filter");
+    this.filter = filter;
+    return this;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
    * @see org.helenus.driver.ObjectSet#stream()
    */
   @Override
@@ -199,7 +246,7 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
     for (final Row row: rows) {
       final T obj = context.getObject(row);
 
-      if (obj != null) {
+      if ((obj != null) && filter.test(obj)) {
         ts.add(obj);
       }
     }
@@ -230,7 +277,11 @@ public class ObjectSetImpl<T> implements ObjectSet<T> {
           this.next = next;
         } else {
           while ((this.next == null) && i.hasNext()) { // skip over all invalid type result
-            this.next = context.getObject(i.next());
+            final T n = context.getObject(i.next());
+
+            if (filter.test(n)) {
+              this.next = n;
+            }
           }
         }
         return this.next != null;

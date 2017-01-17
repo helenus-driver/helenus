@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,50 +30,50 @@ import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.ParseUtils;
 import com.datastax.driver.core.TypeCodec;
 
-import org.helenus.driver.KeyspaceWith;
+import org.helenus.driver.WithOptions;
 import org.helenus.driver.codecs.provider.VarCharCodecProvider;
 import org.helenus.driver.persistence.Keyspace;
 import org.helenus.driver.persistence.StrategyClass;
 
 /**
- * The <code>KeyspaceWithImpl</code> class defines options to be used when
- * creating keyspaces.
+ * The <code>WithOptionsImpl</code> class defines options to be used when
+ * creating indexes.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
- * @version 1 - Jan 19, 2015 - paouelle - Creation
+ * @version 1 - Jan 17, 2017 - paouelle - Creation
  *
  * @since 1.0
  */
-public class KeyspaceWithImpl
+public class WithOptionsImpl
   extends Utils.Appendeable
-  implements KeyspaceWith {
+  implements WithOptions {
   /**
-   * Holds the name for this option.
+   * Holds the name for the options.
    *
    * @author paouelle
    */
   private final String name;
 
   /**
-   * Holds the value for the option.
+   * Holds the value for the options.
    *
    * @author paouelle
    */
   private final Object value;
 
   /**
-   * Instantiates a new <code>KeyspaceWithImpl</code> object.
+   * Instantiates a new <code>WithOptionsImpl</code> object.
    *
    * @author paouelle
    *
-   * @param  name the name of the option
+   * @param  name the name for the option
    * @param  value the option's value
-   * @throws NullPointerException if <code>name</code> or <code>value</code>
-   *         is <code>null</code>
+   * @throws NullPointerException if <code>name</code> or <code>value</code> is
+   *         <code>null</code>
    */
-  public KeyspaceWithImpl(String name, Object value) {
+  public WithOptionsImpl(String name, Object value) {
     org.apache.commons.lang3.Validate.notNull(name, "invalid null name");
     org.apache.commons.lang3.Validate.notNull(value, "invalid null value");
     this.name = name;
@@ -145,14 +145,14 @@ public class KeyspaceWithImpl
    * The <code>ReplicationWithImpl</code> class defines the "REPLICATION"
    * option for the "CREATE KEYSPACE" statement.
    *
-   * @copyright 2015-2015 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 19, 2015 - paouelle - Creation
    *
    * @since 1.0
    */
-  public static class ReplicationWithImpl extends KeyspaceWithImpl {
+  public static class ReplicationWithImpl extends WithOptionsImpl {
     /**
      * Computes the replication properties from the specified @Keyspace
      * annotation.

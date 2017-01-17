@@ -42,9 +42,13 @@ public class DataTypeParser extends DataTypeClassNameParser {
    *
    * @param  mgr the non-<code>null</code> statement manager
    * @param  t the data type to convert
+   * @param  isFrozen <code>true</code> if the data type is frozen; <code>false</code>
+   *         otherwise
    * @return the corresponding CQL data type
    */
-  private static CQLDataType toCQL(StatementManagerImpl mgr, DataType t) {
+  private static CQLDataType toCQL(
+    StatementManagerImpl mgr, DataType t, boolean isFrozen
+  ) {
     if (t instanceof UserType) {
       final UserType ut = (UserType)t;
 
@@ -150,7 +154,7 @@ public class DataTypeParser extends DataTypeClassNameParser {
         @Override
         public String toCQL() {
           return tt.getComponentTypes().stream()
-            .map(ct -> DataTypeParser.toCQL(mgr, ct).toCQL())
+            .map(ct -> DataTypeParser.toCQL(mgr, ct, true).toCQL())
             .collect(Collectors.joining(",", "frozen<tuple<", ">>"));
         }
       };
@@ -159,8 +163,9 @@ public class DataTypeParser extends DataTypeClassNameParser {
       mgr,
       org.helenus.driver.persistence.DataType.valueOf(t.getName().name()),
       t.getTypeArguments().stream()
-        .map(ta -> DataTypeParser.toCQL(mgr, ta))
-        .collect(Collectors.toList())
+        .map(ta -> DataTypeParser.toCQL(mgr, ta, true))
+        .collect(Collectors.toList()),
+      isFrozen
     );
   }
 
@@ -182,7 +187,8 @@ public class DataTypeParser extends DataTypeClassNameParser {
         validator,
         mgr.getProtocolVersion(),
         mgr.getCodecRegistry()
-      )
+      ),
+      DataTypeClassNameParser.isFrozen(validator)
     );
   }
 
@@ -198,8 +204,13 @@ public class DataTypeParser extends DataTypeClassNameParser {
   public static CQLDataType typeToCQL(
     StatementManagerImpl mgr, String type
   ) {
+    final boolean isFrozen;
+
     if (type.startsWith("org.apache.cassandra.db.marshal.FrozenType(")) {
       type = type.substring(43, type.length() - 1);
+      isFrozen = true;
+    } else {
+      isFrozen = false;
     }
     return DataTypeParser.toCQL(
       mgr,
@@ -207,7 +218,8 @@ public class DataTypeParser extends DataTypeClassNameParser {
         type,
         mgr.getProtocolVersion(),
         mgr.getCodecRegistry()
-      )
+      ),
+      isFrozen
     );
   }
 

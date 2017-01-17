@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -41,6 +42,7 @@ import org.helenus.driver.ObjectNotFoundException;
 import org.helenus.driver.ObjectSet;
 import org.helenus.driver.ObjectSetFuture;
 import org.helenus.driver.StatementManager;
+import org.helenus.driver.TooManyMatchesFoundException;
 
 /**
  * The <code>CompoundObjectSetFuture</code> class defines an object set which is
@@ -333,6 +335,13 @@ public class CompoundObjectSetFuture<T>
     private final List<ObjectSet<T>> objects;
 
     /**
+     * Holds the filter to apply.
+     *
+     * @author paouelle
+     */
+    private volatile Predicate<? super T> filter = t -> true;
+
+    /**
      * Holds the current object set from which to retrieve objects.
      *
      * @author paouelle
@@ -412,10 +421,14 @@ public class CompoundObjectSetFuture<T>
      */
     @Override
     public T one() {
-      if (isExhausted()) {
-        return null;
+      while (!isExhausted()) {
+        final T n = objects.get(i).one();
+
+        if (filter.test(n)) {
+          return n;
+        }
       }
-      return objects.get(i).one();
+      return null;
     }
 
     /**
@@ -427,13 +440,51 @@ public class CompoundObjectSetFuture<T>
      */
     @Override
     public T oneRequired() {
-      if (isExhausted()) {
-        throw new ObjectNotFoundException(
+      while (!isExhausted()) {
+        final T n = objects.get(i).oneRequired();
+
+        if (filter.test(n)) {
+          return n;
+        }
+      }
+      throw new ObjectNotFoundException(
+        context.getObjectClass(),
+        "one object was required; none found"
+      );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.ObjectSet#onlyOneRequired()
+     */
+    @Override
+    public T onlyOneRequired() {
+      final T next = oneRequired();
+
+      if (one() != null) {
+        throw new TooManyMatchesFoundException(
           context.getObjectClass(),
-          "one object was required; none found"
+          "only one object was required, more than one found"
         );
       }
-      return objects.get(i).oneRequired();
+      return next;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @author paouelle
+     *
+     * @see org.helenus.driver.ObjectSet#filter(java.util.function.Predicate)
+     */
+    @Override
+    public ObjectSet<T> filter(Predicate<? super T> filter) {
+      org.apache.commons.lang3.Validate.notNull(filter, "invalid null filter");
+      this.filter = filter;
+      return this;
     }
 
     /**
@@ -469,7 +520,9 @@ public class CompoundObjectSetFuture<T>
       final List<T> objs = new ArrayList<>(objects.get(i).all());
 
       while (!isExhausted()) {
-        objs.addAll(objects.get(i).all());
+        objects.get(i).all().stream()
+          .filter(filter)
+          .forEach(t -> objs.add(t));
       }
       return objs;
     }
@@ -484,17 +537,33 @@ public class CompoundObjectSetFuture<T>
     @Override
     public Iterator<T> iterator() {
       return new Iterator<T>() {
+        private T next = null;
+
+        @SuppressWarnings("synthetic-access")
         @Override
         public boolean hasNext() {
-          return !isExhausted();
+          if (next != null) {
+            return true;
+          }
+          while (!isExhausted()) {
+            final T n = objects.get(i).one();
+
+            if (filter.test(n)) {
+              this.next = n;
+              return true;
+            }
+          }
+          return false;
         }
-        @SuppressWarnings("synthetic-access")
         @Override
         public T next() {
           if (isExhausted()) {
             throw new NoSuchElementException();
           }
-          return objects.get(i).one();
+          final T next = this.next;
+
+          this.next = null;
+          return next;
         }
       };
     }

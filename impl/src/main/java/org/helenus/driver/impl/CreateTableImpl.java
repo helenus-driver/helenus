@@ -28,8 +28,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.helenus.driver.Clause;
 import org.helenus.driver.CreateTable;
 import org.helenus.driver.StatementBridge;
-import org.helenus.driver.TableWith;
 import org.helenus.driver.VoidFuture;
+import org.helenus.driver.WithOptions;
 import org.helenus.driver.persistence.Ordering;
 
 /**
@@ -312,10 +312,10 @@ public class CreateTableImpl<T>
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.CreateTable#with(org.helenus.driver.TableWith)
+   * @see org.helenus.driver.CreateTable#with(org.helenus.driver.WithOptions)
    */
   @Override
-  public Options<T> with(TableWith option) {
+  public Options<T> with(WithOptions option) {
     return with.and(option);
   }
 
@@ -376,7 +376,7 @@ public class CreateTableImpl<T>
      *
      * @author paouelle
      */
-    private final List<TableWithImpl> options = new ArrayList<>(8);
+    private final List<WithOptionsImpl> options = new ArrayList<>(8);
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -395,17 +395,17 @@ public class CreateTableImpl<T>
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.CreateTable.Options#and(org.helenus.driver.TableWith)
+     * @see org.helenus.driver.CreateTable.Options#and(org.helenus.driver.WithOptions)
      */
     @Override
-    public Options<T> and(TableWith option) {
+    public Options<T> and(WithOptions option) {
       org.apache.commons.lang3.Validate.notNull(option, "invalid null with");
       org.apache.commons.lang3.Validate.isTrue(
-        option instanceof TableWithImpl,
+        option instanceof WithOptionsImpl,
         "unsupported class of withs: %s",
         option.getClass().getName()
       );
-      options.add((TableWithImpl)option);
+      options.add((WithOptionsImpl)option);
       setDirty();
       return this;
     }

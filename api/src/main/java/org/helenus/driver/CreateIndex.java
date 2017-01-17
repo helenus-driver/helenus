@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import org.helenus.driver.info.ClassInfo;
  * The <code>CreateTable</code> interface provides support for the
  * CREATE INDEX statement for a POJO.
  *
- * @copyright 2015-2016 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author  The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -61,9 +61,22 @@ public interface CreateIndex<T>
    *
    * @author paouelle
    *
-   * @return this CREATE INDEX statement.
+   * @return this CREATE INDEX statement
    */
   public CreateIndex<T> ifNotExists();
+
+  /**
+   * Adds a WITH option to this statement.
+   * <p>
+   * This is a shorter/more readable version for {@code with().and(option)}.
+   *
+   * @author paouelle
+   *
+   * @param  option the option to add
+   * @return this CREATE INDEX statement
+   * @throws NullPointerException if <code>option</code> is <code>null</code>
+   */
+  public CreateIndex<T> with(WithOptions option);
 
   /**
    * Adds a WHERE clause to this statement used to specify keyspace key types
@@ -158,7 +171,7 @@ public interface CreateIndex<T>
    * INDEX statement which can be used to specify keyspace key types used for the
    * keyspace name.
    *
-   * @copyright 2015-2016 The Helenus Driver Project Authors
+   * @copyright 2015-2017 The Helenus Driver Project Authors
    *
    * @author  The Helenus Driver Project Authors
    * @version 1 - Jan 15, 2015 - paouelle - Creation
