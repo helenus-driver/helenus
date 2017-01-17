@@ -557,7 +557,7 @@ public class CompoundObjectSetFuture<T>
         }
         @Override
         public T next() {
-          if (isExhausted()) {
+          if (!hasNext()) {
             throw new NoSuchElementException();
           }
           final T next = this.next;
