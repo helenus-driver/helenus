@@ -514,7 +514,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
   /**
    * Whether this statement is idempotent, i.e. whether it can be applied
    * multiple times without changing the result beyond the initial application.
-   * <p/>
+   * <p>
    * If a statement is <em>not idempotent</em>, the driver will ensure that it
    * never gets executed more than once, which means:
    * <ul>
@@ -524,10 +524,10 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    * </ul>
    * (this behavior is implemented in the driver internals, the corresponding
    * policies will not even be invoked).
-   * <p/>
+   * <p>
    * Note that this method can return {@code null}, in which case the driver
    * will default to {@link QueryOptions#getDefaultIdempotence()}.
-   * <p/>
+   * <p>
    * By default, this method returns {@code null} for all statements, except for
    * <ul>
    * <li>{@link BuiltStatement} - value will be inferred from the query: if it
@@ -547,7 +547,7 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    * </ul>
    * In all cases, calling {@link #setIdempotent(boolean)} forces a value that
    * overrides calculated value.
-   * <p/>
+   * <p>
    * Note that when a statement is prepared ({@link Session#prepare(String)}),
    * its idempotence flag will be propagated to all {@link PreparedStatement}s
    * created from it.
@@ -562,6 +562,8 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    *
    * @author paouelle
    *
+   * @param <U> type of user data
+   *
    * @return the user-defined data attached to this statement or <code>null</code>
    *         if none
    */
@@ -571,6 +573,8 @@ public interface GenericStatement<R, F extends ListenableFuture<R>> {
    * Attaches user-defined data to this statement.
    *
    * @author paouelle
+   *
+   * @param <U> type of user data
    *
    * @param data the user-defined data to attach to this statement
    */

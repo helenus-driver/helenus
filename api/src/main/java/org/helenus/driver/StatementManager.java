@@ -1954,7 +1954,7 @@ public abstract class StatementManager {
 
   /**
    * Gets the {@link CodecRegistry} instance associated with the Cassandra cluster.
-   * <p/>
+   * <p>
    * <i>Note:</i> This method could return {@link CodecRegistry#DEFAULT_INSTANCE}
    * if no specific codec registry has been set on the {@link Cluster}. In this
    * case, care should be taken when registering new codecs as they would be

@@ -37,6 +37,8 @@ public interface CodecProvider {
    *
    * @author paouelle
    *
+   * @param <T> the type of objects to accept
+   *
    * @param  clazz the non-<code>null</code> class the codec should accept
    * @return a suitable codec
    * @throws CodecNotFoundException if a suitable codec cannot be found

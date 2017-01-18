@@ -329,7 +329,7 @@ public interface Select<T> extends ObjectClassStatement<T> {
 
     /**
      * Selects the provided raw expression.
-     * <p/>
+     * <p>
      * The provided string will be appended to the query as-is, without any form
      * of escaping or quoting.
      *

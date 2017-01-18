@@ -456,6 +456,8 @@ public enum DataType implements CQLDataType {
    *
    * @author paouelle
    *
+   * @param <T> the type of objects to decode
+   *
    * @param  clazz the class the codec should accept
    * @return a suitable codec
    * @throws NullPointerException if <code>clazz</code> is <code>null</code>
