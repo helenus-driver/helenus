@@ -256,7 +256,7 @@ public class CreateTableImpl<T>
     if (!with.options.isEmpty() ) {
       builder.append(withAdded ? " AND " : " WITH ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", with.options, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", with.options, null
       );
     }
     builder.append(';');

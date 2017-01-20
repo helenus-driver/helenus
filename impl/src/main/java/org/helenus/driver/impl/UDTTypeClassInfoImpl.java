@@ -17,6 +17,8 @@ package org.helenus.driver.impl;
 
 import java.lang.reflect.Modifier;
 
+import java.util.Map;
+
 import com.datastax.driver.core.UDTValue;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
@@ -228,6 +230,26 @@ public class UDTTypeClassInfoImpl<T>
     }
     // create as an instance of this type (ignore any type column persisted - in fact there should be none)
     final T t = super.getObject(uval);
+
+    // set the type key manually
+    getTableImpl().getTypeKey().ifPresent(f -> f.setValue(t, getType()));
+    return t;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.UDTClassInfoImpl#getObject(java.lang.String, java.util.Map)
+   */
+  @Override
+  public T getObject(String keyspace, Map<String, String> values) {
+    if (values == null) {
+      return null;
+    }
+    // create as an instance of this type (ignore any type column persisted - in fact there should be none)
+    final T t = super.getObject(keyspace, values);
 
     // set the type key manually
     getTableImpl().getTypeKey().ifPresent(f -> f.setValue(t, getType()));

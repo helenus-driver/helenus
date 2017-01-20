@@ -43,10 +43,11 @@ public class UserTypeBridge {
    *
    * @param  mgr the statement manager
    * @param  ucinfo the UDT class info for which to instantiate a Cassandra user type
+   * @param  keyspace the keyspace for which to create a user type
    * @return the newly created corresponding Cassandra user type
    */
   public static UserType instantiate(
-    StatementManagerImpl mgr, UDTClassInfoImpl<?> ucinfo
+    StatementManagerImpl mgr, UDTClassInfoImpl<?> ucinfo, String keyspace
   ) {
     final TableInfoImpl<?> table = ucinfo.getTableImpl();
     final List<UserType.Field> fields = new ArrayList<>(table.getColumns().size());
@@ -59,7 +60,7 @@ public class UserTypeBridge {
       fields.add(new UserType.Field(field.getColumnName(), field.getDataType().getDataType()));
     }
     return new UserType(
-      ucinfo.getKeyspace().name(),
+      keyspace,
       ucinfo.getName(),
       fields,
       mgr.getProtocolVersion(),

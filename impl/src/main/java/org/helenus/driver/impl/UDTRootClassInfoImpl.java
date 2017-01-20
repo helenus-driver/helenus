@@ -31,7 +31,6 @@ import org.apache.commons.lang3.tuple.Triple;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.UDTValue;
-import com.datastax.driver.core.UserType;
 
 import org.helenus.driver.ObjectConversionException;
 import org.helenus.driver.info.FieldInfo;
@@ -614,27 +613,50 @@ public class UDTRootClassInfoImpl<T>
     if (uval == null) {
       return null;
     }
-    // get the table for this UDT
-    final TableInfoImpl<T> table = getTableImpl();
-
     // extract the type so we know which object we are creating
-    for (final UserType.Field coldef: uval.getType()) {
-      // find the field in the table for this column
-      final FieldInfoImpl<T> field = table.getColumnImpl(coldef.getName());
+    final FieldInfoImpl<T> field = getTableImpl().getTypeKey().orElse(null);
 
-      if ((field != null) && field.isTypeKey()) { // get the POJO type
-        final String type = Objects.toString(field.decodeValue(uval), null);
-        final UDTTypeClassInfoImpl<? extends T> tcinfo = ntypes.get(type);
+    if (field != null) { // get the POJO type
+      final String type = Objects.toString(field.decodeValue(uval), null);
+      final UDTTypeClassInfoImpl<? extends T> tcinfo = ntypes.get(type);
 
-        if (tcinfo == null) {
-          throw new ObjectConversionException(
-            clazz, uval, "unknown POJO type: " + type
-          );
-        }
-        return tcinfo.getObject(uval, type);
+      if (tcinfo == null) {
+        throw new ObjectConversionException(
+          clazz, uval, "unknown POJO type: " + type
+        );
       }
+      return tcinfo.getObject(uval, type);
     }
     throw new ObjectConversionException(clazz, uval, "missing POJO type column");
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.impl.UDTClassInfoImpl#getObject(java.lang.String, java.util.Map)
+   */
+  @Override
+  public T getObject(String keyspace, Map<String, String> values) {
+    if (values == null) {
+      return null;
+    }
+    // extract the type so we know which object we are creating
+    final FieldInfoImpl<T> field = getTableImpl().getTypeKey().orElse(null);
+
+    if (field != null) { // get the POJO type
+      final String type = values.get(field.getColumnName());
+      final UDTTypeClassInfoImpl<? extends T> tcinfo = ntypes.get(type);
+
+      if (tcinfo == null) {
+        throw new ObjectConversionException(
+          clazz, values, "unknown POJO type: " + type
+        );
+      }
+      return tcinfo.getObject(keyspace, values);
+    }
+    throw new ObjectConversionException(clazz, values, "missing POJO type column");
   }
 
   /**

@@ -318,9 +318,6 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         }
         typeKeyColumn.setValue(field);
         mandatoryAndPrimaryKeyColumns.put(field.getColumnName(), field);
-        if (field.isIndex()) {
-          indexColumns.put(field.getColumnName(), field);
-        }
       }
       final FieldInfoImpl<T> oldc = columns.put(field.getColumnName(), field);
 
@@ -343,6 +340,9 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       }
       if (field.getDataType().isCollection()) {
         this.hasCollectionColumns = true;
+      }
+      if (field.isIndex()) {
+        indexColumns.put(field.getColumnName(), field);
       }
       if (field.isPartitionKey()) {
         lastPartitionKey = field;
@@ -375,9 +375,6 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           caseInsensitiveKeyColumns.put(field.getColumnName(), field);
         }
       } else {
-        if (field.isIndex()) {
-          indexColumns.put(field.getColumnName(), field);
-        }
         if (field.isMandatory()) {
           mandatoryAndPrimaryKeyColumns.put(field.getColumnName(), field);
           nonPrimaryKeyColumns.put(field.getColumnName(), field);
@@ -662,11 +659,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all column/value pairs for the POJO
    * @throws IllegalArgumentException if a mandatory column is missing from the POJO
    */
-  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(T object) {
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+    String keyspace, T object
+  ) {
     final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
       = new LinkedHashMap<>(columns.size());
 
@@ -717,7 +717,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           );
         }
       }
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -727,12 +727,15 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all partition key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
    */
-  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(T object) {
+  Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(
+    String keyspace, T object
+  ) {
     if (table == null) {
       return Collections.emptyMap();
     }
@@ -751,7 +754,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         table.name(),
         clazz.getSimpleName()
       );
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -773,6 +776,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all keyspace key and partition key
    *         column/value pairs for the POJO
@@ -780,7 +784,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(
-    T object
+    String keyspace, T object
   ) {
     if (table == null) {
       return Collections.emptyMap();
@@ -809,7 +813,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         table.name(),
         clazz.getSimpleName()
       );
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -819,13 +823,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all primary key column/value pairs
    *         for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
-    T object
+    String keyspace, T object
   ) {
     if (table == null) {
       return Collections.emptyMap();
@@ -859,7 +864,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + "'"
         );
       }
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -870,6 +875,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @param  pkeys_override a non-<code>null</code> map of primary key values
    *         to use instead of those provided by the object
@@ -878,7 +884,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    * @throws IllegalArgumentException if a column is missing from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
-    T object, Map<String, Object> pkeys_override
+    String keyspace, T object, Map<String, Object> pkeys_override
   ) {
     if (table == null) {
       return Collections.emptyMap();
@@ -916,7 +922,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           + "'"
         );
       }
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -926,6 +932,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all keyspace key and primary key
    *         column/value pairs for the POJO
@@ -933,7 +940,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(
-    T object
+    String keyspace, T object
   ) {
     if (table == null) {
       return Collections.emptyMap();
@@ -962,7 +969,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         table.name(),
         clazz.getSimpleName()
       );
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -973,13 +980,14 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all mandatory and primary key
    *         column/value pairs for the POJO
    * @throws IllegalArgumentException if a column is missing from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getMandatoryAndPrimaryKeyColumnValues(
-    T object
+    String keyspace, T object
   ) {
     final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
       = new LinkedHashMap<>(mandatoryAndPrimaryKeyColumns.size());
@@ -1031,7 +1039,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           );
         }
       }
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -1041,6 +1049,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @return a non-<code>null</code> map of all non primary key column/value
    *         pairs for the POJO
@@ -1048,7 +1057,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getNonPrimaryKeyColumnValues(
-    T object
+    String keyspace, T object
   ) {
     final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
       = new LinkedHashMap<>(nonPrimaryKeyColumns.size());
@@ -1073,7 +1082,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
           name, clazz.getSimpleName()
         );
       }
-      values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+      values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
     }
     return values;
   }
@@ -1083,6 +1092,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @param  name the name of the column to retrieve
    * @return the column value for the POJO
@@ -1090,7 +1100,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         POJO or is mandatory and missing from the POJO
    */
   Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(
-    T object, CharSequence name
+    String keyspace, T object, CharSequence name
   ) {
     final String n;
 
@@ -1161,7 +1171,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
         );
       }
     }
-    return Triple.of(value, field.getDataType(), field.getCodec());
+    return Triple.of(value, field.getDataType(), field.getCodec(keyspace));
   }
 
   /**
@@ -1169,6 +1179,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @param  names the names of the columns to retrieve
    * @return a non-<code>null</code> map of all requested column/value pairs
@@ -1177,7 +1188,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         by the POJO or is mandatory and missing from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
-    T object, Iterable<CharSequence> names
+    String keyspace, T object, Iterable<CharSequence> names
   ) {
     final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
       = new LinkedHashMap<>(columns.size());
@@ -1190,7 +1201,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       } else {
         n = name.toString();
       }
-      values.put(n, getColumnValue(object, n));
+      values.put(n, getColumnValue(keyspace, object, n));
     }
     return values;
   }
@@ -1200,6 +1211,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *
    * @author paouelle
    *
+   * @param  keyspace the keyspace for which to encode
    * @param  object the non-<code>null</code> POJO object
    * @param  names the names of the columns to retrieve
    * @return a non-<code>null</code> map of all requested column/value pairs
@@ -1208,7 +1220,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
    *         by the POJO or is mandatory and missing from the POJO
    */
   Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
-    T object, CharSequence... names
+    String keyspace, T object, CharSequence... names
   ) {
     final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
       = new LinkedHashMap<>(columns.size());
@@ -1221,7 +1233,7 @@ public class TableInfoImpl<T> implements TableInfo<T> {
       } else {
         n = name.toString();
       }
-      values.put(n, getColumnValue(object, n));
+      values.put(n, getColumnValue(keyspace, object, n));
     }
     return values;
   }

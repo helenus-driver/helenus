@@ -458,12 +458,16 @@ public enum DataType implements CQLDataType {
    *
    * @param <T> the type of objects to decode
    *
+   * @param  keyspace the keyspace for which to get a codec
    * @param  clazz the class the codec should accept
    * @return a suitable codec
-   * @throws NullPointerException if <code>clazz</code> is <code>null</code>
+   * @throws NullPointerException if <code>keyspace</code> or <code>clazz</code>
+   *         is <code>null</code>
    * @throws CodecNotFoundException if a suitable codec cannot be found
    */
-  public <T> TypeCodec<T> codecFor(Class<T> clazz) throws CodecNotFoundException {
+  public <T> TypeCodec<T> codecFor(String keyspace, Class<T> clazz)
+    throws CodecNotFoundException {
+    org.apache.commons.lang3.Validate.notNull(keyspace, "invalid null keyspace");
     org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
     if (provider == null) {
       throw new CodecNotFoundException(

@@ -363,7 +363,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getColumnValues(object);
+      return table.getColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -385,7 +385,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getPartitionKeyColumnValues(object);
+      return table.getPartitionKeyColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -408,7 +408,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so return keyspace keys only
         return getKeyspaceKeyValues();
       }
-      return table.getKeyspaceAndPartitionKeyColumnValues(object);
+      return table.getKeyspaceAndPartitionKeyColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -430,7 +430,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getPrimaryKeyColumnValues(object);
+      return table.getPrimaryKeyColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -455,7 +455,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getPrimaryKeyColumnValues(object, pkeys_override);
+      return table.getPrimaryKeyColumnValues(getKeyspace(), object, pkeys_override);
     }
 
     /**
@@ -470,6 +470,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
     public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceKeyValues() {
       final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> values
         = new LinkedHashMap<>(keyspaceKeys.size());
+      final String keyspace = getKeyspace();
 
       for (final Map.Entry<String, FieldInfoImpl<T>> e: getKeyspaceKeys().entrySet()) {
         final String name = e.getKey();
@@ -479,7 +480,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
         org.apache.commons.lang3.Validate.isTrue(
           value != null, "missing keyspace key '%s'", name
         );
-        values.put(name, Triple.of(value, field.getDataType(), field.getCodec()));
+        values.put(name, Triple.of(value, field.getDataType(), field.getCodec(keyspace)));
       }
       return values;
     }
@@ -504,7 +505,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so return keyspace keys only
         return getKeyspaceKeyValues();
       }
-      return table.getKeyspaceAndPrimaryKeyColumnValues(object);
+      return table.getKeyspaceAndPrimaryKeyColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -526,7 +527,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getMandatoryAndPrimaryKeyColumnValues(object);
+      return table.getMandatoryAndPrimaryKeyColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -549,7 +550,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getNonPrimaryKeyColumnValues(object);
+      return table.getNonPrimaryKeyColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -572,7 +573,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Triple.of(null, null, null);
       }
-      return table.getColumnValue(object, name);
+      return table.getColumnValue(getKeyspace(), object, name);
     }
 
     /**
@@ -596,7 +597,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getColumnValues(object, names);
+      return table.getColumnValues(getKeyspace(), object, names);
     }
 
     /**
@@ -620,7 +621,7 @@ public class ClassInfoImpl<T> implements ClassInfo<T> {
       if (table == null) { // table not defined so nothing to return
         return Collections.emptyMap();
       }
-      return table.getColumnValues(object, names);
+      return table.getColumnValues(getKeyspace(), object, names);
     }
 
     /**

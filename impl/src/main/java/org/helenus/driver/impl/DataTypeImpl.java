@@ -181,6 +181,7 @@ public class DataTypeImpl {
      * @author paouelle
      *
      * @param  trace a string indicating where the codec is required
+     * @param  keyspace the keyspace for which to get a codec
      * @param  dtype the CQL data type for which to find a codec
      * @param  type the type to decode to
      * @param  mandatory if the field is mandatory or represents a primary key
@@ -191,6 +192,7 @@ public class DataTypeImpl {
     @SuppressWarnings("unchecked")
     private static TypeCodec<?> getBasicCodec(
       String trace,
+      String keyspace,
       CQLDataType dtype,
       Type type,
       boolean mandatory,
@@ -201,7 +203,7 @@ public class DataTypeImpl {
 
       // first check if it is a UDT
       if (dtype instanceof UDTClassInfoImpl) {
-        return ((UDTClassInfoImpl<?>)dtype).getCodec(token, codecRegistry);
+        return ((UDTClassInfoImpl<?>)dtype).getCodec(keyspace);
       }
       try { // next try the codec registry directly
         return codecRegistry.codecFor(dtype.getDataType(), token);
@@ -209,7 +211,7 @@ public class DataTypeImpl {
       } // else - oh well try to get our own codecs from our internal codec providers
       if (dtype instanceof DataType) {
         try {
-          return ((DataType)dtype).codecFor(ReflectionUtils.getRawClass(type));
+          return ((DataType)dtype).codecFor(keyspace, ReflectionUtils.getRawClass(type));
         } catch (CodecNotFoundException e) {
           throw new IllegalArgumentException(
             "unable to find a suitable codec to convert to: "
@@ -234,6 +236,7 @@ public class DataTypeImpl {
      * @author paouelle
      *
      * @param  trace a string indicating where the codec is required
+     * @param  keyspace the keyspace for which to get a codec
      * @param  dtype the CQL data type for which to find a codec
      * @param  type the type to decode to
      * @param  mandatory if the field is mandatory or represents a primary key
@@ -244,15 +247,20 @@ public class DataTypeImpl {
     @SuppressWarnings("unchecked")
     private static TypeCodec<?> getCodec(
       String trace,
+      String keyspace,
       CQLDataType dtype,
       Type type,
       boolean mandatory,
       CodecRegistry codecRegistry
     ) {
       if (dtype instanceof Definition) {
-        return ((Definition)dtype).getCodec(trace, type, mandatory, codecRegistry);
+        return ((Definition)dtype).getCodec(
+          trace, keyspace, type, mandatory, codecRegistry
+        );
       }
-      return Definition.getBasicCodec(trace, dtype, type, mandatory, codecRegistry);
+      return Definition.getBasicCodec(
+        trace, keyspace, dtype, type, mandatory, codecRegistry
+      );
     }
 
     /**
@@ -400,6 +408,7 @@ public class DataTypeImpl {
      * @author paouelle
      *
      * @param  trace a string indicating where the codec is required
+     * @param  keyspace the keyspace for which to get a codec
      * @param  type the type to decode to
      * @param  mandatory if the field is mandatory or represents a primary key
      * @param  codecRegistry the codec registry to use when finding a codec
@@ -408,7 +417,11 @@ public class DataTypeImpl {
      */
     @SuppressWarnings({"synthetic-access", "unchecked", "rawtypes"})
     private TypeCodec<?> getCodec(
-      String trace, Type type, boolean mandatory, CodecRegistry codecRegistry
+      String trace,
+      String keyspace,
+      Type type,
+      boolean mandatory,
+      CodecRegistry codecRegistry
     ) {
       final TypeToken token = TypeToken.of(type);
       final Class<?> clazz = ReflectionUtils.getRawClass(type);
@@ -419,7 +432,7 @@ public class DataTypeImpl {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type atype = ptype.getActualTypeArguments()[0]; // lists will always have 1 argument
             final TypeCodec<?> acodec = Definition.getCodec(
-              trace, arguments.get(0), atype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), atype, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = TypeCodec.list(acodec);
 
@@ -436,7 +449,7 @@ public class DataTypeImpl {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
             final TypeCodec<?> acodec = Definition.getCodec(
-              trace, arguments.get(0), atype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), atype, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = new LinkedHashSetCodec((CollectionType)dtype, token, acodec);
 
@@ -455,7 +468,7 @@ public class DataTypeImpl {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
             final TypeCodec<?> acodec = Definition.getCodec(
-              trace, arguments.get(0), atype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), atype, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = new SortedSetCodec((CollectionType)dtype, token, acodec);
 
@@ -472,7 +485,7 @@ public class DataTypeImpl {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type atype = ptype.getActualTypeArguments()[0]; // sets will always have 1 argument
             final TypeCodec<?> acodec = Definition.getCodec(
-              trace, arguments.get(0), atype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), atype, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = TypeCodec.set(acodec);
 
@@ -491,11 +504,11 @@ public class DataTypeImpl {
             final ParameterizedType ptype = (ParameterizedType)type;
             final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
             final TypeCodec<?> kcodec = Definition.getCodec(
-              trace, arguments.get(0), ktype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), ktype, mandatory, codecRegistry
             );
             final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
             final TypeCodec<?> vcodec = Definition.getCodec(
-              trace, arguments.get(1), vtype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(1), vtype, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = new SortedMapCodec((CollectionType)dtype, token, kcodec, vcodec);
 
@@ -514,11 +527,11 @@ public class DataTypeImpl {
             final Type ktype = ptype.getActualTypeArguments()[0]; // maps will always have 2 arguments
             final Class<?> kclazz = ReflectionUtils.getRawClass(ktype);
             final TypeCodec<?> kcodec = Definition.getCodec(
-              trace, arguments.get(0), ktype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), ktype, mandatory, codecRegistry
             );
             final Type vtype = ptype.getActualTypeArguments()[1]; // maps will always have 2 arguments
             final TypeCodec<?> vcodec = Definition.getCodec(
-              trace, arguments.get(1), vtype, mandatory, codecRegistry
+              trace, keyspace, arguments.get(1), vtype, mandatory, codecRegistry
             );
 
             if (kclazz.isEnum()) {
@@ -554,10 +567,10 @@ public class DataTypeImpl {
             final Type a1type = ptype.getActualTypeArguments()[0]; // pairs will always have 2 arguments
             final Type a2type = ptype.getActualTypeArguments()[1];
             final TypeCodec<?> a1codec = Definition.getCodec(
-              trace, arguments.get(0), a1type, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), a1type, mandatory, codecRegistry
             );
             final TypeCodec<?> a2codec = Definition.getCodec(
-              trace, arguments.get(1), a2type, mandatory, codecRegistry
+              trace, keyspace, arguments.get(1), a2type, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = new PairCodec((TupleType)dtype, token, a1codec, a2codec);
 
@@ -575,13 +588,13 @@ public class DataTypeImpl {
             final Type a2type = ptype.getActualTypeArguments()[1];
             final Type a3type = ptype.getActualTypeArguments()[2];
             final TypeCodec<?> a1codec = Definition.getCodec(
-              trace, arguments.get(0), a1type, mandatory, codecRegistry
+              trace, keyspace, arguments.get(0), a1type, mandatory, codecRegistry
             );
             final TypeCodec<?> a2codec = Definition.getCodec(
-              trace, arguments.get(1), a2type, mandatory, codecRegistry
+              trace, keyspace, arguments.get(1), a2type, mandatory, codecRegistry
             );
             final TypeCodec<?> a3codec = Definition.getCodec(
-              trace, arguments.get(2), a3type, mandatory, codecRegistry
+              trace, keyspace, arguments.get(2), a3type, mandatory, codecRegistry
             );
             final TypeCodec<?> codec = new TripleCodec((TupleType)dtype, token, a1codec, a2codec, a3codec);
 
@@ -595,7 +608,7 @@ public class DataTypeImpl {
           throw new IllegalArgumentException("unable to determine element type for " + trace);
         }
       }
-      return Definition.getBasicCodec(trace, this.type, type, mandatory, codecRegistry);
+      return Definition.getBasicCodec(trace, keyspace, this.type, type, mandatory, codecRegistry);
     }
 
     /**
@@ -760,21 +773,24 @@ public class DataTypeImpl {
      *
      * @author paouelle
      *
+     * @param  keyspace the keyspace for which to get a codec
      * @param  field the field decode to its declared type
      * @param  mandatory if the field is mandatory or represents a primary key
      * @param  codecRegistry the codec registry to use when finding a codec
      * @return a suitable codec for this data type and given field
-     * @throws NullPointerException if <code>field</code> or <code>codecRegistry</code>
-     *         is <code>null</code>
+     * @throws NullPointerException if <code>keyspace</code>, <code>field</code>,
+     *         or <code>codecRegistry</code> is <code>null</code>
      * @throws IllegalArgumentException if the combination of field and data types
      *         is not supported
      */
     public TypeCodec<?> getCodec(
-      Field field, boolean mandatory, CodecRegistry codecRegistry
+      String keyspace, Field field, boolean mandatory, CodecRegistry codecRegistry
     ) {
+      org.apache.commons.lang3.Validate.notNull(keyspace, "invalid null keyspace");
       org.apache.commons.lang3.Validate.notNull(field, "invalid null field");
       return getCodec(
         "field: " + field.getDeclaringClass().getName() + "." + field.getName(),
+        keyspace,
         DataTypeImpl.unwrapOptionalIfPresent(field.getGenericType()),
         mandatory,
         codecRegistry
@@ -786,22 +802,27 @@ public class DataTypeImpl {
      *
      * @author paouelle
      *
+     * @param  keyspace the keyspace for which to get a codec
      * @param  clazz the collection class to decode to its declared super type
      * @param  codecRegistry the codec registry to use when finding a codec
      * @return a suitable codec for this collection data type and given class
-     * @throws NullPointerException if <code>clazz</code> or <code>codecRegistry</code>
-     *         is <code>null</code>
+     * @throws NullPointerException if <code>keyspace</code>, <code>clazz</code>,
+     *         or <code>codecRegistry</code> is <code>null</code>
      * @throws IllegalArgumentException if the combination of class and data types
      *         is not supported
      * @throws IllegalStateException if this definition is not representing a
      *         collection
      */
     @SuppressWarnings("synthetic-access")
-    public TypeCodec<?> getCodec(Class<?> clazz, CodecRegistry codecRegistry) {
+    public TypeCodec<?> getCodec(
+      String keyspace, Class<?> clazz, CodecRegistry codecRegistry
+    ) {
+      org.apache.commons.lang3.Validate.notNull(keyspace, "invalid null keyspace");
       org.apache.commons.lang3.Validate.notNull(clazz, "invalid null class");
       org.apache.commons.lang3.Validate.validState(isCollection(), "not a collection definition");
       return getCodec(
         "class: " + clazz.getName(),
+        keyspace,
         clazz.getGenericSuperclass(),
         true, // mandatory by design
         codecRegistry

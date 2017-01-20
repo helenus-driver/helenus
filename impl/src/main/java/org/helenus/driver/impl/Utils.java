@@ -86,6 +86,7 @@ public abstract class Utils {
   }
 
   public static StringBuilder joinAndAppendWithNoDuplicates(
+    String keyspace,
     TableInfoImpl<?> tinfo,
     TypeCodec<?> codec,
     CodecRegistry codecRegistry,
@@ -100,7 +101,7 @@ public abstract class Utils {
     for (final Appendeable value: values) {
       final StringBuilder vsb = new StringBuilder(10);
 
-      value.appendTo(tinfo, codec, codecRegistry, vsb, variables);
+      value.appendTo(keyspace, tinfo, codec, codecRegistry, vsb, variables);
       final String vs = vsb.toString();
 
       if (done.add(vs)) {
@@ -116,6 +117,7 @@ public abstract class Utils {
   }
 
   public static StringBuilder joinAndAppend(
+    String keyspace,
     TableInfoImpl<?> tinfo,
     TypeCodec<?> codec,
     CodecRegistry codecRegistry,
@@ -132,12 +134,13 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      value.appendTo(tinfo, codec, codecRegistry, sb, variables);
+      value.appendTo(keyspace, tinfo, codec, codecRegistry, sb, variables);
     }
     return sb;
   }
 
   public static StringBuilder joinAndAppend(
+    String keyspace,
     TableInfoImpl<?> tinfo,
     TypeCodec<?> codec,
     CodecRegistry codecRegistry,
@@ -155,7 +158,7 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      value.appendTo(tinfo, codec, codecRegistry, sb, variables);
+      value.appendTo(keyspace, tinfo, codec, codecRegistry, sb, variables);
     }
     for (final Appendeable value: moreValues) {
       if (!first) {
@@ -163,7 +166,7 @@ public abstract class Utils {
       } else {
         first = false;
       }
-      value.appendTo(tinfo, codec, codecRegistry, sb, variables);
+      value.appendTo(keyspace, tinfo, codec, codecRegistry, sb, variables);
     }
     return sb;
   }
@@ -610,6 +613,7 @@ public abstract class Utils {
 
   static abstract class Appendeable {
     abstract void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -744,7 +748,7 @@ public abstract class Utils {
         final FieldInfoImpl<?> finfo = tinfo.getColumnImpl(getColumnName());
 
         if (finfo != null) {
-          codec = finfo.getCodec();
+          codec = finfo.getCodec(null);
           if (codec instanceof ArgumentsCodec) {
             final ArgumentsCodec<?> acodec = (ArgumentsCodec<?>)codec;
 

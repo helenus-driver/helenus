@@ -148,7 +148,7 @@ public class CreateKeyspaceImpl<T>
     options.addAll(with.options);
     builder.append(" WITH ");
     Utils.joinAndAppend(
-      null, null, mgr.getCodecRegistry(), builder, " AND ", options, null
+      getKeyspace(), null, null, mgr.getCodecRegistry(), builder, " AND ", options, null
     );
     builder
       .append(" AND DURABLE_WRITES = ")

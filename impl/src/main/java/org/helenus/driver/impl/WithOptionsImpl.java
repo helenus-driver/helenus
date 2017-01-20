@@ -85,10 +85,11 @@ public class WithOptionsImpl
    *
    * @author paouelle
    *
-   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+   * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
    */
   @Override
   void appendTo(
+    String keyspace,
     TableInfoImpl<?> tinfo,
     TypeCodec<?> codec,
     CodecRegistry codecRegistry,

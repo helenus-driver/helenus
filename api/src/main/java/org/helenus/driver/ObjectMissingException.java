@@ -43,6 +43,18 @@ public class ObjectMissingException extends ObjectConversionException {
    * @author paouelle
    *
    * @param clazz the POJO class we are trying to convert to
+   * @param message the error message
+   */
+  public ObjectMissingException(Class<?> clazz, String message) {
+    super(clazz, message);
+  }
+
+  /**
+   * Instantiates a new <code>ObjectMissingException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
    * @param row the result row we are converting from
    * @param message the error message
    */
@@ -63,6 +75,21 @@ public class ObjectMissingException extends ObjectConversionException {
     Class<?> clazz, UDTValue uval, String message
   ) {
     super(clazz, uval, message);
+  }
+
+  /**
+   * Instantiates a new <code>ObjectMissingException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
+   * @param message the error message
+   * @param cause the exception that caused this error
+   */
+  public ObjectMissingException(
+    Class<?> clazz, String message, Throwable cause
+  ) {
+    super(clazz, message, cause);
   }
 
   /**

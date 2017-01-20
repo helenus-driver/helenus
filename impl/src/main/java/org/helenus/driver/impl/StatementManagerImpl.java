@@ -48,7 +48,9 @@ import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.ResultSetFuture;
+import com.datastax.driver.core.SchemaChangeListenerBase;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.UserType;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -161,7 +163,15 @@ public class StatementManagerImpl extends StatementManager {
    *
    * @author vasu
    */
-  protected final Map<Class<?>, ClassInfoImpl<?>> classInfoCache
+  private final Map<Class<?>, ClassInfoImpl<?>> classInfoCache
+    = new ConcurrentHashMap<>(64);
+
+  /**
+   * Holds the user defined types in the manager keyed by their names.
+   *
+   * @author paouelle
+   */
+  private final Map<String, UDTClassInfoImpl<?>> udts
     = new ConcurrentHashMap<>(64);
 
   /**
@@ -238,6 +248,34 @@ public class StatementManagerImpl extends StatementManager {
         new LinkedBlockingQueue<Runnable>()
       )
     );
+    cluster.register(new SchemaChangeListenerBase() {
+      @Override
+      public void onUserTypeAdded(UserType type) {
+        if (type != null) {
+          @SuppressWarnings("synthetic-access")
+          final UDTClassInfoImpl<?> ucinfo = udts.get(type.getName());
+
+          if (ucinfo != null) {
+            ucinfo.register(type);
+          }
+        }
+      }
+      @Override
+      public void onUserTypeRemoved(UserType type) {
+        if (type != null) {
+          @SuppressWarnings("synthetic-access")
+          final UDTClassInfoImpl<?> ucinfo = udts.get(type.getName());
+
+          if (ucinfo != null) {
+            ucinfo.deregister(type);
+          }
+        }
+      }
+      @Override
+      public void onUserTypeChanged(UserType current, UserType previous) {
+        onUserTypeAdded(current); // handle the same way
+      }
+    });
   }
 
   /**
@@ -1993,7 +2031,38 @@ public class StatementManagerImpl extends StatementManager {
     );
 
     // if someone beat us to it then keep that first one
-    return (old != null) ? old : cinfo;
+    if (old != null) {
+      return old;
+    }
+    if (cinfo instanceof UDTClassInfoImpl) {
+      final UDTClassInfoImpl<T> ucinfo = (UDTClassInfoImpl<T>)cinfo;
+
+      udts.put(ucinfo.getName(), ucinfo);
+    }
+    return cinfo;
+  }
+
+  /**
+   * Clears the cache of pojo class info.
+   *
+   * @author paouelle
+   */
+  protected void clearCache() {
+    classInfoCache.clear();
+    udts.clear();
+  }
+
+  /**
+   * Gets the information for a given POJO class.
+   *
+   * @author paouelle
+   *
+   * @param  clazz the class for which to retrieve its information
+   * @return the corresponding class information or <code>null</code> if none
+   *         defined
+   */
+  protected ClassInfoImpl<?> get(Class<?> clazz) {
+    return classInfoCache.get(clazz);
   }
 
   /**

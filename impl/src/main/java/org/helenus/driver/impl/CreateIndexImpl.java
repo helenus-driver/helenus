@@ -180,7 +180,7 @@ public class CreateIndexImpl<T>
     if (!options.isEmpty()) {
       builder.append(" WITH ");
       Utils.joinAndAppend(
-        null, null, mgr.getCodecRegistry(), builder, " AND ", options, null
+        getKeyspace(), null, null, mgr.getCodecRegistry(), builder, " AND ", options, null
       );
     }
     builder.append(';');

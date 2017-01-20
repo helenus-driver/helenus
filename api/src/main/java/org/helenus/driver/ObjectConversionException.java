@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2015 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import com.datastax.driver.core.UDTValue;
  * The <code>ObjectConversionException</code> exception is thrown when unable
  * to convert a result row into a POJO object.
  *
- * @copyright 2015-2015 The Helenus Driver Project Authors
+ * @copyright 2015-2017 The Helenus Driver Project Authors
  *
  * @author The Helenus Driver Project Authors
  * @version 1 - Jan 15, 2015 - paouelle - Creation
@@ -52,14 +52,21 @@ public class ObjectConversionException extends RuntimeException {
    *
    * @author paouelle
    */
-  private final Row row;
+  private volatile Row row;
 
   /**
    * Holds the Cassandra UDT value we were trying to convert from.
    *
    * @author paouelle
    */
-  private final UDTValue uval;
+  private volatile UDTValue uval;
+
+  /**
+   * Holds the Cassandra values we were trying to convert from.
+   *
+   * @author paouelle
+   */
+  private volatile Map<String, String> values;
 
   /**
    * Holds additional details about the error.
@@ -69,6 +76,18 @@ public class ObjectConversionException extends RuntimeException {
   private volatile Map<String, Object> details = null;
 
   /**
+   * Instantiates a new <code>ObjectConversionException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
+   * @param message the error message
+   */
+  public ObjectConversionException(Class<?> clazz, String message) {
+    this(clazz, message, null);
+  }
+
+ /**
    * Instantiates a new <code>ObjectConversionException</code> object.
    *
    * @author paouelle
@@ -102,6 +121,39 @@ public class ObjectConversionException extends RuntimeException {
    * @author paouelle
    *
    * @param clazz the POJO class we are trying to convert to
+   * @param values the values we are converting from
+   * @param message the error message
+   */
+  public ObjectConversionException(
+    Class<?> clazz, Map<String, String> values, String message
+  ) {
+    this(clazz, values, message, null);
+  }
+
+  /**
+   * Instantiates a new <code>ObjectConversionException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
+   * @param message the error message
+   * @param cause the exception that caused this error
+   */
+  public ObjectConversionException(
+    Class<?> clazz, String message, Throwable cause
+  ) {
+    super(message, cause);
+    this.clazz = clazz;
+    this.row = null;
+    this.uval = null;
+  }
+
+  /**
+   * Instantiates a new <code>ObjectConversionException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
    * @param row the result row we are converting from
    * @param message the error message
    * @param cause the exception that caused this error
@@ -113,6 +165,7 @@ public class ObjectConversionException extends RuntimeException {
     this.clazz = clazz;
     this.row = row;
     this.uval = null;
+    this.values = null;
   }
 
   /**
@@ -132,6 +185,27 @@ public class ObjectConversionException extends RuntimeException {
     this.clazz = clazz;
     this.row = null;
     this.uval = uval;
+    this.values = null;
+  }
+
+  /**
+   * Instantiates a new <code>ObjectConversionException</code> object.
+   *
+   * @author paouelle
+   *
+   * @param clazz the POJO class we are trying to convert to
+   * @param values the values we are converting from
+   * @param message the error message
+   * @param cause the exception that caused this error
+   */
+  public ObjectConversionException(
+    Class<?> clazz, Map<String, String> values, String message, Throwable cause
+  ) {
+    super(message, cause);
+    this.clazz = clazz;
+    this.row = null;
+    this.uval = null;
+    this.values = values;
   }
 
   /**
@@ -151,10 +225,20 @@ public class ObjectConversionException extends RuntimeException {
    * @author paouelle
    *
    * @return the result row we were trying to convert from or <code>null</code>
-   *         if converting a user-defined type
    */
   public Row getRow() {
     return row;
+  }
+
+  /**
+   * Sets the Cassandra result row we were trying to convert from.
+   *
+   * @author paouelle
+   *
+   * @param row the result row we were trying to convert from
+   */
+  public void setRow(Row row) {
+    this.row = row;
   }
 
   /**
@@ -162,11 +246,43 @@ public class ObjectConversionException extends RuntimeException {
    *
    * @author paouelle
    *
-   * @return the UDT value we were trying to convert from or <code>null</code>
-   *         if not converting a user-defined type
+   * @return the UDT value we were trying to convert from
    */
   public UDTValue getUDTValue() {
     return uval;
+  }
+
+  /**
+   * Sets the Cassandra UDT value we were trying to convert from.
+   *
+   * @author paouelle
+   *
+   * @param uval the UDT value we were trying to convert from
+   */
+  public void setUDTValue(UDTValue uval) {
+    this.uval = uval;
+  }
+
+  /**
+   * Gets the formatted values we were trying to convert from.
+   *
+   * @author paouelle
+   *
+   * @return the formatted values we were trying to convert from
+   */
+  public Map<String, String> getValues() {
+    return values;
+  }
+
+  /**
+   * Sets the formatted values we were trying to convert from.
+   *
+   * @author paouelle
+   *
+   * @param values the formatted values we were trying to convert from
+   */
+  public void setValues(Map<String, String> values) {
+    this.values = values;
   }
 
   /**

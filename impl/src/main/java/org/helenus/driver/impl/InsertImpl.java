@@ -215,7 +215,7 @@ public class InsertImpl<T>
           final FieldInfoImpl finfo = table.getColumnImpl(n);
 
           if (finfo != null) {
-            columns.put(n, Triple.of(v, finfo.getDataType(), finfo.getCodec()));
+            columns.put(n, Triple.of(v, finfo.getDataType(), finfo.getCodec(getKeyspace())));
           } else {
             columns.put(n, Triple.of(v, null, null));
           }
@@ -287,7 +287,7 @@ public class InsertImpl<T>
         for (final FieldInfoImpl<T> finfo: multiKeys) {
           columns.put(
             StatementImpl.MK_PREFIX + finfo.getColumnName(),
-            Triple.of(ckeys.get(++j), finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec()).codec(0))
+            Triple.of(ckeys.get(++j), finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec(getKeyspace())).codec(0))
           );
         }
         // finally build the query for this combination
@@ -354,7 +354,7 @@ public class InsertImpl<T>
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
       );
     }
     builders.add(builder);

@@ -352,13 +352,13 @@ public class SelectImpl<T>
     if (!where.clauses.isEmpty()) {
       builder.append(" WHERE ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", where.getClauses(table), null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", where.getClauses(table), null
       );
     }
     if (orderings != null) {
       builder.append(" ORDER BY ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, ",", orderings, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, ",", orderings, null
       );
     }
     if (limit > 0) {

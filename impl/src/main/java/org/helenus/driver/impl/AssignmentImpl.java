@@ -284,10 +284,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -300,7 +301,7 @@ public abstract class AssignmentImpl
 
       Utils.appendValue(
         (definition != null) ? definition : field.getDataType(),
-        (codec != null) ? codec : ((this.codec != null) ? this.codec : field.getCodec()),
+        (codec != null) ? codec : ((this.codec != null) ? this.codec : field.getCodec(keyspace)),
         codecRegistry,
         sb,
         value,
@@ -509,10 +510,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -870,10 +872,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1023,10 +1026,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1040,7 +1044,7 @@ public abstract class AssignmentImpl
       sb.append(nsb).append('=').append(nsb).append(isIncr ? '+' : '-');
       Utils.appendValue(
         finfo.getDataType(),
-        (codec != null) ? codec : finfo.getCodec(),
+        (codec != null) ? codec : finfo.getCodec(keyspace),
         codecRegistry,
         sb,
         value,
@@ -1124,10 +1128,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1141,7 +1146,7 @@ public abstract class AssignmentImpl
       sb.append(nsb).append('=');
       Utils.appendList(
         finfo.getDataType(),
-        (codec != null) ? codec : finfo.getCodec(),
+        (codec != null) ? codec : finfo.getCodec(keyspace),
         codecRegistry,
         sb,
         (List<?>)value,
@@ -1234,10 +1239,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1250,7 +1256,7 @@ public abstract class AssignmentImpl
 
       Utils.appendValue(
         finfo.getDataType().getElementType(),
-        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
         codecRegistry,
         sb,
         value,
@@ -1390,10 +1396,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1407,7 +1414,7 @@ public abstract class AssignmentImpl
       sb.append(nsb).append('=').append(nsb).append(isAdd ? '+' : '-');
       Utils.appendValue(
         finfo.getDataType(),
-        (codec != null) ? codec : finfo.getCodec(),
+        (codec != null) ? codec : finfo.getCodec(keyspace),
         codecRegistry,
         sb,
         collection,
@@ -1516,10 +1523,11 @@ public abstract class AssignmentImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1531,7 +1539,7 @@ public abstract class AssignmentImpl
 
       Utils.appendValue(
         finfo.getDataType().getFirstArgumentType(),
-        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
         codecRegistry,
         sb,
         key,
@@ -1540,7 +1548,7 @@ public abstract class AssignmentImpl
       sb.append("]=");
       Utils.appendValue(
         finfo.getDataType().getElementType(),
-        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(1),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(1),
         codecRegistry,
         sb,
         value,

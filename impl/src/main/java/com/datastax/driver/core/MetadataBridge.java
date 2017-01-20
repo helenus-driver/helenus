@@ -41,4 +41,18 @@ public class MetadataBridge {
   public static int getNumHosts(Metadata mdata) {
     return mdata.allHosts().size();
   }
+
+  /**
+   * Escape a CQL3 identifier based on its value as read from the schema tables.
+   * Because it comes from Cassandra, we could just always quote it, but to get
+   * a nicer output we don't do it if it's not necessary.
+   *
+   * @author paouelle
+   *
+   * @param  id the identifier to escape
+   * @return the escaped identifier
+   */
+  public static String escapeId(String id) {
+    return Metadata.escapeId(id);
+  }
 }

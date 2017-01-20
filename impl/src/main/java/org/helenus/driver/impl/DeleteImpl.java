@@ -364,7 +364,7 @@ public class DeleteImpl<T>
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
       );
     }
     // check if the table has multi-keys in which case we need to iterate all
@@ -468,7 +468,7 @@ public class DeleteImpl<T>
 
             // add the multi-key clause values from this combination to the list of clauses
             Utils.joinAndAppend(
-              table, null, mgr.getCodecRegistry(), sb, " AND ", i.next(), cs, null
+              getKeyspace(), table, null, mgr.getCodecRegistry(), sb, " AND ", i.next(), cs, null
             );
             builders.add(finishBuildingQueryString(table, sb));
           }
@@ -478,7 +478,7 @@ public class DeleteImpl<T>
       // we didn't have any multi-keys in the clauses so just delete it based
       // on the given clauses
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", cs, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", cs, null
       );
     } else { // no clauses provided, so add where clauses for all primary key columns
       try {
@@ -559,7 +559,7 @@ public class DeleteImpl<T>
 
                   pkeys.put(
                     StatementImpl.MK_PREFIX + finfo.getColumnName(),
-                    Triple.of(k, finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec()).codec(0))
+                    Triple.of(k, finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec(getKeyspace())).codec(0))
                   );
                 }
                 final StringBuilder sb = new StringBuilder(builder);
@@ -607,7 +607,7 @@ public class DeleteImpl<T>
       }
       builder.append(" IF ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", conditions.conditions, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", conditions.conditions, null
       );
     }
     return builder;

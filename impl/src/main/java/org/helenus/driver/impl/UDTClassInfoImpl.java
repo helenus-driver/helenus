@@ -26,22 +26,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
-
-import java.nio.ByteBuffer;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Triple;
 
-import com.datastax.driver.core.CodecRegistry;
-import com.datastax.driver.core.ProtocolVersion;
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.UDTValue;
 import com.datastax.driver.core.UserType;
-import com.datastax.driver.core.UserTypeBridge;
-import com.datastax.driver.core.exceptions.InvalidTypeException;
-import com.google.common.reflect.TypeToken;
 
 import org.helenus.commons.lang3.reflect.ReflectionUtils;
 import org.helenus.driver.ObjectConversionException;
@@ -134,7 +129,7 @@ public abstract class UDTClassInfoImpl<T>
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
-      return table.getColumnValues(object);
+      return table.getColumnValues(getKeyspace(), object);
     }
 
     /**
@@ -145,7 +140,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+      String tname
+    ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -157,7 +154,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPartitionKeyColumnValues(
+      String tname
+    ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -169,7 +168,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPartitionKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPartitionKeyColumnValues(
+      String tname
+    ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -181,7 +182,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getPrimaryKeyColumnValues(
+      String tname
+    ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -193,7 +196,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getKeyspaceAndPrimaryKeyColumnValues(java.lang.String)
      */
     @Override
-    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(String tname) {
+    public final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getKeyspaceAndPrimaryKeyColumnValues(
+      String tname
+    ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -211,7 +216,7 @@ public abstract class UDTClassInfoImpl<T>
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
-      return table.getMandatoryAndPrimaryKeyColumnValues(object);
+      return table.getMandatoryAndPrimaryKeyColumnValues(getKeyspace(), object);
     }
 
      /**
@@ -239,11 +244,13 @@ public abstract class UDTClassInfoImpl<T>
      *         POJO or is mandatory and missing from the POJO
      */
     @SuppressWarnings("synthetic-access")
-    public Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(CharSequence name) {
+    public Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(
+      CharSequence name
+    ) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Triple.of(null, null, null);
       }
-      return table.getColumnValue(object, name);
+      return table.getColumnValue(getKeyspace(), object, name);
     }
 
     /**
@@ -254,7 +261,9 @@ public abstract class UDTClassInfoImpl<T>
      * @see org.helenus.driver.impl.ClassInfoImpl.POJOContext#getColumnValue(java.lang.String, java.lang.CharSequence)
      */
     @Override
-    public final Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(String tname, CharSequence name) {
+    public final Triple<Object, CQLDataType, TypeCodec<?>> getColumnValue(
+      String tname, CharSequence name
+    ) {
       throw new IllegalArgumentException("user-defined types do not define tables");
     }
 
@@ -270,11 +279,13 @@ public abstract class UDTClassInfoImpl<T>
      *         by the POJO or is mandatory and missing from the POJO
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(Iterable<CharSequence> names) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+      Iterable<CharSequence> names
+    ) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
-      return table.getColumnValues(object, names);
+      return table.getColumnValues(getKeyspace(), object, names);
     }
 
     /**
@@ -303,11 +314,13 @@ public abstract class UDTClassInfoImpl<T>
      *         by the POJO or is mandatory and missing from the POJO
      */
     @SuppressWarnings("synthetic-access")
-    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(CharSequence... names) {
+    public Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> getColumnValues(
+      CharSequence... names
+    ) {
       if (table == null) { // table not defined so nothing to return; should not happen
         return Collections.emptyMap();
       }
-      return table.getColumnValues(object, names);
+      return table.getColumnValues(getKeyspace(), object, names);
     }
 
     /**
@@ -333,18 +346,18 @@ public abstract class UDTClassInfoImpl<T>
   private final String name;
 
   /**
-   * Holds the fake table used to represent the suer-defined type columns.
+   * Holds the fake table used to represent the user-defined type columns.
    *
    * @author paouelle
    */
   private final TableInfoImpl<T> table;
 
   /**
-   * Holds the corresponding Cassandra data type.
+   * Holds the codecs for this UDT keyed per keyspace.
    *
    * @author paouelle
    */
-  private volatile UserType dtype = null;
+  private final Map<String, UDTCodecImpl<T>> codecs;
 
   /**
    * Instantiates a new <code>UDTClassInfoImpl</code> object.
@@ -368,6 +381,7 @@ public abstract class UDTClassInfoImpl<T>
     super(mgr, clazz, entityAnnotationClass);
     this.name = findName();
     this.table = tablesImpl().findFirst().get();
+    this.codecs = new ConcurrentHashMap<>(8);
     // handle special UDT types that extends List, Set, or Map
     if (List.class.isAssignableFrom(clazz)) {
       table.addNonPrimaryColumn(
@@ -426,6 +440,7 @@ public abstract class UDTClassInfoImpl<T>
     super(cinfo, clazz);
     this.name = cinfo.name;
     this.table = cinfo.table;
+    this.codecs = cinfo.codecs;
   }
 
   /**
@@ -497,6 +512,29 @@ public abstract class UDTClassInfoImpl<T>
   }
 
   /**
+   * Decodes the column fields from a set of formatted values and sets the parsed
+   * value in the POJO object.
+   *
+   * @author paouelle
+   *
+   * @param  object the non-<code>null</code> POJO object
+   * @param  keyspace the keyspace for which to create the object
+   * @param  values the formated values to convert into a POJO
+   * @throws ObjectConversionException if unable to decode the UDT value in the
+   *         POJO
+   */
+  private void decodeAndSetColumnFields(
+    T object, String keyspace, Map<String, String> values
+  ) {
+    // get the table for this UDT
+    final TableInfoImpl<T> table = getTableImpl();
+
+    if (table != null) {
+      table.getColumnsImpl().forEach(finfo -> finfo.decodeAndSetValue(object, keyspace, values));
+    }
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -513,36 +551,60 @@ public abstract class UDTClassInfoImpl<T>
    *
    * @author paouelle
    *
-   * @param  token the type to decode to
-   * @param  codecRegistry the codec registry to use when finding codecs
+   * @param  keyspace the keyspace for which to get a codec
    * @return a suitable codec for this user data type
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  protected TypeCodec<T> getCodec(
-    TypeToken<T> token, CodecRegistry codecRegistry
-  ) {
-    final TypeCodec<UDTValue> ucodec = TypeCodec.userType(dtype);
+  protected UDTCodecImpl<T> getCodec(String keyspace) {
+    return codecs.compute(keyspace, (k, old) -> {
+      if (old == null) {
+        // check if we can find the real definition for the keyspace
+        final KeyspaceMetadata km = mgr.getCluster().getMetadata().getKeyspace(keyspace);
 
-    return new TypeCodec(dtype, token) {
-      @Override
-      public T parse(String value) throws InvalidTypeException {
-        return getObject(ucodec.parse(value));
+        if (km != null) {
+          final UserType definition = km.getUserType(name);
+
+          if (definition != null) { // use cluster definition
+            return new UDTCodecImpl<>(this, definition);
+          }
+        }
+        // initialize it with a default
+        old = new UDTCodecImpl<>(this, k);
       }
-      @Override
-      public String format(Object value) throws InvalidTypeException {
-        return ucodec.format(getUDTValue((T)value, codecRegistry));
+      return old;
+    });
+  }
+
+  /**
+   * Registers a new cluster-defined definition for this user data type.
+   *
+   * @author paouelle
+   *
+   * @param definition the new user definition for this the user type to register
+   */
+  protected void register(UserType definition) {
+    codecs.compute(definition.getKeyspace(), (k, old) -> {
+      if (old == null) {
+        old = new UDTCodecImpl<>(this, definition);
+      } else {
+        old.register(definition);
       }
-      @Override
-      public ByteBuffer serialize(Object value, ProtocolVersion protocolVersion)
-        throws InvalidTypeException {
-        return ucodec.serialize(getUDTValue((T)value, codecRegistry), protocolVersion);
-      }
-      @Override
-      public T deserialize(ByteBuffer bytes, ProtocolVersion protocolVersion)
-        throws InvalidTypeException {
-        return getObject(ucodec.deserialize(bytes, protocolVersion));
-      }
-    };
+      return old;
+    });
+  }
+
+  /**
+   * Deregisters the corresponding definition for this user data type.
+   *
+   * @author paouelle
+   *
+   * @param definition the definition for the user type to deregister
+   */
+  protected void deregister(UserType definition) {
+    final UDTCodecImpl<T> ucodec = codecs.get(definition.getKeyspace());
+
+    if (ucodec != null) {
+      ucodec.deregister(definition);
+    }
   }
 
   /**
@@ -617,6 +679,18 @@ public abstract class UDTClassInfoImpl<T>
   }
 
   /**
+   * Gets the corresponding default Cassandra user type.
+   *
+   * @author paouelle
+   *
+   * @param  keyspace the keyspace for which to get a user type
+   * @return the non-<code>null</code> corresponding Cassandra user type
+   */
+  public UserType getUserType(String keyspace) {
+    return getCodec(keyspace).getUserType();
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -625,13 +699,7 @@ public abstract class UDTClassInfoImpl<T>
    */
   @Override
   public com.datastax.driver.core.DataType getDataType() {
-    UserType dtype = this.dtype;
-
-    if (dtype == null) { // lazily instantiate it
-      dtype = UserTypeBridge.instantiate(mgr, this);
-      this.dtype = dtype;
-    }
-    return dtype;
+    return getUserType("");
   }
 
   /**
@@ -807,6 +875,49 @@ public abstract class UDTClassInfoImpl<T>
   }
 
   /**
+   * Instantiates a new blank object.
+   *
+   * @author paouelle
+   *
+   * @return a newly created blank pojo of this type
+   */
+  public T newObject() {
+    try {
+      // create an empty shell for the pojo
+      final T object = constructor.newInstance();
+
+      // start by setting back all final fields' values
+      finalFields.forEach(
+        (field, value) -> {
+          try {
+            // set it in field directly
+            field.set(object, value);
+          } catch (IllegalAccessException e) { // should not happen
+            throw new IllegalStateException(e);
+          }
+        }
+      );
+      return object;
+    } catch (IllegalAccessException|InstantiationException e) {
+      throw new IllegalStateException(clazz.getName(), e);
+    } catch (InvocationTargetException e) {
+      final Throwable t = e.getTargetException();
+
+      if (t instanceof Error) {
+        throw (Error)t;
+      } else if (t instanceof RuntimeException) {
+        throw (RuntimeException)t;
+      } else {
+        throw new ObjectConversionException(
+          clazz,
+          "failed to instantiate blank POJO",
+          t
+        );
+      }
+    }
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @author paouelle
@@ -857,43 +968,56 @@ public abstract class UDTClassInfoImpl<T>
   }
 
   /**
-   * Gets a {@link UDTValue} corresponding to the given object based on this
-   * user defined type class information.
+   * Converts the specified parsed values into a POJO object defined by this
+   * class information.
    *
    * @author paouelle
    *
-   * @param  object the pojo object from which to retrieve the column values
-   * @param  codecRegistry the codec registry to use when finding codecs
-   * @return the {@link UDTValue} corresponding to the specified pojo
-   * @throws IllegalArgumentException if the combination of fields and data types
-   *         is not supported
+   * @param  keyspace the keyspace for which to create the object
+   * @param  values the formated values to convert into a POJO
+   * @return the POJO object corresponding to the given UDT value
+   * @throws ObjectConversionException if unable to convert to a POJO
    */
-  @SuppressWarnings("unchecked")
-  public UDTValue getUDTValue(T object, CodecRegistry codecRegistry) {
-    if (object == null) {
+  public T getObject(String keyspace, Map<String, String> values) {
+    if (values == null) {
       return null;
     }
-    // get the table for this UDT
-    final TableInfoImpl<T> table = getTableImpl();
+    try {
+      // create an empty shell for the pojo
+      final T object = constructor.newInstance();
 
-    if (table == null) {
-      return null;
-    }
-    final UDTValue uval = dtype.newValue();
-    int i = -1;
+      // start by setting back all final fields' values
+      finalFields.forEach(
+        (field, value) -> {
+          try {
+            // set it in field directly
+            field.set(object, value);
+          } catch (IllegalAccessException e) { // should not happen
+            throw new IllegalStateException(e);
+          }
+        }
+      );
+      // now take care of the columns
+      decodeAndSetColumnFields(object, keyspace, values);
+      return object;
+    } catch (IllegalAccessException|InstantiationException e) {
+      throw new IllegalStateException(clazz.getName(), e);
+    } catch (InvocationTargetException e) {
+      final Throwable t = e.getTargetException();
 
-    for (final UserType.Field coldef: uval.getType()) {
-      i++;
-      // find the field in the table for this column
-      final String cname = coldef.getName();
-      final FieldInfoImpl<T> field = table.getColumnImpl(cname);
-
-      if (field != null) {
-        // now let's set the value for this column
-        uval.set(i, field.getValue(object), (TypeCodec<Object>)field.getCodec());
+      if (t instanceof Error) {
+        throw (Error)t;
+      } else if (t instanceof RuntimeException) {
+        throw (RuntimeException)t;
+      } else {
+        throw new ObjectConversionException(
+          clazz,
+          values,
+          "failed to instantiate blank POJO",
+          t
+        );
       }
     }
-    return uval;
   }
 
   /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 The Helenus Driver Project Authors.
+ * Copyright (C) 2015-2017 The Helenus Driver Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -201,11 +202,22 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   protected final DataTypeImpl.Definition definition;
 
   /**
-   * Holds the codec for this field (if it is a column).
+   * Holds the codecs for this field (if it is a column) keyed per keyspace.
    *
    * @author paouelle
    */
-  private final TypeCodec<?> codec;
+  private final Map<String, TypeCodec<?>> codecs;
+
+  /**
+   * Holds an internal codec valid for parsing, formatting, and validating this
+   * field (if it is a column).
+   * <p>
+   * <i>Note:</i> This codec is not suitable for serializing and deserializing
+   * this field's data type.
+   *
+   * @author paouelle
+   */
+  private final TypeCodec<?> icodec;
 
   /**
    * Flag indicating if the field is final.
@@ -302,7 +314,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = field.typeKey;
     this.multiKeyType = field.multiKeyType;
     this.definition = field.definition;
-    this.codec = field.codec;
+    this.codecs = field.codecs;
+    this.icodec = field.icodec;
     this.isFinal = field.isFinal;
     this.finalValue = field.finalValue;
     this.setters = new HashMap<>(field.setters);
@@ -343,7 +356,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = null; // we don't care about this for keyspace keys
     this.multiKeyType = null; // we don't care about this for keyspace keys
     this.definition = null; // we don't care about this for keyspace keys
-    this.codec = null; // we don't care about this for keyspace keys
+    this.codecs = null; // we don't care about this for keyspace keys
+    this.icodec = null; // we don't care about this for keyspace keys
     this.getters = new HashMap<>(6);
     this.setters = new HashMap<>(6);
     findGetter(declaringClass);
@@ -497,11 +511,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     }
     if (isColumn()) {
       this.definition = DataTypeImpl.inferDataTypeFrom(mgr, field, column.isFrozen());
-      this.codec = definition.getCodec(
-        field,
-        isMandatory() || isPartitionKey() || isClusteringKey(),
-        cinfo.mgr.getCodecRegistry()
-      );
+      this.codecs = new ConcurrentHashMap<>(8);
+      this.icodec = getCodec("");
       if (isInTable
           && ((clusteringKey != null) || (partitionKey != null))
           && ((definition.getMainType() == DataType.SET)
@@ -529,7 +540,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       }
     } else {
       this.definition = null;
-      this.codec = null;
+      this.codecs = null;
+      this.icodec = null;
       this.multiKeyType = null;
     }
     this.getters = new HashMap<>(6);
@@ -692,7 +704,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = null; // we don't care about this for keyspace keys
     this.multiKeyType = null; // we don't care about this for keyspace keys
     this.definition = null; // we don't care about this for keyspace keys
-    this.codec = null; // we don't care about this for keyspace keys
+    this.codecs = null; // we don't care about this for keyspace keys
+    this.icodec = null; // we don't care about this for keyspace keys
     this.getters = null;
     this.setters = null;
     this.finalValue = null;
@@ -757,7 +770,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
     this.typeKey = null;
     this.multiKeyType = null;
     this.definition = DataTypeImpl.inferDataTypeFrom(mgr, type, column.isFrozen(), clazz);
-    this.codec = definition.getCodec(clazz, cinfo.mgr.getCodecRegistry());
+    this.codecs = new ConcurrentHashMap<>(8);
+    this.icodec = getCodec("");
     this.getters = new HashMap<>(6);
     this.setters = new HashMap<>(6);
     getters.put(cinfo.getObjectClass(), obj -> obj); // return the instance itself as the value for the field
@@ -1494,14 +1508,51 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Gets a codec for this field.
+   * Gets the default codec for this field.
    *
    * @author paouelle
    *
-   * @return a suitable codec for this field
+   * @return the default codec for this field
    */
-  public TypeCodec<?> getCodec() {
-    return codec;
+  public TypeCodec<?> getDefaultCodec() {
+    return icodec;
+  }
+
+  /**
+   * Gets a codec for this field for a given keyspace.
+   *
+   * @author paouelle
+   *
+   * @param  keyspace the keyspace for which to get a codec
+   * @return a suitable codec for this field and for the given keyspace
+   */
+  public TypeCodec<?> getCodec(String keyspace) {
+    final String ks = (keyspace != null) ? keyspace : "";
+
+    if (codecs == null) {
+      throw new IllegalStateException("should not be called");
+    }
+    if (field == null) {
+      return codecs.compute(ks, (k, old) -> {
+        if (old == null) {
+          old = definition.getCodec(k, clazz, cinfo.mgr.getCodecRegistry());
+        }
+        return old;
+      });
+    } else if (isColumn()) {
+      return codecs.compute(ks, (k, old) -> {
+        if (old == null) {
+          old = definition.getCodec(
+            k,
+            field,
+            isMandatory() || isPartitionKey() || isClusteringKey(),
+            cinfo.mgr.getCodecRegistry()
+          );
+        }
+        return old;
+      });
+    }
+    throw new IllegalStateException("should not be called");
   }
 
   /**
@@ -1514,8 +1565,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         right type or is <code>null</code> when the column is mandatory
    */
   public void validateCollectionValue(Object value) {
-    if (codec instanceof ArgumentsCodec) {
-      validateCollectionValue(((ArgumentsCodec<?>)codec).codec(0), value);
+    if (icodec instanceof ArgumentsCodec) {
+      validateCollectionValue(((ArgumentsCodec<?>)icodec).codec(0), value);
     }
   }
 
@@ -1559,8 +1610,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         when the column is mandatory
    */
   public void validateMapKeyValue(Object key, Object value) {
-    if (codec instanceof ArgumentsCodec) {
-      validateCollectionValue(((ArgumentsCodec<?>)codec).codec(1), value);
+    if (icodec instanceof ArgumentsCodec) {
+      validateCollectionValue(((ArgumentsCodec<?>)icodec).codec(1), value);
     }
     validateMapKey(key);
   }
@@ -1575,8 +1626,8 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    *         of the right mapping types
    */
   public void validateMapKey(Object key) {
-    if (codec instanceof ArgumentsCodec) {
-      final TypeCodec<?> kcodec = ((ArgumentsCodec<?>)codec).codec(0);
+    if (icodec instanceof ArgumentsCodec) {
+      final TypeCodec<?> kcodec = ((ArgumentsCodec<?>)icodec).codec(0);
 
       org.apache.commons.lang3.Validate.isTrue(
         kcodec.accepts(key),
@@ -1709,27 +1760,31 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Decodes the field's value based on the given row.
+   * Decodes the field's specified value.
    *
    * @author paouelle
    *
-   * @param  row the row where the column encoded value is defined
-   * @return the decoded value for this field from the given row
-   * @throws NullPointerException if <code>row</code> is  <code>null</code>
-   * @throws ObjectConversionException if unable to decode the column or if the
-   *         column is not defined in the given row
+   * @param  val the field value to decode
+   * @param  failOnlyIfMandatory <code>false</code> not to fail if the value is
+   *         <code>null</code> and the column is not mandatory; otherwise fails
+   *         if the value is <code>null</code>
+   * @param  trace a trace string indicating where the value was extracted
+   * @return the decoded value for this field
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
    */
-  public Object decodeValue(Row row) {
-    org.apache.commons.lang3.Validate.notNull(row, "invalid null row");
-    // check if the column is defined in the row
-    if (!row.getColumnDefinitions().contains(getColumnName())) {
+  public Object verifyValue(
+    Object val, boolean failOnlyIfMandatory, String trace
+  ) {
+    if (val == null) {
       if (isPartitionKey()) {
         throw new ObjectMissingException(
           clazz,
-          row,
           "missing partition key '"
           + getColumnName()
-          +  "' from result set for field '"
+          +  "' from "
+          + trace
+          + " for field '"
           + declaringClass.getName()
           + "."
           + name
@@ -1739,10 +1794,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       if (isClusteringKey()) {
         throw new ObjectMissingException(
           clazz,
-          row,
           "missing clustering key '"
           + getColumnName()
-          +  "' from result set for field '"
+          +  "' from "
+          + trace
+          + " for field '"
           + declaringClass.getName()
           + "."
           + name
@@ -1752,10 +1808,11 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       if (isTypeKey()) {
         throw new ObjectMissingException(
           clazz,
-          row,
           "missing type key '"
           + getColumnName()
-          +  "' from result set for field '"
+          +  "' from "
+          + trace
+          + " for field '"
           + declaringClass.getName()
           + "."
           + name
@@ -1765,32 +1822,67 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       if (isMandatory()) {
         throw new ObjectMissingException(
           clazz,
-          row,
           "missing mandatory column '"
           + getColumnName()
-          + "' from result set for field '"
+          + "' from "
+          + trace
+          + " for field '"
           + declaringClass.getName()
           + "."
           + name
           + "'"
         );
       }
-      throw new ObjectMissingException(
-        clazz,
-        row,
-        "missing column '"
-        + getColumnName()
-        + "' from result set for field '"
-        + declaringClass.getName()
-        + "."
-        + name
-        + "'"
-      );
+      if (failOnlyIfMandatory) {
+        throw new ObjectMissingException(
+          clazz,
+          "missing column '"
+          + getColumnName()
+          + "' from "
+          + trace
+          + " for field '"
+          + declaringClass.getName()
+          + "."
+          + name
+          + "'"
+        );
+      }
     }
+    return val;
+  }
+
+  /**
+   * Decodes the field's value based on the given row.
+   *
+   * @author paouelle
+   *
+   * @param  row the row where the column encoded value is defined
+   * @return the decoded value for this field from the given row
+   * @throws NullPointerException if <code>row</code> is  <code>null</code>
+   * @throws ObjectConversionException if unable to decode the column
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
+   */
+  public Object decodeValue(Row row) {
+    org.apache.commons.lang3.Validate.notNull(row, "invalid null row");
     Object val;
 
     try {
-      val = row.get(getColumnName(), codec);
+      // check if the column is defined in the row
+      final int index = row.getColumnDefinitions().getIndexOf(getColumnName());
+
+      if (index != -1) {
+        val = verifyValue(
+          row.get(index, getCodec(row.getColumnDefinitions().getKeyspace(index))),
+          false,
+          "result set"
+        );
+      } else {
+        val = verifyValue(null, true, "result set");
+      }
+    } catch (ObjectConversionException e) {
+      e.setRow(row);
+      throw e;
     } catch (IllegalArgumentException|InvalidTypeException e) {
       throw new ObjectConversionException(
         clazz,
@@ -1807,6 +1899,97 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
+   * Decodes the field's value based on the given UDT value.
+   *
+   * @author paouelle
+   *
+   * @param  uval the UDT value where the column encoded value is defined
+   * @return the decoded value for this field from the given UDT value
+   * @throws NullPointerException if <code>uval</code> is <code>null</code>
+   * @throws ObjectConversionException if unable to decode the column
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
+   */
+  public Object decodeValue(UDTValue uval) {
+    org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
+    Object val;
+
+    try {
+      // check if the column is defined in the row
+      if (uval.getType().contains(getColumnName())) {
+        val = verifyValue(
+          uval.get(
+            getColumnName(),
+            getCodec(uval.getType().getKeyspace())
+          ),
+          false,
+          "UDT value"
+        );
+      } else {
+        val = verifyValue(null, true, "UDT value");
+      }
+    } catch (ObjectConversionException e) {
+      e.setUDTValue(uval);
+      throw e;
+    } catch (IllegalArgumentException|InvalidTypeException e) {
+      throw new ObjectConversionException(
+        clazz,
+        uval,
+        "unable to decode value for field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "'",
+        e
+      );
+    }
+    return val;
+  }
+
+  /**
+   * Decodes the field's value based on the given formated values.
+   *
+   * @author paouelle
+   *
+   * @param  keyspace the keyspace for which to create the object
+   * @param  values the formated values to convert into a POJO
+   * @return the decoded value for this field from the given UDT value
+   * @throws ObjectConversionException if unable to decode the column
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
+   */
+  public Object decodeValue(String keyspace, Map<String, String> values) {
+    Object val;
+
+    try {
+      // check if the column is defined in the row
+      if (values.containsKey(getColumnName())) {
+        val = verifyValue(
+          getCodec(keyspace).parse(values.get(getColumnName())),
+          false,
+          "formatted values"
+        );
+      } else {
+        val = verifyValue(null, true, "formatted values");
+      }
+    } catch (ObjectConversionException e) {
+      e.setValues(values);
+      throw e;
+    } catch (IllegalArgumentException|InvalidTypeException e) {
+      throw new ObjectConversionException(
+        clazz,
+        values,
+        "unable to decode value for field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "'",
+        e
+      );
+    }
+    return val;
+  }
+  /**
    * Decodes and sets the field's value in the specified POJO based on the given
    * row.
    *
@@ -1817,9 +2000,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws NullPointerException if <code>object</code> or <code>row</code> is
    *         <code>null</code>
    * @throws ObjectConversionException if unable to decode the column and store
-   *         the corresponding value into the POJO object or if the column is
-   *         a primary key, type key, or mandatory and not defined in the given
-   *         row
+   *         the corresponding value into the POJO object
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
    */
   public void decodeAndSetValue(T object, Row row) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
@@ -1852,65 +2035,6 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
   }
 
   /**
-   * Decodes the field's value based on the given UDT value.
-   *
-   * @author paouelle
-   *
-   * @param  uval the UDT value where the column encoded value is defined
-   * @return the decoded value for this field from the given UDT value
-   * @throws NullPointerException if <code>uval</code> is  <code>null</code>
-   * @throws ObjectConversionException if unable to decode the column or if the
-   *         column is not defined in the given UDT value
-   */
-  public Object decodeValue(UDTValue uval) {
-    org.apache.commons.lang3.Validate.notNull(uval, "invalid null UDT value");
-    // check if the column is defined in the row
-    if (!uval.getType().contains(getColumnName())) {
-      if (isMandatory()) {
-        throw new ObjectMissingException(
-          clazz,
-          uval,
-          "missing mandatory column '"
-          + getColumnName()
-          + "' from UDT value for field '"
-          + declaringClass.getName()
-          + "."
-          + name
-          + "'"
-        );
-      }
-      throw new ObjectMissingException(
-        clazz,
-        uval,
-        "missing column '"
-        + getColumnName()
-        + "' from UDT value for field '"
-        + declaringClass.getName()
-        + "."
-        + name
-        + "'"
-      );
-    }
-    Object val;
-
-    try {
-      val = uval.get(getColumnName(), codec);
-    } catch (IllegalArgumentException|InvalidTypeException e) {
-      throw new ObjectConversionException(
-        clazz,
-        uval,
-        "unable to decode value for field '"
-        + declaringClass.getName()
-        + "."
-        + name
-        + "'",
-        e
-      );
-    }
-    return val;
-  }
-
-  /**
    * Decodes and sets the field's value in the specified POJO based on the given
    * UDT value.
    *
@@ -1921,8 +2045,9 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
    * @throws NullPointerException if <code>object</code> or <code>uval</code> is
    *         <code>null</code>
    * @throws ObjectConversionException if unable to decode the column and store
-   *         the corresponding value into the POJO object or if the column is
-   *         mandatory and not defined in the given UDT value
+   *         the corresponding value into the POJO object
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
    */
   public void decodeAndSetValue(T object, UDTValue uval) {
     org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
@@ -1943,6 +2068,94 @@ public class FieldInfoImpl<T> implements FieldInfo<T> {
       throw new ObjectConversionException(
         clazz,
         uval,
+        "unable to set field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "' with: "
+        + val,
+        e
+      );
+    }
+  }
+
+  /**
+   * Decodes and sets the field's value in the specified POJO based on the given
+   * UDT value.
+   *
+   * @author paouelle
+   *
+   * @param  object the POJO in which to set the field's decoded value
+   * @param  keyspace the keyspace for which to create the object
+   * @param  values the formated values to convert into a POJO
+   * @throws NullPointerException if <code>object</code> is <code>null</code>
+   * @throws ObjectConversionException if unable to decode the column and store
+   *         the corresponding value into the POJO object
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
+   */
+  public void decodeAndSetValue(
+    T object, String keyspace, Map<String, String> values
+  ) {
+    org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    Object val;
+
+    try {
+      val = decodeValue(keyspace, values);
+    } catch (ObjectMissingException e) {
+      // verify if the column is not mandatory in which case we just skip it
+      if (isMandatory()) {
+        throw e;
+      } // else - not mandatory and not defined in the row so skip it
+      return;
+    }
+    try {
+      setValue(object, val);
+    } catch (NullPointerException|IllegalArgumentException e) {
+      throw new ObjectConversionException(
+        clazz,
+        values,
+        "unable to set field '"
+        + declaringClass.getName()
+        + "."
+        + name
+        + "' with: "
+        + val,
+        e
+      );
+    }
+  }
+
+  /**
+   * Verifies and sets the specified field's value in the specified POJO.
+   *
+   * @author paouelle
+   *
+   * @param  object the POJO in which to set the field's decoded value
+   * @param  trace a trace string indicating where the value was extracted
+   * @param  val the value to verify and set
+   * @throws NullPointerException if <code>object</code> is <code>null</code>
+   * @throws ObjectConversionException if unable to decode the column and store
+   *         the corresponding value into the POJO object
+   * @throws ObjectMissingException if the column value is not defined and is
+   *         mandatory
+   */
+  public void verifyAndSetValue(T object, Object val, String trace) {
+    org.apache.commons.lang3.Validate.notNull(object, "invalid null object");
+    try {
+      val = verifyValue(val, true, trace);
+    } catch (ObjectMissingException e) {
+      // verify if the column is not mandatory in which case we just skip it
+      if (isMandatory()) {
+        throw e;
+      } // else - not mandatory and not defined in the row so skip it
+      return;
+    }
+    try {
+      setValue(object, val);
+    } catch (NullPointerException|IllegalArgumentException e) {
+      throw new ObjectConversionException(
+        clazz,
         "unable to set field '"
         + declaringClass.getName()
         + "."

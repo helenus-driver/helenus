@@ -2573,8 +2573,9 @@ public class HelenusJUnit implements MethodRule {
      *
      * @author paouelle
      */
+    @Override
     protected void clearCache() {
-      super.classInfoCache.clear();
+      super.clearCache();
     }
 
     /**
@@ -3130,7 +3131,7 @@ public class HelenusJUnit implements MethodRule {
           super.cacheClassInfoIfAbsent(cinfo);
           return cinfo;
         } // else - check if it is already cached
-        cinfo = (ClassInfoImpl<T>)super.classInfoCache.get(clazz);
+        cinfo = (ClassInfoImpl<T>)get(clazz);
         if (cinfo != null) {
           // this will be the case if we already retrieved another sub-type for
           // a root in which case we would have already retrieved the root and

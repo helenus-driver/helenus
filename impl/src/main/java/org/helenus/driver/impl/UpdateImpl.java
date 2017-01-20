@@ -307,7 +307,7 @@ public class UpdateImpl<T>
     if (!usings.usings.isEmpty()) {
       builder.append(" USING ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", usings.usings, null
       );
     }
     final Collection<FieldInfoImpl<T>> multiKeys = table.getMultiKeys();
@@ -507,7 +507,9 @@ public class UpdateImpl<T>
       }
       builder.append(" SET ");
       // make sure we do not add any duplicates
-      Utils.joinAndAppendWithNoDuplicates(table, null, mgr.getCodecRegistry(), builder, ",", as, null);
+      Utils.joinAndAppendWithNoDuplicates(
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, ",", as, null
+      );
     } else { // nothing to set for this table
       return;
     }
@@ -604,7 +606,7 @@ public class UpdateImpl<T>
 
             // add the multi-key clause values from this combination to the list of clauses
             Utils.joinAndAppend(
-              table, null, mgr.getCodecRegistry(), sb, " AND ", i.next(), cs, null
+              getKeyspace(), table, null, mgr.getCodecRegistry(), sb, " AND ", i.next(), cs, null
             );
             builders.add(finishBuildingQueryString(table, sb));
           }
@@ -614,7 +616,7 @@ public class UpdateImpl<T>
       // we didn't have any multi-keys in the clauses so just update it based
       // on the given clause
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", cs, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", cs, null
       );
     } else { // no clauses provided, so add where clauses for all primary key columns
       try {
@@ -686,7 +688,7 @@ public class UpdateImpl<T>
 
                   pkeys.put(
                     StatementImpl.MK_PREFIX + finfo.getColumnName(),
-                    Triple.of(k, finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec()).codec(0))
+                    Triple.of(k, finfo.getDataType().getElementType(), ((ArgumentsCodec<?>)finfo.getCodec(getKeyspace())).codec(0))
                   );
                 }
                 final StringBuilder sb = new StringBuilder(builder);
@@ -734,7 +736,7 @@ public class UpdateImpl<T>
       }
       builder.append(" IF ");
       Utils.joinAndAppend(
-        table, null, mgr.getCodecRegistry(), builder, " AND ", conditions.conditions, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", conditions.conditions, null
       );
     }
     return builder;

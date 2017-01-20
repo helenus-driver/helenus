@@ -360,10 +360,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -382,7 +383,7 @@ public abstract class ClauseImpl
           if ((finfo != null) && finfo.isMultiKey()) {
             Utils.appendValue(
               (definition != null) ? definition : finfo.getDataType().getElementType(),
-              (codec != null) ? codec : ((this.codec != null) ? this.codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0)),
+              (codec != null) ? codec : ((this.codec != null) ? this.codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0)),
               codecRegistry,
               sb,
               value,
@@ -396,7 +397,7 @@ public abstract class ClauseImpl
           if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
             Utils.appendValue(
               (definition != null) ? definition : finfo.getDataType(),
-              (codec != null) ? codec : ((this.codec != null) ? this.codec : finfo.getCodec()),
+              (codec != null) ? codec : ((this.codec != null) ? this.codec : finfo.getCodec(keyspace)),
               codecRegistry,
               sb,
               value,
@@ -409,7 +410,7 @@ public abstract class ClauseImpl
       }
       Utils.appendValue(
         (definition != null) ? definition : finfo.getDataType(),
-        (codec != null) ? codec : ((this.codec != null) ? this.codec : finfo.getCodec()),
+        (codec != null) ? codec : ((this.codec != null) ? this.codec : finfo.getCodec(keyspace)),
         codecRegistry,
         sb,
         value,
@@ -599,10 +600,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -637,7 +639,7 @@ public abstract class ClauseImpl
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isMultiKey()) {
             Utils.joinAndAppendValues(
-              (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+              (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
               codecRegistry,
               sb,
               ",",
@@ -652,7 +654,7 @@ public abstract class ClauseImpl
           finfo = tinfo.getColumnImpl(sname);
           if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
             Utils.joinAndAppendValues(
-              (codec != null) ? codec : finfo.getCodec(),
+              (codec != null) ? codec : finfo.getCodec(keyspace),
               codecRegistry,
               sb,
               ",",
@@ -666,7 +668,7 @@ public abstract class ClauseImpl
         throw new IllegalStateException("unknown column '" + sname + "'");
       }
       Utils.joinAndAppendValues(
-        (codec != null) ? codec : finfo.getCodec(),
+        (codec != null) ? codec : finfo.getCodec(keyspace),
         codecRegistry,
         sb,
         ",",
@@ -788,10 +790,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -803,7 +806,7 @@ public abstract class ClauseImpl
 
       Utils.appendValue(
         finfo.getDataType().getElementType(),
-        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
         codecRegistry,
         sb,
         value,
@@ -923,10 +926,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -938,7 +942,7 @@ public abstract class ClauseImpl
 
       Utils.appendValue(
         finfo.getDataType().getFirstArgumentType(),
-        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+        (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
         codecRegistry,
         sb,
         key,
@@ -1211,10 +1215,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1244,7 +1249,7 @@ public abstract class ClauseImpl
             if ((finfo != null) && finfo.isMultiKey()) {
               Utils.appendValue(
                 (definition != null) ? definition : finfo.getDataType().getElementType(),
-                (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+                (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
                 codecRegistry,
                 vsb,
                 value,
@@ -1258,7 +1263,7 @@ public abstract class ClauseImpl
             if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
               Utils.appendValue(
                 (definition != null) ? definition : finfo.getDataType(),
-                (codec != null) ? codec : finfo.getCodec(),
+                (codec != null) ? codec : finfo.getCodec(keyspace),
                 codecRegistry,
                 vsb,
                 value,
@@ -1271,7 +1276,7 @@ public abstract class ClauseImpl
         }
         Utils.appendValue(
           (definition != null) ? definition : finfo.getDataType(),
-          (codec != null) ? codec : finfo.getCodec(),
+          (codec != null) ? codec : finfo.getCodec(keyspace),
           codecRegistry,
           vsb,
           value,
@@ -1583,10 +1588,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -1637,7 +1643,7 @@ public abstract class ClauseImpl
             finfo = tinfo.getColumnImpl(sname);
             if ((finfo != null) && finfo.isMultiKey()) {
               Utils.joinAndAppendValues(
-                (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec()).codec(0),
+                (codec != null) ? codec : ((ArgumentsCodec<?>)finfo.getCodec(keyspace)).codec(0),
                 codecRegistry,
                 vsb,
                 ",",
@@ -1652,7 +1658,7 @@ public abstract class ClauseImpl
             finfo = tinfo.getColumnImpl(sname);
             if ((finfo != null) && finfo.isCaseInsensitiveKey()) {
               Utils.joinAndAppendValues(
-                (codec != null) ? codec : finfo.getCodec(),
+                (codec != null) ? codec : finfo.getCodec(keyspace),
                 codecRegistry,
                 vsb,
                 ",",
@@ -1666,7 +1672,7 @@ public abstract class ClauseImpl
           throw new IllegalStateException("unknown column '" + sname + "'");
         }
         Utils.joinAndAppendValues(
-          (codec != null) ? codec : finfo.getCodec(),
+          (codec != null) ? codec : finfo.getCodec(keyspace),
           codecRegistry,
           vsb,
           ",",
@@ -1934,10 +1940,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -2149,7 +2156,8 @@ public abstract class ClauseImpl
     public <T> List<ClauseImpl> processWith(
       TableInfoImpl<T> table, ClassInfoImpl<T>.POJOContext context
     ) {
-      final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys = context.getKeyspaceAndPrimaryKeyColumnValues(table.getName());
+      final Map<String, Triple<Object, CQLDataType, TypeCodec<?>>> pkeys
+        = context.getKeyspaceAndPrimaryKeyColumnValues(table.getName());
       final List<ClauseImpl> clauses = new ArrayList<>(pkeys.size());
 
       for (final Map.Entry<String, Triple<Object, CQLDataType, TypeCodec<?>>> e: pkeys.entrySet()) {
@@ -2199,10 +2207,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -2333,10 +2342,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
@@ -2467,10 +2477,11 @@ public abstract class ClauseImpl
      *
      * @author paouelle
      *
-     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
+     * @see org.helenus.driver.impl.Utils.Appendeable#appendTo(java.lang.String, org.helenus.driver.impl.TableInfoImpl, com.datastax.driver.core.TypeCodec, com.datastax.driver.core.CodecRegistry, java.lang.StringBuilder, java.util.List)
      */
     @Override
     void appendTo(
+      String keyspace,
       TableInfoImpl<?> tinfo,
       TypeCodec<?> codec,
       CodecRegistry codecRegistry,
