@@ -33,7 +33,6 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
@@ -393,10 +392,12 @@ public class DataTypeImpl {
           default:
         }
       } else if (type.isTuple()) {
-        return mgr.getCluster().getMetadata().newTupleType(
+        return TupleType.of(
+          mgr.getProtocolVersion(),
+          mgr.getCodecRegistry(),
           arguments.stream()
             .map(CQLDataType::getDataType)
-            .collect(Collectors.toList())
+            .toArray(com.datastax.driver.core.DataType[]::new)
         );
       }
       return type.getDataType();

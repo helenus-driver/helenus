@@ -557,14 +557,16 @@ public abstract class UDTClassInfoImpl<T>
   protected UDTCodecImpl<T> getCodec(String keyspace) {
     return codecs.compute(keyspace, (k, old) -> {
       if (old == null) {
-        // check if we can find the real definition for the keyspace
-        final KeyspaceMetadata km = mgr.getCluster().getMetadata().getKeyspace(keyspace);
+        // check if we can find the real definition for the keyspace as long as the session is opened
+        if (mgr.getSession() != null) {
+          final KeyspaceMetadata km = mgr.getCluster().getMetadata().getKeyspace(keyspace);
 
-        if (km != null) {
-          final UserType definition = km.getUserType(name);
+          if (km != null) {
+            final UserType definition = km.getUserType(name);
 
-          if (definition != null) { // use cluster definition
-            return new UDTCodecImpl<>(this, definition);
+            if (definition != null) { // use cluster definition
+              return new UDTCodecImpl<>(this, definition);
+            }
           }
         }
         // initialize it with a default
