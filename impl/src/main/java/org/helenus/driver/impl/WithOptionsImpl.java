@@ -15,6 +15,8 @@
  */
 package org.helenus.driver.impl;
 
+import java.io.StringReader;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +24,8 @@ import java.util.Map;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.JsonReader;
+import javax.json.stream.JsonParsingException;
 
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -32,8 +36,10 @@ import com.datastax.driver.core.TypeCodec;
 
 import org.helenus.driver.WithOptions;
 import org.helenus.driver.codecs.provider.VarCharCodecProvider;
+import org.helenus.driver.persistence.CompactionClass;
 import org.helenus.driver.persistence.Keyspace;
-import org.helenus.driver.persistence.StrategyClass;
+import org.helenus.driver.persistence.PlacementClass;
+import org.helenus.driver.persistence.Table;
 
 /**
  * The <code>WithOptionsImpl</code> class defines options to be used when
@@ -155,6 +161,13 @@ public class WithOptionsImpl
    */
   public static class ReplicationWithImpl extends WithOptionsImpl {
     /**
+     * Constant for the replication option name.
+     *
+     * @author paouelle
+     */
+    public final static String NAME = "REPLICATION";
+
+    /**
      * Computes the replication properties from the specified @Keyspace
      * annotation.
      *
@@ -171,7 +184,7 @@ public class WithOptionsImpl
     ) {
       final Keyspace keyspace = cinfo.getKeyspace();
       final JsonObjectBuilder jbuild = Json.createObjectBuilder();
-      StrategyClass strategy = keyspace.strategy();
+      PlacementClass strategy = keyspace.placement();
 
       switch (strategy) {
         case NETWORK_TOPOLOGY:
@@ -181,7 +194,7 @@ public class WithOptionsImpl
             // must have default ones then otherwise fall-through
             dcs = mgr.getDefaultDataCenters();
             if (MapUtils.isEmpty(dcs)) {
-              strategy = StrategyClass.SIMPLE;
+              strategy = PlacementClass.SIMPLE;
             }
           } else {
             final int[] factors = keyspace.replicationFactor();
@@ -197,7 +210,7 @@ public class WithOptionsImpl
               dcs.put(names[i], factors[i]);
             }
           }
-          if (strategy == StrategyClass.NETWORK_TOPOLOGY) {
+          if (strategy == PlacementClass.NETWORK_TOPOLOGY) {
             dcs.entrySet().forEach(e -> jbuild.add(e.getKey(), e.getValue()));
             break;
           } // else - fall-through
@@ -218,7 +231,7 @@ public class WithOptionsImpl
             replicationFactor = mgr.getDefaultReplicationFactor();
           }
           if (replicationFactor == 0) { // fallback to system default
-            replicationFactor = 2;
+            replicationFactor = 3;
           }
           jbuild.add("replication_factor", replicationFactor);
           break;
@@ -233,11 +246,10 @@ public class WithOptionsImpl
      * @author paouelle
      *
      * @param  value the option's value
-     * @throws NullPointerException if <code>name</code> or <code>value</code>
-     *         is <code>null</code>
+     * @throws NullPointerException if <code>value</code> is <code>null</code>
      */
     public ReplicationWithImpl(Object value) {
-      super("REPLICATION", value);
+      super(ReplicationWithImpl.NAME, value);
     }
 
     /**
@@ -251,6 +263,86 @@ public class WithOptionsImpl
      */
     public ReplicationWithImpl(ClassInfoImpl<?> cinfo, StatementManagerImpl mgr) {
       this(ReplicationWithImpl.getReplicationProperties(cinfo, mgr));
+    }
+  }
+
+  /**
+   * The <code>CompactionWithImpl</code> class defines the "COMPACTION"
+   * option for the "CREATE TABLE" statement.
+   *
+   * @copyright 2015-2017 The Helenus Driver Project Authors
+   *
+   * @author  The Helenus Driver Project Authors
+   * @version 1 - Mar 7, 2017 - paouelle - Creation
+   *
+   * @since 1.0
+   */
+  public static class CompactionWithImpl extends WithOptionsImpl {
+    /**
+     * Constant for the compaction option name.
+     *
+     * @author paouelle
+     */
+    public final static String NAME = "COMPACTION";
+
+    /**
+     * Computes the compaction properties from the specified @Table annotation.
+     *
+     * @author paouelle
+     *
+     * @param  tinfo the non-<code>null</code> table info for the pojo class
+     *         where to get the compaction information
+     * @param  mgr the statement manager from which to extract tool options
+     * @return the corresponding Json object for the table properties
+     * @throws JsonParsingException if a JSON object cannot be created due to
+     *         incorrect representation
+     */
+    private static JsonObject getCompactionProperties(
+      TableInfoImpl<?> tinfo, StatementManagerImpl mgr
+    ) {
+      final Table table = tinfo.getTable();
+      final JsonObjectBuilder jbuild = Json.createObjectBuilder();
+      final CompactionClass compaction = table.compaction();
+      final String compactionOptions = table.compactionOptions();
+
+      if (!compactionOptions.isEmpty()) {
+        try (
+          final JsonReader jr = Json.createReader(new StringReader(compactionOptions.replaceAll("'", "\"")));
+        ) {
+          final JsonObject jo = jr.readObject();
+
+          jo.forEach((k, v) -> jbuild.add(k, v));
+        }
+      }
+      jbuild.add("class", compaction.NAME);
+      return jbuild.build();
+    }
+
+    /**
+     * Instantiates a new <code>CompactionWithImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  value the option's value
+     * @throws NullPointerException if <code>value</code> is <code>null</code>
+     */
+    public CompactionWithImpl(Object value) {
+      super(CompactionWithImpl.NAME, value);
+    }
+
+    /**
+     * Instantiates a new <code>CompactionWithImpl</code> object.
+     *
+     * @author paouelle
+     *
+     * @param  tinfo the non-<code>null</code> table info for the pojo class
+     *         where to get the compaction information
+     * @param  mgr the statement manager from which to extract tool options
+     * @throws JsonParsingException if a JSON object cannot be created due to
+     *         incorrect representation
+     */
+    public CompactionWithImpl(TableInfoImpl<?> tinfo, StatementManagerImpl mgr) {
+      this(CompactionWithImpl.getCompactionProperties(tinfo, mgr));
     }
   }
 }

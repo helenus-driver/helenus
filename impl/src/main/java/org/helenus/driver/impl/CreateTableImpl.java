@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.json.stream.JsonParsingException;
+
 import org.apache.commons.lang3.StringUtils;
 
 import org.helenus.driver.Clause;
@@ -30,6 +32,7 @@ import org.helenus.driver.CreateTable;
 import org.helenus.driver.StatementBridge;
 import org.helenus.driver.VoidFuture;
 import org.helenus.driver.WithOptions;
+import org.helenus.driver.impl.WithOptionsImpl.CompactionWithImpl;
 import org.helenus.driver.persistence.Ordering;
 
 /**
@@ -150,6 +153,8 @@ public class CreateTableImpl<T>
    *         assignments reference columns not defined in the POJO or invalid
    *         values or if missing mandatory columns are referenced for the
    *         specified table
+   * @throws JsonParsingException if a JSON object cannot be created to represent
+   *         the specified compaction options due to incorrect representation
    */
   @SuppressWarnings("synthetic-access")
   protected StringBuilder[] buildQueryStrings(TableInfoImpl<T> table) {
@@ -239,7 +244,7 @@ public class CreateTableImpl<T>
       .append(" (")
       .append(StringUtils.join(columns, ","))
       .append(')');
-    boolean withAdded = false; // until proven otherwise
+    boolean added = false; // until proven otherwise
 
     if (!ckeys.isEmpty()) {
       final List<String> order = new ArrayList<>(ckeys.size());
@@ -251,12 +256,21 @@ public class CreateTableImpl<T>
         .append(" WITH CLUSTERING ORDER BY (")
         .append(StringUtils.join(order, ","))
         .append(")");
-      withAdded = true;
+      added = true;
     }
-    if (!with.options.isEmpty() ) {
-      builder.append(withAdded ? " AND " : " WITH ");
+    WithOptionsImpl compaction = with.compaction;
+
+    if (compaction == null) { // default to POJO's detail
+      compaction = new CompactionWithImpl(table, mgr);
+    }
+    final List<WithOptionsImpl> options = new ArrayList<>(with.options.size() + 1);
+
+    options.add(compaction);
+    options.addAll(with.options);
+    if (!options.isEmpty() ) {
+      builder.append(added ? " AND " : " WITH ");
       Utils.joinAndAppend(
-        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", with.options, null
+        getKeyspace(), table, null, mgr.getCodecRegistry(), builder, " AND ", options, null
       );
     }
     builder.append(';');
@@ -372,11 +386,18 @@ public class CreateTableImpl<T>
     extends ForwardingStatementImpl<Void, VoidFuture, T, CreateTableImpl<T>>
     implements Options<T> {
     /**
+     * Holds the "COMPACTION" option for this statement.
+     *
+     * @author paouelle
+     */
+    protected WithOptionsImpl compaction;
+
+    /**
      * Holds options for this statement.
      *
      * @author paouelle
      */
-    private final List<WithOptionsImpl> options = new ArrayList<>(8);
+    protected final List<WithOptionsImpl> options = new ArrayList<>(2);
 
     /**
      * Instantiates a new <code>OptionsImpl</code> object.
@@ -399,13 +420,20 @@ public class CreateTableImpl<T>
      */
     @Override
     public Options<T> and(WithOptions option) {
-      org.apache.commons.lang3.Validate.notNull(option, "invalid null with");
+      org.apache.commons.lang3.Validate.notNull(option, "invalid null option");
       org.apache.commons.lang3.Validate.isTrue(
         option instanceof WithOptionsImpl,
         "unsupported class of withs: %s",
         option.getClass().getName()
       );
-      options.add((WithOptionsImpl)option);
+      final WithOptionsImpl o = (WithOptionsImpl)option;
+
+      if ((o instanceof CompactionWithImpl)
+          || CompactionWithImpl.NAME.equalsIgnoreCase(o.getName())) {
+        this.compaction = o;
+      } else {
+        options.add(o);
+      }
       setDirty();
       return this;
     }

@@ -82,12 +82,10 @@ public class AlterCreateKeyspaceImpl<T> extends CreateKeyspaceImpl<T> {
 
     builder.append("ALTER KEYSPACE ");
     Utils.appendName(builder, getKeyspace());
-    ReplicationWithImpl replication = with.replication;
+    WithOptionsImpl replication = with.replication;
 
     if (replication == null) { // default to POJO's details
-      replication = new ReplicationWithImpl(
-        getContext().getClassInfo(), mgr
-      );
+      replication = new ReplicationWithImpl(getContext().getClassInfo(), mgr);
     }
     final List<WithOptionsImpl> options = new ArrayList<>(with.options.size() + 1);
 

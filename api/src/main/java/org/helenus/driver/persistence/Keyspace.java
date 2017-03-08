@@ -70,13 +70,13 @@ public @interface Keyspace {
 
   /**
    * The optional placement strategy for the keyspace. Defaults to
-   * {@link StrategyClass#NETWORK_TOPOLOGY}.
+   * {@link PlacementClass#NETWORK_TOPOLOGY}.
    *
    * @author paouelle
    *
-   * @return the optional placement strategy
+   * @return the optional placement strategy class
    */
-  StrategyClass strategy() default StrategyClass.NETWORK_TOPOLOGY;
+  PlacementClass placement() default PlacementClass.NETWORK_TOPOLOGY;
 
   /**
    * The default replication factor to use along with the simple placement
@@ -112,7 +112,7 @@ public @interface Keyspace {
   /**
    * When set to false, data written to the keyspace bypasses the commit log.
    * Be careful using this option because you risk losing data. Do not set this
-   * attribute on a keyspace using the {@link StrategyClass#SIMPLE}. Defaults
+   * attribute on a keyspace using the {@link PlacementClass#SIMPLE}. Defaults
    * to true.
    *
    * @author paouelle

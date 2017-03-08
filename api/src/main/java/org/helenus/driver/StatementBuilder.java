@@ -2246,6 +2246,20 @@ public final class StatementBuilder {
   }
 
   /**
+   * Puts a compaction set of properties together for table creation. This
+   * will generate: {@code COMPACTION = map}.
+   *
+   * @author paouelle
+   *
+   * @param  map the map of complication properties in json format
+   * @return the corresponding option (to use in a create table statement)
+   * @throws NullPointerException if <code>map</code> is <code>null</code>
+   */
+  public static WithOptions compaction(JsonObject map) {
+    return StatementManager.getManager().compaction(map);
+  }
+
+  /**
    * Sets the durable write option for a keyspace. This will generate:
    * {@code DURABLE_WRITES = true}.
    *

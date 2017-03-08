@@ -135,12 +135,10 @@ public class CreateKeyspaceImpl<T>
       builder.append("IF NOT EXISTS ");
     }
     Utils.appendName(builder, getKeyspace());
-    ReplicationWithImpl replication = with.replication;
+    WithOptionsImpl replication = with.replication;
 
     if (replication == null) { // default to POJO's details
-      replication = new ReplicationWithImpl(
-        getContext().getClassInfo(), mgr
-      );
+      replication = new ReplicationWithImpl(getContext().getClassInfo(), mgr);
     }
     final List<WithOptionsImpl> options = new ArrayList<>(with.options.size() + 1);
 
@@ -239,7 +237,7 @@ public class CreateKeyspaceImpl<T>
      *
      * @author paouelle
      */
-    protected ReplicationWithImpl replication;
+    protected WithOptionsImpl replication;
 
     /**
      * Holds options for this statement.
@@ -275,10 +273,13 @@ public class CreateKeyspaceImpl<T>
         "unsupported class of withs: %s",
         option.getClass().getName()
       );
-      if (option instanceof ReplicationWithImpl) {
-        this.replication = (ReplicationWithImpl)option;
+      final WithOptionsImpl o = (WithOptionsImpl)option;
+
+      if ((o instanceof ReplicationWithImpl)
+          || ReplicationWithImpl.NAME.equalsIgnoreCase(o.getName())) {
+        this.replication = o;
       } else {
-        options.add((WithOptionsImpl)option);
+        options.add(o);
       }
       setDirty();
       return this;

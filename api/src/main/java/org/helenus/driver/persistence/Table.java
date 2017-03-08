@@ -154,4 +154,23 @@ public @interface Table {
    * @return the optional list of ordered clustering keys
    */
   String[] clustering() default {};
+
+  /**
+   * The optional compaction strategy class for the table. Defaults to
+   * {@link CompactionClass#SIZED_TIERED}.
+   *
+   * @author paouelle
+   *
+   * @return the optional compaction strategy class
+   */
+  CompactionClass compaction() default CompactionClass.SIZED_TIERED;
+
+  /**
+   * The optional compaction options defined as a Json object with {}.
+   *
+   * @author paouelle
+   *
+   * @return the optional compaction options
+   */
+  String compactionOptions() default "";
 }

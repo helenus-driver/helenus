@@ -88,6 +88,8 @@ import org.helenus.driver.Update;
 import org.helenus.driver.Using;
 import org.helenus.driver.WithOptions;
 import org.helenus.driver.impl.Utils.CNameSequence;
+import org.helenus.driver.impl.WithOptionsImpl.CompactionWithImpl;
+import org.helenus.driver.impl.WithOptionsImpl.ReplicationWithImpl;
 import org.helenus.driver.info.ClassInfo;
 import org.helenus.driver.info.EntityFilter;
 import org.helenus.driver.info.TableInfo;
@@ -1869,7 +1871,19 @@ public class StatementManagerImpl extends StatementManager {
    */
   @Override
   protected WithOptions replication(JsonObject map) {
-    return new WithOptionsImpl("REPLICATION", map);
+    return new ReplicationWithImpl(map);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @author paouelle
+   *
+   * @see org.helenus.driver.StatementManager#compaction(javax.json.JsonObject)
+   */
+  @Override
+  protected WithOptions compaction(JsonObject map) {
+    return new CompactionWithImpl(map);
   }
 
   /**
